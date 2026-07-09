@@ -25,41 +25,42 @@ Required review content:
 
 ## Commit / Branch
 
-Branch: `main`
+Branch: `codex/phase-1-data-center`
 
-Issue: [Sprint 0 Review & Next Tasks](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/3)
+Issue: [Sprint 1 Review & Next Tasks - Phase 1 A-share Data Center](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/4)
 
 ## Review Scope
 
-Phase 0 project initialization only.
+Phase 0 cleanup and Phase 1 A-share data center foundation.
 
 ## Summary
 
-Phase 0 initializes the AQuantAI project skeleton with documentation, base FastAPI health endpoints, lightweight dependencies, tests, and Docker files.
+Phase 0 cleanup closed obsolete PR #1 after confirming `main` is the source of truth. Phase 1 adds an AKShare-backed data-provider boundary, normalized data contracts, mocked provider tests, and a lightweight script placeholder.
 
 ## Issues Found
 
-- Initial repository skeleton was present before this review pass.
-- `dashboard` and `scripts` needed package markers to match the required package directory list.
+- PR #1 was obsolete because Phase 0 skeleton already existed on `main`.
+- Phase 1 must not leak raw AKShare column names into later layers.
+- Unit tests must not depend on live AKShare network calls.
 
 ## Architecture Concerns
 
-No later-phase business logic should be added before Phase 1 review approval.
+Later layers must import provider contracts, not AKShare directly. Factor, ranking, backtesting, AI Agent, and dashboard implementation remain out of scope.
 
 ## Code Quality Suggestions
 
-Keep Phase 0 lightweight and preserve explicit module boundaries before adding data source, factor, ranking, backtest, AI agent, or dashboard implementation.
+Keep provider normalization explicit and covered by tests. Add richer ingestion, persistence, retries, and provider fallback only after review approval.
 
 ## Required Changes
 
-- Keep `GET /` and `GET /health` available.
-- Keep tests passing with `pytest`.
-- Keep dependencies limited to the approved Phase 0 list.
+- Add only AKShare as the new data dependency.
+- Keep Tushare, OpenBB, VectorBT, Qlib, and LangGraph out of dependencies.
+- Keep Phase 1 focused on data-source contracts and provider normalization.
 
 ## Next Sprint Tasks
 
-Wait for the next GitHub review before entering Phase 1.
+Wait for the next GitHub review before entering Phase 2.
 
 ## Status
 
-Phase 0 initialized. Waiting for next review.
+Phase 1 implemented in PR. Waiting for next review.

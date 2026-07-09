@@ -12,11 +12,11 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 
 ## Phase 1: A-share Data Center
 
-- Goal: Build the A-share data ingestion and storage foundation.
-- Input: AKShare as primary source, Tushare as backup source, PostgreSQL planning from Phase 0.
-- Output: Data provider interfaces, raw data fetch workflows, storage design updates, and data validation tests.
-- Completion standard: Basic stock universe and market data can be fetched, normalized, and prepared for storage.
-- Current status: Not started.
+- Goal: Build the A-share data source boundary and normalized data contracts.
+- Input: AKShare as the first provider and PostgreSQL planning from Phase 0.
+- Output: Data provider interface, AKShare provider skeleton, normalized data contracts, mocked tests, and a lightweight script placeholder.
+- Completion standard: Provider methods return stable DataFrame schemas with mocked tests and no later-phase business logic.
+- Current status: Ready for review.
 
 ## Phase 2: Multi-factor Scoring System
 

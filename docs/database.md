@@ -1,6 +1,6 @@
 # Database Planning
 
-This document records the planned PostgreSQL schema. Phase 0 does not implement database models or migrations.
+This document records the planned PostgreSQL schema and Phase 1 normalized data contracts. Phase 1 does not implement database models, migrations, or full ingestion.
 
 ## stock_basic
 
@@ -8,11 +8,46 @@ This document records the planned PostgreSQL schema. Phase 0 does not implement 
 - Core fields: stock_code, stock_name, exchange, industry, listing_date, delisting_date, status.
 - Future extensions: Index membership, concept tags, trading board, data source lineage.
 
+Normalized provider columns:
+
+- `stock_code`
+- `stock_name`
+- `exchange`
+- `industry`
+- `listing_date`
+- `status`
+- `source`
+
 ## daily_price
 
 - Purpose: Store daily OHLCV and market data.
 - Core fields: trade_date, stock_code, open, high, low, close, volume, amount, adjustment_type.
 - Future extensions: Adjusted prices, turnover metrics, limit-up and limit-down flags, suspension status.
+
+Normalized provider columns:
+
+- `trade_date`
+- `stock_code`
+- `open`
+- `high`
+- `low`
+- `close`
+- `volume`
+- `amount`
+- `adjust_type`
+- `source`
+
+## trade_calendar
+
+- Purpose: Store open trading dates for the A-share market.
+- Core fields: trade_date, is_open, source.
+- Future extensions: Exchange-specific calendars, half-day flags, holiday metadata, data source lineage.
+
+Normalized provider columns:
+
+- `trade_date`
+- `is_open`
+- `source`
 
 ## financial_data
 
