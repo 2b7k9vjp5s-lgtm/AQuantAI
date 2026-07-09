@@ -2,7 +2,7 @@
 
 AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
 
-Current phase: Phase 2 - multi-factor scoring foundation.
+Current phase: Phase 3 - backtesting foundation.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, and is not intended for automated trading.
 
@@ -24,6 +24,7 @@ AQuantAI aims to become a sustainable research system for:
 - Data research: pandas, numpy
 - Data source foundation: AKShare provider boundary
 - Factor engine: deterministic pandas/numpy factor calculators and scoring utilities
+- Backtest engine: deterministic weekly Top-N equal-weight portfolio backtests
 - Data sources planned for later phases: Tushare, OpenBB
 - Quant modules planned for later phases: VectorBT, Qlib
 - AI modules planned for later phases: LangGraph, OpenAI API
@@ -32,7 +33,7 @@ AQuantAI aims to become a sustainable research system for:
 
 ## Current Scope
 
-Phase 2 includes:
+Phase 3 includes:
 
 - Project structure
 - Documentation
@@ -47,6 +48,9 @@ Phase 2 includes:
 - Factor contracts for values and scores
 - Initial value, growth, quality, momentum, and risk factors
 - Percentile scoring and weighted composite score utilities
+- Backtest contracts and result metrics
+- Top-N equal-weight portfolio selection from total scores
+- Weekly rebalance foundation using local price and score DataFrames
 
 ## Not Supported Yet
 
@@ -55,8 +59,8 @@ The current phase does not implement:
 - Full historical A-share data ingestion
 - Tushare data fetching
 - OpenBB integration
-- Portfolio construction and production stock-pool ranking
-- Backtesting
+- Production stock-pool ranking
+- Strategy optimization or parameter grid search
 - AI Research Agent
 - Dashboard
 - Automated trading
@@ -116,6 +120,7 @@ Every development sprint must start by reading:
 - `docs/roadmap.md`
 - `docs/architecture.md`
 - `docs/factors.md`
+- `docs/backtesting.md`
 - `docs/development.md`
 - `docs/review.md`
 

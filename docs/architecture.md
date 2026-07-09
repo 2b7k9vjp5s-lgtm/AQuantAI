@@ -34,7 +34,7 @@ Dashboard
 - PostgreSQL: Store market data, financial data, factor values, portfolios, backtest results, and reports.
 - Factor Engine: Calculate normalized factor values from prepared data.
 - Ranking Engine: Convert factor values into scores and composites. Portfolio construction is reserved for later phases.
-- Backtest Engine: Evaluate portfolio rules and rebalancing strategies.
+- Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.
 - AI Research Agent: Explain results, coordinate research workflows, and generate reports.
 - Dashboard: Present research data and outputs to users.
 
@@ -56,3 +56,7 @@ Phase 1 adds the data-provider interface, AKShare provider skeleton, normalized 
 ## Phase 2 Boundary
 
 Phase 2 adds factor contracts, deterministic factor calculators, percentile scoring, group composites, and total composite scores. It does not add portfolio construction, weekly rebalancing, VectorBT backtesting, Qlib, AI Agent logic, dashboard UI, automatic trading, full historical ingestion, or live market data calls in tests.
+
+## Phase 3 Boundary
+
+Phase 3 adds backtest contracts, Top-N equal-weight portfolio selection, weekly rebalance mechanics, equity curves, and core metrics. The current VectorBT namespace acts as an adapter boundary with deterministic pandas logic. Phase 3 does not add Qlib, ML model training, AI Agent logic, dashboard UI, broker APIs, order placement, automatic trading, strategy optimization, parameter grid search, full historical ingestion, or live market data calls in tests.
