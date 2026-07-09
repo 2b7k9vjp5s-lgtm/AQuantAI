@@ -2,6 +2,8 @@
 
 GitHub is the preferred source for sprint review records. Use this file as a local mirror or fallback when GitHub Issues or pull request review comments are unavailable.
 
+GitHub write permission test for AQuantAI review workflow.
+
 Preferred GitHub Issue title format:
 
 ```text
