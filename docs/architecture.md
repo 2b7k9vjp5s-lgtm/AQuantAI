@@ -82,3 +82,7 @@ Phase 6 adds dashboard contracts, read-only overview/report payload builders, re
 ## Post-Phase-6 Boundary
 
 Post-Phase-6 stabilization adds documentation consistency, a local end-to-end fixture demo, integration tests, and shared safety validation. It does not add new product phases, full data ingestion, database persistence, production model training, real Qlib experiments, real LLM calls, frontend framework UI, deployment pipelines, login/auth/account systems, broker APIs, order placement, or automatic trading.
+
+## v0.1 Baseline Boundary
+
+The v0.1 baseline freezes the completed local research-only scope and adds release-readiness documentation, version/status alignment, a changelog, a release checklist, future work boundaries, and local-only CI checks. It does not add runtime behavior, live data ingestion, external service integration, trading features, production deployment, or production-readiness claims.

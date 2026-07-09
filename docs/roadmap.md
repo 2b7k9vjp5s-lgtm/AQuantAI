@@ -64,4 +64,12 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Input: Existing contracts, local fixtures, report outputs, and dashboard payloads.
 - Output: Documentation consistency, end-to-end fixture demo, cross-module integration tests, and shared safety validation.
 - Completion standard: Local demo and tests pass without network, trading, broker, or production deployment behavior.
+- Current status: Completed.
+
+## v0.1 Baseline Freeze & Release Readiness
+
+- Goal: Freeze the local research-only v0.1 baseline and prepare release documentation.
+- Input: Completed Phase 0-6 work, post-Phase-6 stabilization, local tests, and fixture demo.
+- Output: Version/status consistency, changelog, release checklist, local-only CI workflow, and future work boundary documentation.
+- Completion standard: Version `0.1.0` is consistent, local tests and demo pass, documentation avoids production-readiness claims, and future work remains outside the v0.1 baseline.
 - Current status: Ready for review.

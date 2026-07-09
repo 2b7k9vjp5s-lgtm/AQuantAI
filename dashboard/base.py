@@ -24,8 +24,8 @@ def build_dashboard_overview(
     sections = {
         "project_overview": DashboardCard(
             title="AQuantAI",
-            body="Research-only quantitative platform foundation through Phase 6.",
-            metrics=[DashboardMetric("phase", "Phase 6"), DashboardMetric("mode", "read-only")],
+            body="Research-only quantitative platform foundation frozen for the v0.1 baseline.",
+            metrics=[DashboardMetric("phase", "v0.1 baseline"), DashboardMetric("mode", "read-only")],
         ).to_dict(),
         "factor_summary": DashboardTable(
             title="Factor Summary",

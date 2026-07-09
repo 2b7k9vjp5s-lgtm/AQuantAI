@@ -12,6 +12,7 @@ def test_dashboard_overview_payload_contains_required_sections() -> None:
 
     assert payload["read_only"] is True
     assert payload["disclaimer"] == RESEARCH_DISCLAIMER
+    assert payload["sections"]["project_overview"]["metrics"][0]["value"] == "v0.1 baseline"
     assert set(payload["sections"]) == {
         "project_overview",
         "factor_summary",
