@@ -156,3 +156,9 @@ Phase 5 report fields:
 - Purpose: Store model prediction outputs in a backtest-compatible format.
 - Core fields: prediction_date, stock_code, model_name, prediction_score, prediction_rank, universe.
 - Future extensions: Experiment ID, model version, confidence bands, calibration metadata.
+
+## dashboard_views
+
+- Purpose: Describe read-only dashboard payloads assembled from research outputs.
+- Core fields: page_id, title, sections, disclaimer, allowed_actions, source_refs, read_only.
+- Future extensions: User preferences, saved views, chart configuration, export metadata.

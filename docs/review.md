@@ -25,42 +25,42 @@ Required review content:
 
 ## Commit / Branch
 
-Branch: `codex/phase-5-ai-research-agent`
+Branch: `codex/phase-6-dashboard-foundation`
 
-Issue: [Sprint 5 Review & Next Tasks - Phase 5 AI Research Agent Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/12)
+Issue: [Sprint 6 Review & Next Tasks - Phase 6 Dashboard Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/14)
 
 ## Review Scope
 
-Phase 4 merge confirmation and Phase 5 AI Research Agent foundation.
+Phase 5 merge confirmation and Phase 6 Dashboard foundation.
 
 ## Summary
 
-PR #11 was marked ready and merged so `main` contains Phase 4. Phase 5 adds research context/report contracts, deterministic report generation, safety disclaimers, source references, a lazy LLM adapter boundary, tests, and documentation.
+PR #13 was marked ready and merged so `main` contains Phase 5. Phase 6 adds dashboard contracts, read-only payload builders, sample FastAPI dashboard endpoints, tests, and documentation.
 
 ## Issues Found
 
-- Phase 5 must keep report assembly separate from calculations, trading workflows, and dashboard UI.
-- Tests must use local fixtures and avoid LLM or live data calls.
-- Reports must avoid buy/sell/hold recommendations and guaranteed-performance language.
+- Phase 6 must keep dashboard behavior read-only and research-only.
+- Tests must use local fixtures and avoid live data calls.
+- Dashboard payloads must not expose trading actions, broker workflows, or recommendation UI.
 
 ## Architecture Concerns
 
-Agent logic consumes documented outputs from prior phases. Dashboard, broker APIs, order placement, automatic trading, and autonomous investment decisions remain out of scope.
+Dashboard logic consumes documented outputs from prior phases. Broker APIs, order placement, automatic trading, production deployment, and recommendation UI remain out of scope.
 
 ## Code Quality Suggestions
 
-Keep report generation deterministic, auditable, and research-only. Add real LLM calls, richer orchestration, or UI only after review approval.
+Keep dashboard payloads deterministic, read-only, and research-only. Add richer frontend UI or deployment workflows only after review approval.
 
 ## Required Changes
 
-- Define research context and report contracts.
-- Implement deterministic report generation with mandatory disclaimer.
-- Keep dashboard, broker APIs, automatic trading, and required OpenAI/LangGraph dependencies out of scope.
+- Define dashboard contracts and read-only payload builders.
+- Add read-only dashboard overview/report endpoints.
+- Keep broker APIs, trading actions, live data calls, and production deployment out of scope.
 
 ## Next Sprint Tasks
 
-Wait for the next GitHub review before entering Phase 6.
+Wait for the next GitHub review before any post-Phase-6 expansion.
 
 ## Status
 
-Phase 5 implemented in PR. Waiting for next review.
+Phase 6 implemented in PR. Waiting for next review.

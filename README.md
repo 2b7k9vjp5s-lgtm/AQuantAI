@@ -2,7 +2,7 @@
 
 AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
 
-Current phase: Phase 5 - AI Research Agent foundation.
+Current phase: Phase 6 - Dashboard foundation.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, and is not intended for automated trading.
 
@@ -27,6 +27,7 @@ AQuantAI aims to become a sustainable research system for:
 - Backtest engine: deterministic weekly Top-N equal-weight portfolio backtests
 - ML research layer: feature/label/prediction contracts and Qlib adapter boundary
 - AI Research Agent: deterministic research-only report assembly and adapter boundaries
+- Dashboard: read-only research presentation contracts and JSON endpoints
 - Data sources planned for later phases: Tushare, OpenBB
 - Quant modules planned for later phases: VectorBT, Qlib
 - AI modules planned for later phases: LangGraph, OpenAI API
@@ -35,7 +36,7 @@ AQuantAI aims to become a sustainable research system for:
 
 ## Current Scope
 
-Phase 5 includes:
+Phase 6 includes:
 
 - Project structure
 - Documentation
@@ -61,6 +62,9 @@ Phase 5 includes:
 - Deterministic local report generation
 - Research-only disclaimer and safety wording checks
 - Optional lazy LLM adapter boundary
+- Dashboard data contracts
+- Read-only overview and report payload builders
+- Read-only dashboard FastAPI endpoints
 
 ## Not Supported Yet
 
@@ -75,10 +79,11 @@ The current phase does not implement:
 - Hyperparameter search
 - Model registry
 - Scheduled retraining
-- Dashboard
+- Trading buttons
 - Broker APIs
 - Order placement
 - Automated trading
+- Production deployment pipeline
 
 ## Quick Start
 
@@ -98,6 +103,8 @@ Open:
 
 - `GET /`
 - `GET /health`
+- `GET /dashboard/overview`
+- `GET /dashboard/report`
 
 Inspect the Phase 1 data provider placeholder:
 
@@ -138,6 +145,7 @@ Every development sprint must start by reading:
 - `docs/backtesting.md`
 - `docs/ml.md`
 - `docs/agent.md`
+- `docs/dashboard.md`
 - `docs/development.md`
 - `docs/review.md`
 
