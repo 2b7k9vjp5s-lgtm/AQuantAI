@@ -2,7 +2,7 @@
 
 AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
 
-Current phase: Phase 6 - Dashboard foundation.
+Current phase: Post-Phase-6 stabilization and integration hardening.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, and is not intended for automated trading.
 
@@ -36,7 +36,7 @@ AQuantAI aims to become a sustainable research system for:
 
 ## Current Scope
 
-Phase 6 includes:
+Phase 0 through Phase 6 are implemented and review-accepted from an architecture perspective. The current stabilization scope includes:
 
 - Project structure
 - Documentation
@@ -65,6 +65,9 @@ Phase 6 includes:
 - Dashboard data contracts
 - Read-only overview and report payload builders
 - Read-only dashboard FastAPI endpoints
+- End-to-end local fixture demo
+- Cross-module integration checks
+- Shared research-only safety validation
 
 ## Not Supported Yet
 
@@ -84,6 +87,7 @@ The current phase does not implement:
 - Order placement
 - Automated trading
 - Production deployment pipeline
+- Login/auth/account system
 
 ## Quick Start
 
@@ -110,6 +114,12 @@ Inspect the Phase 1 data provider placeholder:
 
 ```bash
 python -m scripts.update_data
+```
+
+Run the local research flow demo:
+
+```bash
+python -m scripts.demo_research_flow
 ```
 
 Run tests:

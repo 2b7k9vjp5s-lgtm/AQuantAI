@@ -8,8 +8,7 @@ from typing import Any
 import pandas as pd
 
 from agent.base import AgentRunConfig, AgentRunResult, RESEARCH_DISCLAIMER, ResearchContext, ResearchReport
-
-DISALLOWED_RECOMMENDATION_TERMS = ["buy", "sell", "hold"]
+from backend.safety import validate_research_text
 
 
 class DeterministicResearchReportBuilder:
@@ -115,16 +114,11 @@ def _format_number(value: Any) -> str:
 
 
 def _assert_safe_language(report: ResearchReport) -> None:
-    text = " ".join(
-        [
-            report.summary,
-            *report.factor_highlights,
-            *report.backtest_highlights,
-            *report.ml_highlights,
-            *report.risks,
-            *report.limitations,
-        ]
-    ).lower()
-    forbidden_phrases = ["recommendation to buy", "recommendation to sell", "guaranteed return", "place order"]
-    if any(phrase in text for phrase in forbidden_phrases):
-        raise ValueError("report contains disallowed investment-advice wording")
+    validate_research_text(
+        report.summary,
+        report.factor_highlights,
+        report.backtest_highlights,
+        report.ml_highlights,
+        report.risks,
+        report.limitations,
+    )

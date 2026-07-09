@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from agent import RESEARCH_DISCLAIMER
+from backend.safety import RESEARCH_DISCLAIMER, validate_allowed_actions, validate_research_text
 
 DASHBOARD_DISCLAIMER = RESEARCH_DISCLAIMER
-DISALLOWED_ACTIONS = ["trade", "order", "buy", "sell", "hold"]
 
 
 @dataclass(frozen=True)
@@ -87,7 +86,5 @@ class DashboardPage:
 
 
 def _assert_read_only(payload: dict[str, Any]) -> None:
-    actions = {str(action).lower() for action in payload.get("allowed_actions", [])}
-    disallowed = actions.intersection(DISALLOWED_ACTIONS)
-    if disallowed:
-        raise ValueError(f"Dashboard payload exposes disallowed actions: {sorted(disallowed)}")
+    validate_allowed_actions(payload.get("allowed_actions", []))
+    validate_research_text(payload)

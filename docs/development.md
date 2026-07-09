@@ -38,6 +38,8 @@ Examples:
 - Use `pytest`.
 - Add or update tests for behavior changes.
 - Keep Phase 0 tests limited to application boot and health checks.
+- Keep integration tests local and fixture-based.
+- Do not add network, broker, trading, or production deployment requirements to tests.
 
 ## Configuration Management
 
@@ -75,6 +77,7 @@ Before each sprint, Codex must read:
 - `docs/roadmap.md`
 - `docs/architecture.md`
 - `docs/development.md`
+- Relevant domain docs such as `docs/factors.md`, `docs/backtesting.md`, `docs/ml.md`, `docs/agent.md`, and `docs/dashboard.md`
 
 After ChatGPT reviews a sprint, review feedback should be synchronized to GitHub in this priority order:
 

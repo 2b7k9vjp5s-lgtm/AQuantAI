@@ -56,4 +56,12 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Input: Data, scores, backtests, and reports from previous phases.
 - Output: Dashboard data contracts, read-only payload builders, and sample FastAPI JSON endpoints.
 - Completion standard: Users can inspect project, factor, backtest, ML, and report summaries through read-only payloads.
+- Current status: Completed.
+
+## Post-Phase-6 Stabilization
+
+- Goal: Consolidate Phase 0-6 into a clean, testable local research baseline.
+- Input: Existing contracts, local fixtures, report outputs, and dashboard payloads.
+- Output: Documentation consistency, end-to-end fixture demo, cross-module integration tests, and shared safety validation.
+- Completion standard: Local demo and tests pass without network, trading, broker, or production deployment behavior.
 - Current status: Ready for review.
