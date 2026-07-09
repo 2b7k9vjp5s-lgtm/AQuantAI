@@ -125,6 +125,20 @@ Phase 3 result fields:
 - Core fields: report_id, report_date, title, scope, content, model_name, source_refs.
 - Future extensions: Report versioning, reviewer comments, generated charts, confidence and risk annotations.
 
+Phase 5 report fields:
+
+- `report_date`
+- `title`
+- `scope`
+- `summary`
+- `factor_highlights`
+- `backtest_highlights`
+- `ml_highlights`
+- `risks`
+- `limitations`
+- `disclaimer`
+- `source_refs`
+
 ## ml_features
 
 - Purpose: Store feature snapshots for guarded ML experiments.

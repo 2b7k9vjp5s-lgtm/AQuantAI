@@ -25,42 +25,42 @@ Required review content:
 
 ## Commit / Branch
 
-Branch: `codex/phase-4-qlib-ml-foundation`
+Branch: `codex/phase-5-ai-research-agent`
 
-Issue: [Sprint 4 Review & Next Tasks - Phase 4 Qlib ML Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/10)
+Issue: [Sprint 5 Review & Next Tasks - Phase 5 AI Research Agent Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/12)
 
 ## Review Scope
 
-Phase 3 merge confirmation and Phase 4 Qlib/ML foundation.
+Phase 4 merge confirmation and Phase 5 AI Research Agent foundation.
 
 ## Summary
 
-PR #9 was marked ready and merged so `main` contains Phase 3. Phase 4 adds ML experiment contracts, feature and label contracts, deterministic baseline predictions, a lazy Qlib adapter boundary, tests, and documentation.
+PR #11 was marked ready and merged so `main` contains Phase 4. Phase 5 adds research context/report contracts, deterministic report generation, safety disclaimers, source references, a lazy LLM adapter boundary, tests, and documentation.
 
 ## Issues Found
 
-- Phase 4 must keep Qlib-specific imports isolated behind the adapter boundary.
-- Tests must use local feature and label fixtures and avoid live data calls.
-- Baseline predictions are for interface validation, not investment performance claims.
+- Phase 5 must keep report assembly separate from calculations, trading workflows, and dashboard UI.
+- Tests must use local fixtures and avoid LLM or live data calls.
+- Reports must avoid buy/sell/hold recommendations and guaranteed-performance language.
 
 ## Architecture Concerns
 
-ML logic consumes documented feature and label DataFrame contracts. Production training, hyperparameter search, AI Agent, dashboard, and trading workflows remain out of scope.
+Agent logic consumes documented outputs from prior phases. Dashboard, broker APIs, order placement, automatic trading, and autonomous investment decisions remain out of scope.
 
 ## Code Quality Suggestions
 
-Keep the ML foundation transparent and deterministic. Add real Qlib training, model registry, retraining schedules, or research agents only after review approval.
+Keep report generation deterministic, auditable, and research-only. Add real LLM calls, richer orchestration, or UI only after review approval.
 
 ## Required Changes
 
-- Define ML experiment, feature, label, prediction, and evaluation contracts.
-- Implement a deterministic baseline prediction path.
-- Keep AI Agent, dashboard, broker APIs, automatic trading, and production training out of scope.
+- Define research context and report contracts.
+- Implement deterministic report generation with mandatory disclaimer.
+- Keep dashboard, broker APIs, automatic trading, and required OpenAI/LangGraph dependencies out of scope.
 
 ## Next Sprint Tasks
 
-Wait for the next GitHub review before entering Phase 5.
+Wait for the next GitHub review before entering Phase 6.
 
 ## Status
 
-Phase 4 implemented in PR. Waiting for next review.
+Phase 5 implemented in PR. Waiting for next review.

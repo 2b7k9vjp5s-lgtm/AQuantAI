@@ -40,15 +40,15 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Input: Normalized market data, factor outputs, score outputs, and local fixture datasets.
 - Output: ML experiment configuration, feature/label/prediction contracts, lazy Qlib adapter boundary, and deterministic baseline predictions.
 - Completion standard: ML contracts and baseline predictions are testable from local fixtures without production training or live data calls.
-- Current status: Ready for review.
+- Current status: Completed.
 
 ## Phase 5: AI Research Agent
 
-- Goal: Add AI-assisted interpretation and report generation.
-- Input: Stock pools, factor scores, backtest results, and research context.
-- Output: Research Agent workflows and generated research reports.
-- Completion standard: AI Agent can generate explainable research summaries without owning core calculations.
-- Current status: Not started.
+- Goal: Add research-only agent and report-generation contracts.
+- Input: Data contracts, factor scores, backtest metrics, ML predictions, and source references.
+- Output: Deterministic research reports, safety disclaimers, source refs, and lazy LLM adapter boundary.
+- Completion standard: Reports are structured, auditable, deterministic from local fixtures, and avoid investment-advice wording.
+- Current status: Ready for review.
 
 ## Phase 6: Dashboard
 
