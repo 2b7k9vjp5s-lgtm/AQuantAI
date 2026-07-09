@@ -92,11 +92,32 @@ Normalized score output columns:
 - Core fields: portfolio_date, portfolio_name, stock_code, weight, rank, rebalance_frequency.
 - Future extensions: Constraints, turnover, sector exposure, risk budgets.
 
+Backtest holding output columns:
+
+- `rebalance_date`
+- `stock_code`
+- `weight`
+- `rank`
+- `score`
+- `universe`
+
 ## backtest_result
 
 - Purpose: Store backtest summaries and key performance metrics.
 - Core fields: backtest_id, strategy_name, start_date, end_date, total_return, annual_return, max_drawdown, sharpe_ratio.
 - Future extensions: Equity curves, trade logs, benchmark comparison, parameter snapshots.
+
+Phase 3 result fields:
+
+- `start_date`
+- `end_date`
+- `total_return`
+- `annual_return`
+- `max_drawdown`
+- `volatility`
+- `sharpe_ratio`
+- `turnover`
+- `rebalance_count`
 
 ## research_report
 

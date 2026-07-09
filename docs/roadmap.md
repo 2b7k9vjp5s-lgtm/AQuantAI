@@ -24,15 +24,15 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Input: Normalized data contracts from Phase 1 and local DataFrame fixtures.
 - Output: Value, growth, quality, momentum, and risk calculators plus percentile and composite scoring.
 - Completion standard: Factor values and factor scores can be generated deterministically from local DataFrames with tests.
-- Current status: Ready for review.
+- Current status: Completed.
 
 ## Phase 3: VectorBT Backtesting System
 
-- Goal: Add weekly rebalancing backtests for factor-ranked portfolios.
+- Goal: Add deterministic weekly rebalancing backtest foundations for factor-ranked portfolios.
 - Input: Factor scores and price data.
-- Output: Backtest workflows, performance metrics, and result persistence plan.
-- Completion standard: A weekly rebalanced portfolio can be backtested with repeatable results.
-- Current status: Not started.
+- Output: Backtest contracts, Top-N equal-weight selection, equity curves, and core performance metrics.
+- Completion standard: A weekly rebalanced portfolio can be backtested from local fixtures with repeatable results.
+- Current status: Ready for review.
 
 ## Phase 4: Qlib Machine Learning Models
 

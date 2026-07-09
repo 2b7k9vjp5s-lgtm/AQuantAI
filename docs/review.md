@@ -25,42 +25,42 @@ Required review content:
 
 ## Commit / Branch
 
-Branch: `codex/phase-2-factor-scoring`
+Branch: `codex/phase-3-backtesting-foundation`
 
-Issue: [Sprint 2 Review & Next Tasks - Phase 2 Multi-factor Scoring](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/6)
+Issue: [Sprint 3 Review & Next Tasks - Phase 3 Backtesting Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/8)
 
 ## Review Scope
 
-Phase 1 merge confirmation and Phase 2 multi-factor scoring foundation.
+Phase 2 merge confirmation and Phase 3 backtesting foundation.
 
 ## Summary
 
-PR #5 was marked ready and merged so `main` contains Phase 1. Phase 2 adds factor contracts, initial deterministic factor calculators, scoring utilities, weighted composites, tests, and documentation.
+PR #7 was marked ready and merged so `main` contains Phase 2. Phase 3 adds backtest contracts, Top-N equal-weight portfolio selection, weekly rebalance mechanics, deterministic pandas equity curves, metrics, tests, and documentation.
 
 ## Issues Found
 
-- Phase 2 must keep factor values separate from portfolio construction.
-- Tests must use local DataFrames and avoid live market data calls.
-- Scoring direction and missing value handling must be deterministic.
+- Phase 3 must keep backtesting separate from Qlib, ML training, AI Agent, dashboard, and broker/trading workflows.
+- Tests must use local price and score fixtures and avoid live data calls.
+- Backtest outputs must be deterministic and include clear metrics.
 
 ## Architecture Concerns
 
-Factor calculators consume documented DataFrame contracts. Backtesting, Qlib, AI Agent, dashboard, and trading workflows remain out of scope.
+Backtest logic consumes documented price and score DataFrame contracts. Qlib, ML model training, AI Agent, dashboard, and trading workflows remain out of scope.
 
 ## Code Quality Suggestions
 
-Keep each factor small, transparent, and deterministic. Add richer factor research, persistence, portfolio rules, and backtesting only after review approval.
+Keep backtest mechanics transparent and deterministic. Add richer VectorBT integration, persistence, optimization, and production workflows only after review approval.
 
 ## Required Changes
 
-- Define normalized factor value and score contracts.
-- Implement initial value, growth, quality, momentum, and risk factors.
-- Keep VectorBT, Qlib, AI Agent, dashboard, and trading logic out of scope.
+- Define backtest contracts and result metrics.
+- Implement Top-N equal-weight weekly rebalance foundation.
+- Keep Qlib, AI Agent, dashboard, broker APIs, automatic trading, and optimization out of scope.
 
 ## Next Sprint Tasks
 
-Wait for the next GitHub review before entering Phase 3.
+Wait for the next GitHub review before entering Phase 4.
 
 ## Status
 
-Phase 2 implemented in PR. Waiting for next review.
+Phase 3 implemented in PR. Waiting for next review.
