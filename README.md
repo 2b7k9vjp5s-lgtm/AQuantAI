@@ -2,7 +2,7 @@
 
 AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
 
-Current phase: Phase 1 - A-share data center foundation.
+Current phase: Phase 2 - multi-factor scoring foundation.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, and is not intended for automated trading.
 
@@ -23,6 +23,7 @@ AQuantAI aims to become a sustainable research system for:
 - Database: PostgreSQL
 - Data research: pandas, numpy
 - Data source foundation: AKShare provider boundary
+- Factor engine: deterministic pandas/numpy factor calculators and scoring utilities
 - Data sources planned for later phases: Tushare, OpenBB
 - Quant modules planned for later phases: VectorBT, Qlib
 - AI modules planned for later phases: LangGraph, OpenAI API
@@ -31,7 +32,7 @@ AQuantAI aims to become a sustainable research system for:
 
 ## Current Scope
 
-Phase 1 includes:
+Phase 2 includes:
 
 - Project structure
 - Documentation
@@ -43,6 +44,9 @@ Phase 1 includes:
 - AKShare provider skeleton
 - Normalized stock basic, daily price, and trade calendar contracts
 - Mocked provider tests
+- Factor contracts for values and scores
+- Initial value, growth, quality, momentum, and risk factors
+- Percentile scoring and weighted composite score utilities
 
 ## Not Supported Yet
 
@@ -51,8 +55,7 @@ The current phase does not implement:
 - Full historical A-share data ingestion
 - Tushare data fetching
 - OpenBB integration
-- Factor calculation
-- Ranking models
+- Portfolio construction and production stock-pool ranking
 - Backtesting
 - AI Research Agent
 - Dashboard
@@ -112,6 +115,7 @@ Every development sprint must start by reading:
 - Latest GitHub Review Issue
 - `docs/roadmap.md`
 - `docs/architecture.md`
+- `docs/factors.md`
 - `docs/development.md`
 - `docs/review.md`
 
