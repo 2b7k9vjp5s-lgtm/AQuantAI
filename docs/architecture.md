@@ -39,7 +39,7 @@ Dashboard
 - Ranking Engine: Convert factor values into scores and composites. Portfolio construction is reserved for later phases.
 - Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.
 - ML Research Layer: Define feature, label, prediction, evaluation, and Qlib adapter boundaries without production training.
-- AI Research Agent: Explain results, coordinate research workflows, and generate reports.
+- AI Research Agent: Assemble research-only structured reports from prior-layer outputs without owning calculations or trading decisions.
 - Dashboard: Present research data and outputs to users.
 
 ## Dependency Rules
@@ -48,6 +48,7 @@ Dashboard
 - The factor layer must not be tightly coupled to the backtest layer.
 - The ML layer must keep Qlib-specific imports inside adapter modules.
 - The AI Agent only explains, summarizes, and orchestrates workflows. It must not directly own core factor calculations, ranking logic, or backtest calculations.
+- Optional LLM adapters must be lazy, mockable, and outside deterministic report assembly.
 - Business modules should communicate through explicit interfaces and documented data contracts.
 
 ## Phase 0 Boundary
@@ -69,3 +70,7 @@ Phase 3 adds backtest contracts, Top-N equal-weight portfolio selection, weekly 
 ## Phase 4 Boundary
 
 Phase 4 adds ML experiment contracts, feature and label contracts, prediction outputs, a deterministic baseline model path, and a lazy Qlib adapter boundary. It does not add production model training, hyperparameter search, model registry, scheduled retraining, AI Agent logic, dashboard UI, broker APIs, order placement, automatic trading, live market data calls in tests, or claims about investment profitability.
+
+## Phase 5 Boundary
+
+Phase 5 adds research context contracts, structured research report contracts, deterministic report generation, automatic disclaimers, source-reference preservation, and a lazy LLM adapter boundary. It does not add dashboard UI, broker APIs, order placement, automatic trading, live data fetching in tests, autonomous investment decisions, buy/sell/hold recommendations, guaranteed performance claims, or required OpenAI/LangGraph dependencies.
