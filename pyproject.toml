@@ -37,7 +37,9 @@ include = [
   "agent*",
   "backend*",
   "backtest*",
+  "dashboard*",
   "datasource*",
   "factors*",
   "ranking*",
+  "scripts*",
 ]
