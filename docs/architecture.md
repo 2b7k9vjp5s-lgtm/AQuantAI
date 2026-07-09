@@ -3,7 +3,10 @@
 AQuantAI follows a layered architecture designed for long-term iteration and clear module boundaries.
 
 ```text
-AKShare / Tushare / OpenBB
+AKShare Provider
+          |
+          v
+Normalized Data Contracts
           |
           v
 PostgreSQL
@@ -26,7 +29,8 @@ Dashboard
 
 ## Layer Responsibilities
 
-- Data sources: Fetch and normalize external data from AKShare, Tushare, and OpenBB in later phases.
+- Data sources: Fetch and normalize external data behind provider interfaces. Phase 1 includes only the AKShare boundary.
+- Normalized data contracts: Stable DataFrame columns for stock basic data, daily prices, and trade calendars before database persistence.
 - PostgreSQL: Store market data, financial data, factor values, portfolios, backtest results, and reports.
 - Factor Engine: Calculate factor values from prepared data.
 - Ranking Engine: Combine factor scores into stock rankings and stock pools.
@@ -44,3 +48,7 @@ Dashboard
 ## Phase 0 Boundary
 
 Phase 0 only creates the project skeleton. No market data fetching, factor calculation, backtesting, AI workflow, or dashboard implementation is included.
+
+## Phase 1 Boundary
+
+Phase 1 adds the data-provider interface, AKShare provider skeleton, normalized data contracts, mocked provider tests, and a lightweight update script placeholder. It does not add factor calculation, ranking, backtesting, Qlib, AI Agent logic, dashboard UI, automatic trading, or full historical ingestion.
