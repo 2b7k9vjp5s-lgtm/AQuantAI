@@ -32,15 +32,15 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Input: Factor scores and price data.
 - Output: Backtest contracts, Top-N equal-weight selection, equity curves, and core performance metrics.
 - Completion standard: A weekly rebalanced portfolio can be backtested from local fixtures with repeatable results.
-- Current status: Ready for review.
+- Current status: Completed.
 
 ## Phase 4: Qlib Machine Learning Models
 
-- Goal: Integrate Qlib for machine learning based stock selection research.
-- Input: Prepared feature datasets and labels.
-- Output: Qlib experiment configuration, model training workflow, and evaluation reports.
-- Completion standard: A baseline ML experiment can be trained and evaluated.
-- Current status: Not started.
+- Goal: Create guarded Qlib/ML research contracts and adapter boundaries.
+- Input: Normalized market data, factor outputs, score outputs, and local fixture datasets.
+- Output: ML experiment configuration, feature/label/prediction contracts, lazy Qlib adapter boundary, and deterministic baseline predictions.
+- Completion standard: ML contracts and baseline predictions are testable from local fixtures without production training or live data calls.
+- Current status: Ready for review.
 
 ## Phase 5: AI Research Agent
 

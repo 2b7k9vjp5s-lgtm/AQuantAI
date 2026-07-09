@@ -2,7 +2,7 @@
 
 AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
 
-Current phase: Phase 3 - backtesting foundation.
+Current phase: Phase 4 - Qlib/ML foundation.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, and is not intended for automated trading.
 
@@ -25,6 +25,7 @@ AQuantAI aims to become a sustainable research system for:
 - Data source foundation: AKShare provider boundary
 - Factor engine: deterministic pandas/numpy factor calculators and scoring utilities
 - Backtest engine: deterministic weekly Top-N equal-weight portfolio backtests
+- ML research layer: feature/label/prediction contracts and Qlib adapter boundary
 - Data sources planned for later phases: Tushare, OpenBB
 - Quant modules planned for later phases: VectorBT, Qlib
 - AI modules planned for later phases: LangGraph, OpenAI API
@@ -33,7 +34,7 @@ AQuantAI aims to become a sustainable research system for:
 
 ## Current Scope
 
-Phase 3 includes:
+Phase 4 includes:
 
 - Project structure
 - Documentation
@@ -51,6 +52,10 @@ Phase 3 includes:
 - Backtest contracts and result metrics
 - Top-N equal-weight portfolio selection from total scores
 - Weekly rebalance foundation using local price and score DataFrames
+- ML experiment contracts
+- Feature, label, and prediction output contracts
+- Deterministic baseline prediction path
+- Lazy Qlib adapter boundary
 
 ## Not Supported Yet
 
@@ -61,6 +66,10 @@ The current phase does not implement:
 - OpenBB integration
 - Production stock-pool ranking
 - Strategy optimization or parameter grid search
+- Production model training
+- Hyperparameter search
+- Model registry
+- Scheduled retraining
 - AI Research Agent
 - Dashboard
 - Automated trading
@@ -121,6 +130,7 @@ Every development sprint must start by reading:
 - `docs/architecture.md`
 - `docs/factors.md`
 - `docs/backtesting.md`
+- `docs/ml.md`
 - `docs/development.md`
 - `docs/review.md`
 

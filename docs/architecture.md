@@ -21,6 +21,9 @@ Ranking Engine
 Backtest Engine
           |
           v
+ML Research Layer
+          |
+          v
 AI Research Agent
           |
           v
@@ -35,6 +38,7 @@ Dashboard
 - Factor Engine: Calculate normalized factor values from prepared data.
 - Ranking Engine: Convert factor values into scores and composites. Portfolio construction is reserved for later phases.
 - Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.
+- ML Research Layer: Define feature, label, prediction, evaluation, and Qlib adapter boundaries without production training.
 - AI Research Agent: Explain results, coordinate research workflows, and generate reports.
 - Dashboard: Present research data and outputs to users.
 
@@ -42,6 +46,7 @@ Dashboard
 
 - The data layer must not be tightly coupled to the factor layer.
 - The factor layer must not be tightly coupled to the backtest layer.
+- The ML layer must keep Qlib-specific imports inside adapter modules.
 - The AI Agent only explains, summarizes, and orchestrates workflows. It must not directly own core factor calculations, ranking logic, or backtest calculations.
 - Business modules should communicate through explicit interfaces and documented data contracts.
 
@@ -60,3 +65,7 @@ Phase 2 adds factor contracts, deterministic factor calculators, percentile scor
 ## Phase 3 Boundary
 
 Phase 3 adds backtest contracts, Top-N equal-weight portfolio selection, weekly rebalance mechanics, equity curves, and core metrics. The current VectorBT namespace acts as an adapter boundary with deterministic pandas logic. Phase 3 does not add Qlib, ML model training, AI Agent logic, dashboard UI, broker APIs, order placement, automatic trading, strategy optimization, parameter grid search, full historical ingestion, or live market data calls in tests.
+
+## Phase 4 Boundary
+
+Phase 4 adds ML experiment contracts, feature and label contracts, prediction outputs, a deterministic baseline model path, and a lazy Qlib adapter boundary. It does not add production model training, hyperparameter search, model registry, scheduled retraining, AI Agent logic, dashboard UI, broker APIs, order placement, automatic trading, live market data calls in tests, or claims about investment profitability.

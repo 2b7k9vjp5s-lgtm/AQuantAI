@@ -25,42 +25,42 @@ Required review content:
 
 ## Commit / Branch
 
-Branch: `codex/phase-3-backtesting-foundation`
+Branch: `codex/phase-4-qlib-ml-foundation`
 
-Issue: [Sprint 3 Review & Next Tasks - Phase 3 Backtesting Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/8)
+Issue: [Sprint 4 Review & Next Tasks - Phase 4 Qlib ML Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/10)
 
 ## Review Scope
 
-Phase 2 merge confirmation and Phase 3 backtesting foundation.
+Phase 3 merge confirmation and Phase 4 Qlib/ML foundation.
 
 ## Summary
 
-PR #7 was marked ready and merged so `main` contains Phase 2. Phase 3 adds backtest contracts, Top-N equal-weight portfolio selection, weekly rebalance mechanics, deterministic pandas equity curves, metrics, tests, and documentation.
+PR #9 was marked ready and merged so `main` contains Phase 3. Phase 4 adds ML experiment contracts, feature and label contracts, deterministic baseline predictions, a lazy Qlib adapter boundary, tests, and documentation.
 
 ## Issues Found
 
-- Phase 3 must keep backtesting separate from Qlib, ML training, AI Agent, dashboard, and broker/trading workflows.
-- Tests must use local price and score fixtures and avoid live data calls.
-- Backtest outputs must be deterministic and include clear metrics.
+- Phase 4 must keep Qlib-specific imports isolated behind the adapter boundary.
+- Tests must use local feature and label fixtures and avoid live data calls.
+- Baseline predictions are for interface validation, not investment performance claims.
 
 ## Architecture Concerns
 
-Backtest logic consumes documented price and score DataFrame contracts. Qlib, ML model training, AI Agent, dashboard, and trading workflows remain out of scope.
+ML logic consumes documented feature and label DataFrame contracts. Production training, hyperparameter search, AI Agent, dashboard, and trading workflows remain out of scope.
 
 ## Code Quality Suggestions
 
-Keep backtest mechanics transparent and deterministic. Add richer VectorBT integration, persistence, optimization, and production workflows only after review approval.
+Keep the ML foundation transparent and deterministic. Add real Qlib training, model registry, retraining schedules, or research agents only after review approval.
 
 ## Required Changes
 
-- Define backtest contracts and result metrics.
-- Implement Top-N equal-weight weekly rebalance foundation.
-- Keep Qlib, AI Agent, dashboard, broker APIs, automatic trading, and optimization out of scope.
+- Define ML experiment, feature, label, prediction, and evaluation contracts.
+- Implement a deterministic baseline prediction path.
+- Keep AI Agent, dashboard, broker APIs, automatic trading, and production training out of scope.
 
 ## Next Sprint Tasks
 
-Wait for the next GitHub review before entering Phase 4.
+Wait for the next GitHub review before entering Phase 5.
 
 ## Status
 
-Phase 3 implemented in PR. Waiting for next review.
+Phase 4 implemented in PR. Waiting for next review.
