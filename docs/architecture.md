@@ -40,7 +40,7 @@ Dashboard
 - Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.
 - ML Research Layer: Define feature, label, prediction, evaluation, and Qlib adapter boundaries without production training.
 - AI Research Agent: Assemble research-only structured reports from prior-layer outputs without owning calculations or trading decisions.
-- Dashboard: Present research data and outputs to users.
+- Dashboard: Present research data and outputs through read-only contracts and JSON endpoints.
 
 ## Dependency Rules
 
@@ -74,3 +74,7 @@ Phase 4 adds ML experiment contracts, feature and label contracts, prediction ou
 ## Phase 5 Boundary
 
 Phase 5 adds research context contracts, structured research report contracts, deterministic report generation, automatic disclaimers, source-reference preservation, and a lazy LLM adapter boundary. It does not add dashboard UI, broker APIs, order placement, automatic trading, live data fetching in tests, autonomous investment decisions, buy/sell/hold recommendations, guaranteed performance claims, or required OpenAI/LangGraph dependencies.
+
+## Phase 6 Boundary
+
+Phase 6 adds dashboard contracts, read-only overview/report payload builders, research-only disclaimers, source-reference preservation, and read-only FastAPI JSON endpoints. It does not add broker APIs, order placement, automatic trading, live market data fetching in tests, production user authentication, account management, payment/subscription features, production deployment pipelines, trading buttons, buy/sell/hold recommendation UI, or guaranteed-performance claims.

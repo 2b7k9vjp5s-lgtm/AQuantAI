@@ -48,12 +48,12 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Input: Data contracts, factor scores, backtest metrics, ML predictions, and source references.
 - Output: Deterministic research reports, safety disclaimers, source refs, and lazy LLM adapter boundary.
 - Completion standard: Reports are structured, auditable, deterministic from local fixtures, and avoid investment-advice wording.
-- Current status: Ready for review.
+- Current status: Completed.
 
 ## Phase 6: Dashboard
 
-- Goal: Provide an interactive dashboard for research workflows and results.
+- Goal: Provide a read-only dashboard foundation for research workflows and results.
 - Input: Data, scores, backtests, and reports from previous phases.
-- Output: Dashboard UI and deployment workflow.
-- Completion standard: Users can inspect stock pools, factor results, backtests, and reports through the dashboard.
-- Current status: Not started.
+- Output: Dashboard data contracts, read-only payload builders, and sample FastAPI JSON endpoints.
+- Completion standard: Users can inspect project, factor, backtest, ML, and report summaries through read-only payloads.
+- Current status: Ready for review.
