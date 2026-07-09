@@ -41,6 +41,7 @@ include = [
   "dashboard*",
   "datasource*",
   "factors*",
+  "ml*",
   "ranking*",
   "scripts*",
 ]

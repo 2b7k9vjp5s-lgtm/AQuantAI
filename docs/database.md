@@ -124,3 +124,21 @@ Phase 3 result fields:
 - Purpose: Store AI-assisted research reports and human review notes.
 - Core fields: report_id, report_date, title, scope, content, model_name, source_refs.
 - Future extensions: Report versioning, reviewer comments, generated charts, confidence and risk annotations.
+
+## ml_features
+
+- Purpose: Store feature snapshots for guarded ML experiments.
+- Core fields: feature_date, stock_code, universe, feature columns derived from factors or normalized market data.
+- Future extensions: Feature versioning, lineage, preprocessing metadata, train/test split tags.
+
+## ml_labels
+
+- Purpose: Store supervised learning labels for research experiments.
+- Core fields: label_date, stock_code, future_return, label_window, universe.
+- Future extensions: Label definitions, benchmark-relative returns, outlier policy, leakage checks.
+
+## ml_predictions
+
+- Purpose: Store model prediction outputs in a backtest-compatible format.
+- Core fields: prediction_date, stock_code, model_name, prediction_score, prediction_rank, universe.
+- Future extensions: Experiment ID, model version, confidence bands, calibration metadata.
