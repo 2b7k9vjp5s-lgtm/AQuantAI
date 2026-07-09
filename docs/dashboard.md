@@ -77,3 +77,13 @@ This report is for quantitative research and learning only. It is not investment
 ## Phase 6 Limitations
 
 Phase 6 does not implement broker APIs, order placement, automatic trading, live market data fetching inside tests, production user authentication, account management, payment/subscription features, production deployment pipelines, trading buttons, buy/sell/hold recommendation UI, or guaranteed-performance claims.
+
+## Local Integration Demo
+
+Run the post-Phase-6 local fixture demo with:
+
+```bash
+python -m scripts.demo_research_flow
+```
+
+The demo builds a deterministic research report and dashboard payload from local fixtures only. It does not call AKShare, Qlib, an LLM, a database, or any broker/trading service.

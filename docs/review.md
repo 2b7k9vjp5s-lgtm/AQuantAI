@@ -25,42 +25,42 @@ Required review content:
 
 ## Commit / Branch
 
-Branch: `codex/phase-6-dashboard-foundation`
+Branch: `codex/post-phase-6-stabilization`
 
-Issue: [Sprint 6 Review & Next Tasks - Phase 6 Dashboard Foundation](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/14)
+Issue: [Post-Phase-6 Review & Next Tasks - Stabilization and Integration Hardening](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/16)
 
 ## Review Scope
 
-Phase 5 merge confirmation and Phase 6 Dashboard foundation.
+Phase 6 merge confirmation and post-Phase-6 stabilization.
 
 ## Summary
 
-PR #13 was marked ready and merged so `main` contains Phase 5. Phase 6 adds dashboard contracts, read-only payload builders, sample FastAPI dashboard endpoints, tests, and documentation.
+PR #15 was marked ready and merged so `main` contains Phase 6. The stabilization pass adds documentation consistency updates, a local end-to-end fixture demo, cross-module integration tests, and shared safety validation.
 
 ## Issues Found
 
-- Phase 6 must keep dashboard behavior read-only and research-only.
-- Tests must use local fixtures and avoid live data calls.
-- Dashboard payloads must not expose trading actions, broker workflows, or recommendation UI.
+- Post-Phase-6 work must not become a new feature phase.
+- Demo and integration tests must use local fixtures only.
+- Safety/disclaimer behavior must stay consistent across reports and dashboard payloads.
 
 ## Architecture Concerns
 
-Dashboard logic consumes documented outputs from prior phases. Broker APIs, order placement, automatic trading, production deployment, and recommendation UI remain out of scope.
+The integration flow consumes existing report and dashboard contracts. Broker APIs, order placement, automatic trading, live data, production deployment, and new feature phases remain out of scope.
 
 ## Code Quality Suggestions
 
-Keep dashboard payloads deterministic, read-only, and research-only. Add richer frontend UI or deployment workflows only after review approval.
+Keep the baseline deterministic, local, and research-only. Add new product features only after explicit review.
 
 ## Required Changes
 
-- Define dashboard contracts and read-only payload builders.
-- Add read-only dashboard overview/report endpoints.
-- Keep broker APIs, trading actions, live data calls, and production deployment out of scope.
+- Keep Phase 0-6 documentation consistent.
+- Add end-to-end local fixture demo and integration tests.
+- Centralize safety validation for reports and dashboard payloads.
 
 ## Next Sprint Tasks
 
-Wait for the next GitHub review before any post-Phase-6 expansion.
+Wait for the next GitHub review before any expansion beyond stabilization.
 
 ## Status
 
-Phase 6 implemented in PR. Waiting for next review.
+Post-Phase-6 stabilization implemented in PR. Waiting for next review.

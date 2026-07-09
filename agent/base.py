@@ -7,10 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-RESEARCH_DISCLAIMER = (
-    "This report is for quantitative research and learning only. It is not investment advice, "
-    "not a trading recommendation, and not an instruction to buy, sell, or hold any security."
-)
+from backend.safety import RESEARCH_DISCLAIMER
 
 REPORT_FIELDS = [
     "report_date",

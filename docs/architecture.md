@@ -78,3 +78,7 @@ Phase 5 adds research context contracts, structured research report contracts, d
 ## Phase 6 Boundary
 
 Phase 6 adds dashboard contracts, read-only overview/report payload builders, research-only disclaimers, source-reference preservation, and read-only FastAPI JSON endpoints. It does not add broker APIs, order placement, automatic trading, live market data fetching in tests, production user authentication, account management, payment/subscription features, production deployment pipelines, trading buttons, buy/sell/hold recommendation UI, or guaranteed-performance claims.
+
+## Post-Phase-6 Boundary
+
+Post-Phase-6 stabilization adds documentation consistency, a local end-to-end fixture demo, integration tests, and shared safety validation. It does not add new product phases, full data ingestion, database persistence, production model training, real Qlib experiments, real LLM calls, frontend framework UI, deployment pipelines, login/auth/account systems, broker APIs, order placement, or automatic trading.
