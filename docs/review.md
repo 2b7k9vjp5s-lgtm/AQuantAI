@@ -25,42 +25,42 @@ Required review content:
 
 ## Commit / Branch
 
-Branch: `codex/phase-1-data-center`
+Branch: `codex/phase-2-factor-scoring`
 
-Issue: [Sprint 1 Review & Next Tasks - Phase 1 A-share Data Center](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/4)
+Issue: [Sprint 2 Review & Next Tasks - Phase 2 Multi-factor Scoring](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/6)
 
 ## Review Scope
 
-Phase 0 cleanup and Phase 1 A-share data center foundation.
+Phase 1 merge confirmation and Phase 2 multi-factor scoring foundation.
 
 ## Summary
 
-Phase 0 cleanup closed obsolete PR #1 after confirming `main` is the source of truth. Phase 1 adds an AKShare-backed data-provider boundary, normalized data contracts, mocked provider tests, and a lightweight script placeholder.
+PR #5 was marked ready and merged so `main` contains Phase 1. Phase 2 adds factor contracts, initial deterministic factor calculators, scoring utilities, weighted composites, tests, and documentation.
 
 ## Issues Found
 
-- PR #1 was obsolete because Phase 0 skeleton already existed on `main`.
-- Phase 1 must not leak raw AKShare column names into later layers.
-- Unit tests must not depend on live AKShare network calls.
+- Phase 2 must keep factor values separate from portfolio construction.
+- Tests must use local DataFrames and avoid live market data calls.
+- Scoring direction and missing value handling must be deterministic.
 
 ## Architecture Concerns
 
-Later layers must import provider contracts, not AKShare directly. Factor, ranking, backtesting, AI Agent, and dashboard implementation remain out of scope.
+Factor calculators consume documented DataFrame contracts. Backtesting, Qlib, AI Agent, dashboard, and trading workflows remain out of scope.
 
 ## Code Quality Suggestions
 
-Keep provider normalization explicit and covered by tests. Add richer ingestion, persistence, retries, and provider fallback only after review approval.
+Keep each factor small, transparent, and deterministic. Add richer factor research, persistence, portfolio rules, and backtesting only after review approval.
 
 ## Required Changes
 
-- Add only AKShare as the new data dependency.
-- Keep Tushare, OpenBB, VectorBT, Qlib, and LangGraph out of dependencies.
-- Keep Phase 1 focused on data-source contracts and provider normalization.
+- Define normalized factor value and score contracts.
+- Implement initial value, growth, quality, momentum, and risk factors.
+- Keep VectorBT, Qlib, AI Agent, dashboard, and trading logic out of scope.
 
 ## Next Sprint Tasks
 
-Wait for the next GitHub review before entering Phase 2.
+Wait for the next GitHub review before entering Phase 3.
 
 ## Status
 
-Phase 1 implemented in PR. Waiting for next review.
+Phase 2 implemented in PR. Waiting for next review.

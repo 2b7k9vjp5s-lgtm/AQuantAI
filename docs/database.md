@@ -61,11 +61,30 @@ Normalized provider columns:
 - Core fields: factor_date, stock_code, factor_name, factor_value, factor_version.
 - Future extensions: Factor metadata, calculation windows, source data snapshots, neutralization flags.
 
+Normalized factor output columns:
+
+- `factor_date`
+- `stock_code`
+- `factor_name`
+- `factor_value`
+- `factor_group`
+- `factor_version`
+
 ## factor_scores
 
 - Purpose: Store normalized and comparable factor scores.
 - Core fields: score_date, stock_code, factor_name, score, rank, universe.
 - Future extensions: Industry-neutral scores, z-scores, percentile ranks, composite score components.
+
+Normalized score output columns:
+
+- `score_date`
+- `stock_code`
+- `factor_name`
+- `factor_group`
+- `score`
+- `rank`
+- `universe`
 
 ## portfolio
 

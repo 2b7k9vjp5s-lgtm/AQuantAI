@@ -32,8 +32,8 @@ Dashboard
 - Data sources: Fetch and normalize external data behind provider interfaces. Phase 1 includes only the AKShare boundary.
 - Normalized data contracts: Stable DataFrame columns for stock basic data, daily prices, and trade calendars before database persistence.
 - PostgreSQL: Store market data, financial data, factor values, portfolios, backtest results, and reports.
-- Factor Engine: Calculate factor values from prepared data.
-- Ranking Engine: Combine factor scores into stock rankings and stock pools.
+- Factor Engine: Calculate normalized factor values from prepared data.
+- Ranking Engine: Convert factor values into scores and composites. Portfolio construction is reserved for later phases.
 - Backtest Engine: Evaluate portfolio rules and rebalancing strategies.
 - AI Research Agent: Explain results, coordinate research workflows, and generate reports.
 - Dashboard: Present research data and outputs to users.
@@ -52,3 +52,7 @@ Phase 0 only creates the project skeleton. No market data fetching, factor calcu
 ## Phase 1 Boundary
 
 Phase 1 adds the data-provider interface, AKShare provider skeleton, normalized data contracts, mocked provider tests, and a lightweight update script placeholder. It does not add factor calculation, ranking, backtesting, Qlib, AI Agent logic, dashboard UI, automatic trading, or full historical ingestion.
+
+## Phase 2 Boundary
+
+Phase 2 adds factor contracts, deterministic factor calculators, percentile scoring, group composites, and total composite scores. It does not add portfolio construction, weekly rebalancing, VectorBT backtesting, Qlib, AI Agent logic, dashboard UI, automatic trading, full historical ingestion, or live market data calls in tests.
