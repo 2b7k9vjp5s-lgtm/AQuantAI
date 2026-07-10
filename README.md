@@ -29,7 +29,7 @@ AQuantAI aims to become a sustainable research system for:
 - Backtest engine: deterministic weekly Top-N equal-weight portfolio backtests
 - ML research layer: feature/label/prediction contracts and Qlib adapter boundary
 - AI Research Agent: deterministic research-only report assembly and adapter boundaries
-- Dashboard: read-only research presentation contracts and JSON endpoints
+- Dashboard: read-only local browser page plus research presentation contracts and JSON endpoints
 - Future data source integrations: Tushare, OpenBB
 - Future full quant integrations beyond current adapter boundaries: VectorBT, Qlib
 - Future AI integrations beyond current adapter boundaries: LangGraph, OpenAI API
@@ -112,8 +112,11 @@ Open:
 
 - `GET /`
 - `GET /health`
+- `GET /dashboard` (local graphical, fixture-backed, read-only page)
 - `GET /dashboard/overview`
 - `GET /dashboard/report`
+
+`/dashboard` renders only the existing local fixture/sample Dashboard JSON payloads. It is read-only, uses no live market data, and keeps the raw JSON endpoints available for inspection.
 
 Inspect the Phase 1 data provider placeholder:
 

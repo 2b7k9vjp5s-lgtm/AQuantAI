@@ -2,6 +2,14 @@
 
 Phase 6 creates a read-only dashboard foundation for presenting research outputs. The goal is safe presentation contracts, not trading, production deployment, or account workflows.
 
+## Local Browser Page
+
+`GET /dashboard` serves a local graphical page using repository-owned HTML, CSS, and small vanilla JavaScript assets. It fetches and renders only the existing `GET /dashboard/overview` and `GET /dashboard/report` fixture/sample payloads.
+
+The page is read-only and clearly identifies local fixture/sample data. It does not use live market data, persistence, user inputs, calculations, or external frontend assets. Raw JSON remains available at both Dashboard API endpoints.
+
+Dynamic API values are rendered through DOM APIs and `textContent`; the page does not inject API data with `innerHTML`, dynamic script execution, or templates.
+
 ## Dashboard Boundary
 
 The dashboard consumes outputs from previous phases:
@@ -63,6 +71,7 @@ The dashboard must not expose:
 
 Phase 6 adds deterministic sample JSON endpoints:
 
+- `GET /dashboard`
 - `GET /dashboard/overview`
 - `GET /dashboard/report`
 
