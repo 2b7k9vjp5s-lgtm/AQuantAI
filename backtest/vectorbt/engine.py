@@ -1,8 +1,4 @@
-"""Deterministic weekly backtest foundation.
-
-The module lives under the VectorBT adapter namespace for Phase 3, but the
-initial implementation uses pandas to keep tests lightweight and deterministic.
-"""
+"""Deterministic weekly backtest foundation using explicit next-day execution."""
 
 from __future__ import annotations
 
@@ -25,7 +21,7 @@ from backtest.base import (
 
 
 class WeeklyRebalanceBacktestEngine:
-    """Top-N equal-weight weekly rebalance backtest engine."""
+    """Top-N equal-weight weekly backtest with next-trading-date execution."""
 
     def __init__(self, config: BacktestConfig | None = None) -> None:
         self.config = config or BacktestConfig()
@@ -33,45 +29,44 @@ class WeeklyRebalanceBacktestEngine:
             raise ValueError("top_n must be positive")
         if self.config.initial_cash <= 0:
             raise ValueError("initial_cash must be positive")
+        if self.config.rebalance.frequency != "W":
+            raise ValueError("Only weekly rebalance frequency 'W' is supported")
 
     def select_portfolio(self, scores: pd.DataFrame) -> PortfolioSelection:
-        """Select top-N equal-weight holdings for each score date."""
-        _validate_scores(scores)
-        frame = scores.copy()
-        frame["score_date"] = frame["score_date"].astype(str)
-        frame["stock_code"] = frame["stock_code"].astype(str)
-        frame["score"] = pd.to_numeric(frame["score"], errors="coerce")
-        frame["rank"] = pd.to_numeric(frame["rank"], errors="coerce")
-        frame = frame.dropna(subset=["score", "rank"])
-        if frame.empty:
-            raise ValueError("scores must contain finite score and rank values")
-
+        """Select top-N holdings per score date and universe deterministically."""
+        frame = _normalize_scores(scores)
         selected = (
-            frame.sort_values(["score_date", "rank", "score"], ascending=[True, True, False])
-            .groupby("score_date", as_index=False)
+            frame.sort_values(
+                ["score_date", "universe", "rank", "score", "stock_code"],
+                ascending=[True, True, True, False, True],
+                kind="stable",
+            )
+            .groupby(["score_date", "universe"], as_index=False, sort=False)
             .head(self.config.rebalance.top_n)
             .copy()
         )
-        selected["selection_count"] = selected.groupby("score_date")["stock_code"].transform("count")
+        selected["selection_count"] = selected.groupby(["score_date", "universe"])["stock_code"].transform("count")
         selected["weight"] = 1.0 / selected["selection_count"]
-        selected = selected.rename(columns={"score_date": "rebalance_date"})
-        return PortfolioSelection(selected[HOLDING_COLUMNS])
+        selected = selected.rename(columns={"score_date": "signal_date"})
+        selected["rebalance_date"] = pd.NA
+        return PortfolioSelection(selected[HOLDING_COLUMNS].reset_index(drop=True))
 
     def run(self, prices: pd.DataFrame, scores: pd.DataFrame) -> BacktestResult:
         """Run a deterministic long-only equal-weight backtest."""
-        _validate_prices(prices)
-        selection = self.select_portfolio(scores)
         price_frame = _prepare_prices(prices)
+        selection = self.select_portfolio(scores)
         holdings = selection.holdings.copy()
-        holdings["rebalance_date"] = holdings["rebalance_date"].astype(str)
+        if holdings["universe"].nunique() != 1:
+            raise ValueError("Backtest run supports exactly one universe per score input")
 
         pivot_returns = price_frame.pivot(index="trade_date", columns="stock_code", values="daily_return").sort_index()
         trade_dates = list(pivot_returns.index)
-        rebalance_date_map = _build_rebalance_date_map(list(holdings["rebalance_date"].unique()), trade_dates)
-        if not rebalance_date_map:
-            raise ValueError("No score dates align with available price dates")
-        holdings["rebalance_date"] = holdings["rebalance_date"].map(rebalance_date_map)
-        rebalance_dates = set(rebalance_date_map.values())
+        execution_map = _build_execution_date_map(list(holdings["signal_date"].unique()), trade_dates)
+        if not execution_map:
+            raise ValueError("No score dates have a later available trading date")
+        holdings = holdings[holdings["signal_date"].isin(execution_map)].copy()
+        holdings["rebalance_date"] = holdings["signal_date"].map(execution_map)
+        rebalance_dates = set(execution_map.values())
 
         current_weights = pd.Series(dtype=float)
         previous_weights = pd.Series(dtype=float)
@@ -80,11 +75,6 @@ class WeeklyRebalanceBacktestEngine:
         equity = self.config.initial_cash
 
         for trade_date in trade_dates:
-            if trade_date in rebalance_dates:
-                current_weights = _weights_for_date(holdings, trade_date)
-                turnover_values.append(_turnover(previous_weights, current_weights))
-                previous_weights = current_weights
-
             if current_weights.empty:
                 portfolio_return = 0.0
             else:
@@ -93,8 +83,18 @@ class WeeklyRebalanceBacktestEngine:
             equity *= 1.0 + portfolio_return
             returns.append({"trade_date": trade_date, "portfolio_return": portfolio_return, "equity": equity})
 
+            if trade_date in rebalance_dates:
+                current_weights = _weights_for_date(holdings, trade_date)
+                turnover_values.append(_turnover(previous_weights, current_weights))
+                previous_weights = current_weights
+
         equity_curve = pd.DataFrame(returns)[EQUITY_COLUMNS]
-        metrics = _compute_metrics(equity_curve, self.config.trading_days_per_year, self.config.risk_free_rate)
+        metrics = _compute_metrics(
+            equity_curve,
+            self.config.initial_cash,
+            self.config.trading_days_per_year,
+            self.config.risk_free_rate,
+        )
         metrics["turnover"] = float(np.mean(turnover_values)) if turnover_values else 0.0
         metrics["rebalance_count"] = len(rebalance_dates)
 
@@ -109,7 +109,7 @@ class WeeklyRebalanceBacktestEngine:
             turnover=metrics["turnover"],
             rebalance_count=metrics["rebalance_count"],
             equity_curve=equity_curve,
-            holdings=holdings,
+            holdings=holdings[HOLDING_COLUMNS].sort_values(["rebalance_date", "stock_code"]).reset_index(drop=True),
         )
 
 
@@ -118,29 +118,62 @@ def _validate_prices(prices: pd.DataFrame) -> None:
     require_columns(prices, PRICE_COLUMNS, "prices")
 
 
+def _prepare_prices(prices: pd.DataFrame) -> pd.DataFrame:
+    _validate_prices(prices)
+    frame = prices.copy()
+    frame = _normalize_identifiers(frame, ["trade_date", "stock_code"], "prices")
+    if frame.duplicated(["trade_date", "stock_code"]).any():
+        raise ValueError("prices contains duplicate (trade_date, stock_code) rows")
+    frame["close"] = pd.to_numeric(frame["close"], errors="coerce")
+    if frame["close"].isna().any() or not np.isfinite(frame["close"]).all():
+        raise ValueError("prices must contain finite close values")
+    if (frame["close"] <= 0).any():
+        raise ValueError("prices must contain positive close values")
+    frame = frame.sort_values(["stock_code", "trade_date"], kind="stable")
+    frame["daily_return"] = frame.groupby("stock_code", sort=False)["close"].pct_change().fillna(0.0)
+    return frame
+
+
 def _validate_scores(scores: pd.DataFrame) -> None:
     require_non_empty(scores, "scores")
     require_columns(scores, SCORE_COLUMNS, "scores")
 
 
-def _prepare_prices(prices: pd.DataFrame) -> pd.DataFrame:
-    frame = prices.copy()
-    frame["trade_date"] = frame["trade_date"].astype(str)
-    frame["stock_code"] = frame["stock_code"].astype(str)
-    frame["close"] = pd.to_numeric(frame["close"], errors="coerce")
-    frame = frame.dropna(subset=["close"]).sort_values(["stock_code", "trade_date"])
-    if frame.empty:
-        raise ValueError("prices must contain finite close values")
-    frame["daily_return"] = frame.groupby("stock_code")["close"].pct_change().fillna(0.0)
+def _normalize_scores(scores: pd.DataFrame) -> pd.DataFrame:
+    _validate_scores(scores)
+    frame = scores.copy()
+    frame = _normalize_identifiers(frame, ["score_date", "stock_code", "universe"], "scores")
+    if frame.duplicated(["score_date", "stock_code", "universe"]).any():
+        raise ValueError("scores contains duplicate (score_date, stock_code, universe) rows")
+    for column in ("score", "rank"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        if frame[column].isna().any() or not np.isfinite(frame[column]).all():
+            raise ValueError(f"scores must contain finite {column} values")
+    if (frame["rank"] < 1).any():
+        raise ValueError("scores must contain positive rank values")
     return frame
 
 
-def _build_rebalance_date_map(score_dates: list[str], trade_dates: list[str]) -> dict[str, str]:
-    aligned = {}
-    for score_date in sorted(score_dates):
-        candidates = [trade_date for trade_date in trade_dates if trade_date >= score_date]
+def _normalize_identifiers(frame: pd.DataFrame, columns: list[str], frame_name: str) -> pd.DataFrame:
+    if frame[columns].isna().any().any():
+        raise ValueError(f"{frame_name} must not contain missing identifiers: {columns}")
+    normalized = frame.copy()
+    for column in columns:
+        normalized[column] = normalized[column].astype(str).str.strip()
+    if (normalized[columns] == "").any().any():
+        raise ValueError(f"{frame_name} must not contain blank identifiers: {columns}")
+    return normalized
+
+
+def _build_execution_date_map(signal_dates: list[str], trade_dates: list[str]) -> dict[str, str]:
+    aligned: dict[str, str] = {}
+    for signal_date in sorted(signal_dates):
+        candidates = [trade_date for trade_date in trade_dates if trade_date > signal_date]
         if candidates:
-            aligned[score_date] = candidates[0]
+            aligned[signal_date] = candidates[0]
+    execution_dates = list(aligned.values())
+    if len(execution_dates) != len(set(execution_dates)):
+        raise ValueError("Multiple signal dates map to the same execution date")
     return aligned
 
 
@@ -158,10 +191,15 @@ def _turnover(previous: pd.Series, current: pd.Series) -> float:
     return float((current_aligned - previous_aligned).abs().sum() / 2.0)
 
 
-def _compute_metrics(equity_curve: pd.DataFrame, trading_days_per_year: int, risk_free_rate: float) -> dict[str, float]:
+def _compute_metrics(
+    equity_curve: pd.DataFrame,
+    initial_cash: float,
+    trading_days_per_year: int,
+    risk_free_rate: float,
+) -> dict[str, float]:
     returns = pd.to_numeric(equity_curve["portfolio_return"], errors="coerce").fillna(0.0)
     equity = pd.to_numeric(equity_curve["equity"], errors="coerce")
-    total_return = float(equity.iloc[-1] / equity.iloc[0] - 1.0) if len(equity) > 1 else 0.0
+    total_return = float(equity.iloc[-1] / initial_cash - 1.0)
     years = max(len(equity_curve) / trading_days_per_year, 1 / trading_days_per_year)
     annual_return = float((1.0 + total_return) ** (1.0 / years) - 1.0) if total_return > -1 else -1.0
     running_max = equity.cummax()

@@ -51,6 +51,8 @@ Scoring utilities return:
 
 Factor values are converted into percentile scores from 0 to 100. Descending factors reward larger values. Ascending factors reward smaller values. Missing factor values receive a neutral score of 50.
 
+Scores are isolated by `factor_date`, `factor_name`, and `universe`. Group and total composites remain isolated by `score_date` and `universe`, so stocks from separate dates or universes are never ranked together. Equal scores use `stock_code` as the final deterministic tie-break. Duplicate factor or composite inputs that would make a score ambiguous are rejected, and composite score inputs must be finite.
+
 Default group weights:
 
 - Value: 25%

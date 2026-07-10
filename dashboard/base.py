@@ -15,11 +15,11 @@ def build_dashboard_overview(
     source_refs: list[str] | None = None,
 ) -> DashboardPage:
     """Build a read-only dashboard overview payload."""
-    factor_rows = factor_rows or _sample_factor_rows()
-    backtest_metrics = backtest_metrics or _sample_backtest_metrics()
-    ml_rows = ml_rows or _sample_ml_rows()
-    report = report or _sample_report()
-    source_refs = source_refs or ["docs/factors.md", "docs/backtesting.md", "docs/ml.md", "docs/agent.md"]
+    factor_rows = _sample_factor_rows() if factor_rows is None else factor_rows
+    backtest_metrics = _sample_backtest_metrics() if backtest_metrics is None else backtest_metrics
+    ml_rows = _sample_ml_rows() if ml_rows is None else ml_rows
+    report = _sample_report() if report is None else report
+    source_refs = ["docs/factors.md", "docs/backtesting.md", "docs/ml.md", "docs/agent.md"] if source_refs is None else source_refs
 
     sections = {
         "project_overview": DashboardCard(
@@ -43,8 +43,8 @@ def build_dashboard_overview(
             rows=ml_rows,
         ).to_dict(),
         "research_report_summary": DashboardReportView(
-            title=report["title"],
-            summary=report["summary"],
+            title=report.get("title", ""),
+            summary=report.get("summary", ""),
             risks=report.get("risks", []),
             limitations=report.get("limitations", []),
             source_refs=report.get("source_refs", []),
@@ -59,11 +59,11 @@ def build_dashboard_overview(
 
 def build_dashboard_report(report: dict[str, Any] | None = None) -> DashboardPage:
     """Build a read-only dashboard report payload."""
-    report = report or _sample_report()
+    report = _sample_report() if report is None else report
     sections = {
         "research_report_summary": DashboardReportView(
-            title=report["title"],
-            summary=report["summary"],
+            title=report.get("title", ""),
+            summary=report.get("summary", ""),
             risks=report.get("risks", []),
             limitations=report.get("limitations", []),
             source_refs=report.get("source_refs", []),
@@ -78,7 +78,7 @@ def build_dashboard_report(report: dict[str, Any] | None = None) -> DashboardPag
     }
     return DashboardPage(
         page_id="dashboard_report",
-        title=report["title"],
+        title=report.get("title", ""),
         sections=sections,
         source_refs=report.get("source_refs", []),
     )

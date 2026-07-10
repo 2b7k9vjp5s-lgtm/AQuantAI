@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from ml import PREDICTION_COLUMNS, MLExperimentConfig
-from ml.base import build_feature_dataset, build_label_dataset
+from ml.base import FeatureDataset, build_feature_dataset, build_label_dataset
 from ml.baseline import FactorAverageBaselineModel
 from ml.qlib import QlibAdapter
 
@@ -89,3 +89,59 @@ def test_qlib_adapter_reports_missing_optional_dependency() -> None:
 
     with pytest.raises(RuntimeError, match="Qlib is not installed"):
         _ = adapter.qlib
+
+
+def test_ml_feature_validation_and_tie_breaking_are_deterministic() -> None:
+    config = MLExperimentConfig(experiment_name="phase4-test", universe="test", feature_columns=("value_score",))
+    tied_features = pd.DataFrame(
+        [
+            {"feature_date": "20260630", "stock_code": "000002", "value_score": 80.0, "universe": "test"},
+            {"feature_date": "20260630", "stock_code": "000001", "value_score": 80.0, "universe": "test"},
+            {"feature_date": "20260701", "stock_code": "000001", "value_score": 70.0, "universe": "test"},
+        ]
+    )
+
+    predictions = FactorAverageBaselineModel(config).predict(
+        build_feature_dataset(tied_features, config.feature_columns)
+    ).predictions
+
+    first_date = predictions[predictions["prediction_date"] == "20260630"]
+    assert first_date["stock_code"].tolist() == ["000001", "000002"]
+    assert first_date["prediction_rank"].tolist() == [1, 2]
+    assert predictions[predictions["prediction_date"] == "20260701"]["prediction_rank"].tolist() == [1]
+
+    with pytest.raises(ValueError, match=r"duplicate \(feature_date, stock_code, universe\)"):
+        build_feature_dataset(pd.concat([tied_features, tied_features.iloc[[0]]], ignore_index=True), config.feature_columns)
+
+    non_finite = tied_features.copy()
+    non_finite.loc[0, "value_score"] = float("inf")
+    with pytest.raises(ValueError, match="finite numeric"):
+        build_feature_dataset(non_finite, config.feature_columns)
+
+    mismatched_universe = tied_features.copy()
+    mismatched_universe.loc[0, "universe"] = "other"
+    with pytest.raises(ValueError, match="experiment universe"):
+        FactorAverageBaselineModel(config).predict(build_feature_dataset(mismatched_universe, config.feature_columns))
+
+    with pytest.raises(ValueError, match="finite numeric"):
+        FeatureDataset(tied_features.assign(value_score=float("inf")), config.feature_columns)
+
+    with pytest.raises(ValueError, match=r"duplicate \(feature_date, stock_code, universe\)"):
+        FeatureDataset(pd.concat([tied_features, tied_features.iloc[[0]]], ignore_index=True), config.feature_columns)
+
+    for column in ("feature_date", "stock_code", "universe"):
+        missing_identifier_features = tied_features.copy()
+        missing_identifier_features.loc[0, column] = None
+        with pytest.raises(ValueError, match="missing identifiers"):
+            build_feature_dataset(missing_identifier_features, config.feature_columns)
+
+        blank_identifier_features = tied_features.copy()
+        blank_identifier_features.loc[0, column] = "  "
+        with pytest.raises(ValueError, match="blank identifiers"):
+            build_feature_dataset(blank_identifier_features, config.feature_columns)
+
+        with pytest.raises(ValueError, match="missing identifiers"):
+            FeatureDataset(missing_identifier_features, config.feature_columns)
+
+        with pytest.raises(ValueError, match="blank identifiers"):
+            FeatureDataset(blank_identifier_features, config.feature_columns)
