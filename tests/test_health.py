@@ -12,15 +12,20 @@ def test_root_returns_200() -> None:
     assert response.status_code == 200
 
 
-def test_root_reports_v01_baseline() -> None:
+def test_root_reports_v02_local_dashboard_baseline() -> None:
     response = client.get("/")
 
     assert response.json() == {
         "project": "AQuantAI",
-        "status": "v0.1 research-only baseline",
-        "version": "0.1.0",
-        "phase": "v0.1 baseline freeze",
+        "status": "v0.2 research-only local Dashboard baseline",
+        "version": "0.2.0",
+        "phase": "v0.2 local read-only Dashboard baseline",
     }
+
+
+def test_fastapi_metadata_reports_v02() -> None:
+    assert app.version == "0.2.0"
+    assert app.openapi()["info"]["version"] == "0.2.0"
 
 
 def test_health_returns_200() -> None:

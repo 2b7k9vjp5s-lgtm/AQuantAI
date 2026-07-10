@@ -2,6 +2,29 @@
 
 All notable baseline changes for AQuantAI are summarized here.
 
+## 0.2.0 - v0.2 Local Read-Only Research Dashboard Baseline
+
+Status: release handoff review.
+
+This release aligns the accepted local research baseline after the correctness hardening and local Dashboard delivery. It remains fixture/sample-data-only, research-only, and not production-ready.
+
+### Correctness Hardening
+
+- Isolated factor and composite scoring by date and universe and added deterministic `stock_code` tie-breaking.
+- Corrected post-close rebalance timing so newly executed holdings do not receive the return ending on their execution date.
+- Added duplicate, identifier, universe, and finite-value validation across factor/ranking, backtest, and ML feature paths.
+- Preserved explicit empty Dashboard inputs instead of replacing them with fixture samples.
+
+### Local Dashboard Delivery
+
+- Added the local read-only `GET /dashboard` HTML page using only the existing fixture JSON APIs.
+- Kept Dashboard JSON contracts, `read_only`, the research disclaimer, and allowed actions unchanged.
+
+### Verification and Limitations
+
+- Verified Python startup, Docker startup, pytest, and the local fixture demo.
+- No live ingestion workflow, database persistence, production Qlib/VectorBT/LLM execution, authentication, deployment automation, broker integration, orders, or automated trading is included.
+
 ## 0.1.0 - v0.1 Baseline Freeze
 
 Status: release readiness review.

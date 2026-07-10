@@ -8,8 +8,8 @@ from dashboard import build_dashboard_overview, build_dashboard_report
 
 app = FastAPI(
     title="AQuantAI",
-    version="0.1.0",
-    description="A-share AI multi-factor quantitative research platform.",
+    version="0.2.0",
+    description="A-share AI multi-factor quantitative research platform with a local read-only Dashboard.",
 )
 
 DASHBOARD_STATIC_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "static"
@@ -20,9 +20,9 @@ app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name
 def read_root() -> dict[str, str]:
     return {
         "project": "AQuantAI",
-        "status": "v0.1 research-only baseline",
-        "version": "0.1.0",
-        "phase": "v0.1 baseline freeze",
+        "status": "v0.2 research-only local Dashboard baseline",
+        "version": "0.2.0",
+        "phase": "v0.2 local read-only Dashboard baseline",
     }
 
 

@@ -2,9 +2,9 @@
 
 AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
 
-Current phase: v0.1 baseline freeze and release readiness.
+Current phase: v0.2 local read-only research Dashboard baseline.
 
-Current version: `0.1.0`.
+Current version: `0.2.0`.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
 
@@ -38,7 +38,7 @@ AQuantAI aims to become a sustainable research system for:
 
 ## Current Scope
 
-Phase 0 through Phase 6 and the post-Phase-6 stabilization pass are implemented and review-accepted from an architecture perspective. The v0.1 baseline freezes the following local, deterministic research scope:
+Phase 0 through Phase 6, the correctness hardening pass, and the local Dashboard delivery are implemented and review-accepted from an architecture perspective. The v0.2 baseline is local, deterministic, fixture-backed, and research-only:
 
 - Project structure
 - Documentation
@@ -53,9 +53,11 @@ Phase 0 through Phase 6 and the post-Phase-6 stabilization pass are implemented 
 - Factor contracts for values and scores
 - Initial value, growth, quality, momentum, and risk factors
 - Percentile scoring and weighted composite score utilities
+- Date/universe-isolated factor and composite rankings with deterministic `stock_code` tie-breaking
 - Backtest contracts and result metrics
 - Top-N equal-weight portfolio selection from total scores
 - Weekly rebalance foundation using local price and score DataFrames
+- Post-close rebalance timing with no execution-date return leakage and total return calculated from initial cash
 - ML experiment contracts
 - Feature, label, and prediction output contracts
 - Deterministic baseline prediction path
@@ -67,9 +69,11 @@ Phase 0 through Phase 6 and the post-Phase-6 stabilization pass are implemented 
 - Dashboard data contracts
 - Read-only overview and report payload builders
 - Read-only dashboard FastAPI endpoints
+- Local read-only `/dashboard` HTML page using the existing fixture JSON endpoints only
 - End-to-end local fixture demo
 - Cross-module integration checks
 - Shared research-only safety validation
+- Duplicate, identifier, universe, and finite-value validation across ranking, backtest, and ML inputs
 - Release checklist and future work boundary documentation
 
 ## Not Supported Yet
