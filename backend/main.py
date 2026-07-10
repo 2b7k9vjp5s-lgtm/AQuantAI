@@ -13,9 +13,9 @@ app = FastAPI(
 def read_root() -> dict[str, str]:
     return {
         "project": "AQuantAI",
-        "status": "running",
+        "status": "v0.1 research-only baseline",
         "version": "0.1.0",
-        "phase": "Phase 0",
+        "phase": "v0.1 baseline freeze",
     }
 
 

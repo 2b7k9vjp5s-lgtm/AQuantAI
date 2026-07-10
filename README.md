@@ -2,9 +2,11 @@
 
 AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
 
-Current phase: Post-Phase-6 stabilization and integration hardening.
+Current phase: v0.1 baseline freeze and release readiness.
 
-This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, and is not intended for automated trading.
+Current version: `0.1.0`.
+
+This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
 
 ## Positioning
 
@@ -28,15 +30,15 @@ AQuantAI aims to become a sustainable research system for:
 - ML research layer: feature/label/prediction contracts and Qlib adapter boundary
 - AI Research Agent: deterministic research-only report assembly and adapter boundaries
 - Dashboard: read-only research presentation contracts and JSON endpoints
-- Data sources planned for later phases: Tushare, OpenBB
-- Quant modules planned for later phases: VectorBT, Qlib
-- AI modules planned for later phases: LangGraph, OpenAI API
+- Future data source integrations: Tushare, OpenBB
+- Future full quant integrations beyond current adapter boundaries: VectorBT, Qlib
+- Future AI integrations beyond current adapter boundaries: LangGraph, OpenAI API
 - Deployment: Docker, docker-compose
 - Testing: pytest, httpx
 
 ## Current Scope
 
-Phase 0 through Phase 6 are implemented and review-accepted from an architecture perspective. The current stabilization scope includes:
+Phase 0 through Phase 6 and the post-Phase-6 stabilization pass are implemented and review-accepted from an architecture perspective. The v0.1 baseline freezes the following local, deterministic research scope:
 
 - Project structure
 - Documentation
@@ -68,6 +70,7 @@ Phase 0 through Phase 6 are implemented and review-accepted from an architecture
 - End-to-end local fixture demo
 - Cross-module integration checks
 - Shared research-only safety validation
+- Release checklist and future work boundary documentation
 
 ## Not Supported Yet
 
@@ -125,8 +128,14 @@ python -m scripts.demo_research_flow
 Run tests:
 
 ```bash
-pytest
+python -m pytest
 ```
+
+Release readiness checklist:
+
+- `CHANGELOG.md`
+- `docs/release_checklist.md`
+- `docs/future_work.md`
 
 ## Docker Start
 
@@ -158,6 +167,8 @@ Every development sprint must start by reading:
 - `docs/dashboard.md`
 - `docs/development.md`
 - `docs/review.md`
+- `docs/release_checklist.md`
+- `docs/future_work.md`
 
 Every sprint should update:
 

@@ -41,6 +41,17 @@ Examples:
 - Keep integration tests local and fixture-based.
 - Do not add network, broker, trading, or production deployment requirements to tests.
 
+## v0.1 Release Readiness Checks
+
+Before opening or updating a v0.1 release-readiness pull request, run:
+
+```bash
+python -m pytest
+python -m scripts.demo_research_flow
+```
+
+The checks must remain local and fixture-based. They must not require live data, LLM credentials, broker credentials, trading access, external paid services, or production deployment.
+
 ## Configuration Management
 
 - Use environment variables for local configuration.

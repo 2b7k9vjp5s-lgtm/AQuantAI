@@ -30,7 +30,7 @@ def build_demo_payload() -> dict[str, Any]:
     report = DeterministicResearchReportBuilder().build_report(
         ResearchContext(
             report_date="20260709",
-            scope="Post-Phase-6 local fixture demo",
+            scope="v0.1 baseline local fixture demo",
             factor_scores=factor_scores,
             backtest_metrics=backtest_metrics,
             ml_predictions=ml_predictions,

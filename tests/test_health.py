@@ -12,6 +12,17 @@ def test_root_returns_200() -> None:
     assert response.status_code == 200
 
 
+def test_root_reports_v01_baseline() -> None:
+    response = client.get("/")
+
+    assert response.json() == {
+        "project": "AQuantAI",
+        "status": "v0.1 research-only baseline",
+        "version": "0.1.0",
+        "phase": "v0.1 baseline freeze",
+    }
+
+
 def test_health_returns_200() -> None:
     response = client.get("/health")
 
