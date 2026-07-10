@@ -1,5 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
+from pathlib import Path
+import re
 
 from agent import RESEARCH_DISCLAIMER
 from backend.main import app
@@ -59,6 +61,55 @@ def test_dashboard_fastapi_endpoints_are_read_only() -> None:
     assert report.json()["read_only"] is True
     assert overview.json()["disclaimer"] == RESEARCH_DISCLAIMER
     assert report.json()["disclaimer"] == RESEARCH_DISCLAIMER
+
+
+def test_dashboard_page_and_local_assets_are_available() -> None:
+    client = TestClient(app)
+
+    page = client.get("/dashboard")
+    stylesheet = client.get("/dashboard/static/dashboard.css")
+    script = client.get("/dashboard/static/dashboard.js")
+
+    assert page.status_code == 200
+    assert page.headers["content-type"].startswith("text/html")
+    assert "AQuantAI Dashboard" in page.text
+    assert "Local fixture/sample research data" in page.text
+    assert "Research disclaimer" in page.text
+    assert "<form" not in page.text.lower()
+    assert "<button" not in page.text.lower()
+    assert stylesheet.status_code == 200
+    assert script.status_code == 200
+
+
+def test_dashboard_page_uses_only_existing_safe_json_endpoints() -> None:
+    script = (Path(__file__).resolve().parents[1] / "dashboard" / "static" / "dashboard.js").read_text(encoding="utf-8")
+
+    assert set(re.findall(r'fetchJson\("(/dashboard/[^\"]+)"\)', script)) == {
+        "/dashboard/overview",
+        "/dashboard/report",
+    }
+    assert "innerHTML" not in script
+    assert "eval(" not in script
+    assert "new Function" not in script
+    assert "`" not in script
+    assert "textContent" in script
+    assert "No local fixture rows are available" in script
+
+
+def test_dashboard_page_preserves_existing_endpoint_contracts() -> None:
+    client = TestClient(app)
+
+    root = client.get("/")
+    health = client.get("/health")
+    overview = client.get("/dashboard/overview")
+    report = client.get("/dashboard/report")
+
+    assert root.json()["status"] == "v0.1 research-only baseline"
+    assert health.json() == {"status": "ok"}
+    assert overview.json()["page_id"] == "dashboard_overview"
+    assert report.json()["page_id"] == "dashboard_report"
+    assert overview.json()["read_only"] is True
+    assert report.json()["read_only"] is True
 
 
 def test_dashboard_preserves_explicit_empty_inputs() -> None:

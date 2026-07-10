@@ -1,0 +1,176 @@
+:root {
+  color: #1c2b36;
+  background: #f5f7f8;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #075b85;
+}
+
+a:focus-visible {
+  outline: 3px solid #d97706;
+  outline-offset: 3px;
+}
+
+.page-width {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.site-header,
+.site-footer {
+  background: #123247;
+  color: #ffffff;
+  padding: 32px 0;
+}
+
+.site-header nav {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.site-header a {
+  color: #ffffff;
+}
+
+main {
+  padding: 28px 0 48px;
+}
+
+section {
+  margin: 0 0 32px;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 8px;
+}
+
+h2 {
+  font-size: 1.15rem;
+}
+
+.eyebrow {
+  margin-bottom: 6px;
+  color: #bde3f4;
+  font-weight: 700;
+}
+
+.lede {
+  max-width: 720px;
+}
+
+.status-panel,
+.metric-card,
+.table-wrap,
+.empty-state,
+.content-block {
+  background: #ffffff;
+  border: 1px solid #ccd6dc;
+  border-radius: 6px;
+}
+
+.status-panel,
+.content-block {
+  padding: 20px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  padding: 16px;
+}
+
+.metric-label {
+  color: #52636e;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.metric-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #d8e0e5;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+th {
+  background: #eaf1f4;
+}
+
+.empty-state {
+  padding: 16px;
+  color: #52636e;
+}
+
+.error {
+  color: #9b1c1c;
+  font-weight: 700;
+}
+
+.two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.content-block + .content-block {
+  margin-top: 12px;
+}
+
+.content-block ul {
+  margin-bottom: 0;
+  padding-left: 20px;
+}
+
+.site-footer {
+  background: #243b4a;
+}
+
+@media (max-width: 680px) {
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+
+  .site-header,
+  .site-footer {
+    padding: 24px 0;
+  }
+}

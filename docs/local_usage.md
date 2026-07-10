@@ -38,6 +38,7 @@ Open these local URLs in a browser or HTTP client:
 
 - http://127.0.0.1:8000/
 - http://127.0.0.1:8000/health
+- http://127.0.0.1:8000/dashboard
 - http://127.0.0.1:8000/dashboard/overview
 - http://127.0.0.1:8000/dashboard/report
 
@@ -45,9 +46,10 @@ Expected results:
 
 - `/` reports version `0.1.0`.
 - `/health` reports `{"status": "ok"}`.
+- `/dashboard` is a local graphical page. It renders the existing fixture/sample Dashboard JSON payloads only.
 - Both dashboard endpoints return JSON with `read_only: true` and the research disclaimer.
 
-The Dashboard is a JSON-only, read-only API surface in v0.1. It is not a graphical web frontend. Its allowed actions are limited to viewing, inspecting, and exporting research output; it exposes no trading, order, or broker actions.
+The Dashboard is a local, read-only research surface. The browser page is not a live-data product or a persistence layer: it displays local fixture/sample data, retains the raw JSON endpoints, and exposes no trading, order, broker, account, or editable strategy controls.
 
 ## Docker Image
 
@@ -101,4 +103,4 @@ docker version
 
 - Research and learning use only; not investment advice or a trading recommendation.
 - No live data ingestion, real LLM calls, broker APIs, order placement, automatic trading, or production deployment.
-- No graphical dashboard, authentication, account system, payment system, or database persistence.
+- No live-data dashboard, authentication, account system, payment system, or database persistence. The local `/dashboard` page is presentation-only and fixture-backed.

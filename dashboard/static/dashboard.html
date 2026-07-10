@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AQuantAI Dashboard</title>
+    <link rel="stylesheet" href="/dashboard/static/dashboard.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="page-width">
+        <p class="eyebrow">Local fixture/sample research data</p>
+        <h1>AQuantAI Dashboard</h1>
+        <p class="lede">Read-only local research inspection. This page does not use live market data.</p>
+        <nav aria-label="Dashboard resources">
+          <a href="/dashboard/overview">Overview JSON</a>
+          <a href="/dashboard/report">Report JSON</a>
+        </nav>
+      </div>
+    </header>
+    <main class="page-width">
+      <section class="status-panel" aria-labelledby="status-heading">
+        <h2 id="status-heading">Project status</h2>
+        <p id="load-status" role="status">Loading local dashboard data.</p>
+        <p id="load-error" class="error" role="alert" hidden></p>
+        <div id="project-status" class="metric-grid" aria-live="polite"></div>
+      </section>
+
+      <section aria-labelledby="factor-heading">
+        <h2 id="factor-heading">Factor summary</h2>
+        <div id="factor-summary"></div>
+      </section>
+
+      <section aria-labelledby="backtest-heading">
+        <h2 id="backtest-heading">Backtest metrics</h2>
+        <div id="backtest-summary" class="metric-grid"></div>
+      </section>
+
+      <section aria-labelledby="ml-heading">
+        <h2 id="ml-heading">ML prediction summary</h2>
+        <div id="ml-summary"></div>
+      </section>
+
+      <section aria-labelledby="report-heading">
+        <h2 id="report-heading">Research report</h2>
+        <div id="research-report"></div>
+      </section>
+
+      <section class="two-column" aria-label="Research context">
+        <div>
+          <h2>Highlights</h2>
+          <div id="report-highlights"></div>
+        </div>
+        <div>
+          <h2>Risks and limitations</h2>
+          <div id="research-risks"></div>
+        </div>
+      </section>
+
+      <section aria-labelledby="sources-heading">
+        <h2 id="sources-heading">Source references</h2>
+        <div id="source-references"></div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="page-width">
+        <h2>Research disclaimer</h2>
+        <p id="research-disclaimer">This report is for quantitative research and learning only. It is not investment advice, not a trading recommendation, and not an instruction to buy, sell, or hold any security.</p>
+      </div>
+    </footer>
+    <script src="/dashboard/static/dashboard.js" defer></script>
+  </body>
+</html>
