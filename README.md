@@ -94,6 +94,8 @@ The current phase does not implement:
 
 ## Quick Start
 
+For a complete local handoff covering Python, API, Docker, and Docker Compose usage, see [docs/local_usage.md](docs/local_usage.md).
+
 Install dependencies:
 
 ```bash
