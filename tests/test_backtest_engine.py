@@ -71,8 +71,67 @@ def test_rebalance_dates_align_to_available_trade_dates() -> None:
 
     result = engine.run(_price_fixture(), scores)
 
-    assert set(result.holdings["rebalance_date"]) == {"20260101", "20260105"}
+    assert set(result.holdings["signal_date"]) == {"20260101", "20260104"}
+    assert set(result.holdings["rebalance_date"]) == {"20260102", "20260105"}
     assert result.rebalance_count == 2
+
+
+def test_backtest_uses_next_trading_day_and_initial_cash_for_total_return() -> None:
+    prices = pd.DataFrame(
+        [
+            {"trade_date": "20260101", "stock_code": "000001", "close": 10.0},
+            {"trade_date": "20260102", "stock_code": "000001", "close": 20.0},
+            {"trade_date": "20260105", "stock_code": "000001", "close": 30.0},
+        ]
+    )
+    scores = pd.DataFrame(
+        [{"score_date": "20260101", "stock_code": "000001", "score": 10.0, "rank": 1, "universe": "test"}]
+    )
+    engine = WeeklyRebalanceBacktestEngine(
+        BacktestConfig(initial_cash=100.0, rebalance=RebalanceConfig(top_n=1))
+    )
+
+    result = engine.run(prices, scores)
+
+    assert result.holdings.iloc[0]["signal_date"] == "20260101"
+    assert result.holdings.iloc[0]["rebalance_date"] == "20260102"
+    assert result.equity_curve.iloc[0]["portfolio_return"] == 0.0
+    assert result.equity_curve.iloc[0]["equity"] == pytest.approx(100.0)
+    assert result.total_return == pytest.approx(2.0)
+
+
+def test_portfolio_ties_and_invalid_backtest_inputs_fail_clearly() -> None:
+    engine = WeeklyRebalanceBacktestEngine(BacktestConfig(rebalance=RebalanceConfig(top_n=1)))
+    tied_scores = pd.DataFrame(
+        [
+            {"score_date": "20260101", "stock_code": "000002", "score": 90.0, "rank": 1, "universe": "test"},
+            {"score_date": "20260101", "stock_code": "000001", "score": 90.0, "rank": 1, "universe": "test"},
+        ]
+    )
+
+    assert engine.select_portfolio(tied_scores).holdings["stock_code"].tolist() == ["000001"]
+
+    duplicate_prices = pd.concat([_price_fixture(), _price_fixture().iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match=r"duplicate \(trade_date, stock_code\)"):
+        engine.run(duplicate_prices, _score_fixture())
+
+    duplicate_scores = pd.concat([_score_fixture(), _score_fixture().iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match=r"duplicate \(score_date, stock_code, universe\)"):
+        engine.select_portfolio(duplicate_scores)
+
+    non_finite_scores = _score_fixture().copy()
+    non_finite_scores.loc[0, "score"] = float("inf")
+    with pytest.raises(ValueError, match="finite score"):
+        engine.select_portfolio(non_finite_scores)
+
+    non_finite_prices = _price_fixture().copy()
+    non_finite_prices["close"] = non_finite_prices["close"].astype(float)
+    non_finite_prices.loc[0, "close"] = float("inf")
+    with pytest.raises(ValueError, match="finite close"):
+        engine.run(non_finite_prices, _score_fixture())
+
+    with pytest.raises(ValueError, match="Only weekly"):
+        WeeklyRebalanceBacktestEngine(BacktestConfig(rebalance=RebalanceConfig(frequency="M")))
 
 
 def test_invalid_inputs_fail_with_clear_errors() -> None:

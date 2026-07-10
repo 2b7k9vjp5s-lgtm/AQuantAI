@@ -30,7 +30,9 @@ The initial portfolio construction rule is intentionally small:
 
 ## Rebalance Frequency
 
-Phase 3 implements a weekly rebalance foundation. Score dates are aligned to the first available trade date on or after the score date. Holdings remain active until the next rebalance date.
+Phase 3 implements a weekly rebalance foundation. A score date is a signal date, not an execution date: holdings are applied only on the first available trading date strictly after the signal date. This prevents a score from receiving the same date's market return. Output holdings preserve both `signal_date` and `rebalance_date` (execution date), and holdings remain active until the next rebalance date.
+
+Only weekly frequency (`W`) is supported in the deterministic foundation; unsupported frequencies are rejected clearly. Top-N selection is deterministic for ties using `stock_code` after rank and score ordering. The engine rejects duplicate price rows, duplicate score rows, non-finite prices, scores, or ranks, non-positive prices, and mixed-universe score inputs in a single backtest run.
 
 ## Result Fields
 
@@ -50,7 +52,7 @@ The engine also returns a deterministic equity curve and selected holdings.
 
 ## Metric Definitions
 
-- Total return: final equity divided by initial equity minus one.
+- Total return: final equity divided by configured initial cash minus one.
 - Annual return: total return annualized by configured trading days per year.
 - Max drawdown: minimum equity drawdown from the running peak.
 - Volatility: annualized standard deviation of daily portfolio returns.

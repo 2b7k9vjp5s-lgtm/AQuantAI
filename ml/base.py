@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
 FEATURE_REQUIRED_COLUMNS = ["feature_date", "stock_code", "universe"]
@@ -69,6 +70,14 @@ def build_feature_dataset(frame: pd.DataFrame, feature_columns: tuple[str, ...])
     normalized["feature_date"] = normalized["feature_date"].astype(str)
     normalized["stock_code"] = normalized["stock_code"].astype(str)
     normalized["universe"] = normalized["universe"].astype(str)
+    if normalized.duplicated(["feature_date", "stock_code", "universe"]).any():
+        raise ValueError("features contains duplicate (feature_date, stock_code, universe) rows")
+    for column in feature_columns:
+        normalized[column] = pd.to_numeric(normalized[column], errors="coerce")
+        if normalized[column].isna().any() or not np.isfinite(normalized[column]).all():
+            raise ValueError(f"features column {column} must contain finite numeric values")
+    if normalized["universe"].eq("").any():
+        raise ValueError("features must contain a non-empty universe")
     return FeatureDataset(normalized, feature_columns)
 
 

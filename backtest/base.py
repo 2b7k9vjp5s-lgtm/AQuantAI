@@ -8,7 +8,7 @@ import pandas as pd
 
 PRICE_COLUMNS = ["trade_date", "stock_code", "close"]
 SCORE_COLUMNS = ["score_date", "stock_code", "score", "rank", "universe"]
-HOLDING_COLUMNS = ["rebalance_date", "stock_code", "weight", "rank", "score", "universe"]
+HOLDING_COLUMNS = ["signal_date", "rebalance_date", "stock_code", "weight", "rank", "score", "universe"]
 EQUITY_COLUMNS = ["trade_date", "portfolio_return", "equity"]
 
 

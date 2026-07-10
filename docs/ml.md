@@ -23,6 +23,8 @@ Feature DataFrames must contain:
 
 Feature columns are explicit per experiment so tests and future training runs know exactly what is consumed.
 
+Feature rows are unique by `feature_date`, `stock_code`, and `universe`. Every configured feature value must be finite and numeric, and the baseline checks that all input rows match the experiment universe.
+
 ## Label Contract
 
 Label DataFrames must contain:
@@ -46,7 +48,7 @@ Prediction results must contain:
 - `prediction_rank`
 - `universe`
 
-Prediction ranks are deterministic within each prediction date and universe.
+Prediction ranks are deterministic within each prediction date and universe. Equal prediction scores use `stock_code` as the final tie-break.
 
 ## Baseline Model
 

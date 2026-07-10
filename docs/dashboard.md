@@ -12,6 +12,8 @@ The dashboard consumes outputs from previous phases:
 - research report summaries;
 - source references.
 
+Builder sample fixtures are used only when an input argument is `None`. Explicit empty lists or dictionaries are preserved as empty research inputs and are never silently replaced with sample data.
+
 The dashboard does not fetch live market data, write to a database, place orders, connect to brokers, manage accounts, or perform trading actions.
 
 ## Data Contracts

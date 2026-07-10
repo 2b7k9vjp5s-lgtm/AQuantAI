@@ -59,3 +59,17 @@ def test_dashboard_fastapi_endpoints_are_read_only() -> None:
     assert report.json()["read_only"] is True
     assert overview.json()["disclaimer"] == RESEARCH_DISCLAIMER
     assert report.json()["disclaimer"] == RESEARCH_DISCLAIMER
+
+
+def test_dashboard_preserves_explicit_empty_inputs() -> None:
+    overview = build_dashboard_overview([], {}, [], {}, []).to_dict()
+    report = build_dashboard_report({}).to_dict()
+
+    assert overview["sections"]["factor_summary"]["rows"] == []
+    assert overview["sections"]["backtest_summary"]["metrics"] == []
+    assert overview["sections"]["ml_summary"]["rows"] == []
+    assert overview["source_refs"] == []
+    assert overview["sections"]["research_report_summary"]["title"] == ""
+    assert report["title"] == ""
+    assert report["source_refs"] == []
+    assert report["read_only"] is True

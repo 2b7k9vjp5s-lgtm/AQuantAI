@@ -72,3 +72,51 @@ def test_total_composite_rejects_invalid_weights() -> None:
 
     with pytest.raises(ValueError, match="Composite weights must sum"):
         build_total_composite_scores(group_scores, weights={"value": 0.5})
+
+
+def test_factor_scoring_isolated_by_date_and_universe_with_deterministic_ties() -> None:
+    values = pd.DataFrame(
+        [
+            {"factor_date": "20260101", "stock_code": "000002", "factor_name": "pe_inverse", "factor_value": 1.0, "factor_group": "value", "universe": "alpha"},
+            {"factor_date": "20260101", "stock_code": "000001", "factor_name": "pe_inverse", "factor_value": 1.0, "factor_group": "value", "universe": "alpha"},
+            {"factor_date": "20260102", "stock_code": "000001", "factor_name": "pe_inverse", "factor_value": 10.0, "factor_group": "value", "universe": "alpha"},
+            {"factor_date": "20260102", "stock_code": "000002", "factor_name": "pe_inverse", "factor_value": 1.0, "factor_group": "value", "universe": "alpha"},
+            {"factor_date": "20260101", "stock_code": "000001", "factor_name": "pe_inverse", "factor_value": 5.0, "factor_group": "value", "universe": "beta"},
+        ]
+    )
+    definition = {"pe_inverse": FactorDefinition("pe_inverse", "value", "descending")}
+
+    scores = score_factor_values(values, definition)
+
+    alpha_day_one = scores[(scores["score_date"] == "20260101") & (scores["universe"] == "alpha")]
+    assert alpha_day_one["stock_code"].tolist() == ["000001", "000002"]
+    assert alpha_day_one["rank"].tolist() == [1, 2]
+    assert scores.loc[(scores["score_date"] == "20260102") & (scores["stock_code"] == "000001"), "rank"].iloc[0] == 1
+
+    with pytest.raises(ValueError, match="duplicate rows"):
+        score_factor_values(pd.concat([values, values.iloc[[0]]], ignore_index=True), definition)
+
+
+def test_composite_scores_isolate_universes_and_reject_ambiguous_or_non_finite_rows() -> None:
+    factor_scores = pd.DataFrame(
+        [
+            {"score_date": "20260101", "stock_code": "000001", "factor_name": "pe_inverse", "factor_group": "value", "score": 80.0, "rank": 1, "universe": "alpha"},
+            {"score_date": "20260101", "stock_code": "000002", "factor_name": "pe_inverse", "factor_group": "value", "score": 80.0, "rank": 1, "universe": "alpha"},
+            {"score_date": "20260101", "stock_code": "000001", "factor_name": "pe_inverse", "factor_group": "value", "score": 10.0, "rank": 1, "universe": "beta"},
+        ]
+    )
+
+    group_scores = build_group_composite_scores(factor_scores)
+    total_scores = build_total_composite_scores(group_scores, weights={"value": 1.0})
+
+    assert total_scores[total_scores["universe"] == "alpha"]["stock_code"].tolist() == ["000001", "000002"]
+    assert total_scores[total_scores["universe"] == "alpha"]["rank"].tolist() == [1, 2]
+    assert total_scores[total_scores["universe"] == "beta"]["rank"].tolist() == [1]
+
+    with pytest.raises(ValueError, match="duplicate rows"):
+        build_group_composite_scores(pd.concat([factor_scores, factor_scores.iloc[[0]]], ignore_index=True))
+
+    non_finite = factor_scores.copy()
+    non_finite.loc[0, "score"] = float("inf")
+    with pytest.raises(ValueError, match="finite numeric scores"):
+        build_group_composite_scores(non_finite)
