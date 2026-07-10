@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from ml.base import MLExperimentConfig, PREDICTION_COLUMNS, FeatureDataset, PredictionResult
+from ml.base import MLExperimentConfig, PREDICTION_COLUMNS, FeatureDataset, PredictionResult, validate_feature_frame
 
 
 class FactorAverageBaselineModel:
@@ -21,7 +21,7 @@ class FactorAverageBaselineModel:
         if missing:
             raise ValueError(f"features is missing configured feature columns: {missing}")
 
-        frame = features.frame.copy()
+        frame = validate_feature_frame(features.frame, self.config.feature_columns)
         if not frame["universe"].eq(self.config.universe).all():
             raise ValueError("features universe must match the experiment universe")
         numeric_features = frame.loc[:, self.config.feature_columns].apply(pd.to_numeric, errors="coerce")

@@ -40,9 +40,10 @@ def test_top_n_selection_and_equal_weights() -> None:
     selection = engine.select_portfolio(_score_fixture()).holdings
 
     assert list(selection.columns) == HOLDING_COLUMNS
-    assert set(selection[selection["rebalance_date"] == "20260101"]["stock_code"]) == {"000001", "000002"}
-    assert set(selection[selection["rebalance_date"] == "20260105"]["stock_code"]) == {"000003", "000002"}
-    weight_sums = selection.groupby("rebalance_date")["weight"].sum()
+    assert set(selection[selection["signal_date"] == "20260101"]["stock_code"]) == {"000001", "000002"}
+    assert set(selection[selection["signal_date"] == "20260105"]["stock_code"]) == {"000003", "000002"}
+    assert selection["rebalance_date"].isna().all()
+    weight_sums = selection.groupby("signal_date")["weight"].sum()
     assert all(math.isclose(value, 1.0) for value in weight_sums)
 
 
@@ -97,7 +98,8 @@ def test_backtest_uses_next_trading_day_and_initial_cash_for_total_return() -> N
     assert result.holdings.iloc[0]["rebalance_date"] == "20260102"
     assert result.equity_curve.iloc[0]["portfolio_return"] == 0.0
     assert result.equity_curve.iloc[0]["equity"] == pytest.approx(100.0)
-    assert result.total_return == pytest.approx(2.0)
+    assert result.equity_curve.iloc[1]["equity"] == pytest.approx(100.0)
+    assert result.total_return == pytest.approx(0.5)
 
 
 def test_portfolio_ties_and_invalid_backtest_inputs_fail_clearly() -> None:
@@ -123,6 +125,17 @@ def test_portfolio_ties_and_invalid_backtest_inputs_fail_clearly() -> None:
     non_finite_scores.loc[0, "score"] = float("inf")
     with pytest.raises(ValueError, match="finite score"):
         engine.select_portfolio(non_finite_scores)
+
+    for column in ("score_date", "stock_code", "universe"):
+        missing_identifier_scores = _score_fixture().copy()
+        missing_identifier_scores.loc[0, column] = None
+        with pytest.raises(ValueError, match="missing identifiers"):
+            engine.select_portfolio(missing_identifier_scores)
+
+        blank_identifier_scores = _score_fixture().copy()
+        blank_identifier_scores.loc[0, column] = "  "
+        with pytest.raises(ValueError, match="blank identifiers"):
+            engine.select_portfolio(blank_identifier_scores)
 
     non_finite_prices = _price_fixture().copy()
     non_finite_prices["close"] = non_finite_prices["close"].astype(float)

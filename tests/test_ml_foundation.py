@@ -123,9 +123,25 @@ def test_ml_feature_validation_and_tie_breaking_are_deterministic() -> None:
     with pytest.raises(ValueError, match="experiment universe"):
         FactorAverageBaselineModel(config).predict(build_feature_dataset(mismatched_universe, config.feature_columns))
 
-    unchecked = FeatureDataset(
-        tied_features.assign(value_score=float("inf")),
-        config.feature_columns,
-    )
-    with pytest.raises(ValueError, match="configured features must contain finite"):
-        FactorAverageBaselineModel(config).predict(unchecked)
+    with pytest.raises(ValueError, match="finite numeric"):
+        FeatureDataset(tied_features.assign(value_score=float("inf")), config.feature_columns)
+
+    with pytest.raises(ValueError, match=r"duplicate \(feature_date, stock_code, universe\)"):
+        FeatureDataset(pd.concat([tied_features, tied_features.iloc[[0]]], ignore_index=True), config.feature_columns)
+
+    for column in ("feature_date", "stock_code", "universe"):
+        missing_identifier_features = tied_features.copy()
+        missing_identifier_features.loc[0, column] = None
+        with pytest.raises(ValueError, match="missing identifiers"):
+            build_feature_dataset(missing_identifier_features, config.feature_columns)
+
+        blank_identifier_features = tied_features.copy()
+        blank_identifier_features.loc[0, column] = "  "
+        with pytest.raises(ValueError, match="blank identifiers"):
+            build_feature_dataset(blank_identifier_features, config.feature_columns)
+
+        with pytest.raises(ValueError, match="missing identifiers"):
+            FeatureDataset(missing_identifier_features, config.feature_columns)
+
+        with pytest.raises(ValueError, match="blank identifiers"):
+            FeatureDataset(blank_identifier_features, config.feature_columns)

@@ -48,7 +48,7 @@ class WeeklyRebalanceBacktestEngine:
         selected["selection_count"] = selected.groupby(["score_date", "universe"])["stock_code"].transform("count")
         selected["weight"] = 1.0 / selected["selection_count"]
         selected = selected.rename(columns={"score_date": "signal_date"})
-        selected["rebalance_date"] = selected["signal_date"]
+        selected["rebalance_date"] = pd.NA
         return PortfolioSelection(selected[HOLDING_COLUMNS].reset_index(drop=True))
 
     def run(self, prices: pd.DataFrame, scores: pd.DataFrame) -> BacktestResult:
@@ -75,11 +75,6 @@ class WeeklyRebalanceBacktestEngine:
         equity = self.config.initial_cash
 
         for trade_date in trade_dates:
-            if trade_date in rebalance_dates:
-                current_weights = _weights_for_date(holdings, trade_date)
-                turnover_values.append(_turnover(previous_weights, current_weights))
-                previous_weights = current_weights
-
             if current_weights.empty:
                 portfolio_return = 0.0
             else:
@@ -87,6 +82,11 @@ class WeeklyRebalanceBacktestEngine:
                 portfolio_return = float((day_returns * current_weights).sum())
             equity *= 1.0 + portfolio_return
             returns.append({"trade_date": trade_date, "portfolio_return": portfolio_return, "equity": equity})
+
+            if trade_date in rebalance_dates:
+                current_weights = _weights_for_date(holdings, trade_date)
+                turnover_values.append(_turnover(previous_weights, current_weights))
+                previous_weights = current_weights
 
         equity_curve = pd.DataFrame(returns)[EQUITY_COLUMNS]
         metrics = _compute_metrics(
@@ -121,8 +121,7 @@ def _validate_prices(prices: pd.DataFrame) -> None:
 def _prepare_prices(prices: pd.DataFrame) -> pd.DataFrame:
     _validate_prices(prices)
     frame = prices.copy()
-    frame["trade_date"] = frame["trade_date"].astype(str)
-    frame["stock_code"] = frame["stock_code"].astype(str)
+    frame = _normalize_identifiers(frame, ["trade_date", "stock_code"], "prices")
     if frame.duplicated(["trade_date", "stock_code"]).any():
         raise ValueError("prices contains duplicate (trade_date, stock_code) rows")
     frame["close"] = pd.to_numeric(frame["close"], errors="coerce")
@@ -143,9 +142,7 @@ def _validate_scores(scores: pd.DataFrame) -> None:
 def _normalize_scores(scores: pd.DataFrame) -> pd.DataFrame:
     _validate_scores(scores)
     frame = scores.copy()
-    frame["score_date"] = frame["score_date"].astype(str)
-    frame["stock_code"] = frame["stock_code"].astype(str)
-    frame["universe"] = frame["universe"].astype(str)
+    frame = _normalize_identifiers(frame, ["score_date", "stock_code", "universe"], "scores")
     if frame.duplicated(["score_date", "stock_code", "universe"]).any():
         raise ValueError("scores contains duplicate (score_date, stock_code, universe) rows")
     for column in ("score", "rank"):
@@ -154,9 +151,18 @@ def _normalize_scores(scores: pd.DataFrame) -> pd.DataFrame:
             raise ValueError(f"scores must contain finite {column} values")
     if (frame["rank"] < 1).any():
         raise ValueError("scores must contain positive rank values")
-    if frame["universe"].eq("").any():
-        raise ValueError("scores must contain a non-empty universe")
     return frame
+
+
+def _normalize_identifiers(frame: pd.DataFrame, columns: list[str], frame_name: str) -> pd.DataFrame:
+    if frame[columns].isna().any().any():
+        raise ValueError(f"{frame_name} must not contain missing identifiers: {columns}")
+    normalized = frame.copy()
+    for column in columns:
+        normalized[column] = normalized[column].astype(str).str.strip()
+    if (normalized[columns] == "").any().any():
+        raise ValueError(f"{frame_name} must not contain blank identifiers: {columns}")
+    return normalized
 
 
 def _build_execution_date_map(signal_dates: list[str], trade_dates: list[str]) -> dict[str, str]:
