@@ -1,7 +1,8 @@
-import pytest
-from fastapi.testclient import TestClient
 from pathlib import Path
 import re
+
+import pytest
+from fastapi.testclient import TestClient
 
 from agent import RESEARCH_DISCLAIMER
 from backend.main import app
@@ -14,7 +15,7 @@ def test_dashboard_overview_payload_contains_required_sections() -> None:
 
     assert payload["read_only"] is True
     assert payload["disclaimer"] == RESEARCH_DISCLAIMER
-    assert payload["sections"]["project_overview"]["metrics"][0]["value"] == "v0.1 baseline"
+    assert payload["sections"]["project_overview"]["metrics"][0]["value"] == "v0.2 local Dashboard baseline"
     assert set(payload["sections"]) == {
         "project_overview",
         "factor_summary",
@@ -104,7 +105,7 @@ def test_dashboard_page_preserves_existing_endpoint_contracts() -> None:
     overview = client.get("/dashboard/overview")
     report = client.get("/dashboard/report")
 
-    assert root.json()["status"] == "v0.1 research-only baseline"
+    assert root.json()["status"] == "v0.2 research-only local Dashboard baseline"
     assert health.json() == {"status": "ok"}
     assert overview.json()["page_id"] == "dashboard_overview"
     assert report.json()["page_id"] == "dashboard_report"

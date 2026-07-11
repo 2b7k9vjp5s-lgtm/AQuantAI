@@ -40,7 +40,7 @@ Dashboard
 - Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.
 - ML Research Layer: Define feature, label, prediction, evaluation, and Qlib adapter boundaries without production training.
 - AI Research Agent: Assemble research-only structured reports from prior-layer outputs without owning calculations or trading decisions.
-- Dashboard: Present research data and outputs through read-only contracts and JSON endpoints.
+- Dashboard: Present research data and outputs through read-only contracts, JSON endpoints, and a local fixture-backed browser page.
 
 ## Dependency Rules
 
@@ -86,3 +86,7 @@ Post-Phase-6 stabilization adds documentation consistency, a local end-to-end fi
 ## v0.1 Baseline Boundary
 
 The v0.1 baseline freezes the completed local research-only scope and adds release-readiness documentation, version/status alignment, a changelog, a release checklist, future work boundaries, and local-only CI checks. It does not add runtime behavior, live data ingestion, external service integration, trading features, production deployment, or production-readiness claims.
+
+## v0.2 Local Dashboard Baseline Boundary
+
+The v0.2 baseline records the accepted correctness hardening and the local read-only Dashboard delivery. The browser page renders only existing fixture JSON payloads; Dashboard contracts, research calculations, and allowed actions remain unchanged. It does not add live ingestion, database persistence, production Qlib/VectorBT/LLM execution, authentication, deployment automation, broker APIs, order placement, or automated trading.

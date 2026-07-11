@@ -73,3 +73,11 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Output: Version/status consistency, changelog, release checklist, local-only CI workflow, and future work boundary documentation.
 - Completion standard: Version `0.1.0` is consistent, local tests and demo pass, documentation avoids production-readiness claims, and future work remains outside the v0.1 baseline.
 - Current status: Ready for review.
+
+## v0.2 Local Read-Only Research Dashboard Baseline
+
+- Goal: Align the accepted correctness hardening and local Dashboard delivery into the active, local research-only baseline.
+- Input: The merged deterministic research foundation, v0.2 correctness hardening, and local read-only Dashboard page.
+- Output: Version `0.2.0`, current-status documentation, release handoff information, and focused metadata tests.
+- Completion standard: Active metadata and documentation describe the fixture-backed, read-only v0.2 Dashboard baseline; tests and demo remain local and pass without new product capability.
+- Current status: Version alignment and release handoff review.

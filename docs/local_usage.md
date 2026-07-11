@@ -1,6 +1,6 @@
 # Local Usage Guide
 
-This guide describes the v0.1 local, research-only baseline. It is not production-ready, does not provide investment advice, and does not support live trading, broker connections, or order placement.
+This guide describes the v0.2 local, read-only research Dashboard baseline. It is fixture/sample-data-only, not production-ready, does not provide investment advice, and does not support live trading, broker connections, or order placement.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ Open these local URLs in a browser or HTTP client:
 
 Expected results:
 
-- `/` reports version `0.1.0`.
+- `/` reports version `0.2.0` and the research-only local Dashboard baseline status.
 - `/health` reports `{"status": "ok"}`.
 - `/dashboard` is a local graphical page. It renders the existing fixture/sample Dashboard JSON payloads only.
 - Both dashboard endpoints return JSON with `read_only: true` and the research disclaimer.
@@ -56,16 +56,16 @@ The Dashboard is a local, read-only research surface. The browser page is not a 
 Build the image:
 
 ```bash
-docker build -t aquantai:v0.1 .
+docker build -t aquantai:v0.2 .
 ```
 
 Start it on port 8000:
 
 ```bash
-docker run --rm -p 8000:8000 aquantai:v0.1
+docker run --rm -p 8000:8000 aquantai:v0.2
 ```
 
-Use the same four local URLs above to verify the API. Stop the foreground container with `Ctrl+C`.
+Use the listed local URLs above to verify the API. Stop the foreground container with `Ctrl+C`.
 
 ## Docker Compose
 
@@ -81,7 +81,7 @@ Start the app and PostgreSQL services:
 docker compose up --build
 ```
 
-The app is available on port 8000 and PostgreSQL is exposed on port 5432. PostgreSQL starts to validate the Compose environment, but database persistence is not implemented in the v0.1 baseline. The app remains a local, fixture-oriented research service and does not claim persisted research data.
+The app is available on port 8000 and PostgreSQL is exposed on port 5432. PostgreSQL starts to validate the Compose environment, but database persistence is not implemented in the v0.2 baseline. The app remains a local, fixture-oriented research service and does not claim persisted research data.
 
 Stop and remove the test stack, including its volume:
 
@@ -99,7 +99,7 @@ If PowerShell cannot find `docker` immediately after installing Docker Desktop, 
 docker version
 ```
 
-## v0.1 Boundaries
+## v0.2 Boundaries
 
 - Research and learning use only; not investment advice or a trading recommendation.
 - No live data ingestion, real LLM calls, broker APIs, order placement, automatic trading, or production deployment.

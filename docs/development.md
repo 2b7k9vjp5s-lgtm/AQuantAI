@@ -41,9 +41,9 @@ Examples:
 - Keep integration tests local and fixture-based.
 - Do not add network, broker, trading, or production deployment requirements to tests.
 
-## v0.1 Release Readiness Checks
+## v0.2 Release Handoff Checks
 
-Before opening or updating a v0.1 release-readiness pull request, run:
+Before opening or updating a v0.2 release-handoff pull request, run:
 
 ```bash
 python -m pytest

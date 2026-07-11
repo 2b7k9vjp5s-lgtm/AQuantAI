@@ -1,6 +1,6 @@
 # Future Work
 
-The items below are intentionally outside the v0.1 baseline. They should only be started after a new review issue explicitly opens the next scope.
+The items below are intentionally outside the v0.2 baseline. They should only be started after a new review issue explicitly opens the next scope.
 
 ## Data and Persistence
 
@@ -31,7 +31,7 @@ The items below are intentionally outside the v0.1 baseline. They should only be
 - Release tagging and packaging improvements.
 - Documentation automation for release notes and checklists.
 
-## Explicitly Not in v0.1
+## Explicitly Not in v0.2
 
 - Trading buttons.
 - Broker APIs.
