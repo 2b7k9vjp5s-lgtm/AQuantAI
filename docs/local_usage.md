@@ -65,7 +65,7 @@ Start it on port 8000:
 docker run --rm -p 8000:8000 aquantai:v0.2
 ```
 
-Use the same four local URLs above to verify the API. Stop the foreground container with `Ctrl+C`.
+Use the listed local URLs above to verify the API. Stop the foreground container with `Ctrl+C`.
 
 ## Docker Compose
 

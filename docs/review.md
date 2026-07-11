@@ -21,11 +21,11 @@ Required review content:
 
 ## Current Status
 
-Baseline main commit: `ccede72b3fa56bd043a1781ca971844d71f91665`
+Version-alignment base commit: `ccede72b3fa56bd043a1781ca971844d71f91665`
 
 Active baseline: `0.2.0` local read-only research Dashboard baseline.
 
-Current review: [v0.2 Version Alignment & Release Handoff](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/31)
+Release handoff tracked in [Issue #31](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/31).
 
 The accepted v0.2 scope includes deterministic ranking and backtest correctness hardening plus the local `/dashboard` presentation page backed only by existing fixture JSON APIs. It remains fixture/sample-data-only, read-only, research-only, and not production-ready. Live ingestion, database persistence, production Qlib/VectorBT/LLM execution, authentication, deployment automation, broker integration, order placement, and automated trading remain out of scope.
 
