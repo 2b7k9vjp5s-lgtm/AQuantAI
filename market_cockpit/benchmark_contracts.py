@@ -71,7 +71,7 @@ class BenchmarkProvenance:
     requested_end_date: str
     information_cutoff_date: str
     requested_as_of_cutoff: str | None
-    effective_benchmark_session: str
+    effective_benchmark_session: str | None
     ingestion_imported_at_utc: str
     ingestion_completed_at_utc: str | None
     collection_timestamp_utc: str | None
@@ -97,7 +97,7 @@ class BenchmarkContext:
     equity_information_cutoff_date: str
     benchmark_information_cutoff_date: str
     equity_effective_session: str
-    effective_benchmark_session: str
+    effective_benchmark_session: str | None
     expected_session_source: str
     expected_session_count: int
     expected_session_start: str

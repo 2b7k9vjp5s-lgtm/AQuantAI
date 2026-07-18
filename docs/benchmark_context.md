@@ -39,6 +39,8 @@ Benchmark rows must be no later than that clipped sequence. Equity and benchmark
 
 Overall `aligned` requires both session and cutoff alignment. A partial session result remains `partial`; otherwise an earlier session is `different_session` and equal sessions with different cutoffs are `different_cutoff`. Requested, available, and equity-session-aligned code counts plus an exact sorted missing-code list make the status auditable. No relative-performance calculation is inferred.
 
+The public effective benchmark session is the deterministic maximum of eligible per-code latest sessions after expected-calendar filtering. It is `null` when no exact requested code has an eligible row. A persisted row excluded by the selected equity calendar cannot become an effective session, and an all-ineligible scope remains `partial` with zero available/aligned codes and every exact code listed as missing.
+
 ## Close-Based Formulas
 
 For each exact benchmark code, windows end at that code's latest valid close within the clipped expected-session sequence. Each metric is calculated only when every expected persisted open session in its exact ending window is present once with a finite positive close. Missing rows are not forward-filled, sparse rows do not substitute for expected sessions, and another code is never substituted.

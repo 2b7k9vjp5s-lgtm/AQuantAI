@@ -175,11 +175,7 @@ class MarketCockpitService:
         else:
             alignment_status = "aligned"
 
-        effective_benchmark_session = (
-            max(session for session in latest_sessions if session is not None)
-            if latest_sessions
-            else persisted.effective_benchmark_session
-        )
+        effective_benchmark_session = max(latest_sessions) if latest_sessions else None
         if cutoff_alignment_status == "different_cutoff":
             warnings.append(
                 "Equity and benchmark information cutoffs differ: "
@@ -190,12 +186,20 @@ class MarketCockpitService:
             warnings.append(
                 f"Benchmark exact scope has no eligible row for codes: {missing_codes}."
             )
+        if not available_metrics:
+            warnings.append(
+                "No requested benchmark code has an eligible row in the selected "
+                "persisted open-session sequence."
+            )
         if len(latest_sessions) > 1:
             warnings.append(
                 "Benchmark codes have mixed latest eligible sessions: "
                 f"{sorted(session for session in latest_sessions if session is not None)}."
             )
-        if effective_benchmark_session != equity_effective_session:
+        if (
+            effective_benchmark_session is not None
+            and effective_benchmark_session != equity_effective_session
+        ):
             warnings.append(
                 "Equity and benchmark effective sessions differ: "
                 f"equity={equity_effective_session}, benchmark={effective_benchmark_session}."

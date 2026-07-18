@@ -589,6 +589,66 @@ def test_one_requested_code_without_eligible_row_is_partial(client) -> None:
     assert any("no eligible row" in warning for warning in context["warnings"])
 
 
+def test_all_requested_codes_outside_open_calendar_have_no_effective_session(
+    client,
+) -> None:
+    test_client, session_factory = client
+    equity = _equity(session_factory)
+    rows = build_benchmark_fixture().benchmark_index_daily
+    rows = rows.groupby("index_code", sort=True).head(1).copy()
+    excluded_date = "20260110"
+    rows["trade_date"] = excluded_date
+    benchmark = _benchmark_frame(session_factory, rows)
+
+    response = test_client.get(
+        "/market-cockpit/snapshot?series_key="
+        + equity.series_key
+        + "&benchmark_series_key="
+        + benchmark.series_key
+    )
+    assert response.status_code == 200
+    context = response.json()["benchmark_context"]
+    assert context["requested_code_count"] == 2
+    assert context["available_code_count"] == 0
+    assert context["aligned_code_count"] == 0
+    assert context["missing_codes"] == ["000001", "000300"]
+    assert context["session_alignment_status"] == "partial"
+    assert context["alignment_status"] == "partial"
+    assert context["cutoff_alignment_status"] == "aligned"
+    assert context["effective_benchmark_session"] is None
+    assert context["provenance"]["effective_benchmark_session"] is None
+    for metric in context["metrics"]:
+        assert metric["latest_close"] is None
+        assert metric["latest_session"] is None
+        assert metric["latest_return"] is None
+        assert metric["sma20"] is None
+        assert metric["sma60"] is None
+        assert metric["realized_volatility_20"] is None
+        assert metric["max_drawdown_20"] is None
+        assert metric["available_session_count"] == 0
+        assert metric["latest_return_window"]["reason"] == "insufficient_history"
+        assert metric["risk_window"]["reason"] == "insufficient_history"
+    assert any(
+        "outside the selected equity open-session sequence" in warning
+        and excluded_date in warning
+        for warning in context["warnings"]
+    )
+    assert any(
+        "No requested benchmark code has an eligible row" in warning
+        for warning in context["warnings"]
+    )
+    assert excluded_date not in str(context["effective_benchmark_session"])
+
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "market_cockpit"
+        / "static"
+        / "market_cockpit.js"
+    ).read_text(encoding="utf-8")
+    assert 'return "Unavailable";' in script
+    assert '["Effective benchmark session", provenance.effective_benchmark_session]' in script
+
+
 def test_page_uses_safe_dom_and_neutral_read_only_benchmark_wording() -> None:
     page = TestClient(app).get("/market-cockpit").text
     script = (
