@@ -1,283 +1,230 @@
-# Issue #47 — v0.4B Benchmark Index Persistence And Market Cockpit Context
+# Issue #47 — v0.4B Benchmark Session Integrity And Alignment Revision
 
 ## Task identity
 
 - Repository: `2b7k9vjp5s-lgtm/AQuantAI`
 - Issue: `#47 [v0.4B] Benchmark index persistence and Market Cockpit context`
-- Required product ancestor: v0.4A squash merge `24a41ed7af400ed39babb6b5d5b9ea0da97fe059`
-- Branch to create: `feat/v04b-benchmark-index-context`
-- Draft PR title: `[v0.4B] Add benchmark index context`
+- Draft PR: `#48 [v0.4B] Add benchmark index context`
+- Branch: `feat/v04b-benchmark-index-context`
+- Required base/task ancestor: `5420da2e28b52e9410ca1216c1b8feb7652978ce`
+- Reviewed implementation head: `6402762f1af6723b7a473a779edf9587598dcd91`
+- Passing GitHub Actions run for reviewed head: `29640571746`
+- Blocking COMMENT review: `4728315417`
 - Project version remains `0.2.0`
 
-Read `.codex/WORKFLOW.md`, Issue #47 and its latest authorization comment, merged PR #46, `docs/implementation_plan.md`, `docs/product_architecture.md`, `docs/akshare_ingestion.md`, `docs/market_cockpit.md`, the v0.3 persistence/series code, and the complete v0.4A Market Cockpit implementation before editing.
+Read `.codex/WORKFLOW.md`, Issue #47, PR #48, review `4728315417`, `docs/benchmark_context.md`, the selected-equity Market Cockpit calendar/cutoff implementation, and this file before editing.
 
-The exact branch start SHA is the task-sync commit recorded in the latest authorization comment on Issue #47. It must contain this file and have v0.4A merge commit `24a41ed7af400ed39babb6b5d5b9ea0da97fe059` as an ancestor. Stop and report if the ancestry or task file differs.
+Keep PR #48 Draft. This is a bounded correctness and auditability revision; do not redesign accepted persistence, provider, or product boundaries.
+
+## Accepted implementation that must not regress
+
+The following areas are accepted in principle:
+
+- dedicated `benchmark_index_daily` normalized contract and Alembic `20260718_0003`;
+- restrictive ingestion-run relationship, natural key, validation, rollback, idempotency, and downgrade/upgrade coverage;
+- separate benchmark and equity complete-snapshot series identities;
+- one explicit AKShare `index_zh_a_hist` endpoint with no silent fallback;
+- maximum 20 explicit codes, explicit network authorization, finite timeout/retries, live-cutoff discipline, offline fixture, and database-free dry run;
+- explicit benchmark `series_key` or complete selector, one physical successful run, and no cross-run/series/provider/endpoint stitching;
+- optional `benchmark_series_key` while preserving equity-only v0.4A API behavior;
+- separate provenance and provider-attributed, non-official, non-full-market wording;
+- lazy injectable database construction and 422/404/503 behavior;
+- local semantic HTML/CSS/vanilla JavaScript using DOM/`textContent` only;
+- no import, startup, page, test, CI, fixture-demo, or dry-run network side effect;
+- no relative performance, alpha, beta, signals, recommendations, brokers, orders, or trading.
 
 ## Objective
 
-Add a bounded, provider-attributed benchmark-index daily-data foundation and deterministic read-only benchmark context beside the existing selected-universe Market Cockpit.
+Close two remaining correctness gaps:
 
-This slice closes only the benchmark-index gap. It does not implement sector rotation, style, valuation, crowding, Industry Alpha, recommendations, portfolios, or trading.
+1. benchmark metrics must use exact consecutive point-in-time open-session windows rather than merely the latest N stored rows;
+2. benchmark alignment must never report `aligned` when exact code coverage is incomplete, per-code sessions disagree, or the documented cutoff-alignment condition is not satisfied.
 
-## Required product semantics
+## 1. Establish one explicit expected-session sequence
 
-1. Keep equity selected-universe monitoring and benchmark-index context as separate data domains and separate snapshot series.
-2. Require explicit compatible selectors. Never guess a benchmark series by provider, code popularity, recency, or a hard-coded default.
-3. Never stitch rows across ingestion runs or series.
-4. Never describe provider-attributed data as an official exchange statement unless the reviewed source contract proves that wording.
-5. Never imply full-market coverage from one or several benchmark codes.
-6. Keep all outputs local-first, personal-use, read-only, research-only, auditable, and non-advisory.
-7. Preserve every accepted v0.4A route, payload, calculation, provenance, cutoff, diagnostic, and no-network boundary.
-
-## Implementation order
-
-1. Pull current `main` and verify the exact authorized start SHA from Issue #47.
-2. Create `feat/v04b-benchmark-index-context` from that exact SHA.
-3. Inspect the current ingestion-run, series-identity, migration, repository, provider, CLI, Market Cockpit service/API/page, fixture, and test boundaries before designing changes.
-4. Document the benchmark contract, endpoint mapping, series identity, formulas, cutoff/alignment rules, and missing-data behavior before implementing presentation.
-5. Implement contracts and persistence first, then provider/CLI, repository/service/calculation, API/page, documentation, fixtures, and tests.
-6. Open one Draft PR and stop for ChatGPT review.
-
-## Normalized benchmark contract
-
-Add a dedicated normalized benchmark-index daily contract and ORM table. Use a clear name such as `benchmark_index_daily`; do not reuse `daily_price` or `stock_code` semantics.
-
-Required fields:
-
-- `ingestion_run_id`;
-- `source` or provider identity;
-- `index_code`;
-- `trade_date`;
-- finite positive `close`.
-
-Optional fields may include `open`, `high`, `low`, `volume`, and `amount` only when the selected endpoint semantics are explicitly documented and validated. Missing optional values remain `null`; do not manufacture zeroes. If OHLC values are present, enforce finite values, positive prices, and `low <= open/close <= high`. Activity values, when present, must be finite and nonnegative.
-
-Natural uniqueness must include ingestion run, source, exact index code, and trade date. Add code/date lookup indexes suitable for one-run bounded reads. Link rows restrictively to immutable ingestion attempts.
-
-Update ingestion-run relationships and dataset counts without weakening complete-snapshot, rollback, idempotency, or failed-attempt behavior.
-
-## Migration
-
-Add one explicit Alembic migration after `20260718_0002`.
-
-The migration must:
-
-- create only the benchmark-index persistence required by this issue;
-- preserve all existing rows and constraints;
-- provide deterministic upgrade and downgrade behavior;
-- include portable constraints where supported and application validation for semantics that cannot be expressed portably;
-- pass clean `base -> head`, downgrade/upgrade coverage, and `python -m alembic check`;
-- avoid unrelated schema cleanup.
-
-## Benchmark snapshot-series identity
-
-Benchmark data uses its own canonical series identity and must never share the equity series key.
-
-Canonical identity must include at least:
-
-- series schema version;
-- provider;
-- benchmark contract version;
-- exact dataset names;
-- exact sorted index-code scope;
-- requested start and end dates;
-- daily frequency;
-- complete snapshot mode;
-- exact-scope semantics;
-- exact selected endpoint name;
-- adapter compatibility version;
-- any additional parameter that changes normalized compatibility.
-
-Timeout, retry count, network mode, installed patch version, and collection timestamp remain request metadata rather than compatibility identity unless they change normalized semantics.
-
-Provider-only, code-only, or incomplete selectors fail closed. Snapshot reads select exactly one successful complete physical ingestion run using the established deterministic ordering and never merge histories across runs.
-
-## Controlled AKShare ingestion
-
-Extend the provider abstraction and manual CLI for an explicit bounded list of benchmark index codes.
-
-Before implementing the live mapping, inspect the installed supported AKShare package range and select exactly one index-history endpoint for v0.4B. Record in documentation and tests:
-
-- exact endpoint name;
-- arguments and date/code semantics;
-- returned column mapping;
-- source attribution;
-- frequency;
-- activity-field units or their unsupported status;
-- adapter compatibility version.
-
-Do not implement silent endpoint fallback. A different endpoint must produce a different series identity and requires a future reviewed change.
-
-Live behavior:
-
-- requires explicit `--allow-network`;
-- accepts at most 20 explicit index codes;
-- has no all-index or default-index mode;
-- uses finite child-process timeout and finite retries;
-- cannot run during import, FastAPI startup, page access, tests, or CI;
-- records one UTC collection timestamp;
-- applies the established live-cutoff discipline unless the chosen endpoint has a separately documented historical point-in-time metadata guarantee;
-- bounds requested price dates independently from the information cutoff;
-- rejects unexpected codes, duplicate dates, out-of-range rows, invalid closes, and incompatible metadata transactionally.
-
-Offline fixture and injected-frame paths must cover normalization and persistence without network access. Dry-run creates no engine, ingestion run, or database row.
-
-Provider metadata exposed to users must use a fixed allowlist: collection/import/completion time, effective cutoff, installed package version, endpoint, frequency, exact code scope, network mode, timeout/retries, contract version, and adapter version. Reject or omit unknown sensitive or credential-like keys.
-
-## Repository and selection
-
-Add benchmark repository methods that require an explicit benchmark `series_key` or an equally complete canonical selector.
+For Market Cockpit benchmark context, derive the expected A-share open-session sequence from the already selected equity snapshot's persisted trade calendar.
 
 Requirements:
 
-- one successful complete benchmark snapshot only;
-- deterministic current and historical `as_of_cutoff` selection;
-- no row after the selected information cutoff or permitted effective session;
-- exact code scope and requested date range;
-- no cross-series, cross-run, cross-provider, or endpoint substitution;
-- actionable not-found/incompatible errors;
-- lazy injectable session/engine construction;
-- no fixture fallback disguised as persisted data.
+- use only persisted open sessions at or before the equity effective as-of session;
+- honor the requested `as_of_cutoff`, equity cutoff, benchmark cutoff, equity effective session, and benchmark requested end date;
+- never query a live calendar or infer weekdays;
+- never use rows from another equity or benchmark run;
+- pass the exact ordered expected-session sequence into the benchmark calculation boundary explicitly;
+- keep benchmark and equity data rows separate even though the equity calendar defines session eligibility;
+- fail or return an actionable non-success result if the required persisted calendar is unavailable or internally contradictory; do not silently fall back to row order alone.
 
-## Benchmark calculation contract
+Document why the selected equity trade calendar is the v0.4B session reference for A-share benchmark context.
 
-For each exact benchmark code, calculate only close-based context supportable by persisted rows.
+## 2. Exact per-code window eligibility
 
-Required values:
+For each exact benchmark code, classify row availability against the expected session sequence before calculating metrics.
 
-1. Latest available close and its session.
-2. Latest-session return `close(t) / close(t-1) - 1`, requiring two valid ordered benchmark sessions.
-3. SMA20 and SMA60 position using the current close and the arithmetic mean of exactly the latest 20 or 60 valid ordered sessions, including the current session.
-4. Twenty-return realized volatility requiring exactly 21 valid ordered closes, using sample standard deviation `ddof=1` and annualization `sqrt(252)`.
-5. Twenty-return maximum drawdown from the compounded wealth path built from exactly 21 valid ordered closes, including initial wealth `1.0`.
-6. Available and required session counts, plus bounded warnings.
+### Latest close
 
-Insufficient or broken windows return `null` plus explicit warnings. Do not shorten windows, forward-fill missing closes, infer closed-market values, substitute another code, or fabricate zeroes.
+- The latest available valid close at or before the permitted bound may still be exposed with its actual session.
+- A stale or missing latest row must affect alignment and warnings.
 
-Do not add beta, correlation, alpha, excess return, relative-strength ranking, timing signals, regime recommendations, or buy/sell outputs.
+### Latest return
 
-## Market Cockpit integration
+Calculate `close(t) / close(t-1) - 1` only when:
 
-Preserve the existing required equity `series_key`. Add an optional explicit `benchmark_series_key`, for example:
+- both rows are valid and finite;
+- `t` is the code's latest available session;
+- `t-1` is the immediately preceding expected open session.
 
-`GET /market-cockpit/snapshot?series_key=<equity>&benchmark_series_key=<benchmark>&as_of_cutoff=YYYYMMDD`
+Do not calculate a multi-session move and label it as a latest-session return. A missing immediately preceding expected session returns `null` with a bounded warning.
 
-Behavior:
+### SMA20 and SMA60
 
-- without `benchmark_series_key`, the accepted equity-only v0.4A response remains compatible and benchmark context stays visibly unsupported/unavailable;
-- with a valid benchmark key, select one equity run and one benchmark run independently and expose their provenance separately;
-- with an invalid or incompatible benchmark selector, return an actionable non-success response instead of silently omitting or replacing it;
-- benchmark rows must be at or before both the requested cutoff and the permitted equity effective as-of session;
-- expose benchmark information cutoff, selected run ID, exact code scope, effective benchmark session, endpoint, source, generated time, and alignment status;
-- surface differing equity/benchmark cutoffs or sessions as explicit warnings rather than hiding them;
-- do not calculate cross-domain relative performance in this issue.
+Calculate only when every one of the exact 20 or 60 expected open sessions ending at the code's latest session is present exactly once with a valid close.
 
-Keep error behavior consistent and documented: validation errors use 422, missing eligible data uses 404, and unavailable database/configuration/query state uses 503. Do not convert data-quality problems into HTTP 200 with fabricated values.
+- no shortened window;
+- no sparse-row substitution;
+- no forward fill;
+- no substitution from another code;
+- a gap outside a metric's required window must not invalidate that metric.
 
-## Read-only page
+### Realized volatility and maximum drawdown
 
-Add a bounded benchmark section to `/market-cockpit` using the existing semantic HTML, local CSS, and vanilla JavaScript pattern.
+Calculate only from exactly 21 consecutive expected open sessions ending at the code's latest session.
 
-The page must:
+- derive exactly 20 adjacent one-session returns;
+- use sample standard deviation `ddof=1` and annualize by `sqrt(252)`;
+- build drawdown from initial wealth `1.0` and the same 20 returns;
+- any missing session inside the 21-session window returns both metrics as `null` plus a warning.
 
-- use DOM creation and `textContent`, never `innerHTML`, `eval`, or external assets;
-- display exact benchmark codes, provider/source, endpoint, series/run, cutoff, effective session, formulas, counts, values, warnings, and limitations;
-- distinguish equity scope from benchmark context;
-- use neutral wording such as `provider-attributed benchmark index context` unless a reviewed contract proves an official-source claim;
-- remain usable without a benchmark key and explain the unsupported state;
-- contain no forms, trading controls, recommendations, automatic refresh, collection trigger, or write action.
+### Output and diagnostics
 
-## Compatibility
+Keep outputs bounded and deterministic. Expose enough information to explain every null metric. Use either explicit per-window fields or an equally auditable structure containing at least:
 
-Do not regress:
+- required session count;
+- present valid session count within that exact window;
+- window start/end session when definable;
+- bounded missing session list or missing count;
+- stable reason such as `insufficient_history`, `missing_expected_session`, or `invalid_close`.
 
-- `/`, `/health`, `/dashboard`, `/dashboard/overview`, `/dashboard/report`;
-- `/market-cockpit` static page behavior;
-- equity-only `/market-cockpit/snapshot` requests and payload semantics;
-- v0.4A point-in-time calculations, provenance allowlist, selected-universe labels, completeness states, or latest-return diagnostics;
-- v0.3A/v0.3B ingestion, series identity, migration, rollback, and downgrade protections;
-- import/startup/page/test/CI no-network behavior.
+A total historical `available_session_count` alone is not sufficient when a metric is null despite total rows exceeding its required count.
 
-Any additive response field must be optional or have a backward-compatible default when no benchmark key is supplied.
+Sort code outputs and any missing-session details deterministically.
 
-## Required tests
+## 3. Deterministic alignment and coverage semantics
 
-Add deterministic SQLite and PostgreSQL coverage for at least:
+Revise benchmark context alignment so it accounts for exact requested-code coverage, per-code latest sessions, equity session, and cutoff policy.
 
-1. migration upgrade, downgrade, and existing-row preservation;
-2. benchmark contract normalization and optional-field null behavior;
-3. natural-key uniqueness, duplicate rejection, invalid close/OHLC/activity rejection, and transaction rollback;
-4. deterministic series identity and isolation across code scope, dates, endpoint, provider, contract, and adapter version;
-5. provider-only and incomplete-selector fail-closed behavior;
-6. explicit CLI authorization, maximum 20-code scope, dry-run, offline fixture, timeout/retry, and zero-network behavior;
-7. current and historical benchmark snapshot selection;
-8. one physical benchmark run only and no cross-run/series stitching;
-9. benchmark and equity series separation;
-10. cutoff and future-row traps;
-11. exact latest return, SMA20/SMA60, volatility, and drawdown formulas;
-12. insufficient history, missing session, invalid close, and mismatched-session warnings;
-13. API 422/404/503 behavior and equity-only regression;
-14. page provenance, neutral wording, DOM-safe rendering, limitations, and no controls;
-15. all existing Dashboard, persistence, ingestion, and v0.4A tests.
+At minimum expose bounded audit fields equivalent to:
 
-## Required validation
+- requested code count;
+- available code count;
+- aligned code count;
+- exact missing code list;
+- per-code latest session through existing metrics;
+- equity information cutoff;
+- benchmark information cutoff;
+- equity effective session;
+- effective benchmark session;
+- session-alignment status;
+- cutoff-alignment status, or one combined status with equally explicit semantics.
+
+Required rules:
+
+- `aligned` is permitted only when every exact requested code has an available latest row at the equity effective session and the documented cutoff-alignment condition is satisfied;
+- if any requested code has no eligible row, status is `partial` and the code is listed;
+- if code latest sessions differ, status is `partial`;
+- if all available requested codes share one earlier session, status is a clear non-aligned value such as `different_session`;
+- equal effective sessions with different information cutoffs must not remain silently `aligned` if documentation states cutoff differences are non-aligned; model cutoff alignment separately or use a documented combined non-aligned status;
+- warnings, counts, status, provenance, and per-code metrics must not contradict one another.
+
+Do not redefine selected benchmark codes as full-market coverage.
+
+## 4. Documentation and page
+
+Update only directly affected documentation and presentation:
+
+- `docs/benchmark_context.md` must define the expected-session source, exact-window rules, gap behavior, coverage counts, and alignment/cutoff states;
+- page formula wording must say exact consecutive persisted open-session windows, not merely N closes;
+- the page must display coverage/alignment counts and missing codes without unsafe HTML;
+- page empty states must not claim alignment or completeness when a requested code is unavailable;
+- retain provider-attributed, non-official, non-advisory wording and all unsupported-section boundaries.
+
+## 5. Required regression tests
+
+Add deterministic tests for all of the following:
+
+1. remove the immediately previous expected open session for one code: latest return is `null` with an explicit broken-window reason;
+2. remove one middle expected session inside the last 20/21-session window: SMA20, volatility, and drawdown are `null` as applicable;
+3. remove the same middle expected session from every selected code: the gap is still detected even though all code date sets match;
+4. remove a session that is inside the 60-session window but outside the 20/21-session windows: SMA60 is null while shorter valid metrics remain available;
+5. a gap strictly before all required ending windows does not invalidate current metrics;
+6. one requested code has no row under the selected historical cutoff: available/aligned counts and status are partial, never aligned;
+7. mixed per-code latest sessions produce partial status;
+8. all requested codes share one earlier latest session: status is different-session/non-aligned;
+9. equity and benchmark effective sessions match but information cutoffs differ: cutoff status is explicit and overall alignment is not misleadingly aligned;
+10. fully complete exact windows preserve the accepted formulas and aligned result;
+11. current/historical cutoff and future-row traps remain point-in-time safe;
+12. API serialization and page rendering expose the revised bounded fields safely;
+13. equity-only requests remain byte/semantic compatible except for already authorized optional defaults;
+14. all existing migration, persistence, ingestion, v0.4A, Dashboard, and no-network tests continue to pass.
+
+Use fixtures that would fail at reviewed head `6402762f1af6723b7a473a779edf9587598dcd91`.
+
+## 6. Required validation
 
 Run and report exact results for:
 
-1. `python -m pytest -q`
-2. focused benchmark contract/persistence/provider/repository/calculation/API/page tests
-3. PostgreSQL benchmark and Market Cockpit current/as-of tests
-4. existing PostgreSQL persistence and migration tests
-5. clean Alembic `base -> head`
-6. reviewed downgrade/upgrade path for the new migration
-7. `python -m alembic check`
-8. `python -m scripts.demo_research_flow`
-9. existing persisted equity Market Cockpit current/historical demo
-10. one deterministic persisted benchmark current/historical-cutoff demo
-11. `python -m compileall -q backend datasource market_cockpit scripts`
-12. import/startup/page no-network regressions
-13. `git diff --check`
+1. `python -m pytest -q` with the PostgreSQL test URL;
+2. focused benchmark calculation/alignment/API/page regressions;
+3. focused benchmark contract/persistence/provider/repository tests;
+4. PostgreSQL benchmark and Market Cockpit current/as-of tests;
+5. PostgreSQL persistence and migration suite;
+6. clean Alembic `base -> head`;
+7. `20260718_0003 -> 20260718_0002 -> 20260718_0003` downgrade/upgrade path;
+8. `python -m alembic check`;
+9. `python -m scripts.demo_research_flow`;
+10. existing persisted equity current/historical demo;
+11. revised persisted benchmark current/historical-cutoff demo including alignment counts/status;
+12. offline benchmark dry run and repeated idempotent persistence;
+13. `python -m compileall -q backend datasource market_cockpit scripts`;
+14. import/startup/page/dry-run no-network regressions;
+15. `git diff --check`.
 
-Automated validation must remain offline.
+Automated validation must remain offline. No new migration is expected for this revision.
 
-## Documentation
+## 7. GitHub synchronization
 
-Update only directly relevant documentation to define:
+After implementing and pushing:
 
-- benchmark versus equity domain and series separation;
-- exact endpoint and normalized field mapping;
-- compatibility identity and snapshot-selection rules;
-- cutoff and session-alignment behavior;
-- formulas and minimum windows;
-- provenance allowlist and missing-data behavior;
-- CLI, API, page, and fixture use;
-- provider-attributed and non-official-by-default wording;
-- explicit unsupported areas and non-advisory boundary.
-
-## GitHub synchronization
-
-After implementation and push:
-
-1. Open Draft PR `[v0.4B] Add benchmark index context` against `main`.
-2. Update its body with exact base/head SHA, endpoint choice and mapping, contract/migration design, series identity, calculations, API/page behavior, changed files, exact validation output, current/historical demos, and limitations.
-3. Add an Issue #47 completion comment with the same concise record.
-4. Keep the PR Draft.
-5. Stop for ChatGPT review.
+1. Update PR #48 body with:
+   - new head SHA;
+   - expected-session source and clipping rules;
+   - exact per-window eligibility design;
+   - gap reasons/counts;
+   - final alignment and cutoff semantics;
+   - changed files;
+   - exact validation results;
+   - revised current/historical demos and known limitations.
+2. Add a concise Issue #47 completion comment with the same record.
+3. Keep PR #48 Draft.
+4. Stop for ChatGPT re-review.
 
 ## Exclusions and stop conditions
 
 Do not:
 
-- merge the Draft PR;
+- merge PR #48;
 - close Issue #47;
 - create a release or tag;
 - change project version `0.2.0`;
+- rewrite, squash, rebase, amend, or force-push the reviewed implementation commit;
+- add a migration unless a separate schema defect is demonstrated and authorized;
+- change the reviewed AKShare endpoint or add fallback endpoints;
 - add sector/industry classification or rotation;
 - add size/value/growth style, valuation, market-cap breadth, or crowding;
+- add beta, correlation, alpha, excess return, relative-strength ranking, signals, or recommendations;
 - persist derived Market Cockpit snapshots;
 - add schedulers, background collection, page-triggered collection, or automatic refresh;
-- begin v0.5 Industry Alpha or any later product stage;
-- add Stock Research, Watchlist, paper portfolios, LLM execution, authentication, deployment, brokers, orders, recommendations, or trading;
+- begin v0.5 or any later stage;
+- add Stock Research, Watchlist, paper portfolios, LLM execution, authentication, deployment, brokers, orders, or trading;
 - modify, close, rebase, or merge unrelated PR #38.
 
-Stop immediately and report rather than improvising if the endpoint schema is incompatible with the normalized contract, if accepted v0.4A behavior would require a breaking change, if migration safety cannot be demonstrated, or if any network action would be needed during automated validation.
+Stop and report instead of improvising if exact expected-session continuity cannot be established from the selected persisted equity calendar without breaking accepted v0.4A behavior.
