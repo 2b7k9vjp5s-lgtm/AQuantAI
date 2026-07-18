@@ -5,7 +5,30 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
-BenchmarkAlignmentStatus = Literal["aligned", "different_session", "partial"]
+BenchmarkAlignmentStatus = Literal[
+    "aligned", "different_session", "different_cutoff", "partial"
+]
+BenchmarkSessionAlignmentStatus = Literal["aligned", "different_session", "partial"]
+BenchmarkCutoffAlignmentStatus = Literal["aligned", "different_cutoff"]
+BenchmarkWindowReason = Literal[
+    "available",
+    "insufficient_history",
+    "missing_expected_session",
+    "invalid_close",
+]
+
+
+@dataclass(frozen=True)
+class BenchmarkWindowDiagnostic:
+    required_session_count: int
+    present_valid_session_count: int
+    window_start_session: str | None
+    window_end_session: str | None
+    missing_session_count: int
+    missing_sessions: tuple[str, ...]
+    invalid_session_count: int
+    invalid_sessions: tuple[str, ...]
+    reason: BenchmarkWindowReason
 
 
 @dataclass(frozen=True)
@@ -25,6 +48,10 @@ class BenchmarkCodeMetrics:
     sma20_required_sessions: int = 20
     sma60_required_sessions: int = 60
     risk_required_sessions: int = 21
+    latest_return_window: BenchmarkWindowDiagnostic | None = None
+    sma20_window: BenchmarkWindowDiagnostic | None = None
+    sma60_window: BenchmarkWindowDiagnostic | None = None
+    risk_window: BenchmarkWindowDiagnostic | None = None
     warnings: tuple[str, ...] = ()
 
 
@@ -61,6 +88,20 @@ class BenchmarkContext:
     provenance: BenchmarkProvenance
     metrics: list[BenchmarkCodeMetrics]
     alignment_status: BenchmarkAlignmentStatus
+    session_alignment_status: BenchmarkSessionAlignmentStatus
+    cutoff_alignment_status: BenchmarkCutoffAlignmentStatus
+    requested_code_count: int
+    available_code_count: int
+    aligned_code_count: int
+    missing_codes: list[str]
+    equity_information_cutoff_date: str
+    benchmark_information_cutoff_date: str
+    equity_effective_session: str
+    effective_benchmark_session: str
+    expected_session_source: str
+    expected_session_count: int
+    expected_session_start: str
+    expected_session_end: str
     warnings: list[str]
     label: str = "provider-attributed benchmark index context"
     formula_reference: str = "docs/benchmark_context.md"

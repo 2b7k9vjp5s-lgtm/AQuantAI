@@ -27,15 +27,25 @@ Reads require an explicit benchmark `series_key` or an equivalent complete canon
 
 Live collection uses one UTC collection timestamp and requires information cutoff to equal its UTC date. Offline fixture and injected mock collection may use a deterministic cutoff. Requested price dates are independently bounded and may not exceed cutoff.
 
-For Market Cockpit use, benchmark rows must be no later than the selected benchmark run cutoff, optional requested `as_of_cutoff`, requested benchmark end date, and the equity effective as-of session. Equity and benchmark runs are selected independently. Different information cutoffs or effective sessions produce explicit warnings and a non-aligned status; no relative-performance calculation is inferred.
+For Market Cockpit use, the selected equity snapshot's persisted `trade_calendar` is the only v0.4B session reference. This keeps point-in-time eligibility tied to the same physical equity ingestion run that establishes the Market Cockpit as-of session; no live calendar, weekday inference, other equity run, or benchmark row order is used. The ordered sequence contains only persisted `is_open=true` sessions and is clipped by the requested `as_of_cutoff`, equity information cutoff, benchmark information cutoff, equity requested end/effective session, and benchmark requested end. A missing or contradictory selected-equity calendar fails closed.
+
+Benchmark rows must be no later than that clipped sequence. Equity and benchmark runs remain selected independently and their data rows are never joined or stitched. Session alignment and cutoff alignment are reported separately:
+
+- session `aligned`: every exact requested code has a latest valid row at the equity effective session;
+- session `different_session`: every requested code is available on one shared earlier session;
+- session `partial`: any code is unavailable or per-code latest sessions differ;
+- cutoff `aligned`: selected equity and benchmark information cutoffs are equal;
+- cutoff `different_cutoff`: selected information cutoffs differ.
+
+Overall `aligned` requires both session and cutoff alignment. A partial session result remains `partial`; otherwise an earlier session is `different_session` and equal sessions with different cutoffs are `different_cutoff`. Requested, available, and equity-session-aligned code counts plus an exact sorted missing-code list make the status auditable. No relative-performance calculation is inferred.
 
 ## Close-Based Formulas
 
-For each exact benchmark code, rows are ordered by `trade_date` after cutoff filtering. Missing rows are not forward-filled and another code is never substituted.
+For each exact benchmark code, windows end at that code's latest valid close within the clipped expected-session sequence. Each metric is calculated only when every expected persisted open session in its exact ending window is present once with a finite positive close. Missing rows are not forward-filled, sparse rows do not substitute for expected sessions, and another code is never substituted.
 
 ```text
-latest_return = close(t) / close(t-1) - 1                 # exactly 2 closes
-SMA(N) = arithmetic mean of the latest N closes          # N = 20 or 60
+latest_return = close(t) / close(t-1) - 1                 # exact adjacent 2-session window
+SMA(N) = arithmetic mean of one exact N-session window    # N = 20 or 60
 above_SMA(N) = close(t) > SMA(N)
 realized_volatility_20 = sample_std(last 20 returns, ddof=1) * sqrt(252)
 wealth(0) = 1
@@ -43,7 +53,9 @@ wealth(k) = product(1 + return(j), j=1..k)                # 20 returns / 21 clos
 max_drawdown_20 = min(wealth(k) / max(wealth(0..k)) - 1)
 ```
 
-Latest close requires one row, latest return requires two ordered closes, SMA20 requires 20, SMA60 requires 60, and volatility/drawdown require exactly 21 closes. Insufficient or broken windows return `null` with bounded warnings; zero is returned only when it is a valid calculated value.
+Latest close may expose the latest available valid row even when it is stale. Latest return requires the immediately preceding expected open session, SMA20/SMA60 require exact consecutive 20/60-session windows, and volatility/drawdown require one exact consecutive 21-session window producing 20 adjacent one-session returns. A gap outside a metric's ending window does not invalidate that metric.
+
+Every metric window exposes its required count, present-valid count, start/end when definable, bounded missing and invalid session lists with total counts, and one stable reason: `available`, `insufficient_history`, `missing_expected_session`, or `invalid_close`. Broken windows return `null`; zero is returned only when it is a valid calculated value. Code and session diagnostics are sorted deterministically.
 
 ## Manual Commands
 

@@ -99,6 +99,17 @@ function appendDataRows(container, rows) {
   }
 }
 
+function formatBenchmarkWindow(window) {
+  if (!window) {
+    return "Unavailable";
+  }
+  return String(window.reason) +
+    "; valid=" + String(window.present_valid_session_count) + "/" + String(window.required_session_count) +
+    "; range=" + formatValue(window.window_start_session) + " to " + formatValue(window.window_end_session) +
+    "; missing=" + String(window.missing_session_count) + " [" + (window.missing_sessions || []).join(", ") + "]" +
+    "; invalid=" + String(window.invalid_session_count) + " [" + (window.invalid_sessions || []).join(", ") + "]";
+}
+
 function renderBenchmarkContext(payload) {
   const context = payload.benchmark_context;
   const status = document.getElementById("benchmark-status");
@@ -114,10 +125,14 @@ function renderBenchmarkContext(payload) {
   const provenance = context.provenance || {};
   status.textContent = "Showing provider-attributed benchmark index context from one separate complete snapshot. It is not an official exchange statement or a full-market coverage claim.";
   renderMetrics(document.getElementById("benchmark-summary"), [
-    ["Exact benchmark codes", (provenance.index_codes || []).length],
-    ["Alignment", context.alignment_status],
+    ["Requested benchmark codes", context.requested_code_count],
+    ["Available benchmark codes", context.available_code_count],
+    ["Codes aligned to equity session", context.aligned_code_count],
+    ["Overall alignment", context.alignment_status],
+    ["Session alignment", context.session_alignment_status],
+    ["Cutoff alignment", context.cutoff_alignment_status],
     ["Effective benchmark session", provenance.effective_benchmark_session],
-    ["Benchmark cutoff", provenance.information_cutoff_date]
+    ["Expected persisted sessions", context.expected_session_count]
   ]);
   metricsContainer.replaceChildren();
   for (const metric of context.metrics || []) {
@@ -135,6 +150,10 @@ function renderBenchmarkContext(payload) {
       ["Realized volatility (20)", metric.realized_volatility_20, "percent"],
       ["Maximum drawdown (20)", metric.max_drawdown_20, "percent"],
       ["Available sessions", metric.available_session_count],
+      ["Latest-return window", formatBenchmarkWindow(metric.latest_return_window)],
+      ["SMA20 window", formatBenchmarkWindow(metric.sma20_window)],
+      ["SMA60 window", formatBenchmarkWindow(metric.sma60_window)],
+      ["Risk window", formatBenchmarkWindow(metric.risk_window)],
       [
         "Required sessions (return / SMA20 / SMA60 / risk)",
         [
@@ -159,6 +178,12 @@ function renderBenchmarkContext(payload) {
     ["Exact codes", (provenance.index_codes || []).join(", ")],
     ["Requested date range", String(provenance.requested_start_date || "") + " to " + String(provenance.requested_end_date || "")],
     ["Requested historical cutoff", provenance.requested_as_of_cutoff],
+    ["Equity information cutoff", context.equity_information_cutoff_date],
+    ["Benchmark information cutoff", context.benchmark_information_cutoff_date],
+    ["Equity effective session", context.equity_effective_session],
+    ["Missing exact codes", (context.missing_codes || []).join(", ") || "None"],
+    ["Expected-session source", context.expected_session_source],
+    ["Expected-session range", String(context.expected_session_start || "") + " to " + String(context.expected_session_end || "")],
     ["Collected UTC", provenance.collection_timestamp_utc],
     ["Imported UTC", provenance.ingestion_imported_at_utc],
     ["Completed UTC", provenance.ingestion_completed_at_utc],

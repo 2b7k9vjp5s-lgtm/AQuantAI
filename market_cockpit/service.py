@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+from pandas.api.types import is_bool_dtype
+
 from backend.database.series import SnapshotSeriesIdentity
 from market_cockpit.benchmark_calculator import calculate_benchmark_metrics
 from market_cockpit.benchmark_contracts import BenchmarkContext, BenchmarkProvenance
@@ -16,6 +18,7 @@ from market_cockpit.contracts import (
     UnsupportedSection,
 )
 from market_cockpit.repository import MarketCockpitRepository
+from market_cockpit.repository import PersistedMarketDataSnapshot
 
 
 class MarketCockpitService:
@@ -62,8 +65,8 @@ class MarketCockpitService:
         benchmark_context = self._build_benchmark_context(
             benchmark_series_key=benchmark_series_key,
             as_of_cutoff=as_of_cutoff,
+            equity_snapshot=persisted,
             equity_effective_session=calculation.effective_as_of_session,
-            equity_information_cutoff=persisted.information_cutoff_date,
             generated_at=generated_at,
         )
         return MarketCockpitSnapshot(
@@ -119,8 +122,8 @@ class MarketCockpitService:
         *,
         benchmark_series_key: str | None,
         as_of_cutoff: str | None,
+        equity_snapshot: PersistedMarketDataSnapshot,
         equity_effective_session: str,
-        equity_information_cutoff: str,
         generated_at: datetime,
     ) -> BenchmarkContext | None:
         if benchmark_series_key is None:
@@ -132,26 +135,71 @@ class MarketCockpitService:
             as_of_cutoff=as_of_cutoff,
             permitted_end_session=equity_effective_session,
         )
-        metrics, warnings = calculate_benchmark_metrics(persisted)
-        latest_sessions = {
-            metric.latest_session for metric in metrics if metric.latest_session is not None
-        }
-        if persisted.information_cutoff_date != equity_information_cutoff:
-            warnings.append(
-                "Equity and benchmark information cutoffs differ: "
-                f"equity={equity_information_cutoff}, benchmark={persisted.information_cutoff_date}."
-            )
-        if persisted.effective_benchmark_session != equity_effective_session:
-            warnings.append(
-                "Equity and benchmark effective sessions differ: "
-                f"equity={equity_effective_session}, benchmark={persisted.effective_benchmark_session}."
-            )
-        if len(latest_sessions) > 1:
+        expected_sessions = _expected_benchmark_sessions(
+            equity_snapshot=equity_snapshot,
+            benchmark_information_cutoff=persisted.information_cutoff_date,
+            benchmark_requested_end=persisted.requested_end_date,
+            equity_effective_session=equity_effective_session,
+            as_of_cutoff=as_of_cutoff,
+        )
+        metrics, warnings = calculate_benchmark_metrics(
+            persisted,
+            expected_sessions=expected_sessions,
+        )
+        available_metrics = [metric for metric in metrics if metric.latest_session is not None]
+        latest_sessions = {metric.latest_session for metric in available_metrics}
+        missing_codes = sorted(
+            metric.index_code for metric in metrics if metric.latest_session is None
+        )
+        aligned_code_count = sum(
+            metric.latest_session == equity_effective_session for metric in metrics
+        )
+        cutoff_alignment_status = (
+            "aligned"
+            if persisted.information_cutoff_date
+            == equity_snapshot.information_cutoff_date
+            else "different_cutoff"
+        )
+        if missing_codes or len(latest_sessions) > 1:
+            session_alignment_status = "partial"
+        elif latest_sessions != {equity_effective_session}:
+            session_alignment_status = "different_session"
+        else:
+            session_alignment_status = "aligned"
+        if session_alignment_status == "partial":
             alignment_status = "partial"
-        elif persisted.effective_benchmark_session != equity_effective_session:
+        elif session_alignment_status == "different_session":
             alignment_status = "different_session"
+        elif cutoff_alignment_status == "different_cutoff":
+            alignment_status = "different_cutoff"
         else:
             alignment_status = "aligned"
+
+        effective_benchmark_session = (
+            max(session for session in latest_sessions if session is not None)
+            if latest_sessions
+            else persisted.effective_benchmark_session
+        )
+        if cutoff_alignment_status == "different_cutoff":
+            warnings.append(
+                "Equity and benchmark information cutoffs differ: "
+                f"equity={equity_snapshot.information_cutoff_date}, "
+                f"benchmark={persisted.information_cutoff_date}."
+            )
+        if missing_codes:
+            warnings.append(
+                f"Benchmark exact scope has no eligible row for codes: {missing_codes}."
+            )
+        if len(latest_sessions) > 1:
+            warnings.append(
+                "Benchmark codes have mixed latest eligible sessions: "
+                f"{sorted(session for session in latest_sessions if session is not None)}."
+            )
+        if effective_benchmark_session != equity_effective_session:
+            warnings.append(
+                "Equity and benchmark effective sessions differ: "
+                f"equity={equity_effective_session}, benchmark={effective_benchmark_session}."
+            )
         requested_cutoff = (
             str(as_of_cutoff).strip().replace("-", "") if as_of_cutoff is not None else None
         )
@@ -171,7 +219,7 @@ class MarketCockpitService:
                 requested_end_date=persisted.requested_end_date,
                 information_cutoff_date=persisted.information_cutoff_date,
                 requested_as_of_cutoff=requested_cutoff,
-                effective_benchmark_session=persisted.effective_benchmark_session,
+                effective_benchmark_session=effective_benchmark_session,
                 ingestion_imported_at_utc=persisted.ingestion_imported_at_utc,
                 ingestion_completed_at_utc=persisted.ingestion_completed_at_utc,
                 collection_timestamp_utc=persisted.collection_timestamp_utc,
@@ -188,8 +236,91 @@ class MarketCockpitService:
             ),
             metrics=metrics,
             alignment_status=alignment_status,
+            session_alignment_status=session_alignment_status,
+            cutoff_alignment_status=cutoff_alignment_status,
+            requested_code_count=len(metrics),
+            available_code_count=len(available_metrics),
+            aligned_code_count=aligned_code_count,
+            missing_codes=missing_codes,
+            equity_information_cutoff_date=equity_snapshot.information_cutoff_date,
+            benchmark_information_cutoff_date=persisted.information_cutoff_date,
+            equity_effective_session=equity_effective_session,
+            effective_benchmark_session=effective_benchmark_session,
+            expected_session_source="selected_equity_snapshot.persisted_trade_calendar",
+            expected_session_count=len(expected_sessions),
+            expected_session_start=expected_sessions[0],
+            expected_session_end=expected_sessions[-1],
             warnings=warnings,
         )
+
+
+def _expected_benchmark_sessions(
+    *,
+    equity_snapshot: PersistedMarketDataSnapshot,
+    benchmark_information_cutoff: str,
+    benchmark_requested_end: str,
+    equity_effective_session: str,
+    as_of_cutoff: str | None,
+) -> list[str]:
+    calendar = equity_snapshot.trade_calendar.copy()
+    required = {"trade_date", "is_open"}
+    missing = sorted(required - set(calendar.columns))
+    if missing:
+        raise ValueError(
+            f"Selected equity snapshot trade calendar is incomplete; missing={missing}."
+        )
+    calendar["trade_date"] = calendar["trade_date"].map(_compact_date)
+    duplicates = sorted(
+        calendar.loc[
+            calendar.duplicated(["trade_date"], keep=False), "trade_date"
+        ].unique()
+    )
+    if duplicates:
+        raise ValueError(
+            "Selected equity snapshot trade calendar is contradictory; duplicate sessions="
+            f"{duplicates}."
+        )
+    if calendar["is_open"].isna().any() or not is_bool_dtype(calendar["is_open"]):
+        raise ValueError(
+            "Selected equity snapshot trade calendar contains invalid open flags."
+        )
+    bound = min(
+        value
+        for value in (
+            equity_snapshot.information_cutoff_date,
+            equity_snapshot.requested_end_date,
+            benchmark_information_cutoff,
+            benchmark_requested_end,
+            equity_effective_session,
+            _compact_optional_date(as_of_cutoff),
+        )
+        if value is not None
+    )
+    sessions = sorted(
+        calendar.loc[
+            calendar["is_open"].eq(True) & calendar["trade_date"].le(bound),
+            "trade_date",
+        ].unique()
+    )
+    if not sessions:
+        raise ValueError(
+            "Selected equity snapshot has no persisted open session eligible for benchmark context."
+        )
+    return sessions
+
+
+def _compact_optional_date(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _compact_date(value)
+
+
+def _compact_date(value: object) -> str:
+    normalized = str(value).strip().replace("-", "")
+    try:
+        return datetime.strptime(normalized, "%Y%m%d").strftime("%Y%m%d")
+    except ValueError as exc:
+        raise ValueError("Persisted trade-calendar dates must use YYYYMMDD format.") from exc
 
 
 def _unsupported_sections() -> list[UnsupportedSection]:

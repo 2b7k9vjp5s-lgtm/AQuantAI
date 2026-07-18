@@ -118,6 +118,18 @@ def _summary(payload: dict[str, Any]) -> dict[str, Any]:
         "benchmark_information_cutoff": context["provenance"]["information_cutoff_date"],
         "benchmark_effective_session": context["provenance"]["effective_benchmark_session"],
         "alignment_status": context["alignment_status"],
+        "session_alignment_status": context["session_alignment_status"],
+        "cutoff_alignment_status": context["cutoff_alignment_status"],
+        "requested_code_count": context["requested_code_count"],
+        "available_code_count": context["available_code_count"],
+        "aligned_code_count": context["aligned_code_count"],
+        "missing_codes": context["missing_codes"],
+        "expected_session_source": context["expected_session_source"],
+        "expected_session_count": context["expected_session_count"],
+        "expected_session_range": [
+            context["expected_session_start"],
+            context["expected_session_end"],
+        ],
         "metrics": context["metrics"],
     }
 

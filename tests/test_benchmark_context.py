@@ -19,10 +19,7 @@ from backend.database.engine import build_session_factory
 from backend.database.market_data import MarketDataPersistenceService
 from backend.database.models import Base
 from backend.main import app
-from market_cockpit.benchmark_calculator import (
-    BenchmarkCalculationError,
-    calculate_benchmark_metrics,
-)
+from market_cockpit.benchmark_calculator import calculate_benchmark_metrics
 from market_cockpit.benchmark_fixtures import (
     BENCHMARK_FIXTURE_CURRENT_CUTOFF,
     BENCHMARK_FIXTURE_DATES,
@@ -43,6 +40,8 @@ from market_cockpit.fixtures import (
     COCKPIT_FIXTURE_START_DATE,
     build_market_cockpit_fixture,
 )
+from market_cockpit.repository import MarketCockpitRepository
+from market_cockpit.service import _expected_benchmark_sessions
 from scripts.demo_benchmark_context import build_persisted_benchmark_demo
 
 
@@ -112,12 +111,35 @@ def _benchmark(
     )
 
 
+def _benchmark_frame(
+    session_factory: sessionmaker[Session],
+    frame: pd.DataFrame,
+    *,
+    cutoff: str = BENCHMARK_FIXTURE_CURRENT_CUTOFF,
+    requested_end_date: str = BENCHMARK_FIXTURE_END_DATE,
+):
+    return BenchmarkPersistenceService(session_factory).ingest_bundle(
+        replace(build_benchmark_fixture(), benchmark_index_daily=frame.copy()),
+        provider=BENCHMARK_FIXTURE_PROVIDER,
+        requested_start_date=BENCHMARK_FIXTURE_START_DATE,
+        requested_end_date=requested_end_date,
+        information_cutoff_date=cutoff,
+        requested_scope=BENCHMARK_FIXTURE_SCOPE,
+        endpoint="fixture_index_history",
+        adapter_compatibility_version="benchmark-fixture-v1",
+        adapter_version="benchmark-fixture-v1",
+    )
+
+
 def test_exact_close_formulas_and_minimum_windows(database) -> None:
     _, session_factory = database
     result = _benchmark(session_factory)
     with session_factory() as session:
         snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
-    metrics, warnings = calculate_benchmark_metrics(snapshot)
+    metrics, warnings = calculate_benchmark_metrics(
+        snapshot,
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
+    )
     first = metrics[0]
     frame = snapshot.benchmark_index_daily.loc[
         snapshot.benchmark_index_daily["index_code"].eq(first.index_code)
@@ -134,6 +156,10 @@ def test_exact_close_formulas_and_minimum_windows(database) -> None:
     assert first.max_drawdown_20 == pytest.approx(
         np.min(wealth / np.maximum.accumulate(wealth) - 1.0)
     )
+    assert first.latest_return_window.reason == "available"
+    assert first.sma20_window.present_valid_session_count == 20
+    assert first.sma60_window.present_valid_session_count == 60
+    assert first.risk_window.present_valid_session_count == 21
     assert warnings == []
 
 
@@ -150,25 +176,161 @@ def test_insufficient_and_mismatched_sessions_return_null_with_warnings(database
         )
     ]
     metrics, warnings = calculate_benchmark_metrics(
-        replace(snapshot, benchmark_index_daily=frame)
+        replace(snapshot, benchmark_index_daily=frame),
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
     )
     first = next(item for item in metrics if item.index_code == "000001")
     assert first.latest_return is not None
     assert first.sma20 is None
     assert first.sma60 is None
     assert first.realized_volatility_20 is None
-    assert any("mismatched persisted sessions" in warning for warning in warnings)
+    assert first.sma20_window.reason == "missing_expected_session"
+    assert any("reason=missing_expected_session" in warning for warning in warnings)
 
 
-def test_invalid_injected_close_fails_instead_of_fabricating_values(database) -> None:
+def test_gap_before_all_required_ending_windows_does_not_invalidate_metrics(database) -> None:
     _, session_factory = database
     result = _benchmark(session_factory)
     with session_factory() as session:
         snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
     frame = snapshot.benchmark_index_daily.copy()
-    frame.loc[frame.index[0], "close"] = np.inf
-    with pytest.raises(BenchmarkCalculationError, match="invalid close"):
-        calculate_benchmark_metrics(replace(snapshot, benchmark_index_daily=frame))
+    frame = frame.loc[frame["trade_date"].ne(BENCHMARK_FIXTURE_DATES[0])]
+    metrics, warnings = calculate_benchmark_metrics(
+        replace(snapshot, benchmark_index_daily=frame),
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
+    )
+    assert all(metric.latest_return is not None for metric in metrics)
+    assert all(metric.sma20 is not None for metric in metrics)
+    assert all(metric.sma60 is not None for metric in metrics)
+    assert all(metric.realized_volatility_20 is not None for metric in metrics)
+    assert warnings == []
+
+
+def test_equivalent_date_formats_cannot_bypass_duplicate_detection(database) -> None:
+    _, session_factory = database
+    result = _benchmark(session_factory)
+    with session_factory() as session:
+        snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
+    duplicate = snapshot.benchmark_index_daily.iloc[[0]].copy()
+    duplicate["trade_date"] = pd.to_datetime(duplicate["trade_date"]).dt.strftime(
+        "%Y-%m-%d"
+    )
+    frame = pd.concat([snapshot.benchmark_index_daily, duplicate], ignore_index=True)
+    with pytest.raises(ValueError, match="duplicate natural keys"):
+        calculate_benchmark_metrics(
+            replace(snapshot, benchmark_index_daily=frame),
+            expected_sessions=BENCHMARK_FIXTURE_DATES,
+        )
+
+
+def test_missing_immediately_previous_expected_session_breaks_latest_return(database) -> None:
+    _, session_factory = database
+    result = _benchmark(session_factory)
+    with session_factory() as session:
+        snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
+    missing = BENCHMARK_FIXTURE_DATES[-2]
+    frame = snapshot.benchmark_index_daily
+    frame = frame.loc[
+        ~(frame["index_code"].eq("000001") & frame["trade_date"].eq(missing))
+    ]
+    metrics, warnings = calculate_benchmark_metrics(
+        replace(snapshot, benchmark_index_daily=frame),
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
+    )
+    first = next(metric for metric in metrics if metric.index_code == "000001")
+    second = next(metric for metric in metrics if metric.index_code == "000300")
+    assert first.latest_return is None
+    assert first.latest_return_window.reason == "missing_expected_session"
+    assert first.latest_return_window.missing_sessions == (missing,)
+    assert second.latest_return is not None
+    assert any("latest_return unavailable" in warning for warning in warnings)
+
+
+def test_middle_gap_breaks_exact_sma20_and_risk_windows(database) -> None:
+    _, session_factory = database
+    result = _benchmark(session_factory)
+    with session_factory() as session:
+        snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
+    missing = BENCHMARK_FIXTURE_DATES[-10]
+    frame = snapshot.benchmark_index_daily
+    frame = frame.loc[
+        ~(frame["index_code"].eq("000001") & frame["trade_date"].eq(missing))
+    ]
+    metrics, _ = calculate_benchmark_metrics(
+        replace(snapshot, benchmark_index_daily=frame),
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
+    )
+    first = next(metric for metric in metrics if metric.index_code == "000001")
+    assert first.latest_return is not None
+    assert first.sma20 is None
+    assert first.realized_volatility_20 is None
+    assert first.max_drawdown_20 is None
+    assert first.sma20_window.missing_sessions == (missing,)
+    assert first.risk_window.reason == "missing_expected_session"
+
+
+def test_same_middle_gap_for_every_code_is_still_detected(database) -> None:
+    _, session_factory = database
+    result = _benchmark(session_factory)
+    with session_factory() as session:
+        snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
+    missing = BENCHMARK_FIXTURE_DATES[-10]
+    frame = snapshot.benchmark_index_daily.loc[
+        snapshot.benchmark_index_daily["trade_date"].ne(missing)
+    ]
+    metrics, warnings = calculate_benchmark_metrics(
+        replace(snapshot, benchmark_index_daily=frame),
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
+    )
+    assert all(metric.sma20 is None for metric in metrics)
+    assert all(metric.risk_window.missing_sessions == (missing,) for metric in metrics)
+    assert sum("sma20 unavailable" in warning for warning in warnings) == 2
+
+
+def test_gap_only_inside_sma60_window_keeps_shorter_metrics(database) -> None:
+    _, session_factory = database
+    result = _benchmark(session_factory)
+    with session_factory() as session:
+        snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
+    missing = BENCHMARK_FIXTURE_DATES[-30]
+    frame = snapshot.benchmark_index_daily
+    frame = frame.loc[
+        ~(frame["index_code"].eq("000001") & frame["trade_date"].eq(missing))
+    ]
+    metrics, _ = calculate_benchmark_metrics(
+        replace(snapshot, benchmark_index_daily=frame),
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
+    )
+    first = next(metric for metric in metrics if metric.index_code == "000001")
+    assert first.latest_return is not None
+    assert first.sma20 is not None
+    assert first.realized_volatility_20 is not None
+    assert first.max_drawdown_20 is not None
+    assert first.sma60 is None
+    assert first.sma60_window.missing_sessions == (missing,)
+
+
+def test_invalid_close_inside_exact_window_has_stable_reason(database) -> None:
+    _, session_factory = database
+    result = _benchmark(session_factory)
+    with session_factory() as session:
+        snapshot = BenchmarkRepository(session).load_snapshot(series_key=result.series_key)
+    invalid = BENCHMARK_FIXTURE_DATES[-10]
+    frame = snapshot.benchmark_index_daily.copy()
+    frame.loc[
+        frame["index_code"].eq("000001") & frame["trade_date"].eq(invalid),
+        "close",
+    ] = np.inf
+    metrics, warnings = calculate_benchmark_metrics(
+        replace(snapshot, benchmark_index_daily=frame),
+        expected_sessions=BENCHMARK_FIXTURE_DATES,
+    )
+    first = next(metric for metric in metrics if metric.index_code == "000001")
+    assert first.sma20 is None
+    assert first.realized_volatility_20 is None
+    assert first.sma20_window.reason == "invalid_close"
+    assert first.sma20_window.invalid_sessions == (invalid,)
+    assert any("reason=invalid_close" in warning for warning in warnings)
 
 
 def test_repository_permitted_session_excludes_future_rows(database) -> None:
@@ -182,6 +344,44 @@ def test_repository_permitted_session_excludes_future_rows(database) -> None:
         )
     assert snapshot.effective_benchmark_session == permitted
     assert snapshot.benchmark_index_daily["trade_date"].max() == permitted
+
+
+@pytest.mark.parametrize("calendar_state", ["empty", "duplicate", "invalid_flag"])
+def test_required_equity_calendar_fails_closed_when_unavailable_or_contradictory(
+    database,
+    calendar_state: str,
+) -> None:
+    _, session_factory = database
+    equity_result = _equity(session_factory)
+    benchmark_result = _benchmark(session_factory)
+    with session_factory() as session:
+        equity = MarketCockpitRepository(session).load_snapshot(
+            series_key=equity_result.series_key
+        )
+        benchmark = BenchmarkRepository(session).load_snapshot(
+            series_key=benchmark_result.series_key
+        )
+    if calendar_state == "empty":
+        calendar = equity.trade_calendar.iloc[0:0].copy()
+    elif calendar_state == "invalid_flag":
+        calendar = equity.trade_calendar.copy()
+        calendar["is_open"] = "true"
+    else:
+        calendar = pd.concat(
+            [equity.trade_calendar, equity.trade_calendar.iloc[[0]]],
+            ignore_index=True,
+        )
+    with pytest.raises(
+        ValueError,
+        match="no persisted open session|contradictory|invalid open flags",
+    ):
+        _expected_benchmark_sessions(
+            equity_snapshot=replace(equity, trade_calendar=calendar),
+            benchmark_information_cutoff=benchmark.information_cutoff_date,
+            benchmark_requested_end=benchmark.requested_end_date,
+            equity_effective_session=BENCHMARK_FIXTURE_DATES[-1],
+            as_of_cutoff=None,
+        )
 
 
 def test_api_equity_only_is_compatible_and_benchmark_is_optional(client) -> None:
@@ -213,6 +413,16 @@ def test_api_returns_separate_benchmark_provenance_and_alignment(client) -> None
     assert context["provenance"]["series_key"] != payload["provenance"]["series_key"]
     assert context["provenance"]["endpoint"] == "fixture_index_history"
     assert context["provenance"]["index_codes"] == ["000001", "000300"]
+    assert context["session_alignment_status"] == "aligned"
+    assert context["cutoff_alignment_status"] == "aligned"
+    assert context["requested_code_count"] == 2
+    assert context["available_code_count"] == 2
+    assert context["aligned_code_count"] == 2
+    assert context["missing_codes"] == []
+    assert context["expected_session_source"] == (
+        "selected_equity_snapshot.persisted_trade_calendar"
+    )
+    assert context["expected_session_count"] == 65
     assert len(context["metrics"]) == 2
     assert "unknown_metadata" not in str(context)
     assert "must-not-be-exposed" not in str(context)
@@ -273,27 +483,36 @@ def test_historical_cutoff_selects_historical_benchmark_run(client) -> None:
     assert provenance["requested_as_of_cutoff"] == BENCHMARK_FIXTURE_HISTORICAL_CUTOFF
 
 
-def test_different_benchmark_cutoff_and_session_are_explicit(client) -> None:
+def test_mixed_per_code_latest_sessions_are_partial(client) -> None:
     test_client, session_factory = client
     equity = _equity(session_factory)
-    bundle = build_benchmark_fixture(revision="historical")
-    rows = bundle.benchmark_index_daily
-    bundle = replace(
-        bundle,
-        benchmark_index_daily=rows.loc[
-            rows["trade_date"].ne(BENCHMARK_FIXTURE_DATES[-1])
-        ].copy(),
+    rows = build_benchmark_fixture().benchmark_index_daily
+    rows = rows.loc[
+        ~(rows["index_code"].eq("000300") & rows["trade_date"].eq(BENCHMARK_FIXTURE_DATES[-1]))
+    ]
+    benchmark = _benchmark_frame(session_factory, rows)
+    response = test_client.get(
+        "/market-cockpit/snapshot?series_key="
+        + equity.series_key
+        + "&benchmark_series_key="
+        + benchmark.series_key
     )
-    benchmark = BenchmarkPersistenceService(session_factory).ingest_bundle(
-        bundle,
-        provider=BENCHMARK_FIXTURE_PROVIDER,
-        requested_start_date=BENCHMARK_FIXTURE_START_DATE,
-        requested_end_date=BENCHMARK_FIXTURE_END_DATE,
-        information_cutoff_date=BENCHMARK_FIXTURE_HISTORICAL_CUTOFF,
-        requested_scope=BENCHMARK_FIXTURE_SCOPE,
-        endpoint="fixture_index_history",
-        adapter_compatibility_version="benchmark-fixture-v1",
-    )
+    context = response.json()["benchmark_context"]
+    assert response.status_code == 200
+    assert context["alignment_status"] == "partial"
+    assert context["session_alignment_status"] == "partial"
+    assert context["available_code_count"] == 2
+    assert context["aligned_code_count"] == 1
+    assert context["missing_codes"] == []
+    assert any("mixed latest eligible sessions" in warning for warning in context["warnings"])
+
+
+def test_all_codes_on_one_earlier_session_are_different_session(client) -> None:
+    test_client, session_factory = client
+    equity = _equity(session_factory)
+    rows = build_benchmark_fixture().benchmark_index_daily
+    rows = rows.loc[rows["trade_date"].ne(BENCHMARK_FIXTURE_DATES[-1])]
+    benchmark = _benchmark_frame(session_factory, rows)
     response = test_client.get(
         "/market-cockpit/snapshot?series_key="
         + equity.series_key
@@ -303,8 +522,71 @@ def test_different_benchmark_cutoff_and_session_are_explicit(client) -> None:
     assert response.status_code == 200
     context = response.json()["benchmark_context"]
     assert context["alignment_status"] == "different_session"
-    assert any("information cutoffs differ" in warning for warning in context["warnings"])
+    assert context["session_alignment_status"] == "different_session"
+    assert context["cutoff_alignment_status"] == "aligned"
+    assert context["available_code_count"] == 2
+    assert context["aligned_code_count"] == 0
     assert any("effective sessions differ" in warning for warning in context["warnings"])
+
+
+def test_equal_sessions_with_different_cutoffs_are_not_aligned(client) -> None:
+    test_client, session_factory = client
+    equity = _equity(session_factory)
+    benchmark = _benchmark(
+        session_factory,
+        revision="historical",
+        cutoff=BENCHMARK_FIXTURE_HISTORICAL_CUTOFF,
+    )
+    response = test_client.get(
+        "/market-cockpit/snapshot?series_key="
+        + equity.series_key
+        + "&benchmark_series_key="
+        + benchmark.series_key
+    )
+    context = response.json()["benchmark_context"]
+    assert response.status_code == 200
+    assert context["session_alignment_status"] == "aligned"
+    assert context["cutoff_alignment_status"] == "different_cutoff"
+    assert context["alignment_status"] == "different_cutoff"
+    assert context["aligned_code_count"] == 2
+    assert any("information cutoffs differ" in warning for warning in context["warnings"])
+
+
+def test_one_requested_code_without_eligible_row_is_partial(client) -> None:
+    test_client, session_factory = client
+    equity = _equity(
+        session_factory,
+        revision="historical",
+        cutoff=BENCHMARK_FIXTURE_HISTORICAL_CUTOFF,
+    )
+    rows = build_benchmark_fixture(revision="historical").benchmark_index_daily
+    code_one = rows.loc[rows["index_code"].eq("000001")].copy()
+    code_two = rows.loc[
+        rows["index_code"].eq("000300") & rows["trade_date"].eq(BENCHMARK_FIXTURE_DATES[-1])
+    ].copy()
+    code_two["trade_date"] = BENCHMARK_FIXTURE_HISTORICAL_CUTOFF
+    rows = pd.concat([code_one, code_two], ignore_index=True)
+    benchmark = _benchmark_frame(
+        session_factory,
+        rows,
+        cutoff=BENCHMARK_FIXTURE_HISTORICAL_CUTOFF,
+        requested_end_date=BENCHMARK_FIXTURE_HISTORICAL_CUTOFF,
+    )
+    response = test_client.get(
+        "/market-cockpit/snapshot?series_key="
+        + equity.series_key
+        + "&benchmark_series_key="
+        + benchmark.series_key
+        + "&as_of_cutoff="
+        + BENCHMARK_FIXTURE_HISTORICAL_CUTOFF
+    )
+    context = response.json()["benchmark_context"]
+    assert response.status_code == 200
+    assert context["alignment_status"] == "partial"
+    assert context["available_code_count"] == 1
+    assert context["aligned_code_count"] == 1
+    assert context["missing_codes"] == ["000300"]
+    assert any("no eligible row" in warning for warning in context["warnings"])
 
 
 def test_page_uses_safe_dom_and_neutral_read_only_benchmark_wording() -> None:
@@ -319,6 +601,11 @@ def test_page_uses_safe_dom_and_neutral_read_only_benchmark_wording() -> None:
     assert "Benchmark index context" in page
     assert "benchmark_series_key" in page
     assert "Required sessions (return / SMA20 / SMA60 / risk)" in script
+    assert "exact consecutive 2/20/60/21-session windows" in page
+    assert "Requested benchmark codes" in script
+    assert "Cutoff alignment" in script
+    assert "Missing exact codes" in script
+    assert "formatBenchmarkWindow" in script
     assert "innerHTML" not in script
     assert "eval(" not in script
     assert "textContent" in script
@@ -336,5 +623,12 @@ def test_persisted_benchmark_demo_reports_current_and_historical(tmp_path) -> No
     assert payload["current"]["benchmark_information_cutoff"] == BENCHMARK_FIXTURE_CURRENT_CUTOFF
     assert payload["historical"]["benchmark_information_cutoff"] == BENCHMARK_FIXTURE_HISTORICAL_CUTOFF
     assert payload["current"]["alignment_status"] == "aligned"
+    assert payload["current"]["session_alignment_status"] == "aligned"
+    assert payload["current"]["cutoff_alignment_status"] == "aligned"
+    assert payload["current"]["requested_code_count"] == 2
+    assert payload["current"]["available_code_count"] == 2
+    assert payload["current"]["aligned_code_count"] == 2
+    assert payload["current"]["missing_codes"] == []
+    assert payload["current"]["expected_session_count"] == 65
     assert payload["read_only"] is True
     assert payload["network_access"] is False
