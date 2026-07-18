@@ -74,6 +74,20 @@
         <div id="liquidity-warnings"></div>
       </section>
 
+      <section aria-labelledby="price-behavior-heading">
+        <p class="section-kicker">Same selected-equity snapshot, close lookup, and open-session sequence</p>
+        <h2 id="price-behavior-heading">Selected-universe price-behavior proxies</h2>
+        <p id="price-behavior-status">Price-behavior context is loading with the selected-equity snapshot.</p>
+        <p>Descriptive price behavior only. This section is not a canonical style model, factor exposure, market regime, score, signal, recommendation, or investment-attractiveness ranking.</p>
+        <div id="price-behavior-summary" class="metric-grid"></div>
+        <h3>Fixed matched-cohort descriptive quadrants</h3>
+        <div id="price-behavior-quadrants" class="metric-grid"></div>
+        <h3>Complete-window diagnostics</h3>
+        <div id="price-behavior-issues"></div>
+        <div id="price-behavior-source-exclusions"></div>
+        <div id="price-behavior-warnings"></div>
+      </section>
+
       <section aria-labelledby="provenance-heading">
         <p class="section-kicker">One ingestion run, no cross-series stitching</p>
         <h2 id="provenance-heading">Scope and provenance</h2>
@@ -116,7 +130,7 @@
           <div id="warnings"></div>
         </div>
         <div>
-          <p class="section-kicker">Still unsupported after the bounded v0.4D slice</p>
+          <p class="section-kicker">Still unsupported after the bounded v0.4E slice</p>
           <h2>Unsupported sections</h2>
           <div id="unsupported"></div>
         </div>
@@ -133,6 +147,9 @@
           <li>Liquidity distribution uses finite, strictly positive amount observations on the existing effective session. Top-decile membership is <code>max(1, ceil(10% * eligible count))</code>, with amount-descending and stock-code-ascending tie order.</li>
           <li>Liquidity activity uses one fixed matched cohort with eligible amount on the effective session and every exact prior 5 or 20 open sessions. The ratio divides the cohort's current total by the median of its prior session totals.</li>
           <li>Above-baseline liquidity uses the exact 20-prior-session matched cohort and a strict greater-than comparison against each stock's own prior median.</li>
+          <li>Price-behavior momentum requires every valid traded close in exact 21- or 61-open-session windows; intermediate gaps invalidate the stock even when both endpoints exist.</li>
+          <li>Per-stock 20-return volatility uses all 20 close-to-close returns, sample standard deviation with <code>ddof=1</code>, and annualization by <code>sqrt(252)</code>.</li>
+          <li>The price-behavior quadrant uses one fixed cohort eligible for return-20, return-60, and volatility-20. It splits 60-session momentum at zero and volatility at the matched median; ties remain on the lower-or-equal side.</li>
           <li>Risk uses 20 complete selected-universe equal-weight returns and annualizes volatility by square root of 252.</li>
           <li>Benchmark context uses its own explicit series and the selected equity snapshot's persisted open-session calendar. Return, SMA, volatility, and drawdown require exact consecutive 2/20/60/21-session windows ending at each code's latest valid session.</li>
           <li>Sector context uses exact Eastmoney <code>BK</code> identifiers and separate complete snapshots. Latest, 5-session, 20-session, SMA20, volatility, and drawdown metrics require exact 2/6/21/20/21-session windows.</li>

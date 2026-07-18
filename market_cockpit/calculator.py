@@ -27,6 +27,13 @@ from market_cockpit.liquidity_contracts import (
     LiquiditySourceExclusion,
     LiquiditySourceExclusionReason,
 )
+from market_cockpit.price_behavior_calculator import calculate_price_behavior_context
+from market_cockpit.price_behavior_contracts import (
+    PRICE_BEHAVIOR_IDENTIFIER_SAMPLE_LIMIT,
+    PriceBehaviorContext,
+    PriceBehaviorSourceExclusion,
+    PriceBehaviorSourceExclusionReason,
+)
 from market_cockpit.repository import PersistedMarketDataSnapshot
 
 RETURN_EPSILON = 1e-12
@@ -44,6 +51,7 @@ class MarketCockpitCalculation:
     calculation_status: CalculationStatus
     latest_data_diagnostics: LatestDataDiagnostics
     liquidity_context: LiquidityContext
+    price_behavior_context: PriceBehaviorContext
     warnings: list[str]
 
 
@@ -63,6 +71,7 @@ def calculate_market_cockpit(
     expected_codes = sorted(snapshot.stock_codes)
     warnings: list[str] = []
     liquidity_exclusions: list[LiquiditySourceExclusion] = []
+    price_behavior_exclusions: list[PriceBehaviorSourceExclusion] = []
     bound = min(
         value
         for value in (
@@ -102,6 +111,9 @@ def calculate_market_cockpit(
         liquidity_exclusions.append(
             _liquidity_source_exclusion("future_price_rows", prices.loc[future_rows])
         )
+        price_behavior_exclusions.append(
+            _price_behavior_source_exclusion("future_price_rows", prices.loc[future_rows])
+        )
         warnings.append(
             f"Excluded {int(future_rows.sum())} price rows after effective session {effective_session}."
         )
@@ -113,6 +125,11 @@ def calculate_market_cockpit(
                 "out_of_calendar_price_rows", prices.loc[out_of_calendar]
             )
         )
+        price_behavior_exclusions.append(
+            _price_behavior_source_exclusion(
+                "out_of_calendar_price_rows", prices.loc[out_of_calendar]
+            )
+        )
         warnings.append(
             f"Excluded {int(out_of_calendar.sum())} price rows outside persisted open sessions."
         )
@@ -121,6 +138,11 @@ def calculate_market_cockpit(
     if wrong_scope.any():
         liquidity_exclusions.append(
             _liquidity_source_exclusion("wrong_scope_price_rows", prices.loc[wrong_scope])
+        )
+        price_behavior_exclusions.append(
+            _price_behavior_source_exclusion(
+                "wrong_scope_price_rows", prices.loc[wrong_scope]
+            )
         )
         warnings.append(
             f"Excluded price rows outside the exact selected scope: "
@@ -134,6 +156,11 @@ def calculate_market_cockpit(
                 "wrong_adjustment_price_rows", prices.loc[wrong_adjust]
             )
         )
+        price_behavior_exclusions.append(
+            _price_behavior_source_exclusion(
+                "wrong_adjustment_price_rows", prices.loc[wrong_adjust]
+            )
+        )
         warnings.append(
             f"Excluded {int(wrong_adjust.sum())} rows with an incompatible adjustment policy."
         )
@@ -142,6 +169,11 @@ def calculate_market_cockpit(
     if duplicate_keys.any():
         liquidity_exclusions.append(
             _liquidity_source_exclusion(
+                "duplicate_stock_session_price_rows", prices.loc[duplicate_keys]
+            )
+        )
+        price_behavior_exclusions.append(
+            _price_behavior_source_exclusion(
                 "duplicate_stock_session_price_rows", prices.loc[duplicate_keys]
             )
         )
@@ -204,6 +236,15 @@ def calculate_market_cockpit(
         is_no_trade=_is_no_trade,
         is_valid_traded_record=_is_valid_traded_record,
     )
+    price_behavior_context = calculate_price_behavior_context(
+        stock_codes=expected_codes,
+        expected_sessions=sessions,
+        effective_session=effective_session,
+        price_lookup=price_lookup,
+        source_exclusions=price_behavior_exclusions,
+        is_no_trade=_is_no_trade,
+        is_valid_traded_record=_is_valid_traded_record,
+    )
     available_count = (
         latest.advancing_count + latest.declining_count + latest.unchanged_count
     )
@@ -231,6 +272,7 @@ def calculate_market_cockpit(
         calculation_status=calculation_status,
         latest_data_diagnostics=latest_diagnostics,
         liquidity_context=liquidity_context,
+        price_behavior_context=price_behavior_context,
         warnings=warnings,
     )
 
@@ -721,4 +763,20 @@ def _liquidity_source_exclusion(
         identifiers=bounded,
         identifiers_truncated=len(identifiers) > len(bounded),
         identifiers_omitted_count=len(identifiers) - len(bounded),
+    )
+
+
+def _price_behavior_source_exclusion(
+    reason: PriceBehaviorSourceExclusionReason,
+    rows: pd.DataFrame,
+) -> PriceBehaviorSourceExclusion:
+    stock_codes = sorted(rows["stock_code"].astype(str).unique())
+    bounded = stock_codes[:PRICE_BEHAVIOR_IDENTIFIER_SAMPLE_LIMIT]
+    return PriceBehaviorSourceExclusion(
+        reason=reason,
+        excluded_row_count=len(rows),
+        stock_code_count=len(stock_codes),
+        stock_codes=bounded,
+        stock_codes_truncated=len(stock_codes) > len(bounded),
+        stock_codes_omitted_count=len(stock_codes) - len(bounded),
     )

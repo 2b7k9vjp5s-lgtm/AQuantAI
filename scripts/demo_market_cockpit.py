@@ -128,6 +128,7 @@ def _summary(payload: dict[str, Any]) -> dict[str, Any]:
             "latest_return_issues"
         ],
         "liquidity_context": payload["liquidity_context"],
+        "price_behavior_context": payload["price_behavior_context"],
     }
 
 

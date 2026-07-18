@@ -187,3 +187,48 @@ Structured diagnostics contain sorted latest issues and bounded accepted-path so
 All growing identifier samples use the single `LIQUIDITY_IDENTIFIER_SAMPLE_LIMIT = 10` boundary. Latest issues, 5/20-window unavailable stock codes, source-exclusion identifiers, and top-decile member codes expose an exact count, at most ten stable stock-code-ascending identifiers, a truncation flag, and an exact omitted count. Top-5 remains complete because it is intrinsically capped at five. Truncation changes presentation only: full eligible and matched cohorts still determine totals, denominators, activity ratios, and above-baseline counts/shares. Warnings use the same bounded sample and a `(+N more)` suffix rather than interpolating a complete selected universe.
 
 Trading concentration here is a descriptive selected-universe distribution statistic only. It is not evidence of crowding, a market regime, a score, a signal, a recommendation, or investment attractiveness. v0.4D adds no provider, endpoint, network call, ingestion path, database table, migration, independent liquidity series, second calendar, scheduler, automatic refresh, style or valuation analysis, Industry Alpha workflow, broker, order, or trading behavior.
+
+## v0.4E Price-Behavior Proxy Context
+
+v0.4E adds `price_behavior_context` to every successfully selected equity snapshot. It reuses the same physical `PersistedMarketDataSnapshot`, accepted effective session `t`, filtered selected-stock close lookup, and persisted open-session sequence used by v0.4A-v0.4D. The nested context is therefore bound to the outer snapshot's ingestion run, series key, cutoff, requested date range, adjustment, provider, contract, and adapter provenance. It performs no repository query or independent selection.
+
+Only persisted `daily_price.close` and the existing accepted traded-row rules are used. Every required close must be finite and strictly positive, with a valid non-no-trade observation. Missing, no-trade, invalid, non-positive, and non-finite observations make that stock unavailable for the affected metric. No window is shortened; intermediate gaps invalidate the complete window even when both endpoint closes exist. Filling, interpolation, clipping, cross-run stitching, and zero substitution are forbidden.
+
+### Exact momentum and volatility
+
+Return-20 requires exactly 21 persisted open sessions ending at `t`. Return-60 requires exactly 61:
+
+```text
+return_20(i,t) = close(i,t) / close(i,t-20) - 1
+return_60(i,t) = close(i,t) / close(i,t-60) - 1
+```
+
+Eligibility checks every close in the respective complete window, not only the formula endpoints. Each metric reports its own requested, eligible, and unavailable stock counts and its cross-sectional median. Momentum also reports strictly-positive and non-positive counts and the positive share over its independent eligible cohort. A zero return belongs to non-positive. Empty cohorts return `null` medians and shares.
+
+Per-stock volatility requires all 21 closes and all 20 finite close-to-close returns:
+
+```text
+r(i,s) = close(i,s) / close(i,s-1) - 1
+volatility_20(i,t) = sample_std(last 20 r(i,s), ddof=1) * sqrt(252)
+```
+
+The implementation uses a scaled, fail-closed sample-variance calculation. A non-finite intermediate return, variance, annualized result, median, ratio, or other aggregate is rejected. Contracts, `to_dict()`, FastAPI JSON, demos, and the page therefore contain only finite numbers or `null`, never `NaN` or `Infinity`.
+
+### Fixed matched-cohort quadrants
+
+One fixed matched cohort contains only stocks eligible for return-20, return-60, and volatility-20. Its full-cohort volatility median divides the selected-universe distribution into exactly four descriptive buckets:
+
+1. `positive_momentum_lower_or_equal_volatility`: return-60 greater than zero and volatility-20 less than or equal to the matched median;
+2. `positive_momentum_higher_volatility`: return-60 greater than zero and volatility-20 greater than the matched median;
+3. `non_positive_momentum_lower_or_equal_volatility`: return-60 less than or equal to zero and volatility-20 less than or equal to the matched median;
+4. `non_positive_momentum_higher_volatility`: return-60 less than or equal to zero and volatility-20 greater than the matched median.
+
+Volatility ties remain in the lower-or-equal side. For a non-empty matched cohort, bucket counts sum to the exact matched count and bucket shares sum to one within floating tolerance. For an empty cohort, the matched median is `null`, all bucket counts are zero, all bucket shares are `null`, and the reason is `empty_matched_cohort`.
+
+### Status and bounded diagnostics
+
+Each metric is `complete`, `partial`, or `unavailable`, with a typed reason for complete coverage, partial eligibility, insufficient persisted open-session history, an empty eligible cohort, or a non-finite aggregate. Per-stock issues distinguish insufficient history, missing rows, no-trade rows, invalid closes, non-positive closes, non-finite closes, other invalid traded observations, and non-finite calculations. Accepted-path source exclusions preserve exact row and stock counts for future, out-of-calendar, wrong-scope, wrong-adjustment, and duplicate rows.
+
+All growing code samples use `PRICE_BEHAVIOR_IDENTIFIER_SAMPLE_LIMIT = 10`. Metric issues, matched-cohort unavailable codes, source-exclusion codes, and all four bucket-member lists expose exact counts, stable stock-code-ascending samples, truncation flags, and omitted counts. Warnings use the same bounded samples with `(+N more)`. Truncation affects presentation only; complete independent cohorts and the full matched cohort still determine medians, counts, shares, and bucket assignments.
+
+These outputs are selected-universe price-behavior proxies, not canonical size, value, growth, quality, profitability, market-cap, valuation, beta, alpha, or factor-exposure measures. The quadrant is not a risk-on/risk-off label, regime, score, signal, recommendation, crowding conclusion, or investment-attractiveness ranking. v0.4E adds no provider, network call, ingestion, selector, series, calendar, table, migration, dependency, scheduler, automatic refresh, portfolio, broker, order, or trading behavior.
