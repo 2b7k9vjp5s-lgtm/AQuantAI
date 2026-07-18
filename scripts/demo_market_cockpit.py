@@ -121,6 +121,12 @@ def _summary(payload: dict[str, Any]) -> dict[str, Any]:
         "no_trade_latest_count": payload["latest_data_diagnostics"][
             "no_trade_latest_count"
         ],
+        "latest_return_unavailable_count": payload["latest_data_diagnostics"][
+            "latest_return_unavailable_count"
+        ],
+        "latest_return_issues": payload["latest_data_diagnostics"][
+            "latest_return_issues"
+        ],
     }
 
 

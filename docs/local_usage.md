@@ -197,7 +197,7 @@ http://127.0.0.1:8000/market-cockpit?series_key=<series-key>&as_of_cutoff=YYYYMM
 
 `as_of_cutoff` is optional, but `series_key` is mandatory. Missing selection returns 422, no eligible snapshot returns 404, and unavailable database configuration/query state returns 503. No error path falls back to sample data.
 
-The page displays selected-universe scope, stock codes/counts, calculation readiness, unverified scope coverage, conservative overall completeness, ingestion run, allowlisted collection/import/endpoint provenance, requested and selected cutoffs, effective trading session, view-generation time, adjustment policy, stale/no-trade diagnostics, warnings, formulas, and unsupported sections. Internally ready calculations do not establish representative A-share coverage. It is read-only and does not automatically refresh or collect data.
+The page displays selected-universe scope, stock codes/counts, calculation readiness, unverified scope coverage, conservative overall completeness, ingestion run, allowlisted collection/import/endpoint provenance, requested and selected cutoffs, effective trading session, view-generation time, adjustment policy, current-session row health, two-session latest-return eligibility issues, warnings, formulas, and unsupported sections. Every unavailable latest return has one stock-code-sorted reason with its blocking session and prior valid traded-session gap. Internally ready calculations do not establish representative A-share coverage. It is read-only and does not automatically refresh or collect data.
 
 Run the deterministic persisted current/historical demonstration after migration:
 

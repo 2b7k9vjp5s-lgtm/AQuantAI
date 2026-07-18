@@ -35,6 +35,22 @@ A stock is available only when both finite positive closes exist and both rows a
 
 If no stock has an available return, return `null` for ratios and return statistics. Counts remain factual integers.
 
+Latest-return metrics and diagnostics consume one shared stock-code-sorted eligibility classification. Each unavailable return has exactly one issue, with effective-session causes taking precedence over previous-session causes. Stable reason values are:
+
+- `missing_effective_session_row`;
+- `invalid_effective_session_row`;
+- `no_trade_effective_session_row`;
+- `missing_previous_session_row`;
+- `invalid_previous_session_row`;
+- `no_trade_previous_session_row`.
+
+Each issue reports the blocking session, the last valid traded session strictly before that blocking session, and their persisted open-session gap. A previous-session failure never reports the valid effective session as its last-valid reference. If no earlier valid traded session exists, the last-valid session and gap are `null`. The bounded contract enforces:
+
+```text
+latest_return_unavailable_count == metrics.latest_session.unavailable_count
+len(latest_return_issues) == metrics.latest_session.unavailable_count
+```
+
 ### Moving-average breadth
 
 For `N` equal to 20 or 60, a stock is eligible only when it has one finite positive close on every one of the last `N` persisted open sessions, including the effective session.
@@ -95,7 +111,7 @@ Both metrics require exactly 20 eligible return sessions. Otherwise they are `nu
 
 `scope_coverage_status` is `unverified_selected_scope` throughout v0.4A. There is no reviewed policy establishing representative A-share coverage, and no stock-count threshold is invented as a substitute. Therefore the conservative user-facing `completeness_status` is always `partial` when calculations exist and `insufficient_data` when core breadth cannot be calculated. Internally ready calculations do not establish representative A-share or full-market coverage.
 
-Warnings identify exact missing latest/previous prices, no-trade observations, inactive stock records, duplicate sessions, incomplete scope, unavailable windows, and future rows that were excluded. Bounded latest diagnostics report stale/missing and no-trade counts plus stock code, reason, last valid traded session, and persisted open-session gap. They describe observations as potentially suspended or no-trade and never claim a confirmed suspension.
+Warnings identify exact missing effective/previous rows, no-trade observations, inactive stock records, duplicate sessions, incomplete scope, unavailable windows, and future rows that were excluded. Current-session health aggregates (`stale_or_missing_latest_count` and `no_trade_latest_count`) remain separate from latest-return eligibility. `latest_return_unavailable_count` and `latest_return_issues` cover both required sessions and can never be empty when the latest metric reports an unavailable stock. Diagnostics describe observations as potentially suspended or no-trade and never claim a confirmed suspension.
 
 ## Response Provenance
 

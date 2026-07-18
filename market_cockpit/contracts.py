@@ -10,10 +10,13 @@ from backend.safety import RESEARCH_DISCLAIMER, validate_allowed_actions, valida
 CompletenessStatus = Literal["ready", "partial", "insufficient_data"]
 CalculationStatus = Literal["ready", "partial", "insufficient_data"]
 ScopeCoverageStatus = Literal["unverified_selected_scope"]
-LatestDataIssueReason = Literal[
-    "missing_latest_row",
-    "invalid_latest_row",
-    "no_trade_latest",
+LatestReturnIssueReason = Literal[
+    "missing_effective_session_row",
+    "invalid_effective_session_row",
+    "no_trade_effective_session_row",
+    "missing_previous_session_row",
+    "invalid_previous_session_row",
+    "no_trade_previous_session_row",
 ]
 
 
@@ -66,10 +69,11 @@ class MarketCockpitMetrics:
 
 
 @dataclass(frozen=True)
-class AffectedStockDetail:
+class LatestReturnIssue:
     stock_code: str
-    reason: LatestDataIssueReason
-    last_available_session: str | None
+    reason: LatestReturnIssueReason
+    blocking_session: str | None
+    last_valid_traded_session: str | None
     open_session_gap: int | None
 
 
@@ -77,7 +81,8 @@ class AffectedStockDetail:
 class LatestDataDiagnostics:
     stale_or_missing_latest_count: int
     no_trade_latest_count: int
-    affected_stocks: list[AffectedStockDetail]
+    latest_return_unavailable_count: int
+    latest_return_issues: list[LatestReturnIssue]
 
 
 @dataclass(frozen=True)

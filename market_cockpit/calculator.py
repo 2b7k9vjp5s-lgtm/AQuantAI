@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite, sqrt
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 
 from market_cockpit.contracts import (
-    AffectedStockDetail,
     CalculationStatus,
-    LatestSessionMetrics,
     LatestDataDiagnostics,
+    LatestReturnIssue,
+    LatestReturnIssueReason,
+    LatestSessionMetrics,
     MarketCockpitMetrics,
     ParticipationMetric,
     RiskMetrics,
@@ -35,6 +37,13 @@ class MarketCockpitCalculation:
     calculation_status: CalculationStatus
     latest_data_diagnostics: LatestDataDiagnostics
     warnings: list[str]
+
+
+@dataclass(frozen=True)
+class LatestReturnClassification:
+    stock_code: str
+    return_value: float | None
+    issue: LatestReturnIssue | None
 
 
 def calculate_market_cockpit(
@@ -131,13 +140,22 @@ def calculate_market_cockpit(
         warnings.append(f"Selected scope contains non-active stock records: {inactive}.")
 
     price_lookup = _price_lookup(prices)
-    latest_diagnostics = _latest_data_diagnostics(
+    latest_classifications = _classify_latest_returns(
         expected_codes,
         sessions,
         price_lookup,
-        warnings,
     )
-    latest = _latest_metrics(expected_codes, sessions, price_lookup, warnings)
+    if len(sessions) < 2:
+        warnings.append("Latest-session returns require at least two persisted open sessions.")
+    latest_diagnostics = _latest_data_diagnostics(latest_classifications, warnings)
+    latest = _latest_metrics(latest_classifications, len(expected_codes), warnings)
+    if (
+        latest_diagnostics.latest_return_unavailable_count != latest.unavailable_count
+        or len(latest_diagnostics.latest_return_issues) != latest.unavailable_count
+    ):
+        raise MarketCockpitCalculationError(
+            "Latest-return diagnostics must contain exactly one issue per unavailable return."
+        )
     breadth_20 = _window_breadth(20, expected_codes, sessions, price_lookup, warnings)
     breadth_60 = _window_breadth(60, expected_codes, sessions, price_lookup, warnings)
     volume_participation = _participation(
@@ -189,50 +207,21 @@ def _price_lookup(prices: pd.DataFrame) -> dict[tuple[str, str], dict[str, float
 
 
 def _latest_metrics(
-    codes: list[str],
-    sessions: list[str],
-    lookup: dict[tuple[str, str], dict[str, float]],
+    classifications: list[LatestReturnClassification],
+    stock_count: int,
     warnings: list[str],
 ) -> LatestSessionMetrics:
-    if len(sessions) < 2:
-        warnings.append("Latest-session returns require at least two persisted open sessions.")
-        return LatestSessionMetrics(None, None, 0, 0, 0, len(codes), None, None, None)
-    previous_session, latest_session = sessions[-2:]
-    returns: list[float] = []
-    previous_unavailable: list[str] = []
-    for code in codes:
-        previous = _value(
-            lookup,
-            previous_session,
-            code,
-            "close",
-            positive=True,
-            require_trade=True,
-        )
-        current = _value(
-            lookup,
-            latest_session,
-            code,
-            "close",
-            positive=True,
-            require_trade=True,
-        )
-        if previous is None or current is None:
-            if previous is None:
-                previous_unavailable.append(code)
-            continue
-        returns.append(current / previous - 1.0)
-    if previous_unavailable:
-        warnings.append(
-            "Latest-session return is unavailable for stocks without a valid traded previous-session row: "
-            f"{previous_unavailable}."
-        )
+    returns = [
+        item.return_value
+        for item in classifications
+        if item.return_value is not None
+    ]
     advancing = sum(value > RETURN_EPSILON for value in returns)
     declining = sum(value < -RETURN_EPSILON for value in returns)
     unchanged = len(returns) - advancing - declining
     if not returns:
         warnings.append("No selected stock has an available latest-session return.")
-        return LatestSessionMetrics(None, None, 0, 0, 0, len(codes), None, None, None)
+        return LatestSessionMetrics(None, None, 0, 0, 0, stock_count, None, None, None)
     values = np.asarray(returns, dtype=float)
     return LatestSessionMetrics(
         equal_weight_mean_return=float(values.mean()),
@@ -240,7 +229,7 @@ def _latest_metrics(
         advancing_count=advancing,
         declining_count=declining,
         unchanged_count=unchanged,
-        unavailable_count=len(codes) - len(returns),
+        unavailable_count=stock_count - len(returns),
         advance_ratio=float(advancing / len(returns)),
         breadth_balance=float((advancing - declining) / len(returns)),
         return_dispersion=float(values.std(ddof=0)),
@@ -437,66 +426,177 @@ def _value(
     return value
 
 
-def _latest_data_diagnostics(
+def _classify_latest_returns(
     codes: list[str],
     sessions: list[str],
     lookup: dict[tuple[str, str], dict[str, float]],
+) -> list[LatestReturnClassification]:
+    classifications: list[LatestReturnClassification] = []
+    if len(sessions) < 2:
+        for code in codes:
+            classifications.append(
+                LatestReturnClassification(
+                    stock_code=code,
+                    return_value=None,
+                    issue=LatestReturnIssue(
+                        stock_code=code,
+                        reason="missing_previous_session_row",
+                        blocking_session=None,
+                        last_valid_traded_session=None,
+                        open_session_gap=None,
+                    ),
+                )
+            )
+        return classifications
+
+    previous_index = len(sessions) - 2
+    effective_index = len(sessions) - 1
+    for code in codes:
+        effective_record = lookup.get((sessions[effective_index], code))
+        previous_record = lookup.get((sessions[previous_index], code))
+        effective_reason = _record_issue_reason(effective_record, "effective")
+        previous_reason = _record_issue_reason(previous_record, "previous")
+        if effective_reason is not None:
+            issue = _build_latest_return_issue(
+                code,
+                effective_reason,
+                effective_index,
+                sessions,
+                lookup,
+            )
+            classifications.append(LatestReturnClassification(code, None, issue))
+        elif previous_reason is not None:
+            issue = _build_latest_return_issue(
+                code,
+                previous_reason,
+                previous_index,
+                sessions,
+                lookup,
+            )
+            classifications.append(LatestReturnClassification(code, None, issue))
+        else:
+            assert effective_record is not None and previous_record is not None
+            classifications.append(
+                LatestReturnClassification(
+                    stock_code=code,
+                    return_value=(
+                        float(effective_record["close"]) / float(previous_record["close"]) - 1.0
+                    ),
+                    issue=None,
+                )
+            )
+    return classifications
+
+
+def _latest_data_diagnostics(
+    classifications: list[LatestReturnClassification],
     warnings: list[str],
 ) -> LatestDataDiagnostics:
-    latest_session = sessions[-1]
-    affected: list[AffectedStockDetail] = []
-    stale_or_missing: list[str] = []
-    no_trade: list[str] = []
-    for code in codes:
-        record = lookup.get((latest_session, code))
-        if record is not None and _is_valid_traded_record(record):
-            continue
-        if record is not None and _is_no_trade(record):
-            reason = "no_trade_latest"
-            no_trade.append(code)
-        else:
-            reason = "missing_latest_row" if record is None else "invalid_latest_row"
-            stale_or_missing.append(code)
-        last_session = _last_available_session(code, sessions[:-1], lookup)
-        affected.append(
-            AffectedStockDetail(
-                stock_code=code,
-                reason=reason,
-                last_available_session=last_session,
-                open_session_gap=(
-                    len(sessions) - 1 - sessions.index(last_session)
-                    if last_session is not None
-                    else None
-                ),
-            )
-        )
-    if stale_or_missing:
+    issues = [item.issue for item in classifications if item.issue is not None]
+    effective_stale = [
+        issue.stock_code
+        for issue in issues
+        if issue.reason in {
+            "missing_effective_session_row",
+            "invalid_effective_session_row",
+        }
+    ]
+    effective_no_trade = [
+        issue.stock_code
+        for issue in issues
+        if issue.reason == "no_trade_effective_session_row"
+    ]
+    previous_stale = [
+        issue.stock_code
+        for issue in issues
+        if issue.reason in {
+            "missing_previous_session_row",
+            "invalid_previous_session_row",
+        }
+    ]
+    previous_no_trade = [
+        issue.stock_code
+        for issue in issues
+        if issue.reason == "no_trade_previous_session_row"
+    ]
+    if effective_stale:
         warnings.append(
-            "Latest-session rows are missing or invalid for selected stocks; last available "
-            f"session diagnostics are provided: {stale_or_missing}."
+            "Effective-session rows are missing or invalid for latest returns; structured "
+            f"blocking-session diagnostics are provided: {effective_stale}."
         )
-    if no_trade:
+    if effective_no_trade:
         warnings.append(
-            "Latest-session zero-volume and zero-amount rows were excluded as potentially "
-            f"suspended or no-trade observations: {no_trade}."
+            "Effective-session zero-volume and zero-amount rows were excluded as potentially "
+            f"suspended or no-trade observations: {effective_no_trade}."
+        )
+    if previous_stale:
+        warnings.append(
+            "Previous-session rows are missing or invalid for latest returns; structured "
+            f"blocking-session diagnostics are provided: {previous_stale}."
+        )
+    if previous_no_trade:
+        warnings.append(
+            "Previous-session zero-volume and zero-amount rows were excluded from latest returns "
+            f"as potentially suspended or no-trade observations: {previous_no_trade}."
         )
     return LatestDataDiagnostics(
-        stale_or_missing_latest_count=len(stale_or_missing),
-        no_trade_latest_count=len(no_trade),
-        affected_stocks=affected,
+        stale_or_missing_latest_count=len(effective_stale),
+        no_trade_latest_count=len(effective_no_trade),
+        latest_return_unavailable_count=len(issues),
+        latest_return_issues=issues,
     )
 
 
-def _last_available_session(
+def _record_issue_reason(
+    record: dict[str, float] | None,
+    session_role: Literal["effective", "previous"],
+) -> LatestReturnIssueReason | None:
+    if record is None:
+        return (
+            "missing_effective_session_row"
+            if session_role == "effective"
+            else "missing_previous_session_row"
+        )
+    if _is_no_trade(record):
+        return (
+            "no_trade_effective_session_row"
+            if session_role == "effective"
+            else "no_trade_previous_session_row"
+        )
+    if not _is_valid_traded_record(record):
+        return (
+            "invalid_effective_session_row"
+            if session_role == "effective"
+            else "invalid_previous_session_row"
+        )
+    return None
+
+
+def _build_latest_return_issue(
     code: str,
+    reason: LatestReturnIssueReason,
+    blocking_index: int,
     sessions: list[str],
     lookup: dict[tuple[str, str], dict[str, float]],
-) -> str | None:
-    for session in reversed(sessions):
+) -> LatestReturnIssue:
+    last_valid_index: int | None = None
+    for index in range(blocking_index - 1, -1, -1):
+        session = sessions[index]
         record = lookup.get((session, code))
         if record is not None and _is_valid_traded_record(record):
-            return session
-    return None
+            last_valid_index = index
+            break
+    return LatestReturnIssue(
+        stock_code=code,
+        reason=reason,
+        blocking_session=sessions[blocking_index],
+        last_valid_traded_session=(
+            sessions[last_valid_index] if last_valid_index is not None else None
+        ),
+        open_session_gap=(
+            blocking_index - last_valid_index if last_valid_index is not None else None
+        ),
+    )
 
 
 def _is_no_trade(record: dict[str, float]) -> bool:

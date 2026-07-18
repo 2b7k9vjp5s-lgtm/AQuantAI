@@ -3,8 +3,10 @@ from __future__ import annotations
 import importlib
 import re
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -22,6 +24,7 @@ from datasource.akshare.provider import SubprocessAkshareRunner
 from market_cockpit.fixtures import (
     COCKPIT_FIXTURE_ADJUST_TYPE,
     COCKPIT_FIXTURE_CURRENT_CUTOFF,
+    COCKPIT_FIXTURE_DATES,
     COCKPIT_FIXTURE_END_DATE,
     COCKPIT_FIXTURE_HISTORICAL_CUTOFF,
     COCKPIT_FIXTURE_PROVIDER,
@@ -29,6 +32,7 @@ from market_cockpit.fixtures import (
     COCKPIT_FIXTURE_START_DATE,
     build_market_cockpit_fixture,
 )
+from market_cockpit.repository import MarketCockpitRepository
 from scripts.demo_market_cockpit import build_persisted_market_cockpit_demo
 
 
@@ -184,7 +188,8 @@ def test_api_returns_current_and_historical_persisted_snapshots(client) -> None:
     assert current_payload["latest_data_diagnostics"] == {
         "stale_or_missing_latest_count": 0,
         "no_trade_latest_count": 0,
-        "affected_stocks": [],
+        "latest_return_unavailable_count": 0,
+        "latest_return_issues": [],
     }
     assert current_payload["read_only"] is True
     assert current_payload["allowed_actions"] == ["view", "inspect"]
@@ -211,7 +216,7 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "Selected universe / 选定股票范围" in page.text
     assert "One ingestion run, no cross-series stitching" in page.text
     assert "Coverage confidence is unverified" in page.text
-    assert "Latest-session availability diagnostics" in page.text
+    assert "Current-session health and latest-return eligibility" in page.text
     assert "Not supported in v0.4A" in page.text
     assert "Read-only" in page.text
     assert "<form" not in page.text.lower()
@@ -229,8 +234,9 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "Requested historical cutoff" in script.text
     assert "Calculated trading session" in script.text
     assert "View generated UTC" in script.text
-    assert "Stale or missing latest" in script.text
-    assert "No-trade latest" in script.text
+    assert "Current-session stale, invalid, or missing" in script.text
+    assert "Current-session no-trade" in script.text
+    assert "Latest-return unavailable" in script.text
     for forbidden_claim in ("全市场", "A 股市场宽度", "官方指数宽度"):
         assert forbidden_claim not in page.text
 
@@ -308,5 +314,107 @@ def test_persisted_demo_reports_current_and_historical_cutoffs(tmp_path) -> None
     )
     assert payload["current"]["stale_or_missing_latest_count"] == 0
     assert payload["current"]["no_trade_latest_count"] == 0
+    assert payload["current"]["latest_return_unavailable_count"] == 0
+    assert payload["current"]["latest_return_issues"] == []
     assert payload["read_only"] is True
     assert payload["network_access"] is False
+
+
+@pytest.mark.parametrize(
+    (
+        "session_role",
+        "mutation",
+        "expected_reason",
+        "expected_stale_current",
+        "expected_no_trade_current",
+    ),
+    [
+        ("effective", "missing", "missing_effective_session_row", 1, 0),
+        ("effective", "invalid", "invalid_effective_session_row", 1, 0),
+        ("effective", "no_trade", "no_trade_effective_session_row", 0, 1),
+        ("previous", "missing", "missing_previous_session_row", 0, 0),
+        ("previous", "invalid", "invalid_previous_session_row", 0, 0),
+        ("previous", "no_trade", "no_trade_previous_session_row", 0, 0),
+    ],
+)
+def test_api_serializes_every_latest_return_issue_reason(
+    client,
+    monkeypatch,
+    session_role: str,
+    mutation: str,
+    expected_reason: str,
+    expected_stale_current: int,
+    expected_no_trade_current: int,
+) -> None:
+    test_client, session_factory = client
+    result = _ingest(
+        session_factory,
+        revision="current",
+        cutoff=COCKPIT_FIXTURE_CURRENT_CUTOFF,
+    )
+    blocking_date = (
+        COCKPIT_FIXTURE_DATES[-1]
+        if session_role == "effective"
+        else COCKPIT_FIXTURE_DATES[-2]
+    )
+    with session_factory() as session:
+        persisted = MarketCockpitRepository(session).load_snapshot(
+            series_key=result.series_key
+        )
+    prices = persisted.daily_price.copy()
+    mask = prices["trade_date"].eq(blocking_date) & prices["stock_code"].eq("000003")
+    assert int(mask.sum()) == 1
+    if mutation == "missing":
+        prices = prices.loc[~mask].copy()
+    elif mutation == "invalid":
+        prices.loc[mask, "volume"] = np.nan
+    else:
+        prices.loc[mask, ["volume", "amount"]] = 0.0
+    malformed = replace(persisted, daily_price=prices)
+    monkeypatch.setattr(
+        MarketCockpitRepository,
+        "load_snapshot",
+        lambda _self, **_kwargs: malformed,
+    )
+
+    response = test_client.get(
+        "/market-cockpit/snapshot?series_key=" + result.series_key
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    diagnostics = payload["latest_data_diagnostics"]
+    assert payload["metrics"]["latest_session"]["unavailable_count"] == 1
+    assert diagnostics["latest_return_unavailable_count"] == 1
+    assert len(diagnostics["latest_return_issues"]) == 1
+    assert diagnostics["stale_or_missing_latest_count"] == expected_stale_current
+    assert diagnostics["no_trade_latest_count"] == expected_no_trade_current
+    issue = diagnostics["latest_return_issues"][0]
+    assert issue == {
+        "stock_code": "000003",
+        "reason": expected_reason,
+        "blocking_session": blocking_date,
+        "last_valid_traded_session": (
+            COCKPIT_FIXTURE_DATES[-2]
+            if session_role == "effective"
+            else COCKPIT_FIXTURE_DATES[-3]
+        ),
+        "open_session_gap": 1,
+    }
+
+
+def test_page_script_renders_previous_session_issue_without_contradictory_empty_message() -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "market_cockpit"
+        / "static"
+        / "market_cockpit.js"
+    ).read_text(encoding="utf-8")
+
+    assert "Missing previous-session row" in script
+    assert "Invalid previous-session row" in script
+    assert "No-trade previous-session row" in script
+    assert "blocking session=" in script
+    assert "last valid traded session=" in script
+    assert "No latest-return eligibility issues." in script
+    assert "No stale, missing, or no-trade latest observations." not in script

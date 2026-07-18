@@ -93,18 +93,32 @@ function renderProvenance(payload) {
 function renderLatestDiagnostics(payload) {
   const diagnostics = payload.latest_data_diagnostics || {};
   renderMetrics(document.getElementById("diagnostic-summary"), [
-    ["Stale or missing latest", diagnostics.stale_or_missing_latest_count],
-    ["No-trade latest", diagnostics.no_trade_latest_count]
+    ["Current-session stale, invalid, or missing", diagnostics.stale_or_missing_latest_count],
+    ["Current-session no-trade", diagnostics.no_trade_latest_count],
+    ["Latest-return unavailable", diagnostics.latest_return_unavailable_count]
   ]);
   renderList(
-    document.getElementById("affected-stocks"),
-    (diagnostics.affected_stocks || []).map(function (item) {
-      return String(item.stock_code) + ": " + String(item.reason) +
-        "; last available session=" + formatValue(item.last_available_session) +
+    document.getElementById("latest-return-issues"),
+    (diagnostics.latest_return_issues || []).map(function (item) {
+      return String(item.stock_code) + ": " + latestReturnReasonLabel(item.reason) +
+        "; blocking session=" + formatValue(item.blocking_session) +
+        "; last valid traded session=" + formatValue(item.last_valid_traded_session) +
         "; open-session gap=" + formatValue(item.open_session_gap);
     }),
-    "No stale, missing, or no-trade latest observations."
+    "No latest-return eligibility issues."
   );
+}
+
+function latestReturnReasonLabel(reason) {
+  const labels = {
+    missing_effective_session_row: "Missing effective-session row",
+    invalid_effective_session_row: "Invalid effective-session row",
+    no_trade_effective_session_row: "No-trade effective-session row",
+    missing_previous_session_row: "Missing previous-session row",
+    invalid_previous_session_row: "Invalid previous-session row",
+    no_trade_previous_session_row: "No-trade previous-session row"
+  };
+  return labels[reason] || String(reason || "Unknown latest-return issue");
 }
 
 function renderSnapshot(payload) {

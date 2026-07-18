@@ -227,12 +227,15 @@ def test_missing_latest_price_is_unavailable_and_partial() -> None:
     assert result.calculation_status == "partial"
     assert result.latest_data_diagnostics.stale_or_missing_latest_count == 1
     assert result.latest_data_diagnostics.no_trade_latest_count == 0
-    assert result.latest_data_diagnostics.affected_stocks[0].stock_code == "000003"
-    assert result.latest_data_diagnostics.affected_stocks[0].reason == "missing_latest_row"
-    assert result.latest_data_diagnostics.affected_stocks[0].last_available_session == (
+    issue = result.latest_data_diagnostics.latest_return_issues[0]
+    assert issue.stock_code == "000003"
+    assert issue.reason == "missing_effective_session_row"
+    assert issue.blocking_session == latest_date
+    assert issue.last_valid_traded_session == (
         snapshot.trade_calendar.iloc[-2]["trade_date"]
     )
-    assert result.latest_data_diagnostics.affected_stocks[0].open_session_gap == 1
+    assert issue.open_session_gap == 1
+    _assert_latest_return_diagnostic_invariant(result)
     assert any("000003" in warning for warning in result.warnings)
 
 
@@ -316,8 +319,10 @@ def test_no_trade_latest_is_not_counted_as_unchanged_or_participating() -> None:
     assert result.metrics.equal_weight_risk.eligible_return_sessions == 19
     assert diagnostics.stale_or_missing_latest_count == 0
     assert diagnostics.no_trade_latest_count == 1
-    assert diagnostics.affected_stocks[0].reason == "no_trade_latest"
-    assert diagnostics.affected_stocks[0].open_session_gap == 1
+    assert diagnostics.latest_return_issues[0].reason == "no_trade_effective_session_row"
+    assert diagnostics.latest_return_issues[0].blocking_session == latest_date
+    assert diagnostics.latest_return_issues[0].open_session_gap == 1
+    _assert_latest_return_diagnostic_invariant(result)
     assert any("potentially suspended or no-trade" in warning for warning in result.warnings)
 
 
@@ -327,6 +332,9 @@ def test_genuinely_unchanged_close_with_activity_remains_available() -> None:
     assert result.metrics.latest_session.unchanged_count == 1
     assert result.metrics.latest_session.unavailable_count == 0
     assert result.latest_data_diagnostics.no_trade_latest_count == 0
+    assert result.latest_data_diagnostics.latest_return_unavailable_count == 0
+    assert result.latest_data_diagnostics.latest_return_issues == []
+    _assert_latest_return_diagnostic_invariant(result)
 
 
 def test_no_trade_inside_rolling_window_excludes_stock_consistently() -> None:
@@ -357,8 +365,139 @@ def test_no_core_latest_returns_is_insufficient_and_details_are_sorted() -> None
     assert result.available_stock_count == 0
     assert result.calculation_status == "insufficient_data"
     assert result.latest_data_diagnostics.no_trade_latest_count == 3
-    assert [item.stock_code for item in result.latest_data_diagnostics.affected_stocks] == [
+    assert [item.stock_code for item in result.latest_data_diagnostics.latest_return_issues] == [
         "000001",
         "000002",
         "000003",
     ]
+    _assert_latest_return_diagnostic_invariant(result)
+
+
+def test_valid_current_row_with_missing_previous_row_has_structured_issue() -> None:
+    snapshot = _snapshot()
+    previous_date = snapshot.trade_calendar.iloc[-2]["trade_date"]
+    prices = snapshot.daily_price.loc[
+        ~(
+            snapshot.daily_price["trade_date"].eq(previous_date)
+            & snapshot.daily_price["stock_code"].eq("000003")
+        )
+    ].copy()
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+    diagnostics = result.latest_data_diagnostics
+    issue = diagnostics.latest_return_issues[0]
+
+    assert diagnostics.stale_or_missing_latest_count == 0
+    assert diagnostics.no_trade_latest_count == 0
+    assert issue.reason == "missing_previous_session_row"
+    assert issue.blocking_session == previous_date
+    assert issue.last_valid_traded_session == snapshot.trade_calendar.iloc[-3]["trade_date"]
+    assert issue.open_session_gap == 1
+    _assert_latest_return_diagnostic_invariant(result)
+
+
+def test_valid_current_row_with_no_trade_previous_row_has_structured_issue() -> None:
+    snapshot = _snapshot()
+    previous_date = snapshot.trade_calendar.iloc[-2]["trade_date"]
+    prices = snapshot.daily_price.copy()
+    mask = prices["trade_date"].eq(previous_date) & prices["stock_code"].eq("000003")
+    prices.loc[mask, ["volume", "amount"]] = 0.0
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+    issue = result.latest_data_diagnostics.latest_return_issues[0]
+
+    assert result.latest_data_diagnostics.stale_or_missing_latest_count == 0
+    assert result.latest_data_diagnostics.no_trade_latest_count == 0
+    assert issue.reason == "no_trade_previous_session_row"
+    assert issue.blocking_session == previous_date
+    assert issue.last_valid_traded_session == snapshot.trade_calendar.iloc[-3]["trade_date"]
+    assert issue.open_session_gap == 1
+    _assert_latest_return_diagnostic_invariant(result)
+
+
+@pytest.mark.parametrize(("field", "value"), [("volume", np.nan), ("close", np.inf)])
+def test_valid_current_row_with_invalid_previous_row_has_structured_issue(
+    field: str,
+    value: float,
+) -> None:
+    snapshot = _snapshot()
+    previous_date = snapshot.trade_calendar.iloc[-2]["trade_date"]
+    prices = snapshot.daily_price.copy()
+    mask = prices["trade_date"].eq(previous_date) & prices["stock_code"].eq("000003")
+    prices.loc[mask, field] = value
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+    issue = result.latest_data_diagnostics.latest_return_issues[0]
+
+    assert issue.reason == "invalid_previous_session_row"
+    assert issue.blocking_session == previous_date
+    assert issue.last_valid_traded_session == snapshot.trade_calendar.iloc[-3]["trade_date"]
+    assert issue.open_session_gap == 1
+    _assert_latest_return_diagnostic_invariant(result)
+
+
+def test_effective_session_issue_precedes_previous_session_issue() -> None:
+    snapshot = _snapshot()
+    effective_date = snapshot.trade_calendar.iloc[-1]["trade_date"]
+    previous_date = snapshot.trade_calendar.iloc[-2]["trade_date"]
+    prices = snapshot.daily_price.copy()
+    previous_mask = prices["trade_date"].eq(previous_date) & prices["stock_code"].eq("000003")
+    prices.loc[previous_mask, ["volume", "amount"]] = 0.0
+    prices = prices.loc[
+        ~(
+            prices["trade_date"].eq(effective_date)
+            & prices["stock_code"].eq("000003")
+        )
+    ].copy()
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+    issue = result.latest_data_diagnostics.latest_return_issues[0]
+
+    assert issue.reason == "missing_effective_session_row"
+    assert issue.blocking_session == effective_date
+    assert issue.last_valid_traded_session == snapshot.trade_calendar.iloc[-3]["trade_date"]
+    assert issue.open_session_gap == 2
+    _assert_latest_return_diagnostic_invariant(result)
+
+
+def test_latest_return_issues_are_unique_and_stock_code_sorted() -> None:
+    snapshot = _snapshot()
+    effective_date = snapshot.trade_calendar.iloc[-1]["trade_date"]
+    previous_date = snapshot.trade_calendar.iloc[-2]["trade_date"]
+    prices = snapshot.daily_price.copy()
+    prices.loc[
+        prices["trade_date"].eq(effective_date)
+        & prices["stock_code"].eq("000001"),
+        ["volume", "amount"],
+    ] = 0.0
+    prices = prices.loc[
+        ~(
+            prices["trade_date"].eq(previous_date)
+            & prices["stock_code"].eq("000002")
+        )
+    ].copy()
+    prices.loc[
+        prices["trade_date"].eq(effective_date)
+        & prices["stock_code"].eq("000003"),
+        "close",
+    ] = np.nan
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+    issues = result.latest_data_diagnostics.latest_return_issues
+
+    assert [issue.stock_code for issue in issues] == ["000001", "000002", "000003"]
+    assert [issue.reason for issue in issues] == [
+        "no_trade_effective_session_row",
+        "missing_previous_session_row",
+        "invalid_effective_session_row",
+    ]
+    _assert_latest_return_diagnostic_invariant(result)
+
+
+def _assert_latest_return_diagnostic_invariant(result) -> None:
+    diagnostics = result.latest_data_diagnostics
+    unavailable = result.metrics.latest_session.unavailable_count
+    assert diagnostics.latest_return_unavailable_count == unavailable
+    assert len(diagnostics.latest_return_issues) == unavailable
+    codes = [issue.stock_code for issue in diagnostics.latest_return_issues]
+    assert codes == sorted(set(codes))
