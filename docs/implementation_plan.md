@@ -45,6 +45,10 @@ The third v0.4 slice is limited to a separate provider-attributed Eastmoney indu
 
 The fourth v0.4 slice is limited to deterministic liquidity-distribution statistics over the same selected-equity complete snapshot, effective session, and persisted open-session sequence already selected for v0.4A. It uses only eligible positive `daily_price.amount` observations and adds latest total/median amount, descriptive top-5/top-decile concentration, exact fixed-cohort 5/20-prior-session activity ratios, and above-prior-20-median participation. It adds no provider endpoint, ingestion, persistence, migration, independent series, calendar, style, valuation, crowding conclusion, signal, recommendation, or automatic collection.
 
+### v0.4E Authorized Price-Behavior Proxy Context
+
+The fifth v0.4 slice is limited to deterministic selected-universe price-behavior proxies over the same physical equity snapshot, accepted effective session, filtered close lookup, and persisted open-session sequence. It adds exact complete-window 20/60-session momentum, per-stock 20-return sample volatility annualized by `sqrt(252)`, independent cohort summaries, and one fixed matched-cohort four-bucket distribution. It does not claim canonical style factors, factor exposures, a market regime, risk appetite, valuation, crowding, signals, recommendations, or investment rankings, and adds no provider, ingestion, persistence, migration, selector, series, calendar, or automatic collection.
+
 ## v0.5 Industry Alpha Stage 1 And Evidence Infrastructure
 
 - **Objective:** model industry maps and evidence-backed causal research.

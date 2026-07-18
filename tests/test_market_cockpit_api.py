@@ -294,6 +294,15 @@ def test_api_returns_current_and_historical_persisted_snapshots(client) -> None:
     assert liquidity["activity_20"]["matched_cohort_count"] == 3
     assert liquidity["read_only"] is True
     assert liquidity["scope_label"] == "selected universe"
+    price_behavior = current_payload["price_behavior_context"]
+    assert price_behavior["effective_session"] == COCKPIT_FIXTURE_END_DATE
+    assert price_behavior["return_20"]["eligible_stock_count"] == 3
+    assert price_behavior["return_60"]["eligible_stock_count"] == 3
+    assert price_behavior["volatility_20"]["eligible_stock_count"] == 3
+    assert price_behavior["matched_cohort"]["matched_cohort_count"] == 3
+    assert price_behavior["read_only"] is True
+    assert price_behavior["scope_label"] == "selected universe"
+    json.dumps(current_payload, allow_nan=False)
     assert current_payload["read_only"] is True
     assert current_payload["allowed_actions"] == ["view", "inspect"]
     assert current_payload["unsupported_sections"]
@@ -350,6 +359,52 @@ def test_api_strictly_serializes_nulls_for_liquidity_aggregate_overflow(
     assert "Infinity" not in serialized
 
 
+def test_api_strictly_serializes_nulls_for_non_finite_price_behavior(
+    client,
+    monkeypatch,
+) -> None:
+    test_client, _ = client
+    snapshot = build_liquidity_test_snapshot(stock_count=1, session_count=61)
+    prices = snapshot.daily_price.copy()
+    first_date = snapshot.trade_calendar.iloc[0]["trade_date"]
+    prices.loc[
+        prices["trade_date"].eq(first_date) & prices["stock_code"].eq("000001"),
+        "close",
+    ] = float(np.nextafter(0.0, 1.0))
+    malformed = replace(snapshot, daily_price=prices)
+
+    class StaticRepository:
+        def load_snapshot(self, **_kwargs):
+            return malformed
+
+    expected = RealMarketCockpitService(
+        StaticRepository(),
+        clock=lambda: datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc),
+    ).build_snapshot(series_key="a" * 64)
+
+    class StaticService:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def build_snapshot(self, **_kwargs):
+            return expected
+
+    monkeypatch.setattr(market_cockpit_api, "MarketCockpitService", StaticService)
+    response = test_client.get("/market-cockpit/snapshot?series_key=" + "a" * 64)
+
+    assert response.status_code == 200
+    payload = response.json()
+    context = payload["price_behavior_context"]
+    assert context["return_60"]["median_return"] is None
+    assert context["return_60"]["eligible_stock_count"] == 0
+    assert context["return_60"]["diagnostics"]["issues"][0]["reason"] == (
+        "non_finite_calculation"
+    )
+    serialized = json.dumps(payload, allow_nan=False)
+    assert "NaN" not in serialized
+    assert "Infinity" not in serialized
+
+
 def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations() -> None:
     client = TestClient(app)
 
@@ -371,7 +426,9 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "Liquidity distribution and trading concentration" in page.text
     assert "descriptive distribution statistic" in page.text
     assert "not a crowding conclusion" in page.text
-    assert "Still unsupported after the bounded v0.4D slice" in page.text
+    assert "Selected-universe price-behavior proxies" in page.text
+    assert "not a canonical style model" in page.text
+    assert "Still unsupported after the bounded v0.4E slice" in page.text
     assert "Read-only" in page.text
     assert "<form" not in page.text.lower()
     assert "<button" not in page.text.lower()
@@ -395,6 +452,10 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "Exact stable sector codes" in script.text
     assert "No sector series was requested" in script.text
     assert "renderLiquidityContext" in script.text
+    assert "renderPriceBehaviorContext" in script.text
+    assert "Price-behavior context unavailable" in script.text
+    assert "formatPriceBehaviorBucket" in script.text
+    assert "blocking session=" in script.text
     assert "Top-decile concentration" in script.text
     assert "No liquidity source-exclusion diagnostics" in script.text
     assert "Number.isFinite" in script.text
@@ -483,6 +544,18 @@ def test_persisted_demo_reports_current_and_historical_cutoffs(tmp_path) -> None
     assert payload["current"]["no_trade_latest_count"] == 0
     assert payload["current"]["latest_return_unavailable_count"] == 0
     assert payload["current"]["latest_return_issues"] == []
+    assert payload["current"]["price_behavior_context"]["calculation_status"] == (
+        "complete"
+    )
+    assert payload["historical"]["price_behavior_context"]["calculation_status"] == (
+        "complete"
+    )
+    assert payload["current"]["price_behavior_context"]["effective_session"] == (
+        COCKPIT_FIXTURE_END_DATE
+    )
+    assert payload["historical"]["price_behavior_context"]["effective_session"] == (
+        COCKPIT_FIXTURE_END_DATE
+    )
     assert payload["read_only"] is True
     assert payload["network_access"] is False
 

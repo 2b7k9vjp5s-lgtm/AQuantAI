@@ -135,6 +135,117 @@ function renderLiquidityContext(payload) {
   );
 }
 
+function formatPriceBehaviorWindow(metric) {
+  const window = metric && metric.window ? metric.window : {};
+  return String(metric && metric.reason ? metric.reason : "Unavailable") +
+    "; closes=" + String(window.observed_open_session_count || 0) +
+    "/" + String(window.required_close_count || 0) +
+    "; start=" + formatValue(window.window_start_session) +
+    "; end=" + formatValue(window.window_end_session);
+}
+
+function formatPriceBehaviorIssues(metric) {
+  const diagnostics = metric && metric.diagnostics ? metric.diagnostics : {};
+  const lines = (diagnostics.issues || []).map(function (issue) {
+    return String(issue.stock_code) + ": " + String(issue.reason) +
+      "; blocking session=" + formatValue(issue.blocking_session);
+  });
+  lines.unshift(
+    String(metric && metric.metric ? metric.metric : "metric") +
+    " issue count=" + String(diagnostics.issue_count || 0) +
+    "; sample truncated=" + String(Boolean(diagnostics.issues_truncated)) +
+    "; omitted=" + String(diagnostics.issues_omitted_count || 0) +
+    (diagnostics.issues_truncated ?
+      " (+" + String(diagnostics.issues_omitted_count) + " more)." : ".")
+  );
+  return lines;
+}
+
+function formatPriceBehaviorBucket(bucket) {
+  const value = bucket || {};
+  return "count=" + String(value.count || 0) +
+    "; share=" + formatValue(value.share, "percent") +
+    "; sample=" + formatIdentifierSample(
+      value.stock_codes,
+      value.stock_codes_truncated,
+      value.stock_codes_omitted_count
+    );
+}
+
+function renderPriceBehaviorContext(payload) {
+  const context = payload.price_behavior_context;
+  const status = document.getElementById("price-behavior-status");
+  if (!context) {
+    status.textContent = "Price-behavior context unavailable for this response.";
+    renderMetrics(document.getElementById("price-behavior-summary"), []);
+    renderMetrics(document.getElementById("price-behavior-quadrants"), []);
+    renderList(document.getElementById("price-behavior-issues"), [], "No price-behavior context was returned.");
+    renderList(document.getElementById("price-behavior-source-exclusions"), [], "No price-behavior source diagnostics were returned.");
+    renderList(document.getElementById("price-behavior-warnings"), [], "No price-behavior context was returned.");
+    return;
+  }
+  const return20 = context.return_20 || {};
+  const return60 = context.return_60 || {};
+  const volatility20 = context.volatility_20 || {};
+  const matched = context.matched_cohort || {};
+  const quadrants = matched.quadrants || {};
+  const diagnostics = context.diagnostics || {};
+  status.textContent = String(context.interpretation || "Descriptive selected-universe price-behavior proxies.");
+  renderMetrics(document.getElementById("price-behavior-summary"), [
+    ["Effective session", context.effective_session],
+    ["Return-20 median", return20.median_return, "percent"],
+    ["Return-20 positive share", return20.positive_share, "percent"],
+    ["Return-20 eligible", return20.eligible_stock_count],
+    ["Return-20 window", formatPriceBehaviorWindow(return20)],
+    ["Return-60 median", return60.median_return, "percent"],
+    ["Return-60 positive share", return60.positive_share, "percent"],
+    ["Return-60 eligible", return60.eligible_stock_count],
+    ["Return-60 window", formatPriceBehaviorWindow(return60)],
+    ["Volatility-20 median", volatility20.median_annualized_volatility, "percent"],
+    ["Volatility-20 eligible", volatility20.eligible_stock_count],
+    ["Volatility-20 window", formatPriceBehaviorWindow(volatility20)],
+    ["Matched cohort", matched.matched_cohort_count],
+    ["Matched median volatility", matched.matched_median_annualized_volatility, "percent"],
+    ["Matched unavailable sample", formatIdentifierSample(
+      matched.unavailable_stock_codes,
+      matched.unavailable_stock_codes_truncated,
+      matched.unavailable_stock_codes_omitted_count
+    )],
+    ["Calculation status", context.calculation_status]
+  ]);
+  renderMetrics(document.getElementById("price-behavior-quadrants"), [
+    ["Positive momentum, volatility <= median", formatPriceBehaviorBucket(quadrants.positive_momentum_lower_or_equal_volatility)],
+    ["Positive momentum, volatility > median", formatPriceBehaviorBucket(quadrants.positive_momentum_higher_volatility)],
+    ["Non-positive momentum, volatility <= median", formatPriceBehaviorBucket(quadrants.non_positive_momentum_lower_or_equal_volatility)],
+    ["Non-positive momentum, volatility > median", formatPriceBehaviorBucket(quadrants.non_positive_momentum_higher_volatility)]
+  ]);
+  renderList(
+    document.getElementById("price-behavior-issues"),
+    formatPriceBehaviorIssues(return20)
+      .concat(formatPriceBehaviorIssues(return60))
+      .concat(formatPriceBehaviorIssues(volatility20)),
+    "No price-behavior eligibility issues."
+  );
+  renderList(
+    document.getElementById("price-behavior-source-exclusions"),
+    (diagnostics.source_exclusions || []).map(function (item) {
+      return String(item.reason) + ": rows=" + String(item.excluded_row_count) +
+        "; stock count=" + String(item.stock_code_count) +
+        "; sample=" + formatIdentifierSample(
+          item.stock_codes,
+          item.stock_codes_truncated,
+          item.stock_codes_omitted_count
+        );
+    }),
+    "No price-behavior source rows were excluded after accepted equity filtering."
+  );
+  renderList(
+    document.getElementById("price-behavior-warnings"),
+    context.warnings || [],
+    "No price-behavior availability warnings."
+  );
+}
+
 function metricCard(label, value, kind) {
   const card = createElement("article", null, "metric-card");
   card.append(
@@ -511,6 +622,7 @@ function renderSnapshot(payload) {
   ]);
   renderLatestDiagnostics(payload);
   renderLiquidityContext(payload);
+  renderPriceBehaviorContext(payload);
   renderProvenance(payload);
   renderBenchmarkContext(payload);
   renderSectorContext(payload);
