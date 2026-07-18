@@ -1,10 +1,8 @@
 #!/usr/bin/env sh
 set -u
 
-AQUANTAI_PORT="${AQUANTAI_PORT:-8000}"
-export AQUANTAI_PORT
-DASHBOARD_URL="http://127.0.0.1:${AQUANTAI_PORT}/dashboard"
-HEALTH_URL="http://127.0.0.1:${AQUANTAI_PORT}/health"
+DASHBOARD_URL="http://127.0.0.1:8000/dashboard"
+HEALTH_URL="http://127.0.0.1:8000/health"
 MAX_ATTEMPTS=30
 
 fail() {
@@ -34,7 +32,8 @@ printf '%s\n' "Starting AQuantAI. The first launch may take a few minutes while 
 if ! docker compose up --build -d; then
   printf '%s\n' "Docker could not build or start AQuantAI. Review the Docker error above." >&2
   printf '%s\n' "If it mentions pip, setuptools, or package downloads, check the internet or proxy used by Docker and retry." >&2
-  printf '%s\n' "If it mentions port $AQUANTAI_PORT, close the conflicting service or set AQUANTAI_PORT to another available local port." >&2
+  printf '%s\n' "If it mentions port 8000, close the program using port 8000, then run this launcher again." >&2
+  printf '%s\n' "To find the process, run: lsof -i :8000 or ss -ltnp | grep :8000" >&2
   fail "No volumes, images, .env files, or user files were deleted."
 fi
 
@@ -42,15 +41,26 @@ attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
   status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 2 "$HEALTH_URL" 2>/dev/null || true)
   if [ "$status" = "200" ]; then
-    if command -v open >/dev/null 2>&1; then
-      open "$DASHBOARD_URL"
-    elif command -v xdg-open >/dev/null 2>&1; then
-      xdg-open "$DASHBOARD_URL" >/dev/null 2>&1 || true
-    else
-      printf '%s\n' "AQuantAI is ready. Open $DASHBOARD_URL in your browser."
-      exit 0
-    fi
-    printf '%s\n' "AQuantAI is ready. The Dashboard is opening at $DASHBOARD_URL"
+    os_name=$(uname -s 2>/dev/null || printf '%s' "unknown")
+    case "$os_name" in
+      Darwin)
+        if command -v open >/dev/null 2>&1 && open "$DASHBOARD_URL" >/dev/null 2>&1; then
+          printf '%s\n' "AQuantAI is ready. The Dashboard is opening at $DASHBOARD_URL"
+        else
+          printf '%s\n' "AQuantAI is ready, but macOS could not open the browser. Open $DASHBOARD_URL"
+        fi
+        ;;
+      Linux*)
+        if command -v xdg-open >/dev/null 2>&1 && xdg-open "$DASHBOARD_URL" >/dev/null 2>&1; then
+          printf '%s\n' "AQuantAI is ready. The Dashboard is opening at $DASHBOARD_URL"
+        else
+          printf '%s\n' "AQuantAI is ready, but Linux could not open the browser. Open $DASHBOARD_URL"
+        fi
+        ;;
+      *)
+        printf '%s\n' "AQuantAI is ready. Open $DASHBOARD_URL"
+        ;;
+    esac
     exit 0
   fi
   printf '%s\n' "Waiting for AQuantAI to become ready (attempt $attempt of $MAX_ATTEMPTS)..."
@@ -64,4 +74,4 @@ docker compose ps >&2 || true
 printf '%s\n' "Recent app logs:" >&2
 docker compose logs --tail 30 app >&2 || true
 printf '%s\n' "Use ./stop-aquantai.sh to stop partially started services without deleting data." >&2
-fail "Check the messages above, confirm port $AQUANTAI_PORT is available, then run this launcher again."
+fail "Check the messages above, confirm port 8000 is available, then run this launcher again."

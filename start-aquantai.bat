@@ -2,24 +2,28 @@
 setlocal EnableExtensions DisableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"
-if not defined AQUANTAI_PORT set "AQUANTAI_PORT=8000"
-set "DASHBOARD_URL=http://127.0.0.1:%AQUANTAI_PORT%/dashboard"
-set "HEALTH_URL=http://127.0.0.1:%AQUANTAI_PORT%/health"
+set "DASHBOARD_URL=http://127.0.0.1:8000/dashboard"
+set "HEALTH_URL=http://127.0.0.1:8000/health"
 set "MAX_ATTEMPTS=30"
+set "RESULT_WAIT_SECONDS=10"
+set "PUSHD_OK=0"
+set "EXIT_CODE=1"
+if /I "%~1"=="--no-wait" set "RESULT_WAIT_SECONDS=0"
 
 pushd "%SCRIPT_DIR%" >nul 2>&1
 if errorlevel 1 (
   echo Could not open the AQuantAI folder. Move this file back into the repository folder and try again.
-  exit /b 1
+  goto :finish
 )
+set "PUSHD_OK=1"
 
 where docker >nul 2>&1
 if errorlevel 1 goto :docker_missing
 
-docker compose version >nul 2>&1
+"%ComSpec%" /d /c docker compose version >nul 2>&1
 if errorlevel 1 goto :compose_missing
 
-docker info >nul 2>&1
+"%ComSpec%" /d /c docker info >nul 2>&1
 if errorlevel 1 goto :daemon_unavailable
 
 if not exist ".env" (
@@ -31,32 +35,36 @@ if not exist ".env" (
   echo Keeping your existing .env file unchanged.
 )
 
-docker compose config --quiet >nul 2>&1
+"%ComSpec%" /d /c docker compose config --quiet >nul 2>&1
 if errorlevel 1 goto :compose_config_invalid
 
 echo Starting AQuantAI. The first launch may take a few minutes while Docker builds the local services.
-docker compose up --build -d
+"%ComSpec%" /d /c docker compose up --build -d
 if errorlevel 1 goto :compose_start_failed
 
 for /L %%I in (1,1,%MAX_ATTEMPTS%) do (
   call :check_health
   if not errorlevel 1 goto :dashboard_ready
-  echo Waiting for AQuantAI to become ready (attempt %%I of %MAX_ATTEMPTS%)...
-  timeout /t 2 /nobreak >nul
+  echo Waiting for AQuantAI to become ready ^(attempt %%I of %MAX_ATTEMPTS%^)...
+  "%ComSpec%" /d /c timeout /t 2 /nobreak >nul
 )
 
 echo AQuantAI did not become ready before the health-check timeout.
 echo Current Docker Compose status:
-docker compose ps
+"%ComSpec%" /d /c docker compose ps
 echo Recent app logs:
-docker compose logs --tail 30 app
-echo Check the messages above, confirm port %AQUANTAI_PORT% is available, then run this launcher again.
+"%ComSpec%" /d /c docker compose logs --tail 30 app
+echo Check the messages above, confirm port 8000 is available, then run this launcher again.
 echo You can use stop-aquantai.bat to stop any partially started services without deleting data.
 goto :failure
 
 :dashboard_ready
-start "" "%DASHBOARD_URL%"
-echo AQuantAI is ready. The Dashboard is opening at %DASHBOARD_URL%
+call :open_dashboard
+if errorlevel 1 (
+  echo AQuantAI is ready, but Windows could not open the browser. Open %DASHBOARD_URL%
+) else (
+  echo AQuantAI is ready. The Dashboard is opening at %DASHBOARD_URL%
+)
 goto :success
 
 :docker_missing
@@ -87,18 +95,32 @@ goto :failure
 :compose_start_failed
 echo Docker could not build or start AQuantAI. Review the Docker error above.
 echo If it mentions pip, setuptools, or package downloads, check the internet or proxy used by Docker Desktop and retry.
-echo If it mentions port %AQUANTAI_PORT%, close the conflicting service or set AQUANTAI_PORT to another available local port.
+echo If it mentions port 8000, close the program using port 8000, then run this launcher again.
+echo To find the process, run: netstat -ano ^| findstr :8000
 echo No volumes, images, .env files, or user files were deleted.
 goto :failure
 
 :failure
-popd
-exit /b 1
+set "EXIT_CODE=1"
+goto :finish
 
 :success
-popd
-exit /b 0
+set "EXIT_CODE=0"
+goto :finish
+
+:finish
+if "%PUSHD_OK%"=="1" popd
+if not "%RESULT_WAIT_SECONDS%"=="0" (
+  echo.
+  echo This window will close in %RESULT_WAIT_SECONDS% seconds.
+  "%ComSpec%" /d /c timeout /t %RESULT_WAIT_SECONDS% /nobreak >nul 2>&1
+)
+exit /b %EXIT_CODE%
 
 :check_health
-powershell -NoProfile -Command "$response = Invoke-WebRequest -UseBasicParsing -Uri '%HEALTH_URL%' -TimeoutSec 2 -ErrorAction Stop; if ($response.StatusCode -eq 200) { exit 0 }; exit 1" >nul 2>&1
+"%ComSpec%" /d /c powershell -NoProfile -Command "$response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2 -ErrorAction Stop; if ($response.StatusCode -eq 200) { exit 0 }; exit 1" >nul 2>&1
+exit /b %errorlevel%
+
+:open_dashboard
+"%ComSpec%" /d /c powershell -NoProfile -Command "Start-Process 'http://127.0.0.1:8000/dashboard'" >nul 2>&1
 exit /b %errorlevel%
