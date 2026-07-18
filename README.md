@@ -8,6 +8,12 @@ Current version: `0.2.0`.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
 
+## Planned Personal Research Architecture
+
+The approved future direction is a local-first personal investment research workbench: Market Cockpit, Industry Alpha, Stock Research, Watchlist, Paper Portfolio, and Settings. The existing provider, factor, ranking, backtest, ML-boundary, report, and read-only Dashboard layers are preserved as Quant Core.
+
+This architecture is planning only. The active v0.2 application remains a fixture-backed, read-only research Dashboard. See [product architecture](docs/product_architecture.md), [research workflow](docs/research_workflow.md), [conceptual data model](docs/data_model.md), and [implementation plan](docs/implementation_plan.md).
+
 ## Positioning
 
 AQuantAI aims to become a sustainable research system for:

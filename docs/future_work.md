@@ -1,42 +1,26 @@
 # Future Work
 
-The items below are intentionally outside the v0.2 baseline. They should only be started after a new review issue explicitly opens the next scope.
+All items below are outside the implemented v0.2 fixture-backed, read-only baseline. They require a new authorized review issue and staged delivery under [implementation_plan.md](implementation_plan.md).
 
-## Data and Persistence
+## Planned Product Work
 
-- Database persistence for normalized research data.
-- Full A-share historical ingestion.
-- Production-grade data validation and reconciliation.
-- Tushare and OpenBB integration behind explicit provider boundaries.
+- Local launcher completion and real-data persistence foundations.
+- Market Cockpit for dated market-state and risk context.
+- Industry Alpha Stage 1 evidence infrastructure, then Stage 2 and Stock Research.
+- Watchlist status history and verification tasks.
+- Personal Paper Portfolio records, manual simulated trades, thesis snapshots, and later portfolio analysis.
+- Quant Core integration as a validation input, not an autonomous conclusion engine.
 
-## Quant Research
+## Supporting Work
 
-- Real Qlib experiments using validated datasets.
-- Richer feature engineering and model evaluation workflows.
-- Strategy optimization and parameter search after deterministic baselines are reviewed.
+- Provider adapters and reconciliation behind stable interfaces.
+- Richer local read-only presentation and provenance review.
+- Guarded optional LLM enhancement only after the research evidence workflow is established.
+- Broader local CI and release-process documentation as future scopes require.
 
-## AI Research
+## Explicitly Outside The Planned Product
 
-- Optional LLM report enhancement through guarded adapter implementations.
-- More detailed source attribution and report comparison workflows.
-
-## Dashboard
-
-- Richer frontend dashboard views for inspecting local research outputs.
-- Improved read-only UX for factor, backtest, ML, and report artifacts.
-
-## CI and Release Process
-
-- Broader CI coverage once the baseline stabilizes further.
-- Release tagging and packaging improvements.
-- Documentation automation for release notes and checklists.
-
-## Explicitly Not in v0.2
-
-- Trading buttons.
-- Broker APIs.
-- Order placement.
-- Automated trading.
-- Production deployment.
-- Live credential handling.
-- Investment advice or trading recommendations.
+- Broker connectivity, real orders, automated trading, or trading buttons.
+- Investment advice, guaranteed outcomes, or trading recommendations.
+- Multi-user SaaS, authentication, subscriptions, payments, or cloud-product scope.
+- Unreviewed direct coupling to market-data, Quant, or LLM vendors.
