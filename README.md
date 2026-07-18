@@ -199,7 +199,7 @@ Open the local page with the same selector:
 http://127.0.0.1:8000/market-cockpit?series_key=<series-key>&as_of_cutoff=YYYYMMDD
 ```
 
-The API never performs provider-only selection and never falls back to fixture Dashboard data. It reports exact scope, ingestion provenance, cutoff, adjustment policy, completeness warnings, and unsupported sections. Exact formulas and minimum windows are documented in [Market Cockpit v0.4A](docs/market_cockpit.md).
+The API never performs provider-only selection and never falls back to fixture Dashboard data. It reports exact scope, calculation readiness, unverified scope coverage, conservative overall completeness, allowlisted immutable ingestion provenance, cutoff, adjustment policy, stale/no-trade diagnostics, warnings, and unsupported sections. An internally ready result still describes only the selected universe and remains overall `partial` because v0.4A has no reviewed representative-coverage policy. Exact formulas and minimum windows are documented in [Market Cockpit v0.4A](docs/market_cockpit.md).
 
 Run tests:
 

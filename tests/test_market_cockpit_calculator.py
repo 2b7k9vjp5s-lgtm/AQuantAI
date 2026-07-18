@@ -85,6 +85,16 @@ def _snapshot(*, sessions: int = 65) -> PersistedMarketDataSnapshot:
         requested_start_date=dates[0],
         requested_end_date=dates[-1],
         adjust_type="qfq",
+        ingestion_imported_at_utc="2026-07-18T04:00:00Z",
+        ingestion_completed_at_utc="2026-07-18T04:00:01Z",
+        collection_timestamp_utc=None,
+        effective_information_cutoff_date=None,
+        akshare_package_version=None,
+        stock_basic_endpoint=None,
+        daily_price_endpoint=None,
+        trade_calendar_endpoint=None,
+        frequency=None,
+        adapter_compatibility_version=None,
         stock_codes=codes,
         series_identity=identity,
         stock_basic=stock_basic,
@@ -140,7 +150,7 @@ def test_participation_and_equal_weight_risk_use_documented_windows() -> None:
         expected_volatility
     )
     assert result.metrics.equal_weight_risk.max_drawdown_20 == pytest.approx(expected_drawdown)
-    assert result.completeness_status == "ready"
+    assert result.calculation_status == "ready"
     assert result.warnings == []
 
 
@@ -181,7 +191,7 @@ def test_insufficient_windows_return_null_not_fabricated_zero() -> None:
     assert result.metrics.volume_participation.ratio_to_prior_20_session_median is None
     assert result.metrics.equal_weight_risk.realized_volatility_20 is None
     assert result.metrics.equal_weight_risk.max_drawdown_20 is None
-    assert result.completeness_status == "partial"
+    assert result.calculation_status == "partial"
     assert any("require 20 persisted" in warning for warning in result.warnings)
 
 
@@ -214,7 +224,15 @@ def test_missing_latest_price_is_unavailable_and_partial() -> None:
 
     assert result.available_stock_count == 2
     assert result.metrics.latest_session.unavailable_count == 1
-    assert result.completeness_status == "partial"
+    assert result.calculation_status == "partial"
+    assert result.latest_data_diagnostics.stale_or_missing_latest_count == 1
+    assert result.latest_data_diagnostics.no_trade_latest_count == 0
+    assert result.latest_data_diagnostics.affected_stocks[0].stock_code == "000003"
+    assert result.latest_data_diagnostics.affected_stocks[0].reason == "missing_latest_row"
+    assert result.latest_data_diagnostics.affected_stocks[0].last_available_session == (
+        snapshot.trade_calendar.iloc[-2]["trade_date"]
+    )
+    assert result.latest_data_diagnostics.affected_stocks[0].open_session_gap == 1
     assert any("000003" in warning for warning in result.warnings)
 
 
@@ -247,7 +265,7 @@ def test_incomplete_scope_and_non_active_stock_are_visible_warnings() -> None:
 
     result = calculate_market_cockpit(replace(snapshot, stock_basic=stock_basic))
 
-    assert result.completeness_status == "partial"
+    assert result.calculation_status == "partial"
     assert any("do not exactly match" in warning for warning in result.warnings)
     assert any("non-active stock records" in warning for warning in result.warnings)
 
@@ -270,5 +288,77 @@ def test_same_input_and_clock_produce_identical_service_output() -> None:
     assert first == second
     assert first["scope_label"] == "selected universe"
     assert first["scope_label_zh"] == "选定股票范围"
+    assert first["calculation_status"] == "ready"
+    assert first["scope_coverage_status"] == "unverified_selected_scope"
+    assert first["completeness_status"] == "partial"
+    assert "do not imply representative" in first["warnings"][-1]
     assert first["read_only"] is True
     assert len(first["unsupported_sections"]) == 5
+
+
+def test_no_trade_latest_is_not_counted_as_unchanged_or_participating() -> None:
+    snapshot = _snapshot()
+    latest_date = snapshot.requested_end_date
+    prices = snapshot.daily_price.copy()
+    mask = prices["trade_date"].eq(latest_date) & prices["stock_code"].eq("000003")
+    prices.loc[mask, ["volume", "amount"]] = 0.0
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+    diagnostics = result.latest_data_diagnostics
+
+    assert result.available_stock_count == 2
+    assert result.metrics.latest_session.unchanged_count == 0
+    assert result.metrics.latest_session.unavailable_count == 1
+    assert result.metrics.volume_participation.eligible_stock_count == 2
+    assert result.metrics.amount_participation.eligible_stock_count == 2
+    assert result.metrics.breadth_20.eligible_stock_count == 2
+    assert result.metrics.breadth_60.eligible_stock_count == 2
+    assert result.metrics.equal_weight_risk.eligible_return_sessions == 19
+    assert diagnostics.stale_or_missing_latest_count == 0
+    assert diagnostics.no_trade_latest_count == 1
+    assert diagnostics.affected_stocks[0].reason == "no_trade_latest"
+    assert diagnostics.affected_stocks[0].open_session_gap == 1
+    assert any("potentially suspended or no-trade" in warning for warning in result.warnings)
+
+
+def test_genuinely_unchanged_close_with_activity_remains_available() -> None:
+    result = calculate_market_cockpit(_snapshot())
+
+    assert result.metrics.latest_session.unchanged_count == 1
+    assert result.metrics.latest_session.unavailable_count == 0
+    assert result.latest_data_diagnostics.no_trade_latest_count == 0
+
+
+def test_no_trade_inside_rolling_window_excludes_stock_consistently() -> None:
+    snapshot = _snapshot()
+    affected_date = snapshot.trade_calendar.iloc[-10]["trade_date"]
+    prices = snapshot.daily_price.copy()
+    mask = prices["trade_date"].eq(affected_date) & prices["stock_code"].eq("000002")
+    prices.loc[mask, ["volume", "amount"]] = 0.0
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+
+    assert result.metrics.breadth_20.eligible_stock_count == 2
+    assert result.metrics.breadth_60.eligible_stock_count == 2
+    assert result.metrics.volume_participation.eligible_stock_count == 2
+    assert result.metrics.amount_participation.eligible_stock_count == 2
+    assert result.metrics.equal_weight_risk.eligible_return_sessions == 18
+    assert result.calculation_status == "partial"
+
+
+def test_no_core_latest_returns_is_insufficient_and_details_are_sorted() -> None:
+    snapshot = _snapshot()
+    latest_date = snapshot.requested_end_date
+    prices = snapshot.daily_price.copy()
+    prices.loc[prices["trade_date"].eq(latest_date), ["volume", "amount"]] = 0.0
+
+    result = calculate_market_cockpit(replace(snapshot, daily_price=prices))
+
+    assert result.available_stock_count == 0
+    assert result.calculation_status == "insufficient_data"
+    assert result.latest_data_diagnostics.no_trade_latest_count == 3
+    assert [item.stock_code for item in result.latest_data_diagnostics.affected_stocks] == [
+        "000001",
+        "000002",
+        "000003",
+    ]

@@ -386,7 +386,10 @@ def test_postgres_market_cockpit_current_and_historical_cutoff_use_one_series(
         assert historical_view.provenance.ingestion_run_id == historical.ingestion_run_id
         assert current_view.provenance.series_key == historical_view.provenance.series_key
         assert current_view.provenance.adjust_type == "qfq"
-        assert current_view.completeness_status == "ready"
-        assert historical_view.completeness_status == "ready"
+        assert current_view.calculation_status == "ready"
+        assert historical_view.calculation_status == "ready"
+        assert current_view.scope_coverage_status == "unverified_selected_scope"
+        assert current_view.completeness_status == "partial"
+        assert historical_view.completeness_status == "partial"
     finally:
         engine.dispose()

@@ -29,7 +29,15 @@
         </div>
         <p id="load-status" role="status">Reading the series selector from this page URL.</p>
         <p id="load-error" class="error" role="alert" hidden></p>
+        <p id="scope-coverage-note">Calculation readiness applies only to the exact selected universe. Coverage confidence is unverified.</p>
         <div id="scope-summary" class="metric-grid" aria-live="polite"></div>
+      </section>
+
+      <section aria-labelledby="diagnostics-heading">
+        <p class="section-kicker">Potentially suspended, stale, or no-trade observations</p>
+        <h2 id="diagnostics-heading">Latest-session availability diagnostics</h2>
+        <div id="diagnostic-summary" class="metric-grid"></div>
+        <div id="affected-stocks"></div>
       </section>
 
       <section aria-labelledby="breadth-heading">
@@ -75,6 +83,7 @@
         <h2 id="formula-heading">Formula summary</h2>
         <ul>
           <li>Latest return: current close divided by the previous open-session close, minus one.</li>
+          <li>A zero-volume and zero-amount row is no-trade and is excluded from breadth, participation, rolling close, and risk windows.</li>
           <li>20/60-session metrics require every close in the full persisted calendar window.</li>
           <li>Participation compares the current value with the median of the prior 20 sessions.</li>
           <li>Risk uses 20 complete selected-universe equal-weight returns and annualizes volatility by square root of 252.</li>

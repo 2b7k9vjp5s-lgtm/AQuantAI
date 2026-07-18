@@ -8,6 +8,13 @@ from typing import Any, Literal
 from backend.safety import RESEARCH_DISCLAIMER, validate_allowed_actions, validate_research_text
 
 CompletenessStatus = Literal["ready", "partial", "insufficient_data"]
+CalculationStatus = Literal["ready", "partial", "insufficient_data"]
+ScopeCoverageStatus = Literal["unverified_selected_scope"]
+LatestDataIssueReason = Literal[
+    "missing_latest_row",
+    "invalid_latest_row",
+    "no_trade_latest",
+]
 
 
 @dataclass(frozen=True)
@@ -59,6 +66,21 @@ class MarketCockpitMetrics:
 
 
 @dataclass(frozen=True)
+class AffectedStockDetail:
+    stock_code: str
+    reason: LatestDataIssueReason
+    last_available_session: str | None
+    open_session_gap: int | None
+
+
+@dataclass(frozen=True)
+class LatestDataDiagnostics:
+    stale_or_missing_latest_count: int
+    no_trade_latest_count: int
+    affected_stocks: list[AffectedStockDetail]
+
+
+@dataclass(frozen=True)
 class MarketCockpitProvenance:
     series_key: str
     ingestion_run_id: int
@@ -69,8 +91,19 @@ class MarketCockpitProvenance:
     requested_start_date: str
     requested_end_date: str
     adjust_type: str
-    generated_at_utc: str
+    ingestion_imported_at_utc: str
+    ingestion_completed_at_utc: str | None
+    collection_timestamp_utc: str | None
+    effective_information_cutoff_date: str | None
+    akshare_package_version: str | None
+    stock_basic_endpoint: str | None
+    daily_price_endpoint: str | None
+    trade_calendar_endpoint: str | None
+    frequency: str | None
+    adapter_compatibility_version: str | None
+    requested_as_of_cutoff: str | None
     effective_as_of_session: str
+    generated_at_utc: str
 
 
 @dataclass(frozen=True)
@@ -87,11 +120,19 @@ class MarketCockpitSnapshot:
     stock_codes: list[str]
     universe_stock_count: int
     available_stock_count: int
+    calculation_status: CalculationStatus
+    scope_coverage_status: ScopeCoverageStatus
     completeness_status: CompletenessStatus
+    latest_data_diagnostics: LatestDataDiagnostics
     warnings: list[str]
     unsupported_sections: list[UnsupportedSection]
     scope_label: str = "selected universe"
     scope_label_zh: str = "选定股票范围"
+    scope_coverage_note: str = (
+        "Calculation readiness describes only this exact selected universe. "
+        "v0.4A has no reviewed coverage policy, so it does not establish representative "
+        "A-share or full-market coverage."
+    )
     formula_reference: str = "docs/market_cockpit.md"
     allowed_actions: list[str] = field(default_factory=lambda: ["view", "inspect"])
     disclaimer: str = RESEARCH_DISCLAIMER

@@ -63,12 +63,23 @@ function renderProvenance(payload) {
     ["Ingestion run", provenance.ingestion_run_id],
     ["Provider", provenance.provider],
     ["Contract / adapter", String(provenance.contract_version || "") + " / " + String(provenance.adapter_version || "")],
-    ["Information cutoff", provenance.information_cutoff_date],
-    ["As-of trading session", provenance.effective_as_of_session],
+    ["Imported UTC", provenance.ingestion_imported_at_utc],
+    ["Completed UTC", provenance.ingestion_completed_at_utc],
+    ["Collected UTC", provenance.collection_timestamp_utc],
+    ["Selected run information cutoff", provenance.information_cutoff_date],
+    ["Effective information cutoff", provenance.effective_information_cutoff_date],
+    ["Requested historical cutoff", provenance.requested_as_of_cutoff],
+    ["Calculated trading session", provenance.effective_as_of_session],
     ["Requested date range", String(provenance.requested_start_date || "") + " to " + String(provenance.requested_end_date || "")],
     ["Adjustment", provenance.adjust_type || "unadjusted"],
+    ["AKShare package", provenance.akshare_package_version],
+    ["Stock-basic endpoint", provenance.stock_basic_endpoint],
+    ["Daily-price endpoint", provenance.daily_price_endpoint],
+    ["Trade-calendar endpoint", provenance.trade_calendar_endpoint],
+    ["Frequency", provenance.frequency],
+    ["Adapter compatibility", provenance.adapter_compatibility_version],
     ["Exact stock codes", (payload.stock_codes || []).join(", ")],
-    ["Generated UTC", provenance.generated_at_utc]
+    ["View generated UTC", provenance.generated_at_utc]
   ];
   const container = document.getElementById("provenance");
   container.replaceChildren();
@@ -77,6 +88,23 @@ function renderProvenance(payload) {
     item.append(createElement("dt", row[0]), createElement("dd", row[1]));
     container.append(item);
   }
+}
+
+function renderLatestDiagnostics(payload) {
+  const diagnostics = payload.latest_data_diagnostics || {};
+  renderMetrics(document.getElementById("diagnostic-summary"), [
+    ["Stale or missing latest", diagnostics.stale_or_missing_latest_count],
+    ["No-trade latest", diagnostics.no_trade_latest_count]
+  ]);
+  renderList(
+    document.getElementById("affected-stocks"),
+    (diagnostics.affected_stocks || []).map(function (item) {
+      return String(item.stock_code) + ": " + String(item.reason) +
+        "; last available session=" + formatValue(item.last_available_session) +
+        "; open-session gap=" + formatValue(item.open_session_gap);
+    }),
+    "No stale, missing, or no-trade latest observations."
+  );
 }
 
 function renderSnapshot(payload) {
@@ -92,7 +120,9 @@ function renderSnapshot(payload) {
     ["Universe stocks", payload.universe_stock_count],
     ["Available latest returns", payload.available_stock_count],
     ["Effective session", payload.provenance.effective_as_of_session],
-    ["Completeness", payload.completeness_status]
+    ["Calculation status", payload.calculation_status],
+    ["Scope coverage", payload.scope_coverage_status],
+    ["Overall completeness", payload.completeness_status]
   ]);
   renderMetrics(document.getElementById("latest-metrics"), [
     ["Equal-weight mean return", latest.equal_weight_mean_return, "percent"],
@@ -124,6 +154,7 @@ function renderSnapshot(payload) {
     ["Maximum drawdown (20)", risk.max_drawdown_20, "percent"],
     ["Risk return sessions", risk.eligible_return_sessions]
   ]);
+  renderLatestDiagnostics(payload);
   renderProvenance(payload);
   renderList(document.getElementById("warnings"), payload.warnings, "No completeness warnings for this snapshot.");
   renderList(
@@ -134,6 +165,7 @@ function renderSnapshot(payload) {
     "No unsupported-section metadata is available."
   );
   document.getElementById("research-disclaimer").textContent = payload.disclaimer;
+  document.getElementById("scope-coverage-note").textContent = payload.scope_coverage_note;
   const badge = document.getElementById("completeness-badge");
   badge.textContent = payload.completeness_status;
   badge.className = "badge badge-" + payload.completeness_status;

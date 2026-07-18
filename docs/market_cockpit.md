@@ -24,7 +24,7 @@ For stock `i` on effective session `t` and its immediately preceding persisted o
 r(i,t) = close(i,t) / close(i,t-1) - 1
 ```
 
-A stock is available only when both finite positive closes exist. Advancing means `r > 1e-12`, declining means `r < -1e-12`, and unchanged means `abs(r) <= 1e-12`.
+A stock is available only when both finite positive closes exist and both rows are traded observations. A row with both `volume == 0` and `amount == 0` is deterministically classified as `no_trade`; it is unavailable and cannot become an unchanged return. Advancing means `r > 1e-12`, declining means `r < -1e-12`, and unchanged means `abs(r) <= 1e-12`. An unchanged close with positive trading activity remains valid.
 
 - equal-weight mean return: arithmetic mean of available `r(i,t)`;
 - median return: median of available `r(i,t)`;
@@ -45,7 +45,7 @@ above_sma(i,N,t) = close(i,t) > SMA(i,N,t)
 above_sma_ratio(N,t) = above count / eligible count
 ```
 
-Fewer than `N` calendar sessions or any missing stock close makes that stock unavailable for the metric. A zero eligible count returns `null`, never zero.
+Fewer than `N` calendar sessions, any missing stock close, or any no-trade row makes that stock unavailable for the metric. A zero eligible count returns `null`, never zero.
 
 ### New highs and lows
 
@@ -68,11 +68,11 @@ participation(i,x,t) = x(i,t) / baseline(i,x,t)
 aggregate_participation(x,t) = mean(participation(i,x,t) over eligible stocks)
 ```
 
-The current session is excluded from the baseline. A stock is unavailable when any required value is missing/non-finite or the baseline is not positive. The aggregate is `null` when no stock is eligible and always includes a coverage count.
+The current session is excluded from the baseline. A stock is unavailable when any required value is missing/non-finite, any required row is no-trade, or the baseline is not positive. The aggregate is `null` when no stock is eligible and always includes a coverage count.
 
 ### Equal-weight risk
 
-Risk uses the latest 20 close-to-close return sessions. A session return is eligible only when every selected stock has finite positive closes on that session and its preceding open session. This strict complete-universe rule keeps equal weights stable.
+Risk uses the latest 20 close-to-close return sessions. A session return is eligible only when every selected stock has finite positive closes and traded observations on that session and its preceding open session. This strict complete-universe rule keeps equal weights stable.
 
 ```text
 universe_return(t) = mean(r(i,t) for every selected stock)
@@ -85,17 +85,23 @@ max_drawdown_20 = min(drawdown(k), k=0..20)
 
 Both metrics require exactly 20 eligible return sessions. Otherwise they are `null` with an insufficient-history warning. A zero drawdown is valid only after the full window is available.
 
-## Completeness
+## Calculation, Scope Coverage, And Overall Completeness
 
-- `ready`: exact selected scope is present, latest returns cover every stock, and all 20/60-session and participation/risk windows have full-universe coverage.
-- `partial`: latest breadth is calculable, but at least one stock/window/field is missing, stale, duplicated, inactive, or otherwise unavailable.
-- `insufficient_data`: no effective open session, no available latest return, or the selected snapshot cannot support core breadth calculations.
+`calculation_status` describes only internal metric availability for the exact selected universe:
 
-Warnings identify exact missing latest/previous prices, inactive stock records, duplicate sessions, incomplete scope, unavailable windows, and future rows that were excluded. Duplicate stock-session rows are excluded from calculations instead of selecting an arbitrary value.
+- `ready`: exact selected rows are present, latest returns cover every stock, and all 20/60-session and participation/risk windows have full-scope coverage;
+- `partial`: core breadth is calculable, but at least one stock/window/field is missing, stale, no-trade, duplicated, inactive, or otherwise unavailable;
+- `insufficient_data`: no available latest return exists for core breadth calculations.
+
+`scope_coverage_status` is `unverified_selected_scope` throughout v0.4A. There is no reviewed policy establishing representative A-share coverage, and no stock-count threshold is invented as a substitute. Therefore the conservative user-facing `completeness_status` is always `partial` when calculations exist and `insufficient_data` when core breadth cannot be calculated. Internally ready calculations do not establish representative A-share or full-market coverage.
+
+Warnings identify exact missing latest/previous prices, no-trade observations, inactive stock records, duplicate sessions, incomplete scope, unavailable windows, and future rows that were excluded. Bounded latest diagnostics report stale/missing and no-trade counts plus stock code, reason, last valid traded session, and persisted open-session gap. They describe observations as potentially suspended or no-trade and never claim a confirmed suspension.
 
 ## Response Provenance
 
-Every response exposes the exact stock-code scope, selected and available counts, series key, ingestion-run ID, provider, contract version, adapter version, information cutoff, effective as-of session, requested date range, adjustment policy, generated UTC timestamp, completeness status, warnings, and unsupported sections.
+Every response exposes the exact stock-code scope, selected and available counts, series key, ingestion-run ID, provider, contract version, adapter version, selected-run information cutoff, requested historical cutoff, effective as-of session, requested date range, adjustment policy, calculation/scope/overall status, warnings, and unsupported sections.
+
+The immutable provenance view uses a fixed allowlist only: ingestion import and completion timestamps, collection timestamp, effective information cutoff, installed AKShare package version, stock-basic/daily-price/trade-calendar endpoint identifiers, frequency, and adapter compatibility version. Unknown request metadata and fields representing secrets, tokens, passwords, API keys, credentials, connection strings, or cookies are never serialized. Missing fixture/backfill fields are `null`. Timestamps are normalized to UTC ISO-8601. `generated_at_utc` is explicitly view-generation time and is distinct from collection/import time.
 
 ## Unsupported In v0.4A
 

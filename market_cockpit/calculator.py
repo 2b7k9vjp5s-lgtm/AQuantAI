@@ -9,8 +9,10 @@ import numpy as np
 import pandas as pd
 
 from market_cockpit.contracts import (
-    CompletenessStatus,
+    AffectedStockDetail,
+    CalculationStatus,
     LatestSessionMetrics,
+    LatestDataDiagnostics,
     MarketCockpitMetrics,
     ParticipationMetric,
     RiskMetrics,
@@ -30,7 +32,8 @@ class MarketCockpitCalculation:
     effective_as_of_session: str
     metrics: MarketCockpitMetrics
     available_stock_count: int
-    completeness_status: CompletenessStatus
+    calculation_status: CalculationStatus
+    latest_data_diagnostics: LatestDataDiagnostics
     warnings: list[str]
 
 
@@ -128,6 +131,12 @@ def calculate_market_cockpit(
         warnings.append(f"Selected scope contains non-active stock records: {inactive}.")
 
     price_lookup = _price_lookup(prices)
+    latest_diagnostics = _latest_data_diagnostics(
+        expected_codes,
+        sessions,
+        price_lookup,
+        warnings,
+    )
     latest = _latest_metrics(expected_codes, sessions, price_lookup, warnings)
     breadth_20 = _window_breadth(20, expected_codes, sessions, price_lookup, warnings)
     breadth_60 = _window_breadth(60, expected_codes, sessions, price_lookup, warnings)
@@ -141,7 +150,7 @@ def calculate_market_cockpit(
     available_count = (
         latest.advancing_count + latest.declining_count + latest.unchanged_count
     )
-    status = _completeness_status(
+    calculation_status = _calculation_status(
         expected_codes,
         available_count,
         breadth_20,
@@ -162,7 +171,8 @@ def calculate_market_cockpit(
             equal_weight_risk=risk,
         ),
         available_stock_count=available_count,
-        completeness_status=status,
+        calculation_status=calculation_status,
+        latest_data_diagnostics=latest_diagnostics,
         warnings=warnings,
     )
 
@@ -189,18 +199,33 @@ def _latest_metrics(
         return LatestSessionMetrics(None, None, 0, 0, 0, len(codes), None, None, None)
     previous_session, latest_session = sessions[-2:]
     returns: list[float] = []
-    unavailable: list[str] = []
+    previous_unavailable: list[str] = []
     for code in codes:
-        previous = _value(lookup, previous_session, code, "close", positive=True)
-        current = _value(lookup, latest_session, code, "close", positive=True)
+        previous = _value(
+            lookup,
+            previous_session,
+            code,
+            "close",
+            positive=True,
+            require_trade=True,
+        )
+        current = _value(
+            lookup,
+            latest_session,
+            code,
+            "close",
+            positive=True,
+            require_trade=True,
+        )
         if previous is None or current is None:
-            unavailable.append(code)
+            if previous is None:
+                previous_unavailable.append(code)
             continue
         returns.append(current / previous - 1.0)
-    if unavailable:
+    if previous_unavailable:
         warnings.append(
-            "Latest-session return is unavailable for stocks missing a current or previous close: "
-            f"{unavailable}."
+            "Latest-session return is unavailable for stocks without a valid traded previous-session row: "
+            f"{previous_unavailable}."
         )
     advancing = sum(value > RETURN_EPSILON for value in returns)
     declining = sum(value < -RETURN_EPSILON for value in returns)
@@ -242,7 +267,17 @@ def _window_breadth(
     eligible = 0
     unavailable: list[str] = []
     for code in codes:
-        closes = [_value(lookup, session, code, "close", positive=True) for session in selected_sessions]
+        closes = [
+            _value(
+                lookup,
+                session,
+                code,
+                "close",
+                positive=True,
+                require_trade=True,
+            )
+            for session in selected_sessions
+        ]
         if any(value is None for value in closes):
             unavailable.append(code)
             continue
@@ -284,8 +319,25 @@ def _participation(
     ratios: list[float] = []
     unavailable: list[str] = []
     for code in codes:
-        history = [_value(lookup, session, code, field, nonnegative=True) for session in prior_sessions]
-        current = _value(lookup, current_session, code, field, nonnegative=True)
+        history = [
+            _value(
+                lookup,
+                session,
+                code,
+                field,
+                nonnegative=True,
+                require_trade=True,
+            )
+            for session in prior_sessions
+        ]
+        current = _value(
+            lookup,
+            current_session,
+            code,
+            field,
+            nonnegative=True,
+            require_trade=True,
+        )
         if current is None or any(value is None for value in history):
             unavailable.append(code)
             continue
@@ -321,8 +373,22 @@ def _risk_metrics(
     for previous_session, current_session in zip(selected_sessions, selected_sessions[1:]):
         stock_returns: list[float] = []
         for code in codes:
-            previous = _value(lookup, previous_session, code, "close", positive=True)
-            current = _value(lookup, current_session, code, "close", positive=True)
+            previous = _value(
+                lookup,
+                previous_session,
+                code,
+                "close",
+                positive=True,
+                require_trade=True,
+            )
+            current = _value(
+                lookup,
+                current_session,
+                code,
+                "close",
+                positive=True,
+                require_trade=True,
+            )
             if previous is None or current is None:
                 stock_returns = []
                 break
@@ -354,9 +420,12 @@ def _value(
     *,
     positive: bool = False,
     nonnegative: bool = False,
+    require_trade: bool = False,
 ) -> float | None:
     record = lookup.get((session, code))
     if record is None:
+        return None
+    if require_trade and not _is_valid_traded_record(record):
         return None
     value = record.get(field)
     if value is None or not isfinite(value):
@@ -368,7 +437,100 @@ def _value(
     return value
 
 
-def _completeness_status(
+def _latest_data_diagnostics(
+    codes: list[str],
+    sessions: list[str],
+    lookup: dict[tuple[str, str], dict[str, float]],
+    warnings: list[str],
+) -> LatestDataDiagnostics:
+    latest_session = sessions[-1]
+    affected: list[AffectedStockDetail] = []
+    stale_or_missing: list[str] = []
+    no_trade: list[str] = []
+    for code in codes:
+        record = lookup.get((latest_session, code))
+        if record is not None and _is_valid_traded_record(record):
+            continue
+        if record is not None and _is_no_trade(record):
+            reason = "no_trade_latest"
+            no_trade.append(code)
+        else:
+            reason = "missing_latest_row" if record is None else "invalid_latest_row"
+            stale_or_missing.append(code)
+        last_session = _last_available_session(code, sessions[:-1], lookup)
+        affected.append(
+            AffectedStockDetail(
+                stock_code=code,
+                reason=reason,
+                last_available_session=last_session,
+                open_session_gap=(
+                    len(sessions) - 1 - sessions.index(last_session)
+                    if last_session is not None
+                    else None
+                ),
+            )
+        )
+    if stale_or_missing:
+        warnings.append(
+            "Latest-session rows are missing or invalid for selected stocks; last available "
+            f"session diagnostics are provided: {stale_or_missing}."
+        )
+    if no_trade:
+        warnings.append(
+            "Latest-session zero-volume and zero-amount rows were excluded as potentially "
+            f"suspended or no-trade observations: {no_trade}."
+        )
+    return LatestDataDiagnostics(
+        stale_or_missing_latest_count=len(stale_or_missing),
+        no_trade_latest_count=len(no_trade),
+        affected_stocks=affected,
+    )
+
+
+def _last_available_session(
+    code: str,
+    sessions: list[str],
+    lookup: dict[tuple[str, str], dict[str, float]],
+) -> str | None:
+    for session in reversed(sessions):
+        record = lookup.get((session, code))
+        if record is not None and _is_valid_traded_record(record):
+            return session
+    return None
+
+
+def _is_no_trade(record: dict[str, float]) -> bool:
+    volume = record.get("volume")
+    amount = record.get("amount")
+    return (
+        volume is not None
+        and amount is not None
+        and isfinite(volume)
+        and isfinite(amount)
+        and volume == 0
+        and amount == 0
+    )
+
+
+def _is_valid_traded_record(record: dict[str, float]) -> bool:
+    close = record.get("close")
+    volume = record.get("volume")
+    amount = record.get("amount")
+    return (
+        close is not None
+        and volume is not None
+        and amount is not None
+        and isfinite(close)
+        and isfinite(volume)
+        and isfinite(amount)
+        and close > 0
+        and volume >= 0
+        and amount >= 0
+        and not _is_no_trade(record)
+    )
+
+
+def _calculation_status(
     codes: list[str],
     available_count: int,
     breadth_20: WindowBreadthMetrics,
@@ -377,7 +539,7 @@ def _completeness_status(
     amount: ParticipationMetric,
     risk: RiskMetrics,
     warnings: list[str],
-) -> CompletenessStatus:
+) -> CalculationStatus:
     if available_count == 0:
         return "insufficient_data"
     full_count = len(codes)

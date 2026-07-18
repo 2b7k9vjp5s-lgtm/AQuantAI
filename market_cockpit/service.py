@@ -43,6 +43,16 @@ class MarketCockpitService:
         generated_at = self._clock()
         if generated_at.tzinfo is None or generated_at.utcoffset() is None:
             raise ValueError("Market Cockpit clock must return a timezone-aware datetime.")
+        scope_warning = (
+            "Scope coverage is unverified: internally ready calculations describe only the "
+            "exact selected universe and do not imply representative A-share or full-market coverage."
+        )
+        warnings = [*calculation.warnings, scope_warning]
+        overall_status = (
+            "insufficient_data"
+            if calculation.calculation_status == "insufficient_data"
+            else "partial"
+        )
         return MarketCockpitSnapshot(
             provenance=MarketCockpitProvenance(
                 series_key=persisted.series_key,
@@ -54,17 +64,39 @@ class MarketCockpitService:
                 requested_start_date=persisted.requested_start_date,
                 requested_end_date=persisted.requested_end_date,
                 adjust_type=persisted.adjust_type,
+                ingestion_imported_at_utc=persisted.ingestion_imported_at_utc,
+                ingestion_completed_at_utc=persisted.ingestion_completed_at_utc,
+                collection_timestamp_utc=persisted.collection_timestamp_utc,
+                effective_information_cutoff_date=(
+                    persisted.effective_information_cutoff_date
+                ),
+                akshare_package_version=persisted.akshare_package_version,
+                stock_basic_endpoint=persisted.stock_basic_endpoint,
+                daily_price_endpoint=persisted.daily_price_endpoint,
+                trade_calendar_endpoint=persisted.trade_calendar_endpoint,
+                frequency=persisted.frequency,
+                adapter_compatibility_version=(
+                    persisted.adapter_compatibility_version
+                ),
+                requested_as_of_cutoff=(
+                    str(as_of_cutoff).strip().replace("-", "")
+                    if as_of_cutoff is not None
+                    else None
+                ),
+                effective_as_of_session=calculation.effective_as_of_session,
                 generated_at_utc=generated_at.astimezone(timezone.utc).isoformat().replace(
                     "+00:00", "Z"
                 ),
-                effective_as_of_session=calculation.effective_as_of_session,
             ),
             metrics=calculation.metrics,
             stock_codes=persisted.stock_codes,
             universe_stock_count=len(persisted.stock_codes),
             available_stock_count=calculation.available_stock_count,
-            completeness_status=calculation.completeness_status,
-            warnings=calculation.warnings,
+            calculation_status=calculation.calculation_status,
+            scope_coverage_status="unverified_selected_scope",
+            completeness_status=overall_status,
+            latest_data_diagnostics=calculation.latest_data_diagnostics,
+            warnings=warnings,
             unsupported_sections=_unsupported_sections(),
         )
 

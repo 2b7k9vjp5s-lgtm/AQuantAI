@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -62,7 +63,19 @@ def _ingest(session_factory: sessionmaker[Session], *, revision: str, cutoff: st
         information_cutoff_date=cutoff,
         requested_scope=COCKPIT_FIXTURE_SCOPE,
         adjust_type=COCKPIT_FIXTURE_ADJUST_TYPE,
-        provider_request_metadata={"fixture_revision": revision},
+        compatibility_parameters={
+            "stock_basic_endpoint": "fixture_stock_basic",
+            "daily_price_endpoint": "fixture_daily_price",
+            "trade_calendar_endpoint": "fixture_trade_calendar",
+            "frequency": "daily",
+            "adapter_compatibility_version": "market-cockpit-fixture-v1",
+        },
+        provider_request_metadata={
+            "fixture_revision": revision,
+            "collection_timestamp_utc": f"2026-04-{cutoff[-2:]}T12:00:00Z",
+            "effective_information_cutoff_date": cutoff,
+            "unknown_metadata": "must-not-be-public",
+        },
         adapter_version="market-cockpit-fixture-v1",
     )
 
@@ -145,14 +158,40 @@ def test_api_returns_current_and_historical_persisted_snapshots(client) -> None:
     assert current_payload["provenance"]["series_key"] == current.series_key
     assert current_payload["provenance"]["adjust_type"] == "qfq"
     assert current_payload["provenance"]["effective_as_of_session"] == COCKPIT_FIXTURE_END_DATE
+    assert current_payload["provenance"]["requested_as_of_cutoff"] is None
+    assert historical_payload["provenance"]["requested_as_of_cutoff"] == (
+        COCKPIT_FIXTURE_HISTORICAL_CUTOFF
+    )
+    assert current_payload["provenance"]["collection_timestamp_utc"] == (
+        "2026-04-05T12:00:00Z"
+    )
+    assert current_payload["provenance"]["effective_information_cutoff_date"] == (
+        COCKPIT_FIXTURE_CURRENT_CUTOFF
+    )
+    assert current_payload["provenance"]["stock_basic_endpoint"] == "fixture_stock_basic"
+    assert current_payload["provenance"]["adapter_compatibility_version"] == (
+        "market-cockpit-fixture-v1"
+    )
+    assert current_payload["provenance"]["ingestion_imported_at_utc"].endswith("Z")
+    assert current_payload["provenance"]["ingestion_completed_at_utc"].endswith("Z")
+    assert current_payload["provenance"]["generated_at_utc"].endswith("Z")
     assert current_payload["stock_codes"] == ["000001", "000002", "000003"]
     assert current_payload["universe_stock_count"] == 3
     assert current_payload["available_stock_count"] == 3
-    assert current_payload["completeness_status"] == "ready"
+    assert current_payload["calculation_status"] == "ready"
+    assert current_payload["scope_coverage_status"] == "unverified_selected_scope"
+    assert current_payload["completeness_status"] == "partial"
+    assert current_payload["latest_data_diagnostics"] == {
+        "stale_or_missing_latest_count": 0,
+        "no_trade_latest_count": 0,
+        "affected_stocks": [],
+    }
     assert current_payload["read_only"] is True
     assert current_payload["allowed_actions"] == ["view", "inspect"]
     assert current_payload["unsupported_sections"]
     serialized = str(current_payload)
+    assert "unknown_metadata" not in serialized
+    assert "must-not-be-public" not in serialized
     assert "全市场" not in serialized
     assert "A 股市场宽度" not in serialized
     assert "官方指数宽度" not in serialized
@@ -171,6 +210,8 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "selected-universe monitoring" in page.text
     assert "Selected universe / 选定股票范围" in page.text
     assert "One ingestion run, no cross-series stitching" in page.text
+    assert "Coverage confidence is unverified" in page.text
+    assert "Latest-session availability diagnostics" in page.text
     assert "Not supported in v0.4A" in page.text
     assert "Read-only" in page.text
     assert "<form" not in page.text.lower()
@@ -181,6 +222,15 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "`" not in script.text
     assert "textContent" in script.text
     assert "/market-cockpit/snapshot?" in script.text
+    assert "Calculation status" in script.text
+    assert "Scope coverage" in script.text
+    assert "Collected UTC" in script.text
+    assert "Imported UTC" in script.text
+    assert "Requested historical cutoff" in script.text
+    assert "Calculated trading session" in script.text
+    assert "View generated UTC" in script.text
+    assert "Stale or missing latest" in script.text
+    assert "No-trade latest" in script.text
     for forbidden_claim in ("全市场", "A 股市场宽度", "官方指数宽度"):
         assert forbidden_claim not in page.text
 
@@ -195,6 +245,20 @@ def test_market_cockpit_page_does_not_create_database_or_access_network(monkeypa
     response = TestClient(app).get("/market-cockpit")
 
     assert response.status_code == 200
+
+
+def test_import_and_fastapi_startup_do_not_create_database_or_access_network(monkeypatch) -> None:
+    def reject_side_effect(*_args, **_kwargs):
+        raise AssertionError("import or startup attempted a database or network side effect")
+
+    monkeypatch.setattr(market_cockpit_api, "build_engine", reject_side_effect)
+    monkeypatch.setattr(SubprocessAkshareRunner, "call", reject_side_effect)
+    import backend.main as main_module
+
+    reloaded = importlib.reload(main_module)
+    with TestClient(reloaded.app) as startup_client:
+        assert startup_client.get("/health").json() == {"status": "ok"}
+        assert startup_client.get("/market-cockpit").status_code == 200
 
 
 def test_existing_dashboard_and_api_contracts_are_unchanged() -> None:
@@ -233,7 +297,16 @@ def test_persisted_demo_reports_current_and_historical_cutoffs(tmp_path) -> None
         COCKPIT_FIXTURE_HISTORICAL_CUTOFF
     )
     assert payload["current"]["ingestion_run_id"] != payload["historical"]["ingestion_run_id"]
-    assert payload["current"]["completeness_status"] == "ready"
-    assert payload["historical"]["completeness_status"] == "ready"
+    assert payload["current"]["calculation_status"] == "ready"
+    assert payload["historical"]["calculation_status"] == "ready"
+    assert payload["current"]["scope_coverage_status"] == "unverified_selected_scope"
+    assert payload["current"]["completeness_status"] == "partial"
+    assert payload["historical"]["completeness_status"] == "partial"
+    assert payload["current"]["collection_timestamp_utc"] == "2026-04-05T12:00:00Z"
+    assert payload["historical"]["requested_as_of_cutoff"] == (
+        COCKPIT_FIXTURE_HISTORICAL_CUTOFF
+    )
+    assert payload["current"]["stale_or_missing_latest_count"] == 0
+    assert payload["current"]["no_trade_latest_count"] == 0
     assert payload["read_only"] is True
     assert payload["network_access"] is False
