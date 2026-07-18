@@ -11,6 +11,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import build_engine, build_session_factory
+from industry_alpha.chain_map_query import IndustryChainMapQueryService
+from industry_alpha.chain_map_repository import IndustryChainMapRepository
 from industry_alpha.errors import EvidenceLedgerNotFound, EvidenceLedgerNotVisible
 from industry_alpha.query import EvidenceLedgerQueryService
 from industry_alpha.repository import EvidenceLedgerRepository
@@ -34,6 +36,43 @@ def get_industry_alpha_session_factory() -> Iterator[sessionmaker[Session]]:
         yield build_session_factory(engine)
     finally:
         engine.dispose()
+
+
+@router.get("/maps")
+def list_industry_maps(
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return IndustryChainMapQueryService(
+                IndustryChainMapRepository(session)
+            ).list_maps(as_of_cutoff=as_of_cutoff).to_dict()
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/maps/{map_id}")
+def get_industry_map(
+    map_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return IndustryChainMapQueryService(
+                IndustryChainMapRepository(session)
+            ).get_map(map_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
 
 
 @router.get("/cases")

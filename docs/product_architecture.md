@@ -25,7 +25,7 @@ Market observations can create research cases. Research produces evidence-backed
 | --- | --- | --- |
 | Home | Local market summary, recent research changes, and verification reminders. | Planned |
 | Market Cockpit | Selected-universe breadth, participation, liquidity distribution, price-behavior proxies, risk, provenance, completeness, and optional separately selected provider-attributed benchmark and sector context. | v0.4A-v0.4E merged; canonical style, valuation, regime, and crowding conclusions unsupported |
-| Industry Alpha | Stage 1 industry mapping and Stage 2 investment screening with evidence and cutoff dates. | Bounded v0.5A append-only evidence ledger in review; scoring, mapping, conclusions, and Stage 2 unsupported |
+| Industry Alpha | Stage 1 industry mapping and Stage 2 investment screening with evidence and cutoff dates. | v0.5A evidence ledger merged; bounded v0.5B evidence-backed chain maps in review; scoring, company beneficiaries, Stage 2, recommendations, and trading unsupported |
 | Stock Research | Company role, beneficiary relationship, financial transmission, expectations, valuation, catalysts, and risks. | Planned |
 | Watchlist | Research status, catalysts, risks, verification tasks, and status history. | Planned |
 | Paper Portfolio | Multiple simulated portfolios, manual simulated trades, positions, cash, NAV, benchmarks, concentration, and thesis snapshots. | Planned |
