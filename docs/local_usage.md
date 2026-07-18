@@ -154,7 +154,7 @@ The first import writes the local deterministic fixture. The second is idempoten
 
 ### Manual AKShare Collection
 
-Real collection is never automatic. The CLI requires explicit codes, date bounds, adjustment policy, cutoff, and network consent:
+Real collection is never automatic. The CLI requires explicit codes, date bounds, adjustment policy, cutoff, and network consent. In live mode, the cutoff must equal the UTC collection date; past or future values fail before any provider or database activity:
 
 ```bash
 python -m scripts.ingest_akshare_market_data \
@@ -162,11 +162,11 @@ python -m scripts.ingest_akshare_market_data \
   --start-date 20260708 \
   --end-date 20260709 \
   --adjust qfq \
-  --cutoff 20260709 \
+  --cutoff 20260718 \
   --allow-network
 ```
 
-The default request timeout is 20 seconds per endpoint call with at most two retries. Both limits are finite and can be reduced with `--timeout-seconds` and `--max-retries`. One request accepts at most 50 explicit stock codes and never defaults to all stocks or an unbounded date range.
+The default request timeout is 20 seconds per endpoint call with at most two retries. Both limits are finite and can be reduced with `--timeout-seconds` and `--max-retries`. One request accepts at most 50 explicit stock codes and never defaults to all stocks or an unbounded date range. The `stock_info_a_code_name` endpoint has no historical date selector, so this command cannot reconstruct a historical stock universe; live stock-basic rows describe only information available at collection time.
 
 Normalization-only mode prints the canonical scope, series key, cutoff, validation status, and row counts without writing the database:
 

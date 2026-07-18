@@ -4,8 +4,10 @@ import os
 from datetime import date, datetime, timezone
 
 import pytest
+import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from alembic.util.exc import CommandError
 from sqlalchemy import MetaData, Table, create_engine, inspect, insert, select
 from sqlalchemy.engine import make_url
 
@@ -110,5 +112,95 @@ def test_upgrade_from_v03a_backfills_deterministic_snapshot_series_identity() ->
             "series_key",
         ]
     finally:
+        engine.dispose()
+        command.downgrade(config, "base")
+
+
+def test_downgrade_fails_closed_before_schema_changes_for_multi_series_history() -> None:
+    database_url = _postgres_url()
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.downgrade(config, "base")
+    command.upgrade(config, "head")
+    engine = create_engine(database_url)
+    batch_identifier = "d" * 64
+    try:
+        metadata = MetaData()
+        runs = Table("ingestion_runs", metadata, autoload_with=engine)
+        identity_kwargs = {
+            "provider": "akshare",
+            "dataset": "market_data_bundle",
+            "contract_version": "1.0",
+            "datasets": ["daily_price", "stock_basic", "trade_calendar"],
+            "stock_codes": ["000001"],
+            "requested_start_date": "20260709",
+            "requested_end_date": "20260709",
+            "adjust_type": "qfq",
+        }
+        first_identity = build_snapshot_series_identity(
+            **identity_kwargs,
+            compatibility_parameters={"adapter_compatibility_version": "v1"},
+        )
+        second_identity = build_snapshot_series_identity(
+            **identity_kwargs,
+            compatibility_parameters={"adapter_compatibility_version": "v2"},
+        )
+        common = {
+            "batch_identifier": batch_identifier,
+            "provider": "akshare",
+            "dataset": "market_data_bundle",
+            "imported_at": datetime(2026, 7, 18, tzinfo=timezone.utc),
+            "completed_at": datetime(2026, 7, 18, tzinfo=timezone.utc),
+            "requested_start_date": date(2026, 7, 9),
+            "requested_end_date": date(2026, 7, 9),
+            "information_cutoff_date": date(2026, 7, 18),
+            "requested_scope": {"stock_codes": ["000001"], "datasets": ["stock_basic"]},
+            "provider_request_metadata": {"network_access": False},
+            "adapter_version": "test-adapter",
+            "snapshot_mode": "complete",
+            "contract_version": "1.0",
+            "status": "succeeded",
+            "row_count_received": 0,
+            "row_count_written": 0,
+            "dataset_counts": {},
+        }
+        with engine.begin() as connection:
+            connection.execute(
+                insert(runs),
+                [
+                    {
+                        **common,
+                        "series_key": first_identity.series_key,
+                        "series_identity": first_identity.canonical,
+                    },
+                    {
+                        **common,
+                        "series_key": second_identity.series_key,
+                        "series_identity": second_identity.canonical,
+                    },
+                ],
+            )
+
+        with pytest.raises(CommandError, match="No schema changes were applied"):
+            command.downgrade(config, "20260718_0001")
+
+        columns = {column["name"] for column in inspect(engine).get_columns("ingestion_runs")}
+        indexes = {index["name"] for index in inspect(engine).get_indexes("ingestion_runs")}
+        assert "series_key" in columns
+        assert "ix_ingestion_runs_series_cutoff" in indexes
+        with engine.connect() as connection:
+            assert connection.scalar(
+                select(sa.func.count()).select_from(runs).where(
+                    runs.c.batch_identifier == batch_identifier
+                )
+            ) == 2
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260718_0002"
+    finally:
+        with engine.begin() as connection:
+            metadata = MetaData()
+            cleanup_runs = Table("ingestion_runs", metadata, autoload_with=engine)
+            connection.execute(
+                cleanup_runs.delete().where(cleanup_runs.c.batch_identifier == batch_identifier)
+            )
         engine.dispose()
         command.downgrade(config, "base")

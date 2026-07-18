@@ -170,7 +170,7 @@ Run the fixture command a second time to verify the same ingestion ID is reused 
 
 ### Controlled AKShare Ingestion
 
-AKShare collection is manual and bounded. It requires explicit stock codes, dates, adjustment policy, cutoff, and `--allow-network`:
+AKShare collection is manual and bounded. It requires explicit stock codes, dates, adjustment policy, cutoff, and `--allow-network`. The live cutoff must equal the UTC collection date and is rejected before any provider or database activity otherwise:
 
 ```bash
 python -m scripts.ingest_akshare_market_data \
@@ -178,11 +178,11 @@ python -m scripts.ingest_akshare_market_data \
   --start-date 20260708 \
   --end-date 20260709 \
   --adjust qfq \
-  --cutoff 20260709 \
+  --cutoff 20260718 \
   --allow-network
 ```
 
-Inspect normalization and the canonical series key without database writes by adding `--dry-run`. For deterministic offline verification, replace `--allow-network` with `--offline-fixture`. No AKShare call occurs during imports, FastAPI startup, Dashboard use, tests, CI, or the fixture demo. See [controlled AKShare ingestion](docs/akshare_ingestion.md).
+Inspect normalization and the canonical series key without database writes by adding `--dry-run`. For deterministic offline verification, replace `--allow-network` with `--offline-fixture`. The live stock-basic endpoint has no historical date selector, so it cannot reconstruct a historical stock universe; rows describe information available at collection time. No AKShare call occurs during imports, FastAPI startup, Dashboard use, tests, CI, or the fixture demo. See [controlled AKShare ingestion](docs/akshare_ingestion.md).
 
 Run tests:
 

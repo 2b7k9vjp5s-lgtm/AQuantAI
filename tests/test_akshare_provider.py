@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from importlib.metadata import version
 
 from datasource.akshare import AkshareDataProvider
 from datasource.akshare.provider import (
@@ -13,6 +14,7 @@ from datasource.akshare.provider import (
     RAW_VOLUME,
     AkshareProviderError,
     AkshareProviderTimeout,
+    validate_akshare_runtime_version,
 )
 from datasource.base import DAILY_PRICE_COLUMNS, STOCK_BASIC_COLUMNS, TRADE_CALENDAR_COLUMNS
 
@@ -194,3 +196,27 @@ def test_bundle_collection_rejects_near_full_market_code_lists() -> None:
             "20260131",
             "qfq",
         )
+
+
+def test_request_metadata_records_the_installed_akshare_package_version() -> None:
+    provider = AkshareDataProvider(FakeAkshare())
+
+    metadata = provider.request_metadata(
+        stock_codes=["000001"],
+        start_date="20260101",
+        end_date="20260131",
+        adjust="qfq",
+        network_mode="injected-mock",
+    )
+
+    assert metadata["akshare_package_version"] == version("akshare")
+
+
+@pytest.mark.parametrize("package_version", ["1.15.99", "2.0.0", "unknown"])
+def test_runtime_compatibility_rejects_unreviewed_akshare_versions(package_version: str) -> None:
+    with pytest.raises(AkshareProviderError, match="supports|semantic version"):
+        validate_akshare_runtime_version(package_version)
+
+
+def test_runtime_compatibility_accepts_reviewed_akshare_version() -> None:
+    assert validate_akshare_runtime_version("1.18.64") == "1.18.64"

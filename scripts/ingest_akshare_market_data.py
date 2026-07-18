@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import build_engine, build_session_factory
@@ -16,8 +18,9 @@ from backend.database.market_data import (
     MarketDataPersistenceService,
     validate_market_data_bundle,
 )
-from datasource.akshare import ADAPTER_VERSION, AkshareDataProvider
+from datasource.akshare import ADAPTER_COMPATIBILITY_VERSION, ADAPTER_VERSION, AkshareDataProvider
 from datasource.akshare.provider import (
+    DAILY_PRICE_ENDPOINT,
     MAX_STOCK_CODES_PER_REQUEST,
     RAW_AMOUNT,
     RAW_CLOSE,
@@ -27,14 +30,33 @@ from datasource.akshare.provider import (
     RAW_OPEN,
     RAW_STOCK_CODE,
     RAW_VOLUME,
+    STOCK_BASIC_ENDPOINT,
+    TRADE_CALENDAR_ENDPOINT,
 )
 from datasource.base import AdjustType
 
 AKSHARE_SCOPE_DATASETS = ["daily_price", "stock_basic", "trade_calendar"]
-AKSHARE_COMPATIBILITY_PARAMETERS = {
-    "frequency": "daily",
-    "trade_calendar": "tool_trade_date_hist_sina",
-}
+
+
+def akshare_compatibility_parameters(
+    *,
+    stock_basic_endpoint: str = STOCK_BASIC_ENDPOINT,
+    daily_price_endpoint: str = DAILY_PRICE_ENDPOINT,
+    trade_calendar_endpoint: str = TRADE_CALENDAR_ENDPOINT,
+    frequency: str = "daily",
+    adapter_compatibility_version: str = ADAPTER_COMPATIBILITY_VERSION,
+) -> dict[str, str]:
+    """Return only fields that change normalized snapshot compatibility."""
+    return {
+        "stock_basic_endpoint": stock_basic_endpoint,
+        "daily_price_endpoint": daily_price_endpoint,
+        "trade_calendar_endpoint": trade_calendar_endpoint,
+        "frequency": frequency,
+        "adapter_compatibility_version": adapter_compatibility_version,
+    }
+
+
+AKSHARE_COMPATIBILITY_PARAMETERS = akshare_compatibility_parameters()
 
 
 @dataclass(frozen=True)
@@ -57,6 +79,8 @@ def run_controlled_akshare_ingestion(
     provider: AkshareDataProvider | None = None,
     session_factory: sessionmaker[Session] | None = None,
     database_url: str | None = None,
+    clock: Callable[[], datetime] | None = None,
+    engine_factory: Callable[[str | None], Engine] = build_engine,
 ) -> dict[str, Any]:
     """Execute one explicit collection; no default path can access the network."""
     if request.allow_network and request.offline_fixture:
@@ -73,6 +97,13 @@ def run_controlled_akshare_ingestion(
         raise ValueError("end_date must not exceed cutoff.")
     if request.adjust_type not in ("", "qfq", "hfq"):
         raise ValueError("adjust_type must be '', 'qfq', or 'hfq'.")
+    collection_timestamp = _collection_timestamp(clock)
+    collection_date = collection_timestamp.strftime("%Y%m%d")
+    if request.allow_network and cutoff_date != collection_date:
+        raise ValueError(
+            "Live AKShare cutoff must equal the UTC collection date "
+            f"{collection_date}; past and future live cutoffs are not permitted."
+        )
     provider = provider or AkshareDataProvider(
         _FrozenAkshareClient() if request.offline_fixture else None,
         request_timeout_seconds=request.timeout_seconds,
@@ -92,10 +123,16 @@ def run_controlled_akshare_ingestion(
         adjust=request.adjust_type,
         network_mode=network_mode,
     )
+    request_metadata.update(
+        {
+            "collection_timestamp_utc": collection_timestamp.isoformat().replace("+00:00", "Z"),
+            "effective_information_cutoff_date": cutoff_date,
+        }
+    )
 
     engine = None
     if not request.dry_run and session_factory is None:
-        engine = build_engine(database_url)
+        engine = engine_factory(database_url)
         session_factory = build_session_factory(engine)
     service = (
         MarketDataPersistenceService(session_factory)
@@ -223,6 +260,13 @@ def _date(value: str, field: str) -> str:
         return datetime.strptime(normalized, "%Y%m%d").strftime("%Y%m%d")
     except ValueError as exc:
         raise ValueError(f"{field} must use YYYYMMDD format.") from exc
+
+
+def _collection_timestamp(clock: Callable[[], datetime] | None) -> datetime:
+    collected_at = (clock or (lambda: datetime.now(timezone.utc)))()
+    if collected_at.tzinfo is None or collected_at.utcoffset() is None:
+        raise ValueError("Collection clock must return a timezone-aware datetime.")
+    return collected_at.astimezone(timezone.utc)
 
 
 class _FrozenAkshareClient:

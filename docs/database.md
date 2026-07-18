@@ -28,7 +28,7 @@ Physical uniqueness adds `ingestion_run_id` to each logical key. A corrected bat
 
 Each accepted batch is a **complete snapshot**, not a partial revision. `requested_scope.stock_codes` is an **exact scope**: stock-basic and daily-price code sets must both equal the declared set. A later eligible snapshot that omits an earlier key does not carry that key forward. Partial revisions and tombstones are not implemented in v0.3A and are rejected rather than interpreted ambiguously.
 
-Compatible snapshots share a canonical **series key**. Its SHA-256 input includes provider, dataset/contract combination, exact stock-code scope, requested date range, adjustment policy, complete/exact semantics, and canonical compatibility parameters. Different stock scopes, dates, or adjustment policies therefore cannot replace one another.
+Compatible snapshots share a canonical **series key**. Its SHA-256 input includes provider, dataset/contract combination, exact stock-code scope, requested date range, adjustment policy, complete/exact semantics, and canonical compatibility parameters. For AKShare these parameters include all three endpoint identifiers, daily frequency, and an explicit adapter compatibility version. Timeout, retry, live/offline mode, and the installed package patch version are request provenance rather than compatibility dimensions. Different stock scopes, dates, adjustment policies, endpoint mappings, or adapter compatibility versions therefore cannot replace one another.
 
 Repository callers must supply an explicit series key or an equivalent complete canonical selector. Provider-only lookup fails closed even when only one series currently exists. Current and as-of readback first select one eligible successful complete snapshot within that series, ordered by:
 
@@ -38,7 +38,7 @@ Repository callers must supply an explicit series key or an equivalent complete 
 
 `as_of_cutoff` additionally requires `information_cutoff_date <= as_of_cutoff`. Rows are then read only from the selected snapshot. Prior values, failed attempts, and batch provenance remain queryable for audit.
 
-Migration `20260718_0002` adds and indexes the series identity plus provider-request provenance. It deterministically backfills v0.3A runs from provider, bundle/contract, exact scope, requested dates, snapshot semantics, and persisted adjustment values. The migration supports both a clean upgrade from base and an in-place upgrade from `20260718_0001`.
+Migration `20260718_0002` adds and indexes the series identity plus provider-request provenance. It deterministically backfills v0.3A runs from provider, bundle/contract, exact scope, requested dates, snapshot semantics, and persisted adjustment values. The migration supports both a clean upgrade from base and an in-place upgrade from `20260718_0001`. Before downgrade changes any index, constraint, or column, it detects successful duplicate batch identifiers across series. Such history cannot satisfy the v0.3A batch-only unique rule, so downgrade fails closed with an actionable error and does not delete, merge, or overwrite audit records.
 
 ## Validation And Transactions
 
@@ -57,7 +57,7 @@ python -m scripts.persist_fixture_market_data
 
 The first import writes 2 stock-basic rows, 4 daily-price rows, and 2 trade-calendar rows. The second prints the same ingestion ID with `rows_written: 0` and `idempotent: true`. The command uses only local deterministic DataFrames and never calls AKShare or another network provider.
 
-Controlled AKShare collection uses `python -m scripts.ingest_akshare_market_data` and is documented in [akshare_ingestion.md](akshare_ingestion.md). It requires explicit codes, dates, adjustment policy, cutoff, and either real-network consent or the offline fixture mode. API startup, Dashboard use, tests, CI, and the fixture demo never invoke it.
+Controlled AKShare collection uses `python -m scripts.ingest_akshare_market_data` and is documented in [akshare_ingestion.md](akshare_ingestion.md). It requires explicit codes, dates, adjustment policy, cutoff, and either real-network consent or the offline fixture mode. A live cutoff must equal the UTC collection date and the request records the exact UTC timestamp plus installed AKShare version. Because `stock_info_a_code_name` has no historical selector, live stock-basic data represents only what was available at collection time and cannot reconstruct a historical universe. API startup, Dashboard use, tests, CI, and the fixture demo never invoke it.
 
 Inside Compose, run the commands with `docker compose exec app`. The public `.env.example` URL uses service hostname `postgres`. For direct host execution, set `DATABASE_URL` to the exposed host address, for example `postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai`.
 

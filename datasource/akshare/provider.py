@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import multiprocessing
+import re
 import time
 from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 import pandas as pd
@@ -19,11 +21,14 @@ from datasource.base import (
 )
 
 ADAPTER_VERSION = "akshare-normalizer-v1"
+ADAPTER_COMPATIBILITY_VERSION = "aquantai.akshare-adapter.v1"
 STOCK_BASIC_ENDPOINT = "stock_info_a_code_name"
 DAILY_PRICE_ENDPOINT = "stock_zh_a_hist"
 TRADE_CALENDAR_ENDPOINT = "tool_trade_date_hist_sina"
 ALLOWED_ENDPOINTS = {STOCK_BASIC_ENDPOINT, DAILY_PRICE_ENDPOINT, TRADE_CALENDAR_ENDPOINT}
 MAX_STOCK_CODES_PER_REQUEST = 50
+MIN_AKSHARE_VERSION = (1, 16, 0)
+MAX_AKSHARE_VERSION_EXCLUSIVE = (2, 0, 0)
 
 RAW_CODE = "\u4ee3\u7801"
 RAW_NAME = "\u540d\u79f0"
@@ -43,6 +48,33 @@ class AkshareProviderError(RuntimeError):
 
 class AkshareProviderTimeout(AkshareProviderError):
     """Raised when a live endpoint exceeds its configured hard timeout."""
+
+
+def installed_akshare_version() -> str:
+    """Return the installed, reviewed-compatible AKShare package version."""
+    try:
+        package_version = version("akshare")
+    except PackageNotFoundError as exc:
+        raise AkshareProviderError(
+            "AKShare is not installed. Install the project dependencies before manual collection."
+        ) from exc
+    return validate_akshare_runtime_version(package_version)
+
+
+def validate_akshare_runtime_version(package_version: str) -> str:
+    """Fail closed outside the AKShare major/minor range reviewed by this adapter."""
+    normalized = str(package_version).strip()
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)", normalized)
+    if match is None:
+        raise AkshareProviderError(
+            f"Unsupported AKShare version {normalized!r}; expected a semantic version in [1.16.0, 2.0.0)."
+        )
+    parsed = tuple(int(value) for value in match.groups())
+    if not MIN_AKSHARE_VERSION <= parsed < MAX_AKSHARE_VERSION_EXCLUSIVE:
+        raise AkshareProviderError(
+            f"Unsupported AKShare version {normalized!r}; this adapter supports [1.16.0, 2.0.0)."
+        )
+    return normalized
 
 
 class _ClientRunner:
@@ -111,6 +143,7 @@ class AkshareDataProvider(DataProvider):
         max_retries: int = 2,
         retry_delay_seconds: float = 0.25,
         sleep: Callable[[float], None] = time.sleep,
+        akshare_package_version: str | None = None,
     ) -> None:
         if akshare_client is not None and runner is not None:
             raise ValueError("Provide akshare_client or runner, not both.")
@@ -126,6 +159,11 @@ class AkshareDataProvider(DataProvider):
         self.max_retries = max_retries
         self.retry_delay_seconds = float(retry_delay_seconds)
         self._sleep = sleep
+        self.akshare_package_version = (
+            validate_akshare_runtime_version(akshare_package_version)
+            if akshare_package_version is not None
+            else installed_akshare_version()
+        )
 
     @property
     def akshare(self) -> Any:
@@ -282,6 +320,7 @@ class AkshareDataProvider(DataProvider):
     ) -> dict[str, Any]:
         return {
             "adapter_version": ADAPTER_VERSION,
+            "akshare_package_version": self.akshare_package_version,
             "endpoints": [STOCK_BASIC_ENDPOINT, DAILY_PRICE_ENDPOINT, TRADE_CALENDAR_ENDPOINT],
             "stock_codes": sorted(stock_codes),
             "start_date": _compact_date(start_date),

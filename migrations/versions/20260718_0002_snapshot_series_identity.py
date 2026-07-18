@@ -14,6 +14,7 @@ from datetime import date
 from typing import Any
 
 from alembic import op
+from alembic.util.exc import CommandError
 import sqlalchemy as sa
 
 revision: str = "20260718_0002"
@@ -105,6 +106,27 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    connection = op.get_bind()
+    duplicate = connection.execute(
+        sa.text(
+            """
+            SELECT batch_identifier, COUNT(*) AS successful_series_count
+            FROM ingestion_runs
+            WHERE status = 'succeeded'
+            GROUP BY batch_identifier
+            HAVING COUNT(*) > 1
+            ORDER BY batch_identifier
+            LIMIT 1
+            """
+        )
+    ).mappings().first()
+    if duplicate is not None:
+        raise CommandError(
+            "Cannot downgrade revision 20260718_0002 without losing valid multi-series audit history: "
+            f"batch {duplicate['batch_identifier']} has "
+            f"{duplicate['successful_series_count']} successful series. No schema changes were applied. "
+            "Keep this revision installed; this migration will not delete, merge, or overwrite ingestion runs."
+        )
     op.drop_index("ix_ingestion_runs_series_cutoff", table_name="ingestion_runs")
     op.drop_index("uq_ingestion_runs_successful_batch", table_name="ingestion_runs")
     op.create_index(
