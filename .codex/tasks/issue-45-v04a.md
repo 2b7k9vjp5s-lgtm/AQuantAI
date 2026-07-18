@@ -1,4 +1,4 @@
-# Issue #45 — v0.4A Market Cockpit Review Task
+# Issue #45 — v0.4A Market Cockpit Final Diagnostic Revision
 
 ## Task identity
 
@@ -7,181 +7,167 @@
 - Draft PR: `#46 [v0.4A] Add database-backed Market Cockpit foundation`
 - Branch: `feat/v04a-market-cockpit-foundation`
 - Required main ancestor: `b1e6ee59a2e26b0989e205353f63ed56dacdf137`
-- Reviewed implementation head: `bec8fc83ec78d1b1c5d1214889ae758ab1da7487`
-- Blocking review: `4728172324`
-- Accepted pre-review CI run: `29637868999`
+- Previously reviewed implementation head: `867879b1ccbcf722935a259fa80ee1fb57078411`
+- Passing CI for that head: `29638648101`
+- Blocking re-review: `4728218845`
 
-The commits after the reviewed implementation head that only add `.codex/WORKFLOW.md` and this task file are authorized task-synchronization commits. Any other unexpected commit must be reported before editing.
+Read `.codex/WORKFLOW.md`, Issue #45, PR #46, review `4728218845`, and this file before editing.
 
-Read `.codex/WORKFLOW.md`, Issue #45, PR #46, and review `4728172324` before changing code.
+The original three review areas are accepted in principle and must not regress:
+
+- calculation readiness, scope coverage, and conservative overall status are separate;
+- immutable ingestion provenance is exposed only through a fixed allowlist;
+- current-session missing, invalid, and no-trade observations are excluded from calculations;
+- rolling metrics and risk apply the no-trade policy;
+- one explicit snapshot series and one physical ingestion run are used;
+- all calculations remain deterministic and point-in-time safe;
+- API/page behavior remains read-only, local-first, offline in automated validation, and non-advisory.
 
 ## Objective
 
-Revise the existing v0.4A implementation so that it remains a local, read-only, database-backed monitor for one explicit persisted snapshot series while accurately representing scope confidence, immutable collection provenance, and stale/no-trade data.
+Close the remaining auditability inconsistency between the latest-return metric and structured diagnostics.
 
-Preserve the accepted architecture:
+A latest return requires valid traded rows on both:
 
-- one explicit `series_key` or complete canonical selector;
-- one selected successful complete ingestion run;
+1. the effective as-of session; and
+2. the immediately preceding persisted open session.
+
+At reviewed head `867879b1ccbcf722935a259fa80ee1fb57078411`, `_latest_metrics()` correctly makes the stock unavailable when either row is unusable, but `_latest_data_diagnostics()` inspects only the effective-session row. A valid current row with a missing, invalid, or no-trade previous row therefore increments `metrics.latest_session.unavailable_count` while structured diagnostic counts and details can remain empty.
+
+The final response and page must never show an unavailable latest return without a corresponding deterministic structured reason.
+
+## Required contract and calculation revision
+
+### 1. One structured issue for every unavailable latest return
+
+Implement and enforce this invariant:
+
+```text
+latest_return_unavailable_count == metrics.latest_session.unavailable_count
+len(latest_return_issues) == metrics.latest_session.unavailable_count
+```
+
+There must be exactly one issue per unavailable stock code, sorted deterministically by stock code.
+
+A stock with a valid latest return must not appear in this issue list.
+
+### 2. Distinguish current-session and previous-session causes
+
+Use explicit reason values that distinguish at least:
+
+- missing effective-session row;
+- invalid effective-session row;
+- no-trade effective-session row;
+- missing previous-session row;
+- invalid previous-session row;
+- no-trade previous-session row.
+
+Names may follow the existing contract style, but must be stable, documented, and tested.
+
+Use deterministic precedence when more than one row is unusable:
+
+1. effective-session cause first;
+2. otherwise previous-session cause.
+
+This prevents duplicate details for one stock and keeps the count invariant exact.
+
+### 3. Make session-gap fields meaningful for the blocking row
+
+Each issue must expose enough bounded information to audit why the return is unavailable. Include at minimum:
+
+- `stock_code`;
+- `reason`;
+- the session whose missing/invalid/no-trade row blocks the return;
+- the last valid traded session before that blocking session, or `null`;
+- the persisted open-session gap from the last valid traded session to the blocking session, or `null`.
+
+Do not report the valid current session as the “last available” answer for a previous-session failure. The reference point must be the blocking session.
+
+Do not emit raw price rows or an unbounded history dump.
+
+### 4. Preserve useful current-session aggregates without contradiction
+
+The existing current-session aggregates may remain:
+
+- `stale_or_missing_latest_count`;
+- `no_trade_latest_count`.
+
+Add a separate latest-return unavailable aggregate and issue list, or broaden/rename the diagnostic contract cleanly. Whichever design is used:
+
+- the API meaning must be explicit;
+- the page must distinguish current-row health from latest-return eligibility;
+- an unavailable latest return must never coexist with an empty diagnostic message claiming no relevant issue;
+- warnings and structured details must agree.
+
+### 5. Reuse one eligibility classification path
+
+Avoid separate logic drifting between `_latest_metrics()` and diagnostics.
+
+Prefer a shared deterministic classifier that evaluates, per stock:
+
+- current record eligibility;
+- previous record eligibility;
+- selected reason and blocking session;
+- latest return value when eligible.
+
+Metrics and diagnostics should consume the same classification result so their counts cannot diverge.
+
+Do not change the reviewed return formula or epsilon semantics.
+
+## Required tests
+
+Add focused tests for all of the following:
+
+1. valid current row plus missing previous row;
+2. valid current row plus previous row with both volume and amount zero;
+3. valid current row plus invalid/non-finite previous activity or price;
+4. effective-session issue precedence when both current and previous rows are unusable;
+5. genuinely unchanged, positively traded current and previous rows remain a valid unchanged return;
+6. exact equality between structured latest-return unavailable count, issue-list length, and `metrics.latest_session.unavailable_count`;
+7. one deterministic issue per affected stock with stock-code ordering;
+8. correct blocking-session, last-valid-session, and gap values;
+9. API serialization of all reason variants used by tests;
+10. page rendering of previous-session failures;
+11. the page does not display an empty “no issue” message while latest unavailable count is non-zero;
+12. existing current-session no-trade, rolling-window, risk, scope, provenance, cutoff, and future-row tests continue to pass.
+
+Add a regression test that would fail on reviewed head `867879b1ccbcf722935a259fa80ee1fb57078411`: keep the effective-session row valid, remove or zero both activity fields on the preceding open-session row, and assert the structured issue is present.
+
+## Retained architecture and behavior
+
+Do not regress or redesign the accepted implementation:
+
+- explicit `series_key` or complete canonical selector;
 - no provider-only selection;
-- no cross-run or cross-series history stitching;
-- persisted trade-calendar session windows;
-- deterministic point-in-time calculations;
+- one selected successful complete ingestion run;
+- no cross-run or cross-series stitching;
+- no row after the effective cutoff/session;
+- exact stock scope, requested date range, adjustment policy, and compatibility series;
+- persisted trade-calendar windows;
+- calculation status `ready|partial|insufficient_data` for the exact universe;
+- scope coverage `unverified_selected_scope` in v0.4A;
+- conservative overall status `partial` when calculations exist, otherwise `insufficient_data`;
+- immutable provenance allowlist and sensitive/unknown metadata exclusion;
 - lazy and injectable database construction;
-- read-only FastAPI endpoint and local static page;
-- existing fixture Dashboard routes and payloads unchanged;
-- all automated validation offline.
+- existing Dashboard routes and fixture payloads unchanged;
+- local HTML/CSS/vanilla JavaScript using DOM/`textContent` only;
+- no form, trading control, recommendation language, CDN, framework, or automatic refresh;
+- 422/404/503 API error behavior;
+- no fixture fallback disguised as persisted data;
+- no network access during import, startup, tests, CI, page use, or fixture demonstrations.
 
-## Required revisions
+## Documentation and page
 
-### 1. Separate calculation readiness from scope coverage confidence
+Update `docs/market_cockpit.md` and any directly affected local usage text to define:
 
-The current three-stock fixture is internally complete but is incorrectly reported as overall `ready`. Issue #45 requires small or incomplete scopes to remain visibly limited.
+- latest-return eligibility requires two valid traded sessions;
+- current-session diagnostics versus latest-return diagnostics;
+- all structured reason values;
+- blocking-session and gap semantics;
+- deterministic precedence and ordering;
+- the count invariant.
 
-Implement explicit coverage-aware semantics without claiming market representation and without inventing an unsupported “representative A-share” threshold.
-
-Required contract behavior:
-
-- Add a calculation/data status that describes whether the requested metrics are internally complete for the exact selected universe.
-- Add a scope coverage status, with an explicit value such as `unverified_selected_scope`, because v0.4A has no reviewed market-wide coverage policy.
-- Keep the existing overall `completeness_status` as the conservative user-facing status.
-- The overall status must be `partial` when scope coverage is unverified or explicitly small, even when every calculation is available.
-- `insufficient_data` remains required when no core latest return can be calculated.
-- The API and page must state that internally ready calculations do not imply representative A-share or full-market coverage.
-- Do not use `全市场`, `A股市场宽度`, `market-wide breadth`, or equivalent claims.
-
-Do not introduce an arbitrary stock-count threshold and call it market representativeness. A numeric diagnostic such as scope count may be shown, but the confidence decision must remain tied to the absence of a reviewed coverage policy.
-
-Update the current three-stock fixture expectations: calculations may be internally ready, but the overall completeness status must remain `partial` with a visible scope warning.
-
-Add tests for:
-
-- internally complete three-stock scope;
-- incomplete latest-return coverage;
-- no core latest returns;
-- coverage fields serialized in API and rendered on the page;
-- forbidden full-market wording remains absent.
-
-### 2. Carry sanitized immutable ingestion provenance into the view
-
-The selected `ingestion_runs` row already stores immutable provenance. Extend the repository snapshot and public provenance contract with an explicit allowlist.
-
-Expose at minimum:
-
-- ingestion `imported_at` in UTC;
-- ingestion `completed_at` in UTC;
-- `collection_timestamp_utc` when present in provider request metadata;
-- `effective_information_cutoff_date` when present;
-- installed `akshare_package_version` when present;
-- endpoint identifiers and adapter compatibility version from canonical `compatibility_parameters`;
-- the request's `as_of_cutoff` as a separate nullable field;
-- selected run information cutoff;
-- effective as-of trading session;
-- view `generated_at_utc`, clearly labeled as generation time.
-
-Rules:
-
-- Never serialize the complete opaque `provider_request_metadata` object directly.
-- Use a fixed explicit allowlist.
-- Never expose keys containing or representing secrets, tokens, passwords, API keys, credentials, connection strings, or cookies.
-- Missing optional provenance values must be `null` or an explicit unavailable state, not fabricated strings.
-- Normalize timestamps to timezone-aware UTC ISO-8601 values.
-- Backfilled or fixture runs without live collection metadata must remain valid and visibly identify unavailable optional fields.
-- Do not modify persisted ingestion history or migrations for this view-only requirement unless a demonstrated schema defect requires separate authorization.
-
-Update API/page labels so users can distinguish:
-
-- when source data was collected/imported;
-- what information cutoff it claims;
-- what historical cutoff the user requested;
-- which trading session was actually calculated;
-- when the view was generated.
-
-Add tests for:
-
-- live-style allowed metadata fields;
-- fixture/backfilled missing optional metadata;
-- endpoint and adapter compatibility provenance;
-- requested `as_of_cutoff` echo;
-- sensitive and unknown metadata keys excluded;
-- timestamp normalization;
-- page provenance labels.
-
-### 3. Define deterministic stale and no-trade handling
-
-The current code treats any positive close pair as a valid return and permits current zero participation values. This can classify a carried-forward no-trade row as a valid unchanged observation.
-
-Implement a conservative policy using only existing normalized fields.
-
-Required rules:
-
-- A stock missing a row on the effective session is unavailable for latest breadth.
-- For each affected stock, derive and report the last valid available session at or before the effective session and the number of persisted open-session gaps.
-- A stock-session row with both `volume == 0` and `amount == 0` is a deterministic `no_trade` observation.
-- A `no_trade` observation is unavailable for latest-session breadth and participation.
-- A no-trade carried-forward close must not be counted as `unchanged`.
-- Do not claim a confirmed suspension. Use wording such as `potentially suspended or no-trade`.
-- A genuinely unchanged close with positive trading activity remains a valid unchanged return.
-- Negative, non-finite, or otherwise invalid volume/amount remains unavailable under existing validation rules.
-- Rolling close metrics and risk must document and consistently apply the no-trade policy. Prefer excluding the affected stock/window rather than silently treating a no-trade close as a traded observation.
-
-Extend contracts with auditable aggregate diagnostics, at minimum:
-
-- stale or missing latest count;
-- no-trade latest count;
-- optionally structured affected-stock details containing code, reason, last available session, and open-session gap.
-
-Keep the response bounded and deterministic. Do not add an unbounded raw-row dump.
-
-Add tests for:
-
-- missing latest row with last-session/gap detail;
-- zero volume and zero amount with unchanged close;
-- genuinely unchanged close with positive volume/amount;
-- no-trade exclusion from advance/decline/unchanged and participation;
-- rolling/risk coverage behavior under a no-trade session;
-- deterministic warning/detail ordering.
-
-## Retained metric and point-in-time requirements
-
-Do not regress the existing reviewed formulas:
-
-- latest close-to-close mean and median returns;
-- advancing, declining, unchanged, unavailable counts;
-- advance ratio and breadth balance;
-- population cross-sectional dispersion;
-- 20/60-session close SMA breadth;
-- 20/60-session closing-price new highs and lows;
-- current volume/amount versus each stock's prior-20-session median;
-- equal-weight daily universe returns, 20-return sample volatility annualized by `sqrt(252)`, and compounded-wealth maximum drawdown;
-- `null` plus warning for insufficient windows, never fabricated zero.
-
-Point-in-time rules remain mandatory:
-
-- select no snapshot after requested `as_of_cutoff`;
-- use no calendar or price row after the effective session;
-- use one physical ingestion run only;
-- never substitute adjustment policy, scope, date range, or compatibility series;
-- keep the future-price trap test;
-- keep current and historical cutoff repository/PostgreSQL tests.
-
-## API and page requirements
-
-Retain:
-
-- `GET /market-cockpit/snapshot?series_key=...&as_of_cutoff=YYYYMMDD`;
-- `GET /market-cockpit`;
-- local CSS and vanilla JavaScript;
-- DOM and `textContent` rendering only;
-- no form, trading control, recommendation language, framework, CDN, or automatic refresh;
-- 422 for invalid/missing selector or cutoff;
-- 404 for no eligible complete snapshot;
-- 503 for unavailable database configuration or query failure;
-- no fixture fallback disguised as persisted data.
-
-The page must render the new scope coverage, collection provenance, stale/no-trade diagnostics, warnings, formulas, and unsupported sections.
-
-Database construction must remain lazy. Imports, FastAPI startup, static page serving, tests, CI, fixture demos, and existing Dashboard routes must not create an engine, migrate, collect data, or access a provider/network.
+Update the page to render the revised bounded diagnostics. Preserve source/cutoff/scope/provenance/formula/unsupported-section presentation and forbidden-market-coverage wording protections.
 
 ## Required validation
 
@@ -189,24 +175,17 @@ Run and report exact results for:
 
 1. `python -m pytest -q`
 2. focused Market Cockpit contract/calculation/repository/API/page tests
-3. PostgreSQL Market Cockpit and current/as-of cutoff tests
-4. existing PostgreSQL persistence/migration tests
+3. PostgreSQL Market Cockpit current/as-of cutoff tests
+4. existing PostgreSQL persistence and migration tests
 5. clean Alembic `base -> head`
 6. `python -m alembic check`
 7. `python -m scripts.demo_research_flow`
 8. `python -m scripts.demo_market_cockpit`
 9. `python -m compileall -q backend market_cockpit scripts`
 10. import/startup/page no-network regression tests
+11. `git diff --check`
 
-The deterministic Market Cockpit demo must show:
-
-- current and historical selected ingestion runs;
-- internally ready calculation status where applicable;
-- conservative overall partial status for the unverified three-stock scope;
-- immutable collection/import/view timestamps as available;
-- no-trade/stale diagnostics;
-- read-only true;
-- network access false.
+No migration is expected. Do not add one unless a demonstrated schema defect is reported and separately authorized.
 
 ## GitHub synchronization
 
@@ -214,17 +193,16 @@ After implementing and pushing:
 
 1. Update PR #46 body with:
    - new head SHA;
-   - final calculation, coverage, and overall status semantics;
-   - provenance allowlist;
-   - stale/no-trade policy;
-   - contracts and page changes;
+   - the shared latest-return eligibility/classification design;
+   - reason values and precedence;
+   - blocking-session and gap semantics;
+   - count invariants;
    - changed files;
    - exact validation results;
-   - current/historical demo output;
-   - known limitations.
+   - demo output and known limitations.
 2. Add an Issue #45 comment with the same concise completion record.
 3. Keep PR #46 Draft.
-4. Stop and wait for ChatGPT review.
+4. Stop and wait for ChatGPT re-review.
 
 ## Exclusions and stop conditions
 
@@ -234,11 +212,11 @@ Do not:
 - close Issue #45;
 - create a release or tag;
 - change version `0.2.0`;
-- add migrations without a separately justified schema defect;
+- add migrations without separate authorization;
 - add provider endpoints or external datasets;
-- add official indices, industry/sector rotation, style, valuation, market cap, or crowding;
+- add official indices, sectors, style, valuation, market cap, or crowding;
 - persist derived cockpit snapshots;
-- add scheduling, background collection, or automatic refresh;
+- add schedulers, background collection, or automatic refresh;
 - begin v0.4B or v0.5;
-- add Industry Alpha, Stock Research, Watchlist, paper portfolios, LLM execution, authentication, deployment, broker, order, or trading behavior;
+- add Industry Alpha, Stock Research, Watchlist, paper portfolios, LLM execution, authentication, deployment, broker, order, recommendation, or trading behavior;
 - modify, close, rebase, or merge unrelated PR #38.
