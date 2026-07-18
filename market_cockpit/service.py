@@ -132,6 +132,7 @@ class MarketCockpitService:
             latest_data_diagnostics=calculation.latest_data_diagnostics,
             warnings=warnings,
             unsupported_sections=_unsupported_sections(),
+            liquidity_context=calculation.liquidity_context,
             benchmark_context=benchmark_context,
             sector_context=sector_context,
         )

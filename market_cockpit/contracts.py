@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from backend.safety import RESEARCH_DISCLAIMER, validate_allowed_actions, validate_research_text
 from market_cockpit.benchmark_contracts import BenchmarkContext
+from market_cockpit.liquidity_contracts import LiquidityContext
 from market_cockpit.sector_contracts import SectorContext
 
 CompletenessStatus = Literal["ready", "partial", "insufficient_data"]
@@ -133,6 +134,7 @@ class MarketCockpitSnapshot:
     latest_data_diagnostics: LatestDataDiagnostics
     warnings: list[str]
     unsupported_sections: list[UnsupportedSection]
+    liquidity_context: LiquidityContext | None = None
     benchmark_context: BenchmarkContext | None = None
     sector_context: SectorContext | None = None
     scope_label: str = "selected universe"

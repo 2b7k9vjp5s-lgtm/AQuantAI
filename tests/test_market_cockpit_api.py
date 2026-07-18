@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import json
 import re
 from collections.abc import Iterator
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -34,6 +36,7 @@ from market_cockpit.fixtures import (
     build_market_cockpit_fixture,
 )
 from market_cockpit.repository import MarketCockpitRepository
+from market_cockpit.service import MarketCockpitService as RealMarketCockpitService
 from market_cockpit.sector_fixtures import (
     SECTOR_FIXTURE_CODES,
     SECTOR_FIXTURE_CURRENT_CUTOFF,
@@ -44,6 +47,7 @@ from market_cockpit.sector_fixtures import (
     build_sector_fixture,
 )
 from scripts.demo_market_cockpit import build_persisted_market_cockpit_demo
+from tests.test_liquidity_context import _snapshot as build_liquidity_test_snapshot
 
 
 @pytest.fixture
@@ -185,6 +189,9 @@ def test_api_adds_sector_context_only_for_an_explicit_valid_sector_series(client
 
     assert equity_only.status_code == 200
     assert equity_only.json()["sector_context"] is None
+    assert equity_only.json()["liquidity_context"]["effective_session"] == (
+        COCKPIT_FIXTURE_END_DATE
+    )
     assert with_sector.status_code == 200
     context = with_sector.json()["sector_context"]
     assert context["provenance"]["series_key"] == sector.series_key
@@ -279,6 +286,14 @@ def test_api_returns_current_and_historical_persisted_snapshots(client) -> None:
         "latest_return_unavailable_count": 0,
         "latest_return_issues": [],
     }
+    liquidity = current_payload["liquidity_context"]
+    assert liquidity["effective_session"] == COCKPIT_FIXTURE_END_DATE
+    assert liquidity["requested_stock_count"] == 3
+    assert liquidity["latest_eligible_count"] == 3
+    assert liquidity["activity_5"]["matched_cohort_count"] == 3
+    assert liquidity["activity_20"]["matched_cohort_count"] == 3
+    assert liquidity["read_only"] is True
+    assert liquidity["scope_label"] == "selected universe"
     assert current_payload["read_only"] is True
     assert current_payload["allowed_actions"] == ["view", "inspect"]
     assert current_payload["unsupported_sections"]
@@ -288,6 +303,51 @@ def test_api_returns_current_and_historical_persisted_snapshots(client) -> None:
     assert "全市场" not in serialized
     assert "A 股市场宽度" not in serialized
     assert "官方指数宽度" not in serialized
+
+
+def test_api_strictly_serializes_nulls_for_liquidity_aggregate_overflow(
+    client,
+    monkeypatch,
+) -> None:
+    test_client, _ = client
+    snapshot = build_liquidity_test_snapshot(stock_count=20)
+    prices = snapshot.daily_price.copy()
+    prices.loc[
+        prices["trade_date"].eq(snapshot.requested_end_date), "amount"
+    ] = float(np.finfo(float).max * 0.75)
+    overflow_snapshot = replace(snapshot, daily_price=prices)
+
+    class StaticRepository:
+        def load_snapshot(self, **_kwargs):
+            return overflow_snapshot
+
+    expected = RealMarketCockpitService(
+        StaticRepository(),
+        clock=lambda: datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc),
+    ).build_snapshot(series_key="a" * 64)
+
+    class StaticService:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def build_snapshot(self, **_kwargs):
+            return expected
+
+    monkeypatch.setattr(market_cockpit_api, "MarketCockpitService", StaticService)
+    response = test_client.get("/market-cockpit/snapshot?series_key=" + "a" * 64)
+
+    assert response.status_code == 200
+    payload = response.json()
+    liquidity = payload["liquidity_context"]
+    assert liquidity["latest_total_amount"] is None
+    assert liquidity["top5_concentration_share"] is None
+    assert liquidity["top_decile_concentration_share"] is None
+    assert liquidity["latest_aggregate_reason"] == "non_finite_aggregate"
+    assert liquidity["activity_5"]["reason"] == "non_finite_aggregate"
+    assert liquidity["activity_20"]["activity_ratio"] is None
+    serialized = json.dumps(payload, allow_nan=False)
+    assert "NaN" not in serialized
+    assert "Infinity" not in serialized
 
 
 def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations() -> None:
@@ -308,7 +368,10 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "Selected-sector market context" in page.text
     assert "exact stable codes" in page.text
     assert "does not provide sector constituents" in page.text
-    assert "Still unsupported after the bounded v0.4C slice" in page.text
+    assert "Liquidity distribution and trading concentration" in page.text
+    assert "descriptive distribution statistic" in page.text
+    assert "not a crowding conclusion" in page.text
+    assert "Still unsupported after the bounded v0.4D slice" in page.text
     assert "Read-only" in page.text
     assert "<form" not in page.text.lower()
     assert "<button" not in page.text.lower()
@@ -331,6 +394,16 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "sector_series_key" in script.text
     assert "Exact stable sector codes" in script.text
     assert "No sector series was requested" in script.text
+    assert "renderLiquidityContext" in script.text
+    assert "Top-decile concentration" in script.text
+    assert "No liquidity source-exclusion diagnostics" in script.text
+    assert "Number.isFinite" in script.text
+    assert "Latest aggregate reason" in script.text
+    assert "formatIdentifierSample" in script.text
+    assert "unavailable count=" in script.text
+    assert "sample truncated=" in script.text
+    assert '"; omitted="' in script.text
+    assert 'return "Unavailable"' in script.text
     for forbidden_claim in ("全市场", "A 股市场宽度", "官方指数宽度"):
         assert forbidden_claim not in page.text
 
