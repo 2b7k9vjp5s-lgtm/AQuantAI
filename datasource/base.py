@@ -37,6 +37,18 @@ TRADE_CALENDAR_COLUMNS = [
     "source",
 ]
 
+BENCHMARK_INDEX_DAILY_COLUMNS = [
+    "source",
+    "index_code",
+    "trade_date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+]
+
 
 @dataclass(frozen=True)
 class MarketDataBundle:
@@ -45,6 +57,13 @@ class MarketDataBundle:
     stock_basic: pd.DataFrame
     daily_price: pd.DataFrame
     trade_calendar: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class BenchmarkIndexBundle:
+    """One bounded complete snapshot of normalized benchmark-index rows."""
+
+    benchmark_index_daily: pd.DataFrame
 
 
 class DataProvider(ABC):

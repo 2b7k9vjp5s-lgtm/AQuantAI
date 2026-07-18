@@ -2,6 +2,8 @@
 
 v0.3B provides one manually invoked adapter from AKShare responses to the existing normalized stock-basic, daily-price, and trade-calendar contracts. It is not a scheduler, background service, Dashboard source, or full-market crawler.
 
+v0.4B adds a separate bounded benchmark command using only `index_zh_a_hist`. Its rows, canonical identity, persistence table, and Market Cockpit context remain separate from the equity bundle. There is no silent endpoint fallback; see [benchmark_context.md](benchmark_context.md).
+
 ## Snapshot-Series Identity
 
 A canonical series key is the SHA-256 hash of stable JSON containing:
@@ -82,3 +84,4 @@ Provider or normalization failures leave zero market-data rows and retain an imm
 - No Dashboard database reads or UI changes.
 - No financial statements, factor persistence, research workflow, watchlists, or paper portfolios.
 - No Market Cockpit, Industry Alpha, Qlib training, LLM execution, broker connectivity, order placement, or trading.
+- Benchmark collection does not imply official exchange attribution or full-market coverage and adds no timing, recommendation, or relative-performance output.

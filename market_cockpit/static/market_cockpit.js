@@ -90,6 +90,91 @@ function renderProvenance(payload) {
   }
 }
 
+function appendDataRows(container, rows) {
+  container.replaceChildren();
+  for (const row of rows) {
+    const item = createElement("div", null, "data-row");
+    item.append(createElement("dt", row[0]), createElement("dd", formatValue(row[1], row[2])));
+    container.append(item);
+  }
+}
+
+function renderBenchmarkContext(payload) {
+  const context = payload.benchmark_context;
+  const status = document.getElementById("benchmark-status");
+  const metricsContainer = document.getElementById("benchmark-metrics");
+  if (!context) {
+    status.textContent = "Benchmark context unavailable: no explicit benchmark series key was supplied. Equity selected-universe monitoring remains unchanged.";
+    renderMetrics(document.getElementById("benchmark-summary"), []);
+    metricsContainer.replaceChildren();
+    appendDataRows(document.getElementById("benchmark-provenance"), []);
+    renderList(document.getElementById("benchmark-warnings"), [], "No benchmark series was requested.");
+    return;
+  }
+  const provenance = context.provenance || {};
+  status.textContent = "Showing provider-attributed benchmark index context from one separate complete snapshot. It is not an official exchange statement or a full-market coverage claim.";
+  renderMetrics(document.getElementById("benchmark-summary"), [
+    ["Exact benchmark codes", (provenance.index_codes || []).length],
+    ["Alignment", context.alignment_status],
+    ["Effective benchmark session", provenance.effective_benchmark_session],
+    ["Benchmark cutoff", provenance.information_cutoff_date]
+  ]);
+  metricsContainer.replaceChildren();
+  for (const metric of context.metrics || []) {
+    const article = createElement("article", null, "benchmark-item");
+    article.append(createElement("h3", String(metric.index_code)));
+    const list = createElement("dl", null, "data-list");
+    appendDataRows(list, [
+      ["Latest close", metric.latest_close],
+      ["Latest session", metric.latest_session],
+      ["Latest return", metric.latest_return, "percent"],
+      ["SMA20", metric.sma20],
+      ["Above SMA20", metric.above_sma20],
+      ["SMA60", metric.sma60],
+      ["Above SMA60", metric.above_sma60],
+      ["Realized volatility (20)", metric.realized_volatility_20, "percent"],
+      ["Maximum drawdown (20)", metric.max_drawdown_20, "percent"],
+      ["Available sessions", metric.available_session_count],
+      [
+        "Required sessions (return / SMA20 / SMA60 / risk)",
+        [
+          metric.latest_return_required_sessions,
+          metric.sma20_required_sessions,
+          metric.sma60_required_sessions,
+          metric.risk_required_sessions
+        ].join(" / ")
+      ]
+    ]);
+    article.append(list);
+    metricsContainer.append(article);
+  }
+  appendDataRows(document.getElementById("benchmark-provenance"), [
+    ["Benchmark series key", provenance.series_key],
+    ["Benchmark ingestion run", provenance.ingestion_run_id],
+    ["Provider / source", String(provenance.provider || "") + " / " + String(provenance.source || "")],
+    ["Endpoint", provenance.endpoint],
+    ["Contract / adapter", String(provenance.contract_version || "") + " / " + String(provenance.adapter_version || "")],
+    ["Adapter compatibility", provenance.adapter_compatibility_version],
+    ["Frequency", provenance.frequency],
+    ["Exact codes", (provenance.index_codes || []).join(", ")],
+    ["Requested date range", String(provenance.requested_start_date || "") + " to " + String(provenance.requested_end_date || "")],
+    ["Requested historical cutoff", provenance.requested_as_of_cutoff],
+    ["Collected UTC", provenance.collection_timestamp_utc],
+    ["Imported UTC", provenance.ingestion_imported_at_utc],
+    ["Completed UTC", provenance.ingestion_completed_at_utc],
+    ["AKShare package", provenance.akshare_package_version],
+    ["Network mode", provenance.network_mode],
+    ["Timeout seconds", provenance.timeout_seconds],
+    ["Max retries", provenance.max_retries],
+    ["View generated UTC", provenance.generated_at_utc]
+  ]);
+  renderList(
+    document.getElementById("benchmark-warnings"),
+    context.warnings || [],
+    "No benchmark alignment or window warnings."
+  );
+}
+
 function renderLatestDiagnostics(payload) {
   const diagnostics = payload.latest_data_diagnostics || {};
   renderMetrics(document.getElementById("diagnostic-summary"), [
@@ -170,6 +255,7 @@ function renderSnapshot(payload) {
   ]);
   renderLatestDiagnostics(payload);
   renderProvenance(payload);
+  renderBenchmarkContext(payload);
   renderList(document.getElementById("warnings"), payload.warnings, "No completeness warnings for this snapshot.");
   renderList(
     document.getElementById("unsupported"),
@@ -192,7 +278,7 @@ async function loadMarketCockpit() {
   const seriesKey = params.get("series_key");
   if (!seriesKey) {
     status.textContent = "No series selected.";
-    error.textContent = "Open this page with ?series_key=<64-character series key> and optional &as_of_cutoff=YYYYMMDD.";
+    error.textContent = "Open this page with ?series_key=<64-character equity series key>, optional &benchmark_series_key=<64-character benchmark series key>, and optional &as_of_cutoff=YYYYMMDD.";
     error.hidden = false;
     return;
   }
@@ -200,6 +286,10 @@ async function loadMarketCockpit() {
   const cutoff = params.get("as_of_cutoff");
   if (cutoff) {
     apiParams.set("as_of_cutoff", cutoff);
+  }
+  const benchmarkSeriesKey = params.get("benchmark_series_key");
+  if (benchmarkSeriesKey) {
+    apiParams.set("benchmark_series_key", benchmarkSeriesKey);
   }
   try {
     const response = await fetch("/market-cockpit/snapshot?" + apiParams.toString(), {

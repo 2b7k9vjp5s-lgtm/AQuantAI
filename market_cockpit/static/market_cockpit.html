@@ -66,6 +66,18 @@
         <div id="provenance" class="data-list"></div>
       </section>
 
+      <section aria-labelledby="benchmark-heading">
+        <p class="section-kicker">Separate series, provider-attributed context</p>
+        <h2 id="benchmark-heading">Benchmark index context</h2>
+        <p id="benchmark-status">No benchmark series selected. Add an explicit <code>benchmark_series_key</code> to inspect bounded provider-attributed context.</p>
+        <div id="benchmark-summary" class="metric-grid"></div>
+        <div id="benchmark-metrics" class="benchmark-grid"></div>
+        <h3>Benchmark provenance</h3>
+        <div id="benchmark-provenance" class="data-list"></div>
+        <h3>Benchmark warnings</h3>
+        <div id="benchmark-warnings"></div>
+      </section>
+
       <section class="two-column" aria-label="Data quality and limitations">
         <div>
           <p class="section-kicker">Completeness</p>
@@ -73,7 +85,7 @@
           <div id="warnings"></div>
         </div>
         <div>
-          <p class="section-kicker">Not supported in v0.4A</p>
+          <p class="section-kicker">Not supported in v0.4A; still unsupported in v0.4B</p>
           <h2>Unsupported sections</h2>
           <div id="unsupported"></div>
         </div>
@@ -88,8 +100,9 @@
           <li>20/60-session metrics require every close in the full persisted calendar window.</li>
           <li>Participation compares the current value with the median of the prior 20 sessions.</li>
           <li>Risk uses 20 complete selected-universe equal-weight returns and annualizes volatility by square root of 252.</li>
+          <li>Benchmark context uses its own explicit series. Latest return needs 2 closes, SMA needs exactly 20/60 closes, and volatility/drawdown need exactly 21 closes.</li>
         </ul>
-        <p>Repository formula reference: <code>docs/market_cockpit.md</code></p>
+        <p>Formula references: <code>docs/market_cockpit.md</code> and <code>docs/benchmark_context.md</code></p>
       </section>
     </main>
     <footer class="site-footer">
