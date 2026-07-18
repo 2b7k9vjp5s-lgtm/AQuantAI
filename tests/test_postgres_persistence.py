@@ -17,12 +17,15 @@ from backend.database.engine import build_engine, build_session_factory
 import backend.database.market_data as market_data_module
 from backend.database.market_data import FAILED, MarketDataPersistenceService, MarketDataRepository, MarketDataValidationError
 from backend.database.benchmark_data import BenchmarkPersistenceService
+from backend.database.sector_data import SectorPersistenceService
 from backend.database.models import (
     BenchmarkIndexDailyRecord,
     DailyPriceRecord,
     IngestionRun,
     StockBasicRecord,
     TradeCalendarRecord,
+    SectorDailyRecord,
+    SectorDefinitionRecord,
 )
 from datasource.base import MarketDataBundle
 from datasource.fixtures import (
@@ -53,6 +56,16 @@ from market_cockpit.benchmark_fixtures import (
     build_benchmark_fixture,
 )
 from market_cockpit.benchmark_repository import BenchmarkRepository
+from market_cockpit.sector_fixtures import (
+    SECTOR_FIXTURE_CURRENT_CUTOFF,
+    SECTOR_FIXTURE_END_DATE,
+    SECTOR_FIXTURE_HISTORICAL_CUTOFF,
+    SECTOR_FIXTURE_PROVIDER,
+    SECTOR_FIXTURE_SCOPE,
+    SECTOR_FIXTURE_START_DATE,
+    build_sector_fixture,
+)
+from market_cockpit.sector_repository import SectorRepository
 from market_cockpit.repository import MarketCockpitRepository, MarketCockpitSelectionError
 from market_cockpit.service import MarketCockpitService
 
@@ -81,7 +94,7 @@ def clean_postgres_tables(postgres_database_url: str) -> Iterator[None]:
         with engine.begin() as connection:
             connection.execute(
                 text(
-                    "TRUNCATE TABLE benchmark_index_daily, trade_calendar, daily_price, stock_basic, ingestion_runs "
+                    "TRUNCATE TABLE sector_daily, sector_definition, benchmark_index_daily, trade_calendar, daily_price, stock_basic, ingestion_runs "
                     "RESTART IDENTITY CASCADE"
                 )
             )
@@ -124,7 +137,52 @@ def test_clean_postgres_migration_creates_expected_tables(postgres_database_url:
         "daily_price",
         "trade_calendar",
         "benchmark_index_daily",
+        "sector_definition",
+        "sector_daily",
     } <= tables
+
+
+def test_postgres_sector_idempotency_and_current_as_of_selection(
+    postgres_database_url: str,
+) -> None:
+    engine = build_engine(postgres_database_url)
+    session_factory = build_session_factory(engine)
+    service = SectorPersistenceService(session_factory)
+
+    def ingest(revision: str, cutoff: str):
+        return service.ingest_bundle(
+            build_sector_fixture(revision=revision),
+            provider=SECTOR_FIXTURE_PROVIDER,
+            requested_start_date=SECTOR_FIXTURE_START_DATE,
+            requested_end_date=SECTOR_FIXTURE_END_DATE,
+            information_cutoff_date=cutoff,
+            requested_scope=SECTOR_FIXTURE_SCOPE,
+            taxonomy_endpoint="fixture_sector_taxonomy",
+            history_endpoint="fixture_sector_history",
+            adapter_compatibility_version="sector-fixture-v1",
+            adapter_version="sector-fixture-v1",
+        )
+
+    try:
+        historical = ingest("historical", SECTOR_FIXTURE_HISTORICAL_CUTOFF)
+        current = ingest("current", SECTOR_FIXTURE_CURRENT_CUTOFF)
+        repeated = ingest("current", SECTOR_FIXTURE_CURRENT_CUTOFF)
+        assert historical.series_key == current.series_key == repeated.series_key
+        assert repeated.ingestion_run_id == current.ingestion_run_id
+        assert repeated.rows_written == 0 and repeated.idempotent is True
+        with session_factory() as session:
+            repository = SectorRepository(session)
+            current_snapshot = repository.load_snapshot(series_key=current.series_key)
+            historical_snapshot = repository.load_snapshot(
+                series_key=current.series_key,
+                as_of_cutoff=SECTOR_FIXTURE_HISTORICAL_CUTOFF,
+            )
+            assert current_snapshot.ingestion_run_id == current.ingestion_run_id
+            assert historical_snapshot.ingestion_run_id == historical.ingestion_run_id
+            assert session.scalar(select(func.count()).select_from(SectorDefinitionRecord)) == 4
+            assert session.scalar(select(func.count()).select_from(SectorDailyRecord)) == 260
+    finally:
+        engine.dispose()
 
 
 def test_postgres_benchmark_idempotency_constraints_and_cutoff_selection(

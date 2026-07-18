@@ -134,3 +134,9 @@ The page and API are read-only, research-only, and non-advisory. v0.4A adds no c
 v0.4B preserves every equity calculation and selector above. A caller may additionally provide an explicit `benchmark_series_key`. The benchmark repository independently selects one successful complete benchmark run and bounds its rows by requested cutoff and the equity effective session. The response adds `benchmark_context`; without the key it is `null` and the equity-only payload remains compatible.
 
 Benchmark context is provider-attributed, not an official exchange statement or a full-market claim. It exposes exact codes, separate series/run/cutoff/provenance, alignment status, latest close/return, SMA20/SMA60 position, 20-return sample volatility and drawdown, counts, and warnings. It does not calculate beta, alpha, correlation, excess return, relative strength, timing signals, or recommendations. See [benchmark_context.md](benchmark_context.md) for the complete contract.
+
+## Optional v0.4C Sector Context
+
+v0.4C adds an independently selected `sector_series_key`. The sector repository selects one complete physical snapshot and uses this selected equity snapshot's persisted open-session calendar for exact latest, 5-session, 20-session, SMA20-distance, volatility, and drawdown windows. Cross-sectional output is limited to transparent counts, shares, and deterministic top/bottom lists over the exact requested stable `BK` code scope.
+
+Without a sector key, `sector_context` is `null` and all accepted equity-only and equity-plus-benchmark responses remain compatible. Sector output is Eastmoney-provider-attributed, selected-scope, non-official, descriptive, read-only, and non-advisory. It contains no constituents, company beneficiaries, Industry Alpha conclusions, scores, signals, recommendations, or trading behavior. See [sector_context.md](sector_context.md).

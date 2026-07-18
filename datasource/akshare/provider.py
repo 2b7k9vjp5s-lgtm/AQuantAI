@@ -14,12 +14,15 @@ import pandas as pd
 from datasource.base import (
     BENCHMARK_INDEX_DAILY_COLUMNS,
     DAILY_PRICE_COLUMNS,
+    SECTOR_DAILY_COLUMNS,
+    SECTOR_DEFINITION_COLUMNS,
     STOCK_BASIC_COLUMNS,
     TRADE_CALENDAR_COLUMNS,
     AdjustType,
     BenchmarkIndexBundle,
     DataProvider,
     MarketDataBundle,
+    SectorMarketBundle,
 )
 
 ADAPTER_VERSION = "akshare-normalizer-v1"
@@ -28,14 +31,20 @@ STOCK_BASIC_ENDPOINT = "stock_info_a_code_name"
 DAILY_PRICE_ENDPOINT = "stock_zh_a_hist"
 TRADE_CALENDAR_ENDPOINT = "tool_trade_date_hist_sina"
 BENCHMARK_INDEX_ENDPOINT = "index_zh_a_hist"
+SECTOR_TAXONOMY_ENDPOINT = "stock_board_industry_name_em"
+SECTOR_HISTORY_ENDPOINT = "stock_board_industry_hist_em"
+SECTOR_CLASSIFICATION_SYSTEM = "eastmoney_industry_board"
 ALLOWED_ENDPOINTS = {
     STOCK_BASIC_ENDPOINT,
     DAILY_PRICE_ENDPOINT,
     TRADE_CALENDAR_ENDPOINT,
     BENCHMARK_INDEX_ENDPOINT,
+    SECTOR_TAXONOMY_ENDPOINT,
+    SECTOR_HISTORY_ENDPOINT,
 }
 MAX_STOCK_CODES_PER_REQUEST = 50
 MAX_BENCHMARK_CODES_PER_REQUEST = 20
+MAX_SECTOR_CODES_PER_REQUEST = 30
 MIN_AKSHARE_VERSION = (1, 16, 0)
 MAX_AKSHARE_VERSION_EXCLUSIVE = (2, 0, 0)
 
@@ -49,6 +58,9 @@ RAW_LOW = "\u6700\u4f4e"
 RAW_CLOSE = "\u6536\u76d8"
 RAW_VOLUME = "\u6210\u4ea4\u91cf"
 RAW_AMOUNT = "\u6210\u4ea4\u989d"
+RAW_SECTOR_CODE = "\u677f\u5757\u4ee3\u7801"
+RAW_SECTOR_NAME = "\u677f\u5757\u540d\u79f0"
+RAW_TURNOVER_RATE = "\u6362\u624b\u7387"
 
 
 class AkshareProviderError(RuntimeError):
@@ -432,6 +444,153 @@ class AkshareDataProvider(DataProvider):
             "max_retries": self.max_retries,
             "akshare_package_version": self.akshare_package_version,
             "contract_version": contract_version,
+            "adapter_version": ADAPTER_VERSION,
+            "adapter_compatibility_version": adapter_compatibility_version,
+        }
+
+    def get_sector_market_bundle(
+        self,
+        sector_codes: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> SectorMarketBundle:
+        """Normalize one exact stable-code Eastmoney industry-board snapshot."""
+        normalized_codes = sorted({str(value).strip().upper() for value in sector_codes})
+        if not normalized_codes or len(normalized_codes) != len(sector_codes):
+            raise AkshareProviderError(
+                "sector_codes must be a non-empty list without duplicates."
+            )
+        if len(normalized_codes) > MAX_SECTOR_CODES_PER_REQUEST:
+            raise AkshareProviderError(
+                f"At most {MAX_SECTOR_CODES_PER_REQUEST} sector codes are allowed."
+            )
+        if any(re.fullmatch(r"BK[0-9]+", code) is None for code in normalized_codes):
+            raise AkshareProviderError(
+                "Every sector code must be a stable Eastmoney BK identifier."
+            )
+        taxonomy = self._call(SECTOR_TAXONOMY_ENDPOINT)
+        _require_frame(taxonomy, SECTOR_TAXONOMY_ENDPOINT)
+        _require_columns(
+            taxonomy,
+            [RAW_SECTOR_CODE, RAW_SECTOR_NAME],
+            SECTOR_TAXONOMY_ENDPOINT,
+        )
+        definitions = taxonomy.rename(
+            columns={RAW_SECTOR_CODE: "sector_code", RAW_SECTOR_NAME: "sector_name"}
+        ).copy()
+        definitions["sector_code"] = definitions["sector_code"].astype(str).str.strip().str.upper()
+        definitions = definitions.loc[
+            definitions["sector_code"].isin(normalized_codes)
+        ].copy()
+        if definitions.duplicated(["sector_code"]).any():
+            raise AkshareProviderError(
+                "AKShare sector taxonomy returned duplicate stable identifiers."
+            )
+        missing = sorted(set(normalized_codes) - set(definitions["sector_code"]))
+        if missing:
+            raise AkshareProviderError(
+                f"AKShare sector taxonomy did not contain requested codes: {missing}."
+            )
+        definitions = _ensure_columns(
+            definitions,
+            SECTOR_DEFINITION_COLUMNS,
+            defaults={
+                "source": self.source_name,
+                "classification_system": SECTOR_CLASSIFICATION_SYSTEM,
+                "classification_level": pd.NA,
+                "parent_sector_code": pd.NA,
+                "parent_sector_name": pd.NA,
+            },
+        )
+        definitions["source"] = self.source_name
+        definitions["classification_system"] = SECTOR_CLASSIFICATION_SYSTEM
+
+        frames: list[pd.DataFrame] = []
+        for code in normalized_codes:
+            raw = self._call(
+                SECTOR_HISTORY_ENDPOINT,
+                symbol=code,
+                start_date=_compact_date(start_date),
+                end_date=_compact_date(end_date),
+                period="\u65e5k",
+                adjust="",
+            )
+            _require_frame(raw, SECTOR_HISTORY_ENDPOINT)
+            _require_columns(raw, [RAW_DATE, RAW_CLOSE], SECTOR_HISTORY_ENDPOINT)
+            frame = raw.rename(
+                columns={
+                    RAW_DATE: "trade_date",
+                    RAW_OPEN: "open",
+                    RAW_HIGH: "high",
+                    RAW_LOW: "low",
+                    RAW_CLOSE: "close",
+                    RAW_VOLUME: "volume",
+                    RAW_AMOUNT: "amount",
+                    RAW_TURNOVER_RATE: "turnover_rate",
+                }
+            )
+            frame = _ensure_columns(
+                frame,
+                SECTOR_DAILY_COLUMNS,
+                defaults={
+                    "source": self.source_name,
+                    "sector_code": code,
+                    "open": pd.NA,
+                    "high": pd.NA,
+                    "low": pd.NA,
+                    "volume": pd.NA,
+                    "amount": pd.NA,
+                    "turnover_rate": pd.NA,
+                },
+            )
+            frame["source"] = self.source_name
+            frame["sector_code"] = code
+            frame["trade_date"] = _normalize_date(frame["trade_date"])
+            frame = frame.loc[
+                frame["trade_date"].between(
+                    _compact_date(start_date), _compact_date(end_date)
+                )
+            ]
+            frames.append(frame[SECTOR_DAILY_COLUMNS])
+        daily = (
+            pd.concat(frames, ignore_index=True)
+            if frames
+            else _empty_frame(SECTOR_DAILY_COLUMNS)
+        )
+        return SectorMarketBundle(
+            sector_definition=definitions[SECTOR_DEFINITION_COLUMNS]
+            .sort_values("sector_code")
+            .reset_index(drop=True),
+            sector_daily=daily.reset_index(drop=True),
+        )
+
+    def sector_request_metadata(
+        self,
+        *,
+        sector_codes: list[str],
+        start_date: str,
+        end_date: str,
+        network_mode: str,
+        definition_contract_version: str,
+        daily_contract_version: str,
+        adapter_compatibility_version: str,
+    ) -> dict[str, Any]:
+        return {
+            "taxonomy_endpoint": SECTOR_TAXONOMY_ENDPOINT,
+            "history_endpoint": SECTOR_HISTORY_ENDPOINT,
+            "classification_system": SECTOR_CLASSIFICATION_SYSTEM,
+            "classification_level": None,
+            "frequency": "daily",
+            "adjust_type": "",
+            "sector_codes": sorted(sector_codes),
+            "start_date": _compact_date(start_date),
+            "end_date": _compact_date(end_date),
+            "network_mode": network_mode,
+            "timeout_seconds": self.request_timeout_seconds,
+            "max_retries": self.max_retries,
+            "akshare_package_version": self.akshare_package_version,
+            "definition_contract_version": definition_contract_version,
+            "daily_contract_version": daily_contract_version,
             "adapter_version": ADAPTER_VERSION,
             "adapter_compatibility_version": adapter_compatibility_version,
         }

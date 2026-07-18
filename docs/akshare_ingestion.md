@@ -4,6 +4,10 @@ v0.3B provides one manually invoked adapter from AKShare responses to the existi
 
 v0.4B adds a separate bounded benchmark command using only `index_zh_a_hist`. Its rows, canonical identity, persistence table, and Market Cockpit context remain separate from the equity bundle. There is no silent endpoint fallback; see [benchmark_context.md](benchmark_context.md).
 
+v0.4C adds a separate bounded sector command using only `stock_board_industry_name_em` for stable Eastmoney `BK` identifiers and `stock_board_industry_hist_em` for exact-code bounded history. It has no display-name selector or endpoint fallback; see [sector_context.md](sector_context.md).
+
+The sector taxonomy endpoint has no historical date selector. Live taxonomy names and classification metadata are collection-time observations and cannot reconstruct historical taxonomy membership or naming.
+
 ## Snapshot-Series Identity
 
 A canonical series key is the SHA-256 hash of stable JSON containing:

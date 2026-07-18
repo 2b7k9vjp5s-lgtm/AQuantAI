@@ -200,6 +200,129 @@ function renderBenchmarkContext(payload) {
   );
 }
 
+function rankedSectorList(title, values) {
+  const section = createElement("div");
+  section.append(createElement("h4", title));
+  const list = document.createElement("ol");
+  for (const item of values || []) {
+    list.append(createElement(
+      "li",
+      String(item.sector_code) + " " + String(item.sector_name) + ": " + formatValue(item.value, "percent")
+    ));
+  }
+  if (!values || values.length === 0) {
+    section.append(createElement("p", "Unavailable", "empty-state"));
+  } else {
+    section.append(list);
+  }
+  return section;
+}
+
+function renderSectorContext(payload) {
+  const context = payload.sector_context;
+  const status = document.getElementById("sector-status");
+  const metricsContainer = document.getElementById("sector-metrics");
+  const rankings = document.getElementById("sector-rankings");
+  if (!context) {
+    status.textContent = "Sector context unavailable: no explicit sector series key was supplied. Equity and benchmark monitoring remain unchanged.";
+    renderMetrics(document.getElementById("sector-summary"), []);
+    renderMetrics(document.getElementById("sector-cross-section"), []);
+    rankings.replaceChildren();
+    metricsContainer.replaceChildren();
+    appendDataRows(document.getElementById("sector-provenance"), []);
+    renderList(document.getElementById("sector-warnings"), [], "No sector series was requested.");
+    return;
+  }
+  const provenance = context.provenance || {};
+  const cross = context.cross_section || {};
+  status.textContent = "Showing provider-attributed selected-sector context from one separate complete snapshot. It is descriptive, non-official, read-only, and non-advisory.";
+  renderMetrics(document.getElementById("sector-summary"), [
+    ["Requested sectors", context.requested_sector_count],
+    ["Available sectors", context.available_sector_count],
+    ["Sectors aligned to equity session", context.aligned_sector_count],
+    ["Scope coverage", context.coverage_status],
+    ["Overall alignment", context.alignment_status],
+    ["Session alignment", context.session_alignment_status],
+    ["Cutoff alignment", context.cutoff_alignment_status],
+    ["Effective sector session", provenance.effective_sector_session],
+    ["Expected persisted sessions", context.expected_session_count]
+  ]);
+  renderMetrics(document.getElementById("sector-cross-section"), [
+    ["Valid latest returns", cross.valid_latest_return_count],
+    ["Positive latest returns", cross.positive_latest_return_count],
+    ["Positive latest-return share", cross.positive_latest_return_share, "percent"],
+    ["Valid SMA20 values", cross.valid_sma20_count],
+    ["Above SMA20", cross.above_sma20_count],
+    ["Above-SMA20 share", cross.above_sma20_share, "percent"]
+  ]);
+  rankings.replaceChildren(
+    rankedSectorList("Top latest-session return", cross.top_latest_return),
+    rankedSectorList("Bottom latest-session return", cross.bottom_latest_return),
+    rankedSectorList("Top 20-session return", cross.top_return_20),
+    rankedSectorList("Bottom 20-session return", cross.bottom_return_20)
+  );
+  metricsContainer.replaceChildren();
+  for (const metric of context.metrics || []) {
+    const article = createElement("article", null, "benchmark-item");
+    article.append(createElement("h3", String(metric.sector_code) + " " + String(metric.sector_name)));
+    const list = createElement("dl", null, "data-list");
+    appendDataRows(list, [
+      ["Latest close", metric.latest_close],
+      ["Latest session", metric.latest_session],
+      ["Latest return", metric.latest_return, "percent"],
+      ["Five-session return", metric.return_5, "percent"],
+      ["Twenty-session return", metric.return_20, "percent"],
+      ["SMA20", metric.sma20],
+      ["SMA20 distance", metric.sma20_distance, "percent"],
+      ["Above SMA20", metric.above_sma20],
+      ["Realized volatility (20)", metric.realized_volatility_20, "percent"],
+      ["Maximum drawdown (20)", metric.max_drawdown_20, "percent"],
+      ["Available sessions", metric.available_session_count],
+      ["Latest-return window", formatBenchmarkWindow(metric.latest_return_window)],
+      ["Five-session window", formatBenchmarkWindow(metric.return_5_window)],
+      ["Twenty-session window", formatBenchmarkWindow(metric.return_20_window)],
+      ["SMA20 window", formatBenchmarkWindow(metric.sma20_window)],
+      ["Risk window", formatBenchmarkWindow(metric.risk_window)]
+    ]);
+    article.append(list);
+    metricsContainer.append(article);
+  }
+  appendDataRows(document.getElementById("sector-provenance"), [
+    ["Sector series key", provenance.series_key],
+    ["Sector ingestion run", provenance.ingestion_run_id],
+    ["Provider / source", String(provenance.provider || "") + " / " + String(provenance.source || "")],
+    ["Taxonomy endpoint", provenance.taxonomy_endpoint],
+    ["History endpoint", provenance.history_endpoint],
+    ["Taxonomy", provenance.taxonomy],
+    ["Classification level", provenance.classification_level],
+    ["Definition / daily contracts", String(provenance.definition_contract_version || "") + " / " + String(provenance.daily_contract_version || "")],
+    ["Adapter / compatibility", String(provenance.adapter_version || "") + " / " + String(provenance.adapter_compatibility_version || "")],
+    ["Exact stable sector codes", (provenance.sector_codes || []).join(", ")],
+    ["Requested date range", String(provenance.requested_start_date || "") + " to " + String(provenance.requested_end_date || "")],
+    ["Requested historical cutoff", provenance.requested_as_of_cutoff],
+    ["Equity information cutoff", context.equity_information_cutoff_date],
+    ["Sector information cutoff", context.sector_information_cutoff_date],
+    ["Equity effective session", context.equity_effective_session],
+    ["Missing exact sector codes", (context.missing_sector_codes || []).join(", ") || "None"],
+    ["Expected-session source", context.expected_session_source],
+    ["Expected-session range", String(context.expected_session_start || "") + " to " + String(context.expected_session_end || "")],
+    ["Frequency / adjustment", String(provenance.frequency || "") + " / " + (provenance.adjust_type || "unadjusted")],
+    ["Collected UTC", provenance.collection_timestamp_utc],
+    ["Imported UTC", provenance.ingestion_imported_at_utc],
+    ["Completed UTC", provenance.ingestion_completed_at_utc],
+    ["AKShare package", provenance.akshare_package_version],
+    ["Network mode", provenance.network_mode],
+    ["Timeout seconds", provenance.timeout_seconds],
+    ["Max retries", provenance.max_retries],
+    ["View generated UTC", provenance.generated_at_utc]
+  ]);
+  renderList(
+    document.getElementById("sector-warnings"),
+    context.warnings || [],
+    "No sector alignment or exact-window warnings."
+  );
+}
+
 function renderLatestDiagnostics(payload) {
   const diagnostics = payload.latest_data_diagnostics || {};
   renderMetrics(document.getElementById("diagnostic-summary"), [
@@ -281,6 +404,7 @@ function renderSnapshot(payload) {
   renderLatestDiagnostics(payload);
   renderProvenance(payload);
   renderBenchmarkContext(payload);
+  renderSectorContext(payload);
   renderList(document.getElementById("warnings"), payload.warnings, "No completeness warnings for this snapshot.");
   renderList(
     document.getElementById("unsupported"),
@@ -303,7 +427,7 @@ async function loadMarketCockpit() {
   const seriesKey = params.get("series_key");
   if (!seriesKey) {
     status.textContent = "No series selected.";
-    error.textContent = "Open this page with ?series_key=<64-character equity series key>, optional &benchmark_series_key=<64-character benchmark series key>, and optional &as_of_cutoff=YYYYMMDD.";
+    error.textContent = "Open this page with ?series_key=<64-character equity series key>, optional &benchmark_series_key=<64-character benchmark series key>, optional &sector_series_key=<64-character sector series key>, and optional &as_of_cutoff=YYYYMMDD.";
     error.hidden = false;
     return;
   }
@@ -315,6 +439,10 @@ async function loadMarketCockpit() {
   const benchmarkSeriesKey = params.get("benchmark_series_key");
   if (benchmarkSeriesKey) {
     apiParams.set("benchmark_series_key", benchmarkSeriesKey);
+  }
+  const sectorSeriesKey = params.get("sector_series_key");
+  if (sectorSeriesKey) {
+    apiParams.set("sector_series_key", sectorSeriesKey);
   }
   try {
     const response = await fetch("/market-cockpit/snapshot?" + apiParams.toString(), {

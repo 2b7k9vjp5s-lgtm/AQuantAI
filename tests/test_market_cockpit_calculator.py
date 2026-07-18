@@ -296,7 +296,8 @@ def test_same_input_and_clock_produce_identical_service_output() -> None:
     assert first["completeness_status"] == "partial"
     assert "do not imply representative" in first["warnings"][-1]
     assert first["read_only"] is True
-    assert len(first["unsupported_sections"]) == 5
+    assert len(first["unsupported_sections"]) == 4
+    assert first["sector_context"] is None
 
 
 def test_no_trade_latest_is_not_counted_as_unchanged_or_participating() -> None:
