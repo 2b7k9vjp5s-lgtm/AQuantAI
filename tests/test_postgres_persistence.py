@@ -67,14 +67,18 @@ def _ingest(
     *,
     cutoff: str = FIXTURE_CUTOFF_DATE,
     scope: dict | None = None,
+    start_date: str = FIXTURE_START_DATE,
+    end_date: str = FIXTURE_END_DATE,
+    adjust_type: str | None = None,
 ):
     return service.ingest_bundle(
         bundle or build_market_data_fixture(),
         provider=FIXTURE_PROVIDER,
-        requested_start_date=FIXTURE_START_DATE,
-        requested_end_date=FIXTURE_END_DATE,
+        requested_start_date=start_date,
+        requested_end_date=end_date,
         information_cutoff_date=cutoff,
         requested_scope=scope or FIXTURE_SCOPE,
+        adjust_type=adjust_type,
     )
 
 
@@ -99,7 +103,12 @@ def test_postgres_fixture_import_constraints_and_idempotency(postgres_database_u
         assert second.ingestion_run_id == first.ingestion_run_id
 
         with session_factory() as session:
-            assert len(MarketDataRepository(session).read_daily_price(FIXTURE_PROVIDER)) == 4
+            assert len(
+                MarketDataRepository(session).read_daily_price(
+                    FIXTURE_PROVIDER,
+                    series_key=first.series_key,
+                )
+            ) == 4
             run = session.get(IngestionRun, first.ingestion_run_id)
             assert run is not None
             duplicate = StockBasicRecord(
@@ -150,8 +159,12 @@ def test_postgres_cutoff_completion_and_run_id_version_order(postgres_database_u
 
         with session_factory() as session:
             repository = MarketDataRepository(session)
-            current = repository.read_stock_basic(FIXTURE_PROVIDER)
-            historical = repository.read_stock_basic(FIXTURE_PROVIDER, as_of_cutoff="20260709")
+            current = repository.read_stock_basic(FIXTURE_PROVIDER, series_key=high.series_key)
+            historical = repository.read_stock_basic(
+                FIXTURE_PROVIDER,
+                series_key=high.series_key,
+                as_of_cutoff="20260709",
+            )
         assert current.loc[current["stock_code"] == "000001", "stock_name"].item() == "Cutoff 20260710"
         assert historical.loc[historical["stock_code"] == "000001", "stock_name"].item() == (
             "Cutoff 20260709 imported later"
@@ -168,8 +181,55 @@ def test_postgres_cutoff_completion_and_run_id_version_order(postgres_database_u
             high_run.completed_at = tied_completion
             revision_run.completed_at = tied_completion
         with session_factory() as session:
-            current = MarketDataRepository(session).read_stock_basic(FIXTURE_PROVIDER)
+            current = MarketDataRepository(session).read_stock_basic(
+                FIXTURE_PROVIDER,
+                series_key=high.series_key,
+            )
         assert current.loc[current["stock_code"] == "000001", "stock_name"].item() == "Same-cutoff revision"
+    finally:
+        engine.dispose()
+
+
+def test_postgres_incompatible_scope_date_and_adjustment_series_are_isolated(
+    postgres_database_url: str,
+) -> None:
+    engine = build_engine(postgres_database_url)
+    session_factory = build_session_factory(engine)
+    service = MarketDataPersistenceService(session_factory)
+    try:
+        full = _ingest(service)
+        fixture = build_market_data_fixture()
+        one_stock = MarketDataBundle(
+            stock_basic=fixture.stock_basic.loc[fixture.stock_basic["stock_code"] == "000001"].copy(),
+            daily_price=fixture.daily_price.loc[fixture.daily_price["stock_code"] == "000001"].copy(),
+            trade_calendar=fixture.trade_calendar.copy(),
+        )
+        one_stock_result = _ingest(
+            service,
+            one_stock,
+            scope={"datasets": list(FIXTURE_SCOPE["datasets"]), "stock_codes": ["000001"]},
+        )
+        one_day = MarketDataBundle(
+            stock_basic=fixture.stock_basic.copy(),
+            daily_price=fixture.daily_price.loc[fixture.daily_price["trade_date"] == "20260709"].copy(),
+            trade_calendar=fixture.trade_calendar.loc[fixture.trade_calendar["trade_date"] == "20260709"].copy(),
+        )
+        one_day_result = _ingest(service, one_day, start_date="20260709", end_date="20260709")
+        qfq = build_market_data_fixture()
+        qfq.daily_price.loc[:, "adjust_type"] = "qfq"
+        qfq_result = _ingest(service, qfq, adjust_type="qfq")
+
+        assert len({full.series_key, one_stock_result.series_key, one_day_result.series_key, qfq_result.series_key}) == 4
+        with session_factory() as session:
+            repository = MarketDataRepository(session)
+            assert len(repository.read_stock_basic(FIXTURE_PROVIDER, series_key=full.series_key)) == 2
+            assert len(
+                repository.read_stock_basic(FIXTURE_PROVIDER, series_key=one_stock_result.series_key)
+            ) == 1
+            assert len(repository.read_daily_price(FIXTURE_PROVIDER, series_key=one_day_result.series_key)) == 2
+            assert set(
+                repository.read_daily_price(FIXTURE_PROVIDER, series_key=qfq_result.series_key)["adjust_type"]
+            ) == {"qfq"}
     finally:
         engine.dispose()
 
@@ -216,8 +276,8 @@ def test_postgres_concurrent_identical_batch_has_one_successful_version(
     both_initial_checks_complete = Barrier(2)
     thread_state = local()
 
-    def synchronized_initial_find(self, batch_identifier):
-        result = original_find(self, batch_identifier)
+    def synchronized_initial_find(self, batch_identifier, series_key):
+        result = original_find(self, batch_identifier, series_key)
         if not getattr(thread_state, "initial_check_complete", False):
             thread_state.initial_check_complete = True
             both_initial_checks_complete.wait(timeout=10)

@@ -17,9 +17,11 @@ from backend.database.market_data import (
     FAILED,
     MarketDataPersistenceService,
     MarketDataRepository,
+    MarketDataSeriesSelectionError,
     MarketDataValidationError,
 )
 from backend.database.models import Base, DailyPriceRecord, IngestionRun, StockBasicRecord, TradeCalendarRecord
+from backend.database.series import SnapshotSeriesIdentity
 from datasource.base import DAILY_PRICE_COLUMNS, STOCK_BASIC_COLUMNS, TRADE_CALENDAR_COLUMNS, MarketDataBundle
 from datasource.fixtures import (
     FIXTURE_CUTOFF_DATE,
@@ -53,14 +55,20 @@ def _ingest(
     *,
     cutoff: str = FIXTURE_CUTOFF_DATE,
     scope: dict | None = None,
+    start_date: str = FIXTURE_START_DATE,
+    end_date: str = FIXTURE_END_DATE,
+    adjust_type: str | None = None,
+    compatibility_parameters: dict | None = None,
 ):
     return MarketDataPersistenceService(session_factory).ingest_bundle(
         bundle or build_market_data_fixture(),
         provider=FIXTURE_PROVIDER,
-        requested_start_date=FIXTURE_START_DATE,
-        requested_end_date=FIXTURE_END_DATE,
+        requested_start_date=start_date,
+        requested_end_date=end_date,
         information_cutoff_date=cutoff,
         requested_scope=scope or FIXTURE_SCOPE,
+        adjust_type=adjust_type,
+        compatibility_parameters=compatibility_parameters,
     )
 
 
@@ -80,9 +88,9 @@ def test_fixture_import_reconstructs_normalized_contracts_in_deterministic_order
     assert result.rows_written == 8
     with session_factory() as session:
         repository = MarketDataRepository(session)
-        stock_basic = repository.read_stock_basic(FIXTURE_PROVIDER)
-        daily_price = repository.read_daily_price(FIXTURE_PROVIDER)
-        trade_calendar = repository.read_trade_calendar(FIXTURE_PROVIDER)
+        stock_basic = repository.read_stock_basic(FIXTURE_PROVIDER, series_key=result.series_key)
+        daily_price = repository.read_daily_price(FIXTURE_PROVIDER, series_key=result.series_key)
+        trade_calendar = repository.read_trade_calendar(FIXTURE_PROVIDER, series_key=result.series_key)
 
     assert list(stock_basic.columns) == STOCK_BASIC_COLUMNS
     assert stock_basic["stock_code"].tolist() == ["000001", "600000"]
@@ -123,6 +131,10 @@ def test_ingestion_run_tracks_scope_cutoff_contract_and_counts(database) -> None
         run = session.get(IngestionRun, result.ingestion_run_id)
         assert run is not None
         assert run.provider == FIXTURE_PROVIDER
+        assert run.series_key == result.series_key
+        assert run.series_identity["adjust_type"] == ""
+        assert run.provider_request_metadata == {}
+        assert run.adapter_version == "normalized-contract-v1"
         assert run.dataset == "market_data_bundle"
         assert run.information_cutoff_date.strftime("%Y%m%d") == FIXTURE_CUTOFF_DATE
         assert run.requested_scope == {
@@ -244,8 +256,12 @@ def test_cutoff_then_completion_then_run_id_selects_current_and_as_of_versions(d
 
     with session_factory() as session:
         repository = MarketDataRepository(session)
-        current = repository.read_stock_basic(FIXTURE_PROVIDER)
-        historical = repository.read_stock_basic(FIXTURE_PROVIDER, as_of_cutoff="20260709")
+        current = repository.read_stock_basic(FIXTURE_PROVIDER, series_key=high.series_key)
+        historical = repository.read_stock_basic(
+            FIXTURE_PROVIDER,
+            series_key=high.series_key,
+            as_of_cutoff="20260709",
+        )
     assert current.loc[current["stock_code"] == "000001", "stock_name"].item() == "Cutoff 20260710"
     assert historical.loc[historical["stock_code"] == "000001", "stock_name"].item() == (
         "Cutoff 20260709 imported later"
@@ -260,8 +276,12 @@ def test_cutoff_then_completion_then_run_id_selects_current_and_as_of_versions(d
         session.get(IngestionRun, revision.ingestion_run_id).completed_at = tied_completion
     with session_factory() as session:
         repository = MarketDataRepository(session)
-        current = repository.read_stock_basic(FIXTURE_PROVIDER)
-        versions = repository.stock_basic_versions(FIXTURE_PROVIDER, "000001")
+        current = repository.read_stock_basic(FIXTURE_PROVIDER, series_key=high.series_key)
+        versions = repository.stock_basic_versions(
+            FIXTURE_PROVIDER,
+            "000001",
+            series_key=high.series_key,
+        )
     assert current.loc[current["stock_code"] == "000001", "stock_name"].item() == "Same-cutoff revision"
     assert [version["ingestion_run_id"] for version in versions] == [
         low.ingestion_run_id,
@@ -271,9 +291,9 @@ def test_cutoff_then_completion_then_run_id_selects_current_and_as_of_versions(d
     assert len({version["batch_identifier"] for version in versions}) == 3
 
 
-def test_complete_snapshot_does_not_carry_forward_keys_omitted_by_new_exact_scope(database) -> None:
+def test_incompatible_exact_stock_scopes_do_not_replace_one_another(database) -> None:
     _, session_factory = database
-    _ingest(session_factory)
+    two_stock_result = _ingest(session_factory)
     fixture = build_market_data_fixture()
     one_stock = MarketDataBundle(
         stock_basic=fixture.stock_basic.loc[fixture.stock_basic["stock_code"] == "000001"].copy(),
@@ -285,14 +305,98 @@ def test_complete_snapshot_does_not_carry_forward_keys_omitted_by_new_exact_scop
         "stock_codes": ["000001"],
     }
 
-    _ingest(session_factory, one_stock, cutoff="20260710", scope=one_stock_scope)
+    one_stock_result = _ingest(session_factory, one_stock, cutoff="20260710", scope=one_stock_scope)
 
     with session_factory() as session:
         repository = MarketDataRepository(session)
-        current = repository.read_stock_basic(FIXTURE_PROVIDER)
-        historical = repository.read_stock_basic(FIXTURE_PROVIDER, as_of_cutoff="20260709")
-    assert current["stock_code"].tolist() == ["000001"]
-    assert historical["stock_code"].tolist() == ["000001", "600000"]
+        two_stock_current = repository.read_stock_basic(
+            FIXTURE_PROVIDER, series_key=two_stock_result.series_key
+        )
+        one_stock_current = repository.read_stock_basic(
+            FIXTURE_PROVIDER, series_key=one_stock_result.series_key
+        )
+    assert two_stock_result.series_key != one_stock_result.series_key
+    assert two_stock_current["stock_code"].tolist() == ["000001", "600000"]
+    assert one_stock_current["stock_code"].tolist() == ["000001"]
+
+
+def test_incompatible_date_ranges_and_adjustment_policies_have_distinct_series(database) -> None:
+    _, session_factory = database
+    full_range = _ingest(session_factory)
+    fixture = build_market_data_fixture()
+    one_day = MarketDataBundle(
+        stock_basic=fixture.stock_basic.copy(),
+        daily_price=fixture.daily_price.loc[fixture.daily_price["trade_date"] == "20260709"].copy(),
+        trade_calendar=fixture.trade_calendar.loc[fixture.trade_calendar["trade_date"] == "20260709"].copy(),
+    )
+    one_day_result = _ingest(
+        session_factory,
+        one_day,
+        start_date="20260709",
+        end_date="20260709",
+    )
+    qfq_fixture = build_market_data_fixture()
+    qfq_fixture.daily_price.loc[:, "adjust_type"] = "qfq"
+    qfq_result = _ingest(session_factory, qfq_fixture, adjust_type="qfq")
+
+    assert len({full_range.series_key, one_day_result.series_key, qfq_result.series_key}) == 3
+    with session_factory() as session:
+        repository = MarketDataRepository(session)
+        assert len(repository.read_daily_price(FIXTURE_PROVIDER, series_key=full_range.series_key)) == 4
+        assert len(repository.read_daily_price(FIXTURE_PROVIDER, series_key=one_day_result.series_key)) == 2
+        qfq = repository.read_daily_price(FIXTURE_PROVIDER, series_key=qfq_result.series_key)
+    assert set(qfq["adjust_type"]) == {"qfq"}
+
+
+def test_same_content_with_incompatible_parameters_has_independent_successful_series(database) -> None:
+    _, session_factory = database
+    daily = _ingest(session_factory, compatibility_parameters={"frequency": "daily"})
+    alternate = _ingest(session_factory, compatibility_parameters={"frequency": "alternate-daily"})
+
+    assert daily.batch_identifier == alternate.batch_identifier
+    assert daily.series_key != alternate.series_key
+    assert daily.ingestion_run_id != alternate.ingestion_run_id
+    with session_factory() as session:
+        runs = session.scalars(select(IngestionRun).order_by(IngestionRun.id)).all()
+        assert [run.status for run in runs] == ["succeeded", "succeeded"]
+
+
+def test_provider_only_repository_read_fails_closed(database) -> None:
+    _, session_factory = database
+    _ingest(session_factory)
+
+    with session_factory() as session:
+        repository = MarketDataRepository(session)
+        with pytest.raises(MarketDataSeriesSelectionError, match="provider-only selection is not allowed"):
+            repository.read_stock_basic(FIXTURE_PROVIDER)
+
+
+def test_complete_canonical_selector_is_equivalent_to_series_key(database) -> None:
+    _, session_factory = database
+    result = _ingest(session_factory)
+    with session_factory() as session:
+        run = session.get(IngestionRun, result.ingestion_run_id)
+        assert run is not None
+        selector = SnapshotSeriesIdentity(result.series_key, run.series_identity)
+        repository = MarketDataRepository(session)
+        by_key = repository.read_stock_basic(FIXTURE_PROVIDER, series_key=result.series_key)
+        by_selector = repository.read_stock_basic(FIXTURE_PROVIDER, selector=selector)
+
+    pd.testing.assert_frame_equal(by_key, by_selector)
+
+
+def test_incomplete_canonical_selector_fails_closed(database) -> None:
+    _, session_factory = database
+    result = _ingest(session_factory)
+    with session_factory() as session:
+        run = session.get(IngestionRun, result.ingestion_run_id)
+        assert run is not None
+        incomplete = dict(run.series_identity)
+        incomplete.pop("adjust_type")
+        selector = SnapshotSeriesIdentity(result.series_key, incomplete)
+
+        with pytest.raises(MarketDataSeriesSelectionError, match="canonical fields are incomplete"):
+            MarketDataRepository(session).read_stock_basic(FIXTURE_PROVIDER, selector=selector)
 
 
 def test_requested_stock_codes_are_an_exact_scope(database) -> None:
@@ -321,6 +425,24 @@ def test_partial_scope_or_snapshot_semantics_are_rejected(database) -> None:
 
     with pytest.raises(MarketDataValidationError, match="stock_code_semantics must be 'exact'"):
         _ingest(session_factory, scope=incompatible_scope)
+
+
+def test_provider_request_metadata_rejects_sensitive_fields(database) -> None:
+    _, session_factory = database
+
+    with pytest.raises(MarketDataValidationError, match="must not contain sensitive field"):
+        MarketDataPersistenceService(session_factory).ingest_bundle(
+            build_market_data_fixture(),
+            provider=FIXTURE_PROVIDER,
+            requested_start_date=FIXTURE_START_DATE,
+            requested_end_date=FIXTURE_END_DATE,
+            information_cutoff_date=FIXTURE_CUTOFF_DATE,
+            requested_scope=FIXTURE_SCOPE,
+            provider_request_metadata={"api_token": "must-not-be-stored"},
+        )
+
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(IngestionRun)) == 0
 
 
 @pytest.mark.parametrize("calendar_failure", ["missing", "closed"])

@@ -42,7 +42,7 @@ Dashboard
 
 - Data sources: Fetch and normalize external data behind provider interfaces. Phase 1 includes only the AKShare boundary.
 - Normalized data contracts: Stable DataFrame columns for stock basic data, daily prices, and trade calendars before database persistence.
-- PostgreSQL: v0.3A persists only normalized stock-basic, daily-price, and trade-calendar versions. Explicit Alembic migrations, ingestion provenance, cutoff-aware reads, and repository interfaces remain isolated from Quant Core calculations. Research workflow, portfolio, backtest, report, and Dashboard persistence remain future work.
+- PostgreSQL: v0.3A persists normalized stock-basic, daily-price, and trade-calendar versions. v0.3B adds canonical snapshot-series identity so only compatible complete snapshots compete for current/as-of selection. Explicit migrations, provenance, series selectors, and repository interfaces remain isolated from Quant Core calculations. Research workflow, portfolio, backtest, report, and Dashboard persistence remain future work.
 - Factor Engine: Calculate normalized factor values from prepared data.
 - Ranking Engine: Convert factor values into scores and composites. Portfolio construction is reserved for later phases.
 - Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.
@@ -98,3 +98,7 @@ The v0.1 baseline freezes the completed local research-only scope and adds relea
 ## v0.2 Local Dashboard Baseline Boundary
 
 The v0.2 baseline records the accepted correctness hardening and the local read-only Dashboard delivery. The browser page renders only existing fixture JSON payloads; Dashboard contracts, research calculations, and allowed actions remain unchanged. It does not add live ingestion, database persistence, production Qlib/VectorBT/LLM execution, authentication, deployment automation, broker APIs, order placement, or automated trading.
+
+## v0.3 Data Foundation Boundary
+
+v0.3A adds explicit PostgreSQL persistence, immutable attempts, complete snapshots, cutoff-aware reads, reconciliation, and fixture-only idempotency. v0.3B adds canonical snapshot-series identity plus one manually invoked AKShare adapter and CLI. Live collection requires explicit bounded scope, `--allow-network`, and a cutoff equal to the UTC collection date; the exact UTC collection time and installed AKShare version are retained as provenance. Endpoint mappings, frequency, and adapter compatibility version define series compatibility, while timeout/retry/network mode do not. The stock-basic endpoint cannot reconstruct a historical universe. Automated tests remain offline. Neither slice connects the Dashboard to PostgreSQL or adds scheduling, background refresh, Market Cockpit, Industry Alpha, LLM execution, broker integration, orders, or trading.

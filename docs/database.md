@@ -1,6 +1,6 @@
 # Market Data Persistence
 
-v0.3A implements explicit PostgreSQL persistence for the existing normalized stock-basic, daily-price, and trade-calendar contracts. It does not implement live provider ingestion, research workflow tables, portfolio storage, or Dashboard database reads.
+v0.3A implements explicit PostgreSQL persistence for the existing normalized stock-basic, daily-price, and trade-calendar contracts. v0.3B adds canonical snapshot-series identity and a manually invoked, bounded AKShare collection path. It does not implement scheduling, research workflow tables, portfolio storage, or Dashboard database reads.
 
 Schema changes are applied only through Alembic. Importing or starting FastAPI never creates or migrates tables.
 
@@ -12,9 +12,9 @@ Schema changes are applied only through Alembic. Importing or starting FastAPI n
 
 ## Ingestion Provenance
 
-`ingestion_runs` records every physical import attempt: provider, dataset, import/completion timestamps, requested date range and scope, information cutoff, contract version, status, row counts, deterministic SHA-256 batch identifier, snapshot mode, and a concise failure summary.
+`ingestion_runs` records every physical import attempt: provider, dataset, import/completion timestamps, requested date range and scope, information cutoff, contract version, status, row counts, deterministic SHA-256 batch identifier, canonical series key and identity, snapshot mode, provider request metadata, adapter version, and a concise failure summary.
 
-The batch identifier covers normalized, deterministically ordered records plus provider, scope, date range, cutoff, contract version, and snapshot mode. Attempts are immutable: a failed attempt remains `failed`, and a retry creates another run with the same batch identifier. A partial unique index permits only one successful run per deterministic batch. Repeating a successfully imported fixture batch returns that successful run and writes zero rows. Concurrent identical imports converge on the same successful run without exposing a unique-key failure to callers. All market-data rows reference their successful ingestion attempt by foreign key; failed writes retain no market rows.
+The batch identifier covers normalized, deterministically ordered records plus provider, scope, date range, cutoff, contract version, and snapshot mode. Attempts are immutable: a failed attempt remains `failed`, and a retry creates another run with the same batch identifier. A partial unique index permits only one successful run per `(batch_identifier, series_key)` pair. This keeps v0.3A content hashes stable while allowing identical content under incompatible series parameters to remain independent. Repeating a successfully imported fixture batch returns that successful run and writes zero rows. Concurrent identical imports converge on the same successful run without exposing a unique-key failure to callers. All market-data rows reference their successful ingestion attempt by foreign key; failed writes retain no market rows.
 
 ## Natural Keys And Corrections
 
@@ -28,13 +28,17 @@ Physical uniqueness adds `ingestion_run_id` to each logical key. A corrected bat
 
 Each accepted batch is a **complete snapshot**, not a partial revision. `requested_scope.stock_codes` is an **exact scope**: stock-basic and daily-price code sets must both equal the declared set. A later eligible snapshot that omits an earlier key does not carry that key forward. Partial revisions and tombstones are not implemented in v0.3A and are rejected rather than interpreted ambiguously.
 
-Current and as-of readback first select one eligible successful complete snapshot, ordered by:
+Compatible snapshots share a canonical **series key**. Its SHA-256 input includes provider, dataset/contract combination, exact stock-code scope, requested date range, adjustment policy, complete/exact semantics, and canonical compatibility parameters. For AKShare these parameters include all three endpoint identifiers, daily frequency, and an explicit adapter compatibility version. Timeout, retry, live/offline mode, and the installed package patch version are request provenance rather than compatibility dimensions. Different stock scopes, dates, adjustment policies, endpoint mappings, or adapter compatibility versions therefore cannot replace one another.
+
+Repository callers must supply an explicit series key or an equivalent complete canonical selector. Provider-only lookup fails closed even when only one series currently exists. Current and as-of readback first select one eligible successful complete snapshot within that series, ordered by:
 
 1. `information_cutoff_date DESC`;
 2. `completed_at DESC`;
 3. `ingestion_run_id DESC` as the deterministic final tie-break.
 
 `as_of_cutoff` additionally requires `information_cutoff_date <= as_of_cutoff`. Rows are then read only from the selected snapshot. Prior values, failed attempts, and batch provenance remain queryable for audit.
+
+Migration `20260718_0002` adds and indexes the series identity plus provider-request provenance. It deterministically backfills v0.3A runs from provider, bundle/contract, exact scope, requested dates, snapshot semantics, and persisted adjustment values. The migration supports both a clean upgrade from base and an in-place upgrade from `20260718_0001`. Before downgrade changes any index, constraint, or column, it detects successful duplicate batch identifiers across series. Such history cannot satisfy the v0.3A batch-only unique rule, so downgrade fails closed with an actionable error and does not delete, merge, or overwrite audit records.
 
 ## Validation And Transactions
 
@@ -52,6 +56,8 @@ python -m scripts.persist_fixture_market_data
 ```
 
 The first import writes 2 stock-basic rows, 4 daily-price rows, and 2 trade-calendar rows. The second prints the same ingestion ID with `rows_written: 0` and `idempotent: true`. The command uses only local deterministic DataFrames and never calls AKShare or another network provider.
+
+Controlled AKShare collection uses `python -m scripts.ingest_akshare_market_data` and is documented in [akshare_ingestion.md](akshare_ingestion.md). It requires explicit codes, dates, adjustment policy, cutoff, and either real-network consent or the offline fixture mode. A live cutoff must equal the UTC collection date and the request records the exact UTC timestamp plus installed AKShare version. Because `stock_info_a_code_name` has no historical selector, live stock-basic data represents only what was available at collection time and cannot reconstruct a historical universe. API startup, Dashboard use, tests, CI, and the fixture demo never invoke it.
 
 Inside Compose, run the commands with `docker compose exec app`. The public `.env.example` URL uses service hostname `postgres`. For direct host execution, set `DATABASE_URL` to the exposed host address, for example `postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai`.
 
@@ -104,7 +110,7 @@ Normalized provider columns:
 - `is_open`
 - `source`
 
-## Future Tables Not Implemented In v0.3A
+## Future Tables Not Implemented In v0.3
 
 The following sections remain planning references only.
 
