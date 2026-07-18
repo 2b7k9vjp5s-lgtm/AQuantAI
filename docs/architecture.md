@@ -42,7 +42,7 @@ Dashboard
 
 - Data sources: Fetch and normalize external data behind provider interfaces. Phase 1 includes only the AKShare boundary.
 - Normalized data contracts: Stable DataFrame columns for stock basic data, daily prices, and trade calendars before database persistence.
-- PostgreSQL: Present as a local Compose service in v0.2; persisted market, research, portfolio, backtest, and report records are planned future work.
+- PostgreSQL: v0.3A persists only normalized stock-basic, daily-price, and trade-calendar versions. Explicit Alembic migrations, ingestion provenance, cutoff-aware reads, and repository interfaces remain isolated from Quant Core calculations. Research workflow, portfolio, backtest, report, and Dashboard persistence remain future work.
 - Factor Engine: Calculate normalized factor values from prepared data.
 - Ranking Engine: Convert factor values into scores and composites. Portfolio construction is reserved for later phases.
 - Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.

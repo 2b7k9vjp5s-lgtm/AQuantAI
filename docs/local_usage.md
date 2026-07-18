@@ -139,7 +139,20 @@ Start the app and PostgreSQL services:
 docker compose up --build
 ```
 
-The app is available on host port 8000 and PostgreSQL is exposed on port 5432. PostgreSQL starts to validate the Compose environment, but database persistence is not implemented in the v0.2 baseline. The app remains a local, fixture-oriented research service and does not claim persisted research data.
+The app is available on host port 8000 and PostgreSQL is exposed on port 5432. The released v0.2 API and Dashboard remain fixture-oriented and do not read from the database. The v0.3A branch adds an isolated persistence foundation for normalized market-data fixtures only.
+
+Migrations are explicit and do not run during API startup. From inside the running app container:
+
+```bash
+docker compose exec app python -m alembic upgrade head
+docker compose exec app python -m alembic current
+docker compose exec app python -m scripts.persist_fixture_market_data
+docker compose exec app python -m scripts.persist_fixture_market_data
+```
+
+The first import writes the local deterministic fixture. The second is idempotent and reports the same ingestion ID with zero rows written. No command in this flow calls AKShare or another external data service.
+
+For direct host-Python use, set `DATABASE_URL` to the exposed host address before running the same commands. The `.env.example` value uses hostname `postgres` inside Compose; use `127.0.0.1` only in the host process environment. See [database.md](database.md) for natural keys, provenance, cutoff behavior, and recovery.
 
 For ordinary local use, stop the stack without deleting volumes or `.env`:
 
@@ -163,4 +176,4 @@ If Windows reserves port 8000, `netsh interface ipv4 show excludedportrange prot
 
 - Research and learning use only; not investment advice or a trading recommendation.
 - No live data ingestion, real LLM calls, broker APIs, order placement, automatic trading, or production deployment.
-- No live-data dashboard, authentication, account system, payment system, or database persistence. The local `/dashboard` page is presentation-only and fixture-backed.
+- No live-data Dashboard, authentication, account system, payment system, or live ingestion. v0.3A database persistence is limited to the local normalized market-data fixture and is not connected to `/dashboard`.

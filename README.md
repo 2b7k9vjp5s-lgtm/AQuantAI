@@ -8,6 +8,8 @@ Current version: `0.2.0`.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
 
+The v0.3A development branch adds a reviewed PostgreSQL persistence foundation for deterministic local stock-basic, daily-price, and trade-calendar fixtures. It does not change the released version, API, Dashboard payloads, or Quant Core calculations, and it does not perform live ingestion.
+
 ## Planned Personal Research Architecture
 
 The approved future direction is a local-first personal investment research workbench: Market Cockpit, Industry Alpha, Stock Research, Watchlist, Paper Portfolio, and Settings. The existing provider, factor, ranking, backtest, ML-boundary, report, and read-only Dashboard layers are preserved as Quant Core.
@@ -55,6 +57,8 @@ Phase 0 through Phase 6, the correctness hardening pass, and the local Dashboard
 - Data provider interface
 - AKShare provider skeleton
 - Normalized stock basic, daily price, and trade calendar contracts
+- Explicit SQLAlchemy engine/session boundary and Alembic market-data migration
+- Versioned PostgreSQL market-data rows with ingestion provenance, cutoff dates, deterministic batch IDs, transactional writes, and idempotent fixture imports
 - Mocked provider tests
 - Factor contracts for values and scores
 - Initial value, growth, quality, momentum, and risk factors
@@ -150,6 +154,17 @@ Run the local research flow demo:
 ```bash
 python -m scripts.demo_research_flow
 ```
+
+### Fixture Market-Data Persistence
+
+Database migrations are explicit and never run when FastAPI imports or starts. After PostgreSQL is available, apply the schema and import the local deterministic fixture with:
+
+```bash
+python -m alembic upgrade head
+python -m scripts.persist_fixture_market_data
+```
+
+Run the fixture command a second time to verify the same ingestion ID is reused with `rows_written: 0` and `idempotent: true`. Set `DATABASE_URL` to a host-reachable PostgreSQL URL when running these commands outside Docker. See [docs/database.md](docs/database.md) for schema, provenance, cutoff, migration, and recovery details.
 
 Run tests:
 

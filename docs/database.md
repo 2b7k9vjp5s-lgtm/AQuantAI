@@ -1,6 +1,51 @@
-# Database Planning
+# Market Data Persistence
 
-This document records the planned PostgreSQL schema and Phase 1 normalized data contracts. Phase 1 does not implement database models, migrations, or full ingestion.
+v0.3A implements explicit PostgreSQL persistence for the existing normalized stock-basic, daily-price, and trade-calendar contracts. It does not implement live provider ingestion, research workflow tables, portfolio storage, or Dashboard database reads.
+
+Schema changes are applied only through Alembic. Importing or starting FastAPI never creates or migrates tables.
+
+## Engine And Session Boundary
+
+- `backend.database.engine.build_engine()` creates a SQLAlchemy engine from an explicit URL or `DATABASE_URL`.
+- `backend.database.engine.build_session_factory()` creates the session boundary used by repositories and ingestion services.
+- The API does not construct a database engine during import and does not run migrations at startup.
+
+## Ingestion Provenance
+
+`ingestion_runs` records provider, dataset, import/completion timestamps, requested date range and scope, information cutoff, contract version, status, row counts, deterministic SHA-256 batch identifier, and a concise failure summary.
+
+The batch identifier covers normalized, deterministically ordered records plus provider, scope, date range, cutoff, and contract version. Repeating the identical fixture batch reuses the successful ingestion run and writes zero rows. All market-data rows reference an ingestion run by foreign key. A failed write rolls back every market-data row, then records the failed run separately with zero written rows.
+
+## Natural Keys And Corrections
+
+Logical natural keys are:
+
+- stock basic: `(source, stock_code)`;
+- daily price: `(source, stock_code, trade_date, adjust_type)`;
+- trade calendar: `(source, trade_date)`.
+
+Physical uniqueness adds `ingestion_run_id` to each logical key. A corrected newer batch adds a new immutable version instead of overwriting the old row. Deterministic readback selects the highest successful ingestion run for each logical key, optionally restricted to `information_cutoff_date <= as_of_cutoff`. Prior values and batch provenance remain queryable.
+
+## Validation And Transactions
+
+Before commit, the service validates contract columns, missing/blank identifiers, six-digit stock codes, declared provider and scope, strict dates, duplicates, finite/non-negative numeric data, OHLC consistency, adjustment values, booleans, requested date range, and cutoff. The three datasets write in one transaction; any validation, constraint, or insert failure leaves no partial market-data rows.
+
+## Migration And Fixture Import
+
+With PostgreSQL available and `DATABASE_URL` pointing to the target database:
+
+```bash
+python -m alembic upgrade head
+python -m alembic current
+python -m scripts.persist_fixture_market_data
+python -m scripts.persist_fixture_market_data
+```
+
+The first import writes 2 stock-basic rows, 4 daily-price rows, and 2 trade-calendar rows. The second prints the same ingestion ID with `rows_written: 0` and `idempotent: true`. The command uses only local deterministic DataFrames and never calls AKShare or another network provider.
+
+Inside Compose, run the commands with `docker compose exec app`. The public `.env.example` URL uses service hostname `postgres`. For direct host execution, set `DATABASE_URL` to the exposed host address, for example `postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai`.
+
+After a failed import, correct the fixture, configuration, or database availability and retry. A failed run has no partial market rows. Do not use `Base.metadata.create_all()` for local operation.
 
 ## stock_basic
 
@@ -49,13 +94,17 @@ Normalized provider columns:
 - `is_open`
 - `source`
 
-## financial_data
+## Future Tables Not Implemented In v0.3A
+
+The following sections remain planning references only.
+
+### financial_data
 
 - Purpose: Store financial statements and derived financial indicators.
 - Core fields: report_date, announce_date, stock_code, revenue, net_profit, total_assets, total_liabilities, equity.
 - Future extensions: Statement type, restatement handling, trailing twelve month metrics, data quality flags.
 
-## factor_values
+### factor_values
 
 - Purpose: Store raw factor calculation outputs.
 - Core fields: factor_date, stock_code, factor_name, factor_value, factor_version.
@@ -70,7 +119,7 @@ Normalized factor output columns:
 - `factor_group`
 - `factor_version`
 
-## factor_scores
+### factor_scores
 
 - Purpose: Store normalized and comparable factor scores.
 - Core fields: score_date, stock_code, factor_name, score, rank, universe.
@@ -86,7 +135,7 @@ Normalized score output columns:
 - `rank`
 - `universe`
 
-## portfolio
+### portfolio
 
 - Purpose: Store generated stock pools and portfolio holdings.
 - Core fields: portfolio_date, portfolio_name, stock_code, weight, rank, rebalance_frequency.
@@ -101,7 +150,7 @@ Backtest holding output columns:
 - `score`
 - `universe`
 
-## backtest_result
+### backtest_result
 
 - Purpose: Store backtest summaries and key performance metrics.
 - Core fields: backtest_id, strategy_name, start_date, end_date, total_return, annual_return, max_drawdown, sharpe_ratio.
@@ -119,7 +168,7 @@ Phase 3 result fields:
 - `turnover`
 - `rebalance_count`
 
-## research_report
+### research_report
 
 - Purpose: Store AI-assisted research reports and human review notes.
 - Core fields: report_id, report_date, title, scope, content, model_name, source_refs.
@@ -139,25 +188,25 @@ Phase 5 report fields:
 - `disclaimer`
 - `source_refs`
 
-## ml_features
+### ml_features
 
 - Purpose: Store feature snapshots for guarded ML experiments.
 - Core fields: feature_date, stock_code, universe, feature columns derived from factors or normalized market data.
 - Future extensions: Feature versioning, lineage, preprocessing metadata, train/test split tags.
 
-## ml_labels
+### ml_labels
 
 - Purpose: Store supervised learning labels for research experiments.
 - Core fields: label_date, stock_code, future_return, label_window, universe.
 - Future extensions: Label definitions, benchmark-relative returns, outlier policy, leakage checks.
 
-## ml_predictions
+### ml_predictions
 
 - Purpose: Store model prediction outputs in a backtest-compatible format.
 - Core fields: prediction_date, stock_code, model_name, prediction_score, prediction_rank, universe.
 - Future extensions: Experiment ID, model version, confidence bands, calibration metadata.
 
-## dashboard_views
+### dashboard_views
 
 - Purpose: Describe read-only dashboard payloads assembled from research outputs.
 - Core fields: page_id, title, sections, disclaimer, allowed_actions, source_refs, read_only.
