@@ -2,6 +2,14 @@
 
 AQuantAI follows a layered architecture designed for long-term iteration and clear module boundaries.
 
+## Current Baseline And Planned Product Architecture
+
+The implemented v0.2 baseline is a local, fixture-backed, read-only research Dashboard. Its provider, factor, ranking, backtest, ML-boundary, report, and Dashboard layers are preserved as **Quant Core**.
+
+Issue #39 defines a future local-first personal research product around Market Cockpit, Industry Alpha, Stock Research, Watchlist, Paper Portfolio, and Settings. It is documentation and implementation planning only; it does not add a new runtime architecture in v0.2. Future product modules will own personal research workflow state and depend on stable provider interfaces. Quant Core provides validation inputs and must not independently produce final research conclusions.
+
+See [product architecture](product_architecture.md), [research workflow](research_workflow.md), [conceptual data model](data_model.md), and [implementation plan](implementation_plan.md).
+
 ```text
 AKShare Provider
           |
@@ -34,7 +42,7 @@ Dashboard
 
 - Data sources: Fetch and normalize external data behind provider interfaces. Phase 1 includes only the AKShare boundary.
 - Normalized data contracts: Stable DataFrame columns for stock basic data, daily prices, and trade calendars before database persistence.
-- PostgreSQL: Store market data, financial data, factor values, portfolios, backtest results, and reports.
+- PostgreSQL: Present as a local Compose service in v0.2; persisted market, research, portfolio, backtest, and report records are planned future work.
 - Factor Engine: Calculate normalized factor values from prepared data.
 - Ranking Engine: Convert factor values into scores and composites. Portfolio construction is reserved for later phases.
 - Backtest Engine: Evaluate deterministic Top-N equal-weight portfolio rules and weekly rebalancing strategies.

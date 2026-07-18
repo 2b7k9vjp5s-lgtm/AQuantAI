@@ -80,4 +80,19 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 - Input: The merged deterministic research foundation, v0.2 correctness hardening, and local read-only Dashboard page.
 - Output: Version `0.2.0`, current-status documentation, release handoff information, and focused metadata tests.
 - Completion standard: Active metadata and documentation describe the fixture-backed, read-only v0.2 Dashboard baseline; tests and demo remain local and pass without new product capability.
-- Current status: Version alignment and release handoff review.
+- Current status: Completed and released as the active `v0.2.0` local read-only research Dashboard baseline.
+
+## Planned Personal Research Workbench
+
+The following releases are approved architecture plans, not implemented product capability. Each requires a separately authorized review issue before work starts:
+
+- v0.2.1: local launcher completion.
+- v0.3: real-data persistence foundation.
+- v0.4: Market Cockpit.
+- v0.5: Industry Alpha Stage 1 and evidence infrastructure.
+- v0.6: Industry Alpha Stage 2 and Stock Research.
+- v0.7: Watchlist and verification tasks.
+- v0.8: Paper Portfolio and simulated trades.
+- v0.9: portfolio analysis and Quant Core integration.
+
+Detailed objectives, exclusions, dependencies, acceptance criteria, and tests are in [implementation_plan.md](implementation_plan.md).
