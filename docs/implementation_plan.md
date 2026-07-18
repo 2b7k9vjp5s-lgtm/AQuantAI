@@ -29,6 +29,10 @@ This plan is prospective. Each stage requires a separate authorized review issue
 - **Acceptance:** every snapshot has date, source, and missing-data behavior; outputs are local and auditable.
 - **Tests:** calculation fixtures, cutoff-date checks, read-only contract tests, and no-live-network unit tests.
 
+### v0.4A Authorized Foundation
+
+The first v0.4 slice is limited to deterministic selected-universe breadth, participation, realized-volatility, drawdown, provenance, and completeness from existing persisted stock-basic, daily-price, and trade-calendar snapshots. Official indices, sectors, style, valuation, crowding, derived-snapshot persistence, and automatic refresh require later separately reviewed data coverage and are explicitly unsupported in v0.4A.
+
 ## v0.5 Industry Alpha Stage 1 And Evidence Infrastructure
 
 - **Objective:** model industry maps and evidence-backed causal research.

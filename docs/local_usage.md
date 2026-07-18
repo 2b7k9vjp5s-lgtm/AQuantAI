@@ -186,6 +186,27 @@ python -m scripts.ingest_akshare_market_data \
 
 For direct host-Python use, set `DATABASE_URL` to the exposed host address before running the same commands. The `.env.example` value uses hostname `postgres` inside Compose; use `127.0.0.1` only in the host process environment. See [database.md](database.md) for natural keys, provenance, cutoff behavior, and recovery.
 
+### Market Cockpit
+
+The v0.4A Market Cockpit is separate from the fixture Dashboard and reads one explicit successful complete snapshot from PostgreSQL. Run migrations and persist data first, then use:
+
+```text
+http://127.0.0.1:8000/market-cockpit/snapshot?series_key=<series-key>&as_of_cutoff=YYYYMMDD
+http://127.0.0.1:8000/market-cockpit?series_key=<series-key>&as_of_cutoff=YYYYMMDD
+```
+
+`as_of_cutoff` is optional, but `series_key` is mandatory. Missing selection returns 422, no eligible snapshot returns 404, and unavailable database configuration/query state returns 503. No error path falls back to sample data.
+
+The page displays selected-universe scope, stock codes/counts, calculation readiness, unverified scope coverage, conservative overall completeness, ingestion run, allowlisted collection/import/endpoint provenance, requested and selected cutoffs, effective trading session, view-generation time, adjustment policy, current-session row health, two-session latest-return eligibility issues, warnings, formulas, and unsupported sections. Every unavailable latest return has one stock-code-sorted reason with its blocking session and prior valid traded-session gap. Internally ready calculations do not establish representative A-share coverage. It is read-only and does not automatically refresh or collect data.
+
+Run the deterministic persisted current/historical demonstration after migration:
+
+```bash
+python -m scripts.demo_market_cockpit
+```
+
+See [market_cockpit.md](market_cockpit.md) for exact formulas, minimum history, missing-data rules, and the official-index/sector/style/valuation/crowding exclusions.
+
 For ordinary local use, stop the stack without deleting volumes or `.env`:
 
 ```bash
@@ -208,5 +229,6 @@ If Windows reserves port 8000, `netsh interface ipv4 show excludedportrange prot
 
 - Research and learning use only; not investment advice or a trading recommendation.
 - The released v0.2 application remains fixture-backed. v0.3B permits only explicit manual, bounded AKShare collection; there is no scheduler or background refresh.
+- The v0.4A Market Cockpit monitors only one explicitly selected persisted universe. It is not full-market or official-index breadth.
 - No real LLM calls, broker APIs, order placement, automatic trading, or production deployment.
 - No live-data Dashboard, authentication, account system, or payment system. PostgreSQL and AKShare ingestion are not connected to `/dashboard`.

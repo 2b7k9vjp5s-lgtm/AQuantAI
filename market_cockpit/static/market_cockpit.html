@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AQuantAI Market Cockpit</title>
+    <link rel="stylesheet" href="/market-cockpit/static/market_cockpit.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="page-width">
+        <p class="eyebrow">Database-backed selected-universe monitoring</p>
+        <h1>AQuantAI Market Cockpit</h1>
+        <p class="lede">Read-only breadth, participation, volatility, drawdown, and data-quality context for one explicit persisted snapshot series.</p>
+        <nav aria-label="Market Cockpit resources">
+          <a href="/dashboard">Fixture Dashboard</a>
+          <a href="/docs">API documentation</a>
+        </nav>
+      </div>
+    </header>
+    <main class="page-width">
+      <section class="status-panel" aria-labelledby="status-heading">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Selected universe / 选定股票范围</p>
+            <h2 id="status-heading">Snapshot status</h2>
+          </div>
+          <span id="completeness-badge" class="badge">Loading</span>
+        </div>
+        <p id="load-status" role="status">Reading the series selector from this page URL.</p>
+        <p id="load-error" class="error" role="alert" hidden></p>
+        <p id="scope-coverage-note">Calculation readiness applies only to the exact selected universe. Coverage confidence is unverified.</p>
+        <div id="scope-summary" class="metric-grid" aria-live="polite"></div>
+      </section>
+
+      <section aria-labelledby="diagnostics-heading">
+        <p class="section-kicker">Potentially suspended, stale, or no-trade observations</p>
+        <h2 id="diagnostics-heading">Current-session health and latest-return eligibility</h2>
+        <p>Current-session row health is reported separately from the two-session eligibility required for a latest return.</p>
+        <div id="diagnostic-summary" class="metric-grid"></div>
+        <div id="latest-return-issues"></div>
+      </section>
+
+      <section aria-labelledby="breadth-heading">
+        <p class="section-kicker">Latest persisted session</p>
+        <h2 id="breadth-heading">Breadth and return distribution</h2>
+        <div id="latest-metrics" class="metric-grid"></div>
+      </section>
+
+      <section class="two-column" aria-label="Trend and participation metrics">
+        <div>
+          <p class="section-kicker">Complete calendar windows</p>
+          <h2>20 / 60 session breadth</h2>
+          <div id="window-metrics"></div>
+        </div>
+        <div>
+          <p class="section-kicker">Prior 20-session medians</p>
+          <h2>Participation and risk</h2>
+          <div id="participation-metrics" class="metric-grid"></div>
+        </div>
+      </section>
+
+      <section aria-labelledby="provenance-heading">
+        <p class="section-kicker">One ingestion run, no cross-series stitching</p>
+        <h2 id="provenance-heading">Scope and provenance</h2>
+        <div id="provenance" class="data-list"></div>
+      </section>
+
+      <section class="two-column" aria-label="Data quality and limitations">
+        <div>
+          <p class="section-kicker">Completeness</p>
+          <h2>Warnings</h2>
+          <div id="warnings"></div>
+        </div>
+        <div>
+          <p class="section-kicker">Not supported in v0.4A</p>
+          <h2>Unsupported sections</h2>
+          <div id="unsupported"></div>
+        </div>
+      </section>
+
+      <section class="formula-panel" aria-labelledby="formula-heading">
+        <p class="section-kicker">Transparent definitions</p>
+        <h2 id="formula-heading">Formula summary</h2>
+        <ul>
+          <li>Latest return: current close divided by the previous open-session close, minus one.</li>
+          <li>A zero-volume and zero-amount row is no-trade and is excluded from breadth, participation, rolling close, and risk windows.</li>
+          <li>20/60-session metrics require every close in the full persisted calendar window.</li>
+          <li>Participation compares the current value with the median of the prior 20 sessions.</li>
+          <li>Risk uses 20 complete selected-universe equal-weight returns and annualizes volatility by square root of 252.</li>
+        </ul>
+        <p>Repository formula reference: <code>docs/market_cockpit.md</code></p>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="page-width">
+        <h2>Research-only boundary</h2>
+        <p id="research-disclaimer">This report is for quantitative research and learning only. It is not investment advice, not a trading recommendation, and not an instruction to buy, sell, or hold any security.</p>
+        <p>Read-only. No automatic refresh, recommendation, broker connection, order, or trading action.</p>
+      </div>
+    </footer>
+    <script src="/market-cockpit/static/market_cockpit.js" defer></script>
+  </body>
+</html>

@@ -84,11 +84,12 @@ Development must proceed phase by phase. Do not start a later phase until the cu
 
 ## Planned Personal Research Workbench
 
-The following releases are approved architecture plans, not implemented product capability. Each requires a separately authorized review issue before work starts:
+The following releases are controlled product stages. Each requires a separately authorized review issue before work starts. The v0.3 persistence foundation is complete; Issue #45 authorizes only the v0.4A selected-universe Market Cockpit foundation:
 
 - v0.2.1: local launcher completion.
-- v0.3: real-data persistence foundation.
-- v0.4: Market Cockpit.
+- v0.3: real-data persistence foundation (completed).
+- v0.4A: database-backed selected-universe Market Cockpit breadth and risk foundation (authorized in Issue #45; review pending).
+- v0.4B and broader Market Cockpit datasets: not authorized.
 - v0.5: Industry Alpha Stage 1 and evidence infrastructure.
 - v0.6: Industry Alpha Stage 2 and Stock Research.
 - v0.7: Watchlist and verification tasks.
