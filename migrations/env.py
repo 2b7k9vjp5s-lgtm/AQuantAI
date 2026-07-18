@@ -9,6 +9,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from backend.database.models import Base
+import industry_alpha.models  # noqa: F401 - register v0.5A metadata
 
 config = context.config
 

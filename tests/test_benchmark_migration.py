@@ -77,7 +77,7 @@ def test_benchmark_migration_preserves_existing_runs_and_round_trips() -> None:
             assert connection.scalar(
                 select(sa.func.count()).select_from(Table("ingestion_runs", MetaData(), autoload_with=engine))
             ) == 1
-            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260718_0004"
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260718_0005"
         engine.dispose()
 
         command.downgrade(config, "20260718_0002")

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend.api.industry_alpha import router as industry_alpha_router
 from backend.api.market_cockpit import router as market_cockpit_router
 from dashboard import build_dashboard_overview, build_dashboard_report
 
@@ -22,6 +23,7 @@ app.mount(
     name="market-cockpit-static",
 )
 app.include_router(market_cockpit_router)
+app.include_router(industry_alpha_router)
 
 
 @app.get("/")

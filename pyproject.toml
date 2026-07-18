@@ -43,6 +43,7 @@ include = [
   "dashboard*",
   "datasource*",
   "factors*",
+  "industry_alpha*",
   "ml*",
   "market_cockpit*",
   "ranking*",

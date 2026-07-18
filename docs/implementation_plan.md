@@ -58,6 +58,10 @@ The fifth v0.4 slice is limited to deterministic selected-universe price-behavio
 - **Acceptance:** facts, inferences, conflicts, missing evidence, and cutoff dates are explicit and versioned.
 - **Tests:** evidence provenance, claim-link, conflict, revision, and fixture workflow tests.
 
+### v0.5A Authorized Evidence Ledger Foundation
+
+The first v0.5 slice is limited to a local, append-only research-case and evidence ledger. It separates workflow state from conclusion status; records immutable A/B/C/D evidence, versioned facts and inferences, explicit support and contradiction links, frozen case-revision claim membership, and mandatory follow-up verification metadata; and provides cutoff-aware read-only APIs plus an offline fixture demo. It does not authorize industry scoring, causal-chain conclusions, company-beneficiary mapping, Stage 2 stock research, LLM execution, scraping, recommendations, signals, portfolios, or trading.
+
 ## v0.6 Stage 2 And Stock Research
 
 - **Objective:** assess beneficiaries, financial transmission, expectations, valuation, catalysts, and risks from Stage 1 inputs.
