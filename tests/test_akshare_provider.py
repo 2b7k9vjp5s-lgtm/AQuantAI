@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from datasource.akshare import AkshareDataProvider
 from datasource.akshare.provider import (
@@ -10,6 +11,8 @@ from datasource.akshare.provider import (
     RAW_OPEN,
     RAW_STOCK_CODE,
     RAW_VOLUME,
+    AkshareProviderError,
+    AkshareProviderTimeout,
 )
 from datasource.base import DAILY_PRICE_COLUMNS, STOCK_BASIC_COLUMNS, TRADE_CALENDAR_COLUMNS
 
@@ -137,3 +140,57 @@ def test_empty_provider_responses_return_expected_columns() -> None:
     assert list(provider.get_stock_basic().columns) == STOCK_BASIC_COLUMNS
     assert list(provider.get_daily_price("000001", "20260101", "20260131").columns) == DAILY_PRICE_COLUMNS
     assert list(provider.get_trade_calendar("20260101", "20260131").columns) == TRADE_CALENDAR_COLUMNS
+
+
+class RaisingRunner:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        self.calls = 0
+
+    def call(self, _endpoint, _kwargs, _timeout_seconds):
+        self.calls += 1
+        raise self.error
+
+
+def test_timeout_is_finite_retried_and_actionable() -> None:
+    runner = RaisingRunner(AkshareProviderTimeout("bounded timeout"))
+    provider = AkshareDataProvider(runner=runner, max_retries=1, sleep=lambda _seconds: None)
+
+    with pytest.raises(AkshareProviderTimeout, match="bounded timeout"):
+        provider.get_stock_basic()
+
+    assert runner.calls == 2
+
+
+def test_provider_exception_is_wrapped_after_finite_attempts() -> None:
+    runner = RaisingRunner(RuntimeError("upstream unavailable"))
+    provider = AkshareDataProvider(runner=runner, max_retries=2, sleep=lambda _seconds: None)
+
+    with pytest.raises(AkshareProviderError, match="failed after 3 attempts"):
+        provider.get_trade_calendar("20260101", "20260131")
+
+    assert runner.calls == 3
+
+
+class MalformedAkshare(FakeAkshare):
+    def stock_zh_a_hist(self, **_kwargs) -> pd.DataFrame:
+        return pd.DataFrame([{"unexpected": "payload"}])
+
+
+def test_malformed_provider_payload_is_rejected_before_contract_mapping() -> None:
+    provider = AkshareDataProvider(MalformedAkshare())
+
+    with pytest.raises(AkshareProviderError, match="missing columns"):
+        provider.get_daily_price("000001", "20260101", "20260131", "qfq")
+
+
+def test_bundle_collection_rejects_near_full_market_code_lists() -> None:
+    provider = AkshareDataProvider(FakeAkshare())
+
+    with pytest.raises(AkshareProviderError, match="At most 50 stock codes"):
+        provider.get_market_data_bundle(
+            [f"{value:06d}" for value in range(51)],
+            "20260101",
+            "20260131",
+            "qfq",
+        )

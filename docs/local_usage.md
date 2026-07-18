@@ -139,7 +139,7 @@ Start the app and PostgreSQL services:
 docker compose up --build
 ```
 
-The app is available on host port 8000 and PostgreSQL is exposed on port 5432. The released v0.2 API and Dashboard remain fixture-oriented and do not read from the database. The v0.3A branch adds an isolated persistence foundation for normalized market-data fixtures only.
+The app is available on host port 8000 and PostgreSQL is exposed on port 5432. The released v0.2 API and Dashboard remain fixture-oriented and do not read from the database. The v0.3 data work remains an isolated persistence and manually controlled ingestion foundation.
 
 Migrations are explicit and do not run during API startup. From inside the running app container:
 
@@ -151,6 +151,38 @@ docker compose exec app python -m scripts.persist_fixture_market_data
 ```
 
 The first import writes the local deterministic fixture. The second is idempotent and reports the same ingestion ID with zero rows written. No command in this flow calls AKShare or another external data service.
+
+### Manual AKShare Collection
+
+Real collection is never automatic. The CLI requires explicit codes, date bounds, adjustment policy, cutoff, and network consent:
+
+```bash
+python -m scripts.ingest_akshare_market_data \
+  --stock-code 000001 \
+  --start-date 20260708 \
+  --end-date 20260709 \
+  --adjust qfq \
+  --cutoff 20260709 \
+  --allow-network
+```
+
+The default request timeout is 20 seconds per endpoint call with at most two retries. Both limits are finite and can be reduced with `--timeout-seconds` and `--max-retries`. One request accepts at most 50 explicit stock codes and never defaults to all stocks or an unbounded date range.
+
+Normalization-only mode prints the canonical scope, series key, cutoff, validation status, and row counts without writing the database:
+
+```bash
+python -m scripts.ingest_akshare_market_data \
+  --stock-code 000001 \
+  --stock-code 600000 \
+  --start-date 20260708 \
+  --end-date 20260709 \
+  --adjust qfq \
+  --cutoff 20260709 \
+  --offline-fixture \
+  --dry-run
+```
+
+`--offline-fixture` is a deterministic local response set for validation and makes no network request. It is mutually exclusive with `--allow-network`. See [akshare_ingestion.md](akshare_ingestion.md) for endpoint mappings, selector semantics, failure behavior, and boundaries.
 
 For direct host-Python use, set `DATABASE_URL` to the exposed host address before running the same commands. The `.env.example` value uses hostname `postgres` inside Compose; use `127.0.0.1` only in the host process environment. See [database.md](database.md) for natural keys, provenance, cutoff behavior, and recovery.
 
@@ -172,8 +204,9 @@ docker version
 
 If Windows reserves port 8000, `netsh interface ipv4 show excludedportrange protocol=tcp` displays the excluded ranges. Do not remove system reservations automatically. Stop the launcher, resolve the Windows or Docker port reservation outside AQuantAI, and retry only after port 8000 is available.
 
-## v0.2 Boundaries
+## Current Boundaries
 
 - Research and learning use only; not investment advice or a trading recommendation.
-- No live data ingestion, real LLM calls, broker APIs, order placement, automatic trading, or production deployment.
-- No live-data Dashboard, authentication, account system, payment system, or live ingestion. v0.3A database persistence is limited to the local normalized market-data fixture and is not connected to `/dashboard`.
+- The released v0.2 application remains fixture-backed. v0.3B permits only explicit manual, bounded AKShare collection; there is no scheduler or background refresh.
+- No real LLM calls, broker APIs, order placement, automatic trading, or production deployment.
+- No live-data Dashboard, authentication, account system, or payment system. PostgreSQL and AKShare ingestion are not connected to `/dashboard`.

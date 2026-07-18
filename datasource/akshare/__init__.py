@@ -1,5 +1,15 @@
 """AKShare data provider integration."""
 
-from datasource.akshare.provider import AkshareDataProvider
+from datasource.akshare.provider import (
+    ADAPTER_VERSION,
+    AkshareDataProvider,
+    AkshareProviderError,
+    AkshareProviderTimeout,
+)
 
-__all__ = ["AkshareDataProvider"]
+__all__ = [
+    "ADAPTER_VERSION",
+    "AkshareDataProvider",
+    "AkshareProviderError",
+    "AkshareProviderTimeout",
+]

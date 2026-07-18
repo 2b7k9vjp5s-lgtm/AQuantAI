@@ -17,6 +17,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.models import DailyPriceRecord, IngestionRun, StockBasicRecord, TradeCalendarRecord
+from backend.database.series import (
+    SnapshotSeriesError,
+    SnapshotSeriesIdentity,
+    build_snapshot_series_identity,
+    canonical_json_object,
+    validate_series_key,
+    validate_snapshot_series_identity,
+)
 from datasource.base import DAILY_PRICE_COLUMNS, STOCK_BASIC_COLUMNS, TRADE_CALENDAR_COLUMNS, MarketDataBundle
 
 CONTRACT_VERSION = "1.0"
@@ -29,16 +37,23 @@ ALLOWED_ADJUST_TYPES = {"", "qfq", "hfq"}
 AUTHORIZED_DATASETS = {"stock_basic", "daily_price", "trade_calendar"}
 SNAPSHOT_MODE = "complete"
 STOCK_CODE_SCOPE_SEMANTICS = "exact"
+DEFAULT_ADAPTER_VERSION = "normalized-contract-v1"
+SENSITIVE_METADATA_TERMS = {"api_key", "apikey", "credential", "password", "secret", "token"}
 
 
 class MarketDataValidationError(ValueError):
     """Raised before market-data rows are committed."""
 
 
+class MarketDataSeriesSelectionError(ValueError):
+    """Raised when a repository read does not identify one compatible series."""
+
+
 @dataclass(frozen=True)
 class IngestionResult:
     ingestion_run_id: int
     batch_identifier: str
+    series_key: str
     status: str
     information_cutoff_date: str
     rows_received: int
@@ -50,6 +65,7 @@ class IngestionResult:
         return {
             "ingestion_run_id": self.ingestion_run_id,
             "batch_identifier": self.batch_identifier,
+            "series_key": self.series_key,
             "status": self.status,
             "information_cutoff_date": self.information_cutoff_date,
             "rows_received": self.rows_received,
@@ -78,6 +94,76 @@ class _NormalizedBundle:
         return sum(self.counts.values())
 
 
+@dataclass(frozen=True)
+class MarketDataValidationSummary:
+    """Normalization-only result returned without opening a database session."""
+
+    series_key: str
+    canonical_scope: dict[str, Any]
+    information_cutoff_date: str
+    dataset_counts: dict[str, int]
+    valid: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "series_key": self.series_key,
+            "canonical_scope": dict(self.canonical_scope),
+            "information_cutoff_date": self.information_cutoff_date,
+            "dataset_counts": dict(self.dataset_counts),
+            "valid": self.valid,
+        }
+
+
+def validate_market_data_bundle(
+    bundle: MarketDataBundle,
+    *,
+    provider: str,
+    requested_start_date: str,
+    requested_end_date: str,
+    information_cutoff_date: str,
+    requested_scope: dict[str, Any],
+    adjust_type: str | None = None,
+    compatibility_parameters: dict[str, Any] | None = None,
+    contract_version: str = CONTRACT_VERSION,
+) -> MarketDataValidationSummary:
+    """Normalize and reconcile a bundle without creating a database engine or run."""
+    provider = _required_text(provider, "provider")
+    contract_version = _required_text(contract_version, "contract_version")
+    start_date = _required_date(requested_start_date, "requested_start_date")
+    end_date = _required_date(requested_end_date, "requested_end_date")
+    cutoff_date = _required_date(information_cutoff_date, "information_cutoff_date")
+    if start_date > end_date:
+        raise MarketDataValidationError("requested_start_date must not be after requested_end_date.")
+    if end_date > cutoff_date:
+        raise MarketDataValidationError("requested_end_date must not exceed information_cutoff_date.")
+    scope = _validate_scope(requested_scope)
+    resolved_adjust_type = _resolve_adjust_type(bundle, adjust_type)
+    series = _build_series_identity(
+        provider=provider,
+        start_date=start_date,
+        end_date=end_date,
+        scope=scope,
+        contract_version=contract_version,
+        adjust_type=resolved_adjust_type,
+        compatibility_parameters=compatibility_parameters,
+    )
+    normalized = _normalize_bundle(
+        bundle,
+        provider=provider,
+        requested_start_date=start_date,
+        requested_end_date=end_date,
+        information_cutoff_date=cutoff_date,
+        requested_scope=scope,
+        expected_adjust_type=resolved_adjust_type,
+    )
+    return MarketDataValidationSummary(
+        series_key=series.series_key,
+        canonical_scope=series.canonical,
+        information_cutoff_date=_compact_date(cutoff_date),
+        dataset_counts=normalized.counts,
+    )
+
+
 class MarketDataPersistenceService:
     """Coordinate validation, provenance, idempotency, and atomic writes."""
 
@@ -94,6 +180,10 @@ class MarketDataPersistenceService:
         information_cutoff_date: str,
         requested_scope: dict[str, Any],
         contract_version: str = CONTRACT_VERSION,
+        adjust_type: str | None = None,
+        compatibility_parameters: dict[str, Any] | None = None,
+        provider_request_metadata: dict[str, Any] | None = None,
+        adapter_version: str = DEFAULT_ADAPTER_VERSION,
     ) -> IngestionResult:
         provider = _required_text(provider, "provider")
         contract_version = _required_text(contract_version, "contract_version")
@@ -105,6 +195,18 @@ class MarketDataPersistenceService:
         if end_date > cutoff_date:
             raise MarketDataValidationError("requested_end_date must not exceed information_cutoff_date.")
         scope = _validate_scope(requested_scope)
+        resolved_adjust_type = _resolve_adjust_type(bundle, adjust_type)
+        series = _build_series_identity(
+            provider=provider,
+            start_date=start_date,
+            end_date=end_date,
+            scope=scope,
+            contract_version=contract_version,
+            adjust_type=resolved_adjust_type,
+            compatibility_parameters=compatibility_parameters,
+        )
+        request_metadata = _request_metadata(provider_request_metadata)
+        adapter_version = _required_text(adapter_version, "adapter_version")
         raw_batch_identifier = _raw_batch_identifier(
             bundle,
             provider=provider,
@@ -124,6 +226,7 @@ class MarketDataPersistenceService:
                 requested_end_date=end_date,
                 information_cutoff_date=cutoff_date,
                 requested_scope=scope,
+                expected_adjust_type=resolved_adjust_type,
             )
         except Exception as exc:
             counts = _raw_counts(bundle)
@@ -136,6 +239,9 @@ class MarketDataPersistenceService:
                 requested_scope=scope,
                 contract_version=contract_version,
                 dataset_counts=counts,
+                series=series,
+                provider_request_metadata=request_metadata,
+                adapter_version=adapter_version,
             )
             self._mark_failed(run_id, exc)
             raise
@@ -150,7 +256,7 @@ class MarketDataPersistenceService:
             contract_version=contract_version,
             snapshot_mode=SNAPSHOT_MODE,
         )
-        existing = self._find_successful_run(batch_identifier)
+        existing = self._find_successful_run(batch_identifier, series.series_key)
         if existing is not None:
             return _result_from_run(existing, idempotent=True, rows_written=0)
 
@@ -163,6 +269,9 @@ class MarketDataPersistenceService:
             requested_scope=scope,
             contract_version=contract_version,
             dataset_counts=normalized.counts,
+            series=series,
+            provider_request_metadata=request_metadata,
+            adapter_version=adapter_version,
         )
         try:
             with self._session_factory.begin() as session:
@@ -175,7 +284,7 @@ class MarketDataPersistenceService:
                 run.error_summary = None
                 run.completed_at = datetime.now(timezone.utc)
         except IntegrityError as exc:
-            concurrent_success = self._find_successful_run(batch_identifier)
+            concurrent_success = self._find_successful_run(batch_identifier, series.series_key)
             if concurrent_success is not None:
                 self._mark_failed(
                     run_id,
@@ -196,11 +305,74 @@ class MarketDataPersistenceService:
                 raise RuntimeError(f"Ingestion run {run_id} was not available after commit.")
             return _result_from_run(completed, idempotent=False, rows_written=normalized.total_rows)
 
-    def _find_successful_run(self, batch_identifier: str) -> IngestionRun | None:
+    def record_failed_attempt(
+        self,
+        exc: Exception,
+        *,
+        provider: str,
+        requested_start_date: str,
+        requested_end_date: str,
+        information_cutoff_date: str,
+        requested_scope: dict[str, Any],
+        adjust_type: str,
+        compatibility_parameters: dict[str, Any] | None = None,
+        provider_request_metadata: dict[str, Any] | None = None,
+        adapter_version: str = DEFAULT_ADAPTER_VERSION,
+        contract_version: str = CONTRACT_VERSION,
+    ) -> int:
+        """Persist an immutable audit attempt when collection fails before normalization."""
+        provider = _required_text(provider, "provider")
+        start_date = _required_date(requested_start_date, "requested_start_date")
+        end_date = _required_date(requested_end_date, "requested_end_date")
+        cutoff_date = _required_date(information_cutoff_date, "information_cutoff_date")
+        contract_version = _required_text(contract_version, "contract_version")
+        if start_date > end_date:
+            raise MarketDataValidationError("requested_start_date must not be after requested_end_date.")
+        if end_date > cutoff_date:
+            raise MarketDataValidationError("requested_end_date must not exceed information_cutoff_date.")
+        scope = _validate_scope(requested_scope)
+        series = _build_series_identity(
+            provider=provider,
+            start_date=start_date,
+            end_date=end_date,
+            scope=scope,
+            contract_version=contract_version,
+            adjust_type=adjust_type,
+            compatibility_parameters=compatibility_parameters,
+        )
+        request_metadata = _request_metadata(provider_request_metadata)
+        adapter_version = _required_text(adapter_version, "adapter_version")
+        batch_identifier = _hash_payload(
+            {
+                "provider_failure": _error_summary(exc),
+                "series_key": series.series_key,
+                "information_cutoff_date": cutoff_date,
+                "adapter_version": adapter_version,
+                "provider_request_metadata": request_metadata,
+            }
+        )
+        run_id = self._create_pending_run(
+            batch_identifier=batch_identifier,
+            provider=provider,
+            start_date=start_date,
+            end_date=end_date,
+            cutoff_date=cutoff_date,
+            requested_scope=scope,
+            contract_version=contract_version,
+            dataset_counts={dataset: 0 for dataset in sorted(AUTHORIZED_DATASETS)},
+            series=series,
+            provider_request_metadata=request_metadata,
+            adapter_version=adapter_version,
+        )
+        self._mark_failed(run_id, exc)
+        return run_id
+
+    def _find_successful_run(self, batch_identifier: str, series_key: str) -> IngestionRun | None:
         with self._session_factory() as session:
             return session.scalar(
                 select(IngestionRun).where(
                     IngestionRun.batch_identifier == batch_identifier,
+                    IngestionRun.series_key == series_key,
                     IngestionRun.status == SUCCEEDED,
                 )
             )
@@ -216,16 +388,23 @@ class MarketDataPersistenceService:
         requested_scope: dict[str, Any],
         contract_version: str,
         dataset_counts: dict[str, int],
+        series: SnapshotSeriesIdentity,
+        provider_request_metadata: dict[str, Any],
+        adapter_version: str,
     ) -> int:
         with self._session_factory.begin() as session:
             run = IngestionRun(
                 batch_identifier=batch_identifier,
+                series_key=series.series_key,
+                series_identity=series.canonical,
                 provider=provider,
                 dataset=MARKET_DATASET,
                 requested_start_date=start_date,
                 requested_end_date=end_date,
                 information_cutoff_date=cutoff_date,
                 requested_scope=requested_scope,
+                provider_request_metadata=provider_request_metadata,
+                adapter_version=adapter_version,
                 snapshot_mode=SNAPSHOT_MODE,
                 contract_version=contract_version,
                 status=PENDING,
@@ -254,9 +433,17 @@ class MarketDataRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def read_stock_basic(self, provider: str, *, as_of_cutoff: str | None = None) -> pd.DataFrame:
+    def read_stock_basic(
+        self,
+        provider: str,
+        *,
+        series_key: str | None = None,
+        selector: SnapshotSeriesIdentity | None = None,
+        as_of_cutoff: str | None = None,
+    ) -> pd.DataFrame:
         provider = _required_text(provider, "provider")
-        statement = _latest_stock_basic_statement(provider, _optional_date(as_of_cutoff))
+        resolved_series_key = _resolve_read_series(provider, series_key, selector)
+        statement = _latest_stock_basic_statement(provider, resolved_series_key, _optional_date(as_of_cutoff))
         records = [dict(row) for row in self._session.execute(statement).mappings()]
         for record in records:
             record["listing_date"] = _compact_optional_date(record["listing_date"])
@@ -269,10 +456,14 @@ class MarketDataRepository:
         start_date: str | None = None,
         end_date: str | None = None,
         as_of_cutoff: str | None = None,
+        series_key: str | None = None,
+        selector: SnapshotSeriesIdentity | None = None,
     ) -> pd.DataFrame:
         provider = _required_text(provider, "provider")
+        resolved_series_key = _resolve_read_series(provider, series_key, selector)
         statement = _latest_daily_price_statement(
             provider,
+            resolved_series_key,
             start_date=_optional_date(start_date),
             end_date=_optional_date(end_date),
             as_of_cutoff=_optional_date(as_of_cutoff),
@@ -289,10 +480,14 @@ class MarketDataRepository:
         start_date: str | None = None,
         end_date: str | None = None,
         as_of_cutoff: str | None = None,
+        series_key: str | None = None,
+        selector: SnapshotSeriesIdentity | None = None,
     ) -> pd.DataFrame:
         provider = _required_text(provider, "provider")
+        resolved_series_key = _resolve_read_series(provider, series_key, selector)
         statement = _latest_trade_calendar_statement(
             provider,
+            resolved_series_key,
             start_date=_optional_date(start_date),
             end_date=_optional_date(end_date),
             as_of_cutoff=_optional_date(as_of_cutoff),
@@ -302,7 +497,15 @@ class MarketDataRepository:
             record["trade_date"] = _compact_date(record["trade_date"])
         return pd.DataFrame(records, columns=TRADE_CALENDAR_COLUMNS)
 
-    def stock_basic_versions(self, provider: str, stock_code: str) -> list[dict[str, Any]]:
+    def stock_basic_versions(
+        self,
+        provider: str,
+        stock_code: str,
+        *,
+        series_key: str | None = None,
+        selector: SnapshotSeriesIdentity | None = None,
+    ) -> list[dict[str, Any]]:
+        resolved_series_key = _resolve_read_series(provider, series_key, selector)
         rows = self._session.execute(
             select(
                 StockBasicRecord.stock_code,
@@ -317,6 +520,7 @@ class MarketDataRepository:
                 StockBasicRecord.source == _required_text(provider, "provider"),
                 StockBasicRecord.stock_code == _stock_code(stock_code, "stock_code"),
                 IngestionRun.status == SUCCEEDED,
+                IngestionRun.series_key == resolved_series_key,
             )
             .order_by(
                 IngestionRun.information_cutoff_date,
@@ -335,6 +539,7 @@ def _normalize_bundle(
     requested_end_date: date,
     information_cutoff_date: date,
     requested_scope: dict[str, Any],
+    expected_adjust_type: str,
 ) -> _NormalizedBundle:
     stock_basic = _normalize_stock_basic(bundle.stock_basic, provider, information_cutoff_date)
     daily_price = _normalize_daily_price(
@@ -351,6 +556,12 @@ def _normalize_bundle(
         requested_end_date,
         information_cutoff_date,
     )
+    observed_adjust_types = {row["adjust_type"] for row in daily_price}
+    if observed_adjust_types != {expected_adjust_type}:
+        raise MarketDataValidationError(
+            "daily_price.adjust_type must exactly match the snapshot-series adjustment policy; "
+            f"expected={expected_adjust_type!r}, observed={sorted(observed_adjust_types)!r}."
+        )
     stock_basic_codes = {row["stock_code"] for row in stock_basic}
     daily_price_codes = {row["stock_code"] for row in daily_price}
     missing_stock_basic = {row["stock_code"] for row in daily_price} - stock_basic_codes
@@ -470,8 +681,8 @@ def _insert_bundle(session: Session, bundle: _NormalizedBundle, run_id: int) -> 
     session.flush()
 
 
-def _latest_stock_basic_statement(provider: str, cutoff: date | None) -> Select[Any]:
-    run_id = _latest_successful_run_id(provider, cutoff)
+def _latest_stock_basic_statement(provider: str, series_key: str, cutoff: date | None) -> Select[Any]:
+    run_id = _latest_successful_run_id(provider, series_key, cutoff)
     return (
         select(*(getattr(StockBasicRecord, column) for column in STOCK_BASIC_COLUMNS))
         .where(StockBasicRecord.ingestion_run_id == run_id)
@@ -481,13 +692,14 @@ def _latest_stock_basic_statement(provider: str, cutoff: date | None) -> Select[
 
 def _latest_daily_price_statement(
     provider: str,
+    series_key: str,
     *,
     start_date: date | None,
     end_date: date | None,
     as_of_cutoff: date | None,
 ) -> Select[Any]:
     statement = select(*(getattr(DailyPriceRecord, column) for column in DAILY_PRICE_COLUMNS)).where(
-        DailyPriceRecord.ingestion_run_id == _latest_successful_run_id(provider, as_of_cutoff)
+        DailyPriceRecord.ingestion_run_id == _latest_successful_run_id(provider, series_key, as_of_cutoff)
     )
     statement = _apply_date_filters(statement, DailyPriceRecord.trade_date, start_date, end_date)
     return statement.order_by(
@@ -500,21 +712,23 @@ def _latest_daily_price_statement(
 
 def _latest_trade_calendar_statement(
     provider: str,
+    series_key: str,
     *,
     start_date: date | None,
     end_date: date | None,
     as_of_cutoff: date | None,
 ) -> Select[Any]:
     statement = select(*(getattr(TradeCalendarRecord, column) for column in TRADE_CALENDAR_COLUMNS)).where(
-        TradeCalendarRecord.ingestion_run_id == _latest_successful_run_id(provider, as_of_cutoff)
+        TradeCalendarRecord.ingestion_run_id == _latest_successful_run_id(provider, series_key, as_of_cutoff)
     )
     statement = _apply_date_filters(statement, TradeCalendarRecord.trade_date, start_date, end_date)
     return statement.order_by(TradeCalendarRecord.trade_date, TradeCalendarRecord.source)
 
 
-def _latest_successful_run_id(provider: str, cutoff: date | None) -> Any:
+def _latest_successful_run_id(provider: str, series_key: str, cutoff: date | None) -> Any:
     statement = select(IngestionRun.id).where(
         IngestionRun.provider == provider,
+        IngestionRun.series_key == series_key,
         IngestionRun.dataset == MARKET_DATASET,
         IngestionRun.status == SUCCEEDED,
         IngestionRun.snapshot_mode == SNAPSHOT_MODE,
@@ -615,6 +829,110 @@ def _validate_scope(scope: dict[str, Any]) -> dict[str, Any]:
         "stock_code_semantics": STOCK_CODE_SCOPE_SEMANTICS,
         "snapshot_mode": SNAPSHOT_MODE,
     }
+
+
+def _resolve_adjust_type(bundle: MarketDataBundle, adjust_type: str | None) -> str:
+    if adjust_type is not None:
+        normalized = str(adjust_type).strip()
+        if normalized not in ALLOWED_ADJUST_TYPES:
+            raise MarketDataValidationError(
+                f"adjust_type must be one of {sorted(ALLOWED_ADJUST_TYPES)!r}."
+            )
+        return normalized
+    frame = bundle.daily_price
+    if not isinstance(frame, pd.DataFrame) or "adjust_type" not in frame.columns:
+        return ""
+    observed = {
+        str(value).strip()
+        for value in frame["adjust_type"]
+        if value is not None and not pd.isna(value)
+    }
+    if not observed:
+        return ""
+    if len(observed) != 1:
+        raise MarketDataValidationError(
+            "An explicit single adjust_type is required when daily_price contains multiple policies."
+        )
+    normalized = observed.pop()
+    if normalized not in ALLOWED_ADJUST_TYPES:
+        raise MarketDataValidationError(
+            f"adjust_type must be one of {sorted(ALLOWED_ADJUST_TYPES)!r}."
+        )
+    return normalized
+
+
+def _build_series_identity(
+    *,
+    provider: str,
+    start_date: date,
+    end_date: date,
+    scope: dict[str, Any],
+    contract_version: str,
+    adjust_type: str,
+    compatibility_parameters: dict[str, Any] | None,
+) -> SnapshotSeriesIdentity:
+    try:
+        return build_snapshot_series_identity(
+            provider=provider,
+            dataset=MARKET_DATASET,
+            contract_version=contract_version,
+            datasets=scope["datasets"],
+            stock_codes=scope["stock_codes"],
+            requested_start_date=_compact_date(start_date),
+            requested_end_date=_compact_date(end_date),
+            adjust_type=adjust_type,
+            compatibility_parameters=compatibility_parameters,
+            snapshot_mode=SNAPSHOT_MODE,
+            stock_code_semantics=STOCK_CODE_SCOPE_SEMANTICS,
+        )
+    except SnapshotSeriesError as exc:
+        raise MarketDataValidationError(str(exc)) from exc
+
+
+def _request_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    try:
+        normalized = canonical_json_object(metadata, "provider_request_metadata")
+    except SnapshotSeriesError as exc:
+        raise MarketDataValidationError(str(exc)) from exc
+    _reject_sensitive_metadata(normalized)
+    return normalized
+
+
+def _reject_sensitive_metadata(value: Any, path: str = "provider_request_metadata") -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = key.lower().replace("-", "_")
+            if any(term in normalized_key for term in SENSITIVE_METADATA_TERMS):
+                raise MarketDataValidationError(f"{path} must not contain sensitive field {key!r}.")
+            _reject_sensitive_metadata(item, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _reject_sensitive_metadata(item, f"{path}[{index}]")
+
+
+def _resolve_read_series(
+    provider: str,
+    series_key: str | None,
+    selector: SnapshotSeriesIdentity | None,
+) -> str:
+    if series_key is None and selector is None:
+        raise MarketDataSeriesSelectionError(
+            "Repository reads require an explicit series_key or complete SnapshotSeriesIdentity; "
+            "provider-only selection is not allowed."
+        )
+    if series_key is not None and selector is not None:
+        raise MarketDataSeriesSelectionError("Provide series_key or selector, not both.")
+    try:
+        if selector is not None:
+            validated = validate_snapshot_series_identity(selector)
+            if validated.canonical.get("provider") != provider:
+                raise MarketDataSeriesSelectionError(
+                    "Selector provider does not match the repository provider argument."
+                )
+            return validated.series_key
+        return validate_series_key(series_key or "")
+    except SnapshotSeriesError as exc:
+        raise MarketDataSeriesSelectionError(str(exc)) from exc
 
 
 def _required_text(value: Any, field: str) -> str:
@@ -725,6 +1043,7 @@ def _result_from_run(run: IngestionRun, *, idempotent: bool, rows_written: int) 
     return IngestionResult(
         ingestion_run_id=run.id,
         batch_identifier=run.batch_identifier,
+        series_key=run.series_key,
         status=run.status,
         information_cutoff_date=_compact_date(run.information_cutoff_date),
         rows_received=run.row_count_received,

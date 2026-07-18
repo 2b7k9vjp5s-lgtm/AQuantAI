@@ -36,13 +36,22 @@ class IngestionRun(Base):
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'succeeded', 'failed')", name="ck_ingestion_runs_status"),
         CheckConstraint("snapshot_mode = 'complete'", name="ck_ingestion_runs_snapshot_mode"),
+        CheckConstraint("length(series_key) = 64", name="ck_ingestion_runs_series_key_length"),
         CheckConstraint("row_count_received >= 0", name="ck_ingestion_runs_received_nonnegative"),
         CheckConstraint("row_count_written >= 0", name="ck_ingestion_runs_written_nonnegative"),
         Index("ix_ingestion_runs_batch_identifier", "batch_identifier"),
         Index("ix_ingestion_runs_provider_dataset_cutoff", "provider", "dataset", "information_cutoff_date"),
         Index(
+            "ix_ingestion_runs_series_cutoff",
+            "series_key",
+            "information_cutoff_date",
+            "completed_at",
+            "id",
+        ),
+        Index(
             "uq_ingestion_runs_successful_batch",
             "batch_identifier",
+            "series_key",
             unique=True,
             postgresql_where=text("status = 'succeeded'"),
             sqlite_where=text("status = 'succeeded'"),
@@ -51,6 +60,8 @@ class IngestionRun(Base):
 
     id: Mapped[int] = mapped_column(IDENTITY_TYPE, primary_key=True, autoincrement=True)
     batch_identifier: Mapped[str] = mapped_column(String(64), nullable=False)
+    series_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    series_identity: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     dataset: Mapped[str] = mapped_column(String(64), nullable=False)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -59,6 +70,8 @@ class IngestionRun(Base):
     requested_end_date: Mapped[date] = mapped_column(Date, nullable=False)
     information_cutoff_date: Mapped[date] = mapped_column(Date, nullable=False)
     requested_scope: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    provider_request_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    adapter_version: Mapped[str] = mapped_column(String(64), nullable=False)
     snapshot_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     contract_version: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)

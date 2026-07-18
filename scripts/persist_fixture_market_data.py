@@ -33,9 +33,15 @@ def persist_fixture_market_data(database_url: str | None = None) -> dict[str, An
         with session_factory() as session:
             repository = MarketDataRepository(session)
             readback_counts = {
-                "stock_basic": len(repository.read_stock_basic(FIXTURE_PROVIDER)),
-                "daily_price": len(repository.read_daily_price(FIXTURE_PROVIDER)),
-                "trade_calendar": len(repository.read_trade_calendar(FIXTURE_PROVIDER)),
+                "stock_basic": len(
+                    repository.read_stock_basic(FIXTURE_PROVIDER, series_key=result.series_key)
+                ),
+                "daily_price": len(
+                    repository.read_daily_price(FIXTURE_PROVIDER, series_key=result.series_key)
+                ),
+                "trade_calendar": len(
+                    repository.read_trade_calendar(FIXTURE_PROVIDER, series_key=result.series_key)
+                ),
             }
         payload = result.to_dict()
         payload["provider"] = FIXTURE_PROVIDER

@@ -8,7 +8,7 @@ Current version: `0.2.0`.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
 
-The v0.3A development branch adds a reviewed PostgreSQL persistence foundation for deterministic local stock-basic, daily-price, and trade-calendar fixtures. It does not change the released version, API, Dashboard payloads, or Quant Core calculations, and it does not perform live ingestion.
+The v0.3B development branch extends the merged v0.3A PostgreSQL foundation with canonical snapshot-series identity and a manually invoked, bounded AKShare ingestion CLI. Network access is never automatic and requires an explicit flag. The released version, API, Dashboard payloads, and Quant Core calculations remain unchanged.
 
 ## Planned Personal Research Architecture
 
@@ -59,6 +59,8 @@ Phase 0 through Phase 6, the correctness hardening pass, and the local Dashboard
 - Normalized stock basic, daily price, and trade calendar contracts
 - Explicit SQLAlchemy engine/session boundary and Alembic market-data migration
 - Complete-snapshot PostgreSQL market-data versions with immutable ingestion attempts, cutoff-aware deterministic reads, exact stock-code scopes, transactional reconciliation, and concurrent-safe idempotent fixture imports
+- Canonical snapshot-series keys that isolate incompatible stock scopes, date ranges, adjustment policies, contracts, and compatibility parameters
+- Manual AKShare normalization and persistence CLI with explicit network opt-in, hard timeouts, finite retries, and dry-run support
 - Mocked provider tests
 - Factor contracts for values and scores
 - Initial value, growth, quality, momentum, and risk factors
@@ -165,6 +167,22 @@ python -m scripts.persist_fixture_market_data
 ```
 
 Run the fixture command a second time to verify the same ingestion ID is reused with `rows_written: 0` and `idempotent: true`. Set `DATABASE_URL` to a host-reachable PostgreSQL URL when running these commands outside Docker. See [docs/database.md](docs/database.md) for schema, provenance, cutoff, migration, and recovery details.
+
+### Controlled AKShare Ingestion
+
+AKShare collection is manual and bounded. It requires explicit stock codes, dates, adjustment policy, cutoff, and `--allow-network`:
+
+```bash
+python -m scripts.ingest_akshare_market_data \
+  --stock-code 000001 \
+  --start-date 20260708 \
+  --end-date 20260709 \
+  --adjust qfq \
+  --cutoff 20260709 \
+  --allow-network
+```
+
+Inspect normalization and the canonical series key without database writes by adding `--dry-run`. For deterministic offline verification, replace `--allow-network` with `--offline-fixture`. No AKShare call occurs during imports, FastAPI startup, Dashboard use, tests, CI, or the fixture demo. See [controlled AKShare ingestion](docs/akshare_ingestion.md).
 
 Run tests:
 
