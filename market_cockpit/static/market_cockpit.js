@@ -36,7 +36,20 @@ function formatLiquidityWindow(window) {
   return String(window.reason) +
     "; matched=" + String(window.matched_cohort_count) +
     "; sessions=" + String(window.observed_session_count) + "/" + String(window.required_session_count) +
-    "; unavailable=" + (window.unavailable_stock_codes || []).join(", ");
+    "; unavailable count=" + String(window.unavailable_stock_count) +
+    "; sample=" + formatIdentifierSample(
+      window.unavailable_stock_codes,
+      window.unavailable_stock_codes_truncated,
+      window.unavailable_stock_codes_omitted_count
+    );
+}
+
+function formatIdentifierSample(values, truncated, omittedCount) {
+  const sample = (values || []).join(", ") || "None";
+  return sample +
+    "; truncated=" + String(Boolean(truncated)) +
+    "; omitted=" + String(omittedCount || 0) +
+    (truncated ? " (+" + String(omittedCount) + " more)" : "");
 }
 
 function renderLiquidityContext(payload) {
@@ -62,10 +75,16 @@ function renderLiquidityContext(payload) {
     ["Latest unavailable", context.latest_unavailable_count],
     ["Latest total amount", context.latest_total_amount],
     ["Latest median amount", context.latest_median_amount],
+    ["Latest aggregate reason", context.latest_aggregate_reason],
     ["Top-5 concentration", context.top5_concentration_share, "percent"],
     ["Top-5 members", context.top5_member_count],
     ["Top-decile concentration", context.top_decile_concentration_share, "percent"],
     ["Top-decile members", context.top_decile_member_count],
+    ["Top-decile member sample", formatIdentifierSample(
+      context.top_decile_stock_codes,
+      context.top_decile_stock_codes_truncated,
+      context.top_decile_stock_codes_omitted_count
+    )],
     ["Above prior-20 median", context.latest_above_20_session_baseline_share, "percent"],
     ["Above prior-20 count", context.latest_above_20_session_baseline_count],
     ["Calculation status", context.calculation_status],
@@ -81,19 +100,31 @@ function renderLiquidityContext(payload) {
     ["20-session baseline total", activity20.baseline_total_amount],
     ["20-session diagnostic", formatLiquidityWindow(activity20)]
   ]);
+  const latestIssueLines = (diagnostics.latest_issues || []).map(function (item) {
+      return String(item.stock_code) + ": " + String(item.reason) + "; session=" + String(item.session);
+    });
+  latestIssueLines.unshift(
+    "Latest issue count=" + String(diagnostics.latest_issue_count || 0) +
+    "; sample truncated=" + String(Boolean(diagnostics.latest_issues_truncated)) +
+    "; omitted=" + String(diagnostics.latest_issues_omitted_count || 0) +
+    (diagnostics.latest_issues_truncated ?
+      " (+" + String(diagnostics.latest_issues_omitted_count) + " more)." : ".")
+  );
   renderList(
     document.getElementById("liquidity-latest-issues"),
-    (diagnostics.latest_issues || []).map(function (item) {
-      return String(item.stock_code) + ": " + String(item.reason) + "; session=" + String(item.session);
-    }),
+    latestIssueLines,
     "No latest-session liquidity eligibility issues."
   );
   renderList(
     document.getElementById("liquidity-source-exclusions"),
     (diagnostics.source_exclusions || []).map(function (item) {
       return String(item.reason) + ": rows=" + String(item.excluded_row_count) +
-        "; identifiers=" + (item.identifiers || []).join(", ") +
-        (item.identifiers_truncated ? "; identifiers truncated" : "");
+        "; identifier count=" + String(item.identifier_count) +
+        "; sample=" + formatIdentifierSample(
+          item.identifiers,
+          item.identifiers_truncated,
+          item.identifiers_omitted_count
+        );
     }),
     "No liquidity source rows were excluded after accepted equity filtering."
   );

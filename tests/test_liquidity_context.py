@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from market_cockpit.calculator import calculate_market_cockpit
+from market_cockpit.liquidity_contracts import LIQUIDITY_IDENTIFIER_SAMPLE_LIMIT
 from market_cockpit.repository import PersistedMarketDataSnapshot
 from scripts.demo_liquidity_context import build_liquidity_context_demo
 
@@ -121,7 +122,9 @@ def test_latest_distribution_top5_and_top_decile_are_exact() -> None:
     assert result.top5_stock_codes == ["000012", "000011", "000010", "000009", "000008"]
     assert result.top5_concentration_share == pytest.approx(500 / 780)
     assert result.top_decile_member_count == 2
-    assert result.top_decile_stock_codes == ["000012", "000011"]
+    assert result.top_decile_stock_codes == ["000011", "000012"]
+    assert result.top_decile_stock_codes_truncated is False
+    assert result.top_decile_stock_codes_omitted_count == 0
     assert result.top_decile_concentration_share == pytest.approx(230 / 780)
     assert result.calculation_status == "complete"
 
@@ -339,8 +342,147 @@ def test_accepted_equity_filter_exclusions_are_structured_and_bounded() -> None:
         "duplicate_stock_session_price_rows",
     ]
     assert all(item.excluded_row_count > 0 for item in exclusions)
-    assert all(len(item.identifiers) <= 20 for item in exclusions)
+    assert all(len(item.identifiers) <= LIQUIDITY_IDENTIFIER_SAMPLE_LIMIT for item in exclusions)
+    assert all(item.identifier_count >= len(item.identifiers) for item in exclusions)
+    assert all(
+        item.identifiers_omitted_count == item.identifier_count - len(item.identifiers)
+        for item in exclusions
+    )
     assert liquidity.calculation_status == "partial"
+
+
+def test_latest_and_concentration_aggregates_fail_closed_on_finite_overflow() -> None:
+    snapshot = _snapshot(stock_count=20)
+    prices = snapshot.daily_price.copy()
+    large = float(np.finfo(float).max * 0.75)
+    prices.loc[prices["trade_date"].eq(snapshot.requested_end_date), "amount"] = large
+
+    liquidity = calculate_market_cockpit(
+        replace(snapshot, daily_price=prices)
+    ).liquidity_context
+
+    assert liquidity.latest_eligible_count == 20
+    assert liquidity.latest_unavailable_count == 0
+    assert liquidity.latest_total_amount is None
+    assert liquidity.latest_median_amount == large
+    assert liquidity.latest_aggregate_reason == "non_finite_aggregate"
+    assert liquidity.top5_member_count == 5
+    assert liquidity.top_decile_member_count == 2
+    assert liquidity.top5_concentration_share is None
+    assert liquidity.top_decile_concentration_share is None
+    assert liquidity.calculation_status == "partial"
+    assert any("non-finite total" in warning for warning in liquidity.warnings)
+    json.dumps(liquidity, default=lambda value: value.__dict__, allow_nan=False)
+
+
+def test_exact_activity_windows_fail_closed_on_finite_session_total_overflow() -> None:
+    snapshot = _snapshot(stock_count=2, session_count=21)
+    prices = snapshot.daily_price.copy()
+    overflow_session = snapshot.trade_calendar.iloc[-3]["trade_date"]
+    prices.loc[
+        prices["trade_date"].eq(overflow_session), "amount"
+    ] = float(np.finfo(float).max * 0.75)
+
+    liquidity = calculate_market_cockpit(
+        replace(snapshot, daily_price=prices)
+    ).liquidity_context
+
+    for window in (liquidity.activity_5, liquidity.activity_20):
+        assert window.matched_cohort_count == 2
+        assert window.unavailable_stock_count == 0
+        assert window.latest_matched_total_amount is None
+        assert window.baseline_total_amount is None
+        assert window.activity_ratio is None
+        assert window.calculation_status == "unavailable"
+        assert window.reason == "non_finite_aggregate"
+    payload = json.dumps(
+        liquidity,
+        default=lambda value: value.__dict__,
+        allow_nan=False,
+    )
+    assert "NaN" not in payload
+    assert "Infinity" not in payload
+
+
+def test_large_latest_issue_diagnostics_are_exact_bounded_and_deterministic() -> None:
+    snapshot = _snapshot(stock_count=25)
+    prices = snapshot.daily_price.copy()
+    prices.loc[
+        prices["trade_date"].eq(snapshot.requested_end_date), "amount"
+    ] = 0.0
+    bounded = replace(snapshot, daily_price=prices)
+
+    first = calculate_market_cockpit(bounded).liquidity_context
+    second = calculate_market_cockpit(bounded).liquidity_context
+    diagnostics = first.diagnostics
+
+    assert first == second
+    assert first.latest_unavailable_count == 25
+    assert diagnostics.latest_issue_count == 25
+    assert len(diagnostics.latest_issues) == LIQUIDITY_IDENTIFIER_SAMPLE_LIMIT
+    assert [issue.stock_code for issue in diagnostics.latest_issues] == [
+        f"{index:06d}" for index in range(1, 11)
+    ]
+    assert diagnostics.latest_issues_truncated is True
+    assert diagnostics.latest_issues_omitted_count == 15
+    assert first.activity_5.unavailable_stock_count == 25
+    assert first.activity_20.unavailable_stock_count == 25
+    assert first.activity_5.unavailable_stock_codes_truncated is True
+    assert first.activity_20.unavailable_stock_codes_omitted_count == 15
+    assert all("(+15 more)" in warning for warning in first.warnings[:3])
+    assert all(len(warning) < 500 for warning in first.warnings)
+    assert "000025" not in " ".join(first.warnings)
+
+
+def test_large_window_diagnostics_do_not_change_full_matched_cohort_math() -> None:
+    snapshot = _snapshot(stock_count=30, session_count=21)
+    prices = snapshot.daily_price.copy()
+    affected_session = snapshot.trade_calendar.iloc[-3]["trade_date"]
+    unavailable_codes = [f"{index:06d}" for index in range(1, 16)]
+    prices.loc[
+        prices["trade_date"].eq(affected_session)
+        & prices["stock_code"].isin(unavailable_codes),
+        "amount",
+    ] = 0.0
+
+    liquidity = calculate_market_cockpit(
+        replace(snapshot, daily_price=prices)
+    ).liquidity_context
+
+    for window in (liquidity.activity_5, liquidity.activity_20):
+        assert window.matched_cohort_count == 15
+        assert window.unavailable_stock_count == 15
+        assert window.unavailable_stock_codes == unavailable_codes[:10]
+        assert window.unavailable_stock_codes_truncated is True
+        assert window.unavailable_stock_codes_omitted_count == 5
+        assert window.activity_ratio == 1.0
+        assert window.calculation_status == "partial"
+    assert liquidity.latest_above_20_session_baseline_count == 0
+    assert liquidity.latest_above_20_session_baseline_share == 0.0
+    assert any("(+5 more)" in warning for warning in liquidity.warnings)
+
+
+def test_large_top_decile_sample_is_bounded_without_changing_denominator() -> None:
+    snapshot = _snapshot(stock_count=120)
+
+    liquidity = calculate_market_cockpit(snapshot).liquidity_context
+
+    expected_total = float(sum(index * 10 for index in range(1, 121)))
+    expected_numerator = float(sum(index * 10 for index in range(109, 121)))
+    assert liquidity.latest_total_amount == expected_total
+    assert liquidity.top_decile_member_count == 12
+    assert liquidity.top_decile_stock_codes == [
+        f"{index:06d}" for index in range(109, 119)
+    ]
+    assert liquidity.top_decile_stock_codes_truncated is True
+    assert liquidity.top_decile_stock_codes_omitted_count == 2
+    assert liquidity.top_decile_concentration_share == pytest.approx(
+        expected_numerator / expected_total
+    )
+    assert liquidity.activity_5.matched_cohort_count == 120
+    assert liquidity.activity_20.matched_cohort_count == 120
+    assert liquidity.activity_5.activity_ratio == 1.0
+    assert liquidity.activity_20.activity_ratio == 1.0
 
 
 def test_output_is_deterministic_and_strict_json_safe() -> None:

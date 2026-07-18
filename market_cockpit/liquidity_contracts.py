@@ -5,7 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+LIQUIDITY_IDENTIFIER_SAMPLE_LIMIT = 10
+
 LiquidityCalculationStatus = Literal["complete", "partial", "unavailable"]
+LiquidityAggregateReason = Literal[
+    "available",
+    "no_eligible_observations",
+    "non_finite_aggregate",
+]
 LiquidityLatestIssueReason = Literal[
     "missing_latest_row",
     "no_trade_latest_row",
@@ -19,6 +26,7 @@ LiquidityWindowReason = Literal[
     "insufficient_open_session_history",
     "empty_matched_cohort",
     "invalid_baseline",
+    "non_finite_aggregate",
 ]
 LiquiditySourceExclusionReason = Literal[
     "future_price_rows",
@@ -40,8 +48,10 @@ class LiquidityLatestIssue:
 class LiquiditySourceExclusion:
     reason: LiquiditySourceExclusionReason
     excluded_row_count: int
+    identifier_count: int
     identifiers: list[str]
     identifiers_truncated: bool
+    identifiers_omitted_count: int
 
 
 @dataclass(frozen=True)
@@ -52,7 +62,10 @@ class LiquidityActivityWindow:
     window_start_session: str | None
     window_end_session: str | None
     matched_cohort_count: int
+    unavailable_stock_count: int
     unavailable_stock_codes: list[str]
+    unavailable_stock_codes_truncated: bool
+    unavailable_stock_codes_omitted_count: int
     latest_matched_total_amount: float | None
     baseline_total_amount: float | None
     activity_ratio: float | None
@@ -62,7 +75,10 @@ class LiquidityActivityWindow:
 
 @dataclass(frozen=True)
 class LiquidityDiagnostics:
+    latest_issue_count: int
     latest_issues: list[LiquidityLatestIssue]
+    latest_issues_truncated: bool
+    latest_issues_omitted_count: int
     source_exclusions: list[LiquiditySourceExclusion]
 
 
@@ -75,12 +91,15 @@ class LiquidityContext:
     latest_unavailable_count: int
     latest_total_amount: float | None
     latest_median_amount: float | None
+    latest_aggregate_reason: LiquidityAggregateReason
     top5_concentration_share: float | None
     top5_member_count: int
     top5_stock_codes: list[str]
     top_decile_concentration_share: float | None
     top_decile_member_count: int
     top_decile_stock_codes: list[str]
+    top_decile_stock_codes_truncated: bool
+    top_decile_stock_codes_omitted_count: int
     activity_5: LiquidityActivityWindow
     activity_20: LiquidityActivityWindow
     latest_above_20_session_baseline_count: int

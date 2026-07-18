@@ -22,6 +22,7 @@ from market_cockpit.contracts import (
 )
 from market_cockpit.liquidity_calculator import calculate_liquidity_context
 from market_cockpit.liquidity_contracts import (
+    LIQUIDITY_IDENTIFIER_SAMPLE_LIMIT,
     LiquidityContext,
     LiquiditySourceExclusion,
     LiquiditySourceExclusionReason,
@@ -712,10 +713,12 @@ def _liquidity_source_exclusion(
         .agg(":".join, axis=1)
         .unique()
     )
-    bounded = identifiers[:20]
+    bounded = identifiers[:LIQUIDITY_IDENTIFIER_SAMPLE_LIMIT]
     return LiquiditySourceExclusion(
         reason=reason,
         excluded_row_count=len(rows),
+        identifier_count=len(identifiers),
         identifiers=bounded,
         identifiers_truncated=len(identifiers) > len(bounded),
+        identifiers_omitted_count=len(identifiers) - len(bounded),
     )
