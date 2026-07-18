@@ -53,6 +53,10 @@ Quant Core -> product-domain validation and review inputs
 
 - Facts require evidence, provenance, and an information cutoff date.
 - Inferences must state their basis and confidence. Missing evidence and unresolved conflicts must be explicit.
+- Workflow lifecycle and formal research-conclusion status are separate, independently versioned fields.
+- Evidence follows A/B/C/D grading; D-grade leads or rumors cannot independently support a conclusion.
+- The system must not fabricate customers, market share, capacity, orders, revenue proportions, certification status, or other unsupported operating facts. Rumors and concept-stock lists must never be presented as facts.
+- Every completed research output ends with a mandatory `后续验证清单`.
 - Important conclusions, watchlist state changes, and paper-position theses are versioned rather than overwritten.
 - Paper portfolios contain simulated records only. They must expose no broker connectivity, real-order behavior, trading buttons, or automated execution.
 - The system remains personal-use, local-first, research-only, and non-advisory. Authentication, multi-user SaaS, subscriptions, and payments are outside this architecture scope.
