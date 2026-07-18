@@ -24,7 +24,7 @@ Market observations can create research cases. Research produces evidence-backed
 | Area | Purpose | Current state |
 | --- | --- | --- |
 | Home | Local market summary, recent research changes, and verification reminders. | Planned |
-| Market Cockpit | Indices, breadth, style, liquidity, sector rotation, crowding, and market risk. | Planned |
+| Market Cockpit | Selected-universe breadth, participation, risk, provenance, and completeness; broader sections require reviewed data coverage. | v0.4A foundation in development; official indices, sectors, style, valuation, and crowding unsupported |
 | Industry Alpha | Stage 1 industry mapping and Stage 2 investment screening with evidence and cutoff dates. | Planned |
 | Stock Research | Company role, beneficiary relationship, financial transmission, expectations, valuation, catalysts, and risks. | Planned |
 | Watchlist | Research status, catalysts, risks, verification tasks, and status history. | Planned |

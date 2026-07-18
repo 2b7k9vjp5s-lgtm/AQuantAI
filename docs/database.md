@@ -59,6 +59,8 @@ The first import writes 2 stock-basic rows, 4 daily-price rows, and 2 trade-cale
 
 Controlled AKShare collection uses `python -m scripts.ingest_akshare_market_data` and is documented in [akshare_ingestion.md](akshare_ingestion.md). It requires explicit codes, dates, adjustment policy, cutoff, and either real-network consent or the offline fixture mode. A live cutoff must equal the UTC collection date and the request records the exact UTC timestamp plus installed AKShare version. Because `stock_info_a_code_name` has no historical selector, live stock-basic data represents only what was available at collection time and cannot reconstruct a historical universe. API startup, Dashboard use, tests, CI, and the fixture demo never invoke it.
 
+The v0.4A Market Cockpit adds no table or migration. Its repository adapter selects one successful complete ingestion run by explicit series/cutoff ordering and reads all three datasets by that physical run ID. Database construction remains request-lazy and injectable; the API never performs provider-only selection or falls back to fixture Dashboard data.
+
 Inside Compose, run the commands with `docker compose exec app`. The public `.env.example` URL uses service hostname `postgres`. For direct host execution, set `DATABASE_URL` to the exposed host address, for example `postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai`.
 
 After a failed import, correct the fixture, configuration, or database availability and retry. The failed attempt remains available for audit, while the retry receives a new ingestion-run ID. A failed run has no partial market rows. Do not use `Base.metadata.create_all()` for local operation.

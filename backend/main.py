@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend.api.market_cockpit import router as market_cockpit_router
 from dashboard import build_dashboard_overview, build_dashboard_report
 
 app = FastAPI(
@@ -13,7 +14,14 @@ app = FastAPI(
 )
 
 DASHBOARD_STATIC_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "static"
+MARKET_COCKPIT_STATIC_DIR = Path(__file__).resolve().parents[1] / "market_cockpit" / "static"
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
+app.mount(
+    "/market-cockpit/static",
+    StaticFiles(directory=MARKET_COCKPIT_STATIC_DIR),
+    name="market-cockpit-static",
+)
+app.include_router(market_cockpit_router)
 
 
 @app.get("/")
@@ -45,3 +53,12 @@ def dashboard_overview() -> dict:
 @app.get("/dashboard/report")
 def dashboard_report() -> dict:
     return build_dashboard_report().to_dict()
+
+
+@app.get("/market-cockpit", include_in_schema=False)
+def market_cockpit_page() -> FileResponse:
+    """Serve the read-only database-backed Market Cockpit page."""
+    return FileResponse(
+        MARKET_COCKPIT_STATIC_DIR / "market_cockpit.html",
+        media_type="text/html",
+    )

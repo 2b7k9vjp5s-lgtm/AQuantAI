@@ -77,6 +77,8 @@ Phase 6 adds deterministic sample JSON endpoints:
 
 These endpoints return local fixture/sample payloads only.
 
+The database-backed `/market-cockpit` page and `/market-cockpit/snapshot` API are a separate v0.4A product boundary. They do not change these fixture Dashboard builders or response contracts and never use Dashboard samples as a database fallback.
+
 ## Required Disclaimer
 
 All dashboard payloads include the same research-only disclaimer used by reports:

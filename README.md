@@ -8,7 +8,7 @@ Current version: `0.2.0`.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
 
-The v0.3B development branch extends the merged v0.3A PostgreSQL foundation with canonical snapshot-series identity and a manually invoked, bounded AKShare ingestion CLI. Network access is never automatic and requires an explicit flag. The released version, API, Dashboard payloads, and Quant Core calculations remain unchanged.
+The v0.4A development branch adds a separate database-backed, read-only Market Cockpit for one explicit persisted snapshot series. It monitors only the selected universe and does not claim full-market or official-index coverage. The released version, fixture Dashboard payloads, and Quant Core calculations remain unchanged.
 
 ## Planned Personal Research Architecture
 
@@ -61,6 +61,7 @@ Phase 0 through Phase 6, the correctness hardening pass, and the local Dashboard
 - Complete-snapshot PostgreSQL market-data versions with immutable ingestion attempts, cutoff-aware deterministic reads, exact stock-code scopes, transactional reconciliation, and concurrent-safe idempotent fixture imports
 - Canonical snapshot-series keys that isolate incompatible stock scopes, date ranges, adjustment policies, contracts, and compatibility parameters
 - Manual AKShare normalization and persistence CLI with explicit network opt-in, hard timeouts, finite retries, and dry-run support
+- Database-backed selected-universe Market Cockpit contracts, deterministic breadth/risk calculations, explicit series/cutoff selection, and a read-only local page
 - Mocked provider tests
 - Factor contracts for values and scores
 - Initial value, growth, quality, momentum, and risk factors
@@ -183,6 +184,22 @@ python -m scripts.ingest_akshare_market_data \
 ```
 
 Inspect normalization and the canonical series key without database writes by adding `--dry-run`. For deterministic offline verification, replace `--allow-network` with `--offline-fixture`. The live stock-basic endpoint has no historical date selector, so it cannot reconstruct a historical stock universe; rows describe information available at collection time. No AKShare call occurs during imports, FastAPI startup, Dashboard use, tests, CI, or the fixture demo. See [controlled AKShare ingestion](docs/akshare_ingestion.md).
+
+### Database-Backed Market Cockpit
+
+After migrating PostgreSQL and persisting a compatible snapshot series, inspect the read-only JSON endpoint with an explicit series key:
+
+```text
+http://127.0.0.1:8000/market-cockpit/snapshot?series_key=<series-key>&as_of_cutoff=YYYYMMDD
+```
+
+Open the local page with the same selector:
+
+```text
+http://127.0.0.1:8000/market-cockpit?series_key=<series-key>&as_of_cutoff=YYYYMMDD
+```
+
+The API never performs provider-only selection and never falls back to fixture Dashboard data. It reports exact scope, ingestion provenance, cutoff, adjustment policy, completeness warnings, and unsupported sections. Exact formulas and minimum windows are documented in [Market Cockpit v0.4A](docs/market_cockpit.md).
 
 Run tests:
 

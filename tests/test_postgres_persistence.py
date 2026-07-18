@@ -26,6 +26,18 @@ from datasource.fixtures import (
     FIXTURE_START_DATE,
     build_market_data_fixture,
 )
+from market_cockpit.fixtures import (
+    COCKPIT_FIXTURE_ADJUST_TYPE,
+    COCKPIT_FIXTURE_CURRENT_CUTOFF,
+    COCKPIT_FIXTURE_END_DATE,
+    COCKPIT_FIXTURE_HISTORICAL_CUTOFF,
+    COCKPIT_FIXTURE_PROVIDER,
+    COCKPIT_FIXTURE_SCOPE,
+    COCKPIT_FIXTURE_START_DATE,
+    build_market_cockpit_fixture,
+)
+from market_cockpit.repository import MarketCockpitRepository, MarketCockpitSelectionError
+from market_cockpit.service import MarketCockpitService
 
 
 @pytest.fixture(scope="module")
@@ -328,5 +340,53 @@ def test_postgres_calendar_reconciliation_rejects_entire_batch(
             assert session.scalar(select(func.count()).select_from(StockBasicRecord)) == 0
             assert session.scalar(select(func.count()).select_from(DailyPriceRecord)) == 0
             assert session.scalar(select(func.count()).select_from(TradeCalendarRecord)) == 0
+    finally:
+        engine.dispose()
+
+
+def test_postgres_market_cockpit_current_and_historical_cutoff_use_one_series(
+    postgres_database_url: str,
+) -> None:
+    engine = build_engine(postgres_database_url)
+    session_factory = build_session_factory(engine)
+    persistence = MarketDataPersistenceService(session_factory)
+    try:
+        historical = persistence.ingest_bundle(
+            build_market_cockpit_fixture(revision="historical"),
+            provider=COCKPIT_FIXTURE_PROVIDER,
+            requested_start_date=COCKPIT_FIXTURE_START_DATE,
+            requested_end_date=COCKPIT_FIXTURE_END_DATE,
+            information_cutoff_date=COCKPIT_FIXTURE_HISTORICAL_CUTOFF,
+            requested_scope=COCKPIT_FIXTURE_SCOPE,
+            adjust_type=COCKPIT_FIXTURE_ADJUST_TYPE,
+        )
+        current = persistence.ingest_bundle(
+            build_market_cockpit_fixture(revision="current"),
+            provider=COCKPIT_FIXTURE_PROVIDER,
+            requested_start_date=COCKPIT_FIXTURE_START_DATE,
+            requested_end_date=COCKPIT_FIXTURE_END_DATE,
+            information_cutoff_date=COCKPIT_FIXTURE_CURRENT_CUTOFF,
+            requested_scope=COCKPIT_FIXTURE_SCOPE,
+            adjust_type=COCKPIT_FIXTURE_ADJUST_TYPE,
+        )
+        assert current.series_key == historical.series_key
+
+        with session_factory() as session:
+            repository = MarketCockpitRepository(session)
+            service = MarketCockpitService(repository)
+            current_view = service.build_snapshot(series_key=current.series_key)
+            historical_view = service.build_snapshot(
+                series_key=current.series_key,
+                as_of_cutoff=COCKPIT_FIXTURE_HISTORICAL_CUTOFF,
+            )
+            with pytest.raises(MarketCockpitSelectionError, match="provider-only"):
+                repository.load_snapshot()
+
+        assert current_view.provenance.ingestion_run_id == current.ingestion_run_id
+        assert historical_view.provenance.ingestion_run_id == historical.ingestion_run_id
+        assert current_view.provenance.series_key == historical_view.provenance.series_key
+        assert current_view.provenance.adjust_type == "qfq"
+        assert current_view.completeness_status == "ready"
+        assert historical_view.completeness_status == "ready"
     finally:
         engine.dispose()
