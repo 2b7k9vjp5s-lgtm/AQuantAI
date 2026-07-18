@@ -2,7 +2,7 @@
 setlocal EnableExtensions DisableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"
-if not defined AQUANTAI_PORT set "AQUANTAI_PORT=8200"
+if not defined AQUANTAI_PORT set "AQUANTAI_PORT=8000"
 set "DASHBOARD_URL=http://127.0.0.1:%AQUANTAI_PORT%/dashboard"
 set "HEALTH_URL=http://127.0.0.1:%AQUANTAI_PORT%/health"
 set "MAX_ATTEMPTS=30"
@@ -31,6 +31,9 @@ if not exist ".env" (
   echo Keeping your existing .env file unchanged.
 )
 
+docker compose config --quiet >nul 2>&1
+if errorlevel 1 goto :compose_config_invalid
+
 echo Starting AQuantAI. The first launch may take a few minutes while Docker builds the local services.
 docker compose up --build -d
 if errorlevel 1 goto :compose_start_failed
@@ -42,7 +45,13 @@ for /L %%I in (1,1,%MAX_ATTEMPTS%) do (
   timeout /t 2 /nobreak >nul
 )
 
-echo AQuantAI did not become ready. Check that Docker Desktop is running and that port %AQUANTAI_PORT% is available.
+echo AQuantAI did not become ready before the health-check timeout.
+echo Current Docker Compose status:
+docker compose ps
+echo Recent app logs:
+docker compose logs --tail 30 app
+echo Check the messages above, confirm port %AQUANTAI_PORT% is available, then run this launcher again.
+echo You can use stop-aquantai.bat to stop any partially started services without deleting data.
 goto :failure
 
 :dashboard_ready
@@ -70,8 +79,16 @@ goto :failure
 echo Could not create .env. Check that you can write to this repository folder, then try again.
 goto :failure
 
+:compose_config_invalid
+echo Docker Compose could not read the local configuration. Check .env against .env.example, then try again.
+echo Your existing .env was not changed.
+goto :failure
+
 :compose_start_failed
-echo Docker could not build or start AQuantAI. Check Docker Desktop, your internet connection for a first build, and whether port %AQUANTAI_PORT% is available, then try again.
+echo Docker could not build or start AQuantAI. Review the Docker error above.
+echo If it mentions pip, setuptools, or package downloads, check the internet or proxy used by Docker Desktop and retry.
+echo If it mentions port %AQUANTAI_PORT%, close the conflicting service or set AQUANTAI_PORT to another available local port.
+echo No volumes, images, .env files, or user files were deleted.
 goto :failure
 
 :failure

@@ -113,7 +113,7 @@ Prerequisites: a repository checkout and Docker Desktop. The launchers do not in
 - Windows: double-click `start-aquantai.bat`. Double-click `stop-aquantai.bat` to stop the local services safely.
 - macOS/Linux: run `chmod +x start-aquantai.sh stop-aquantai.sh`, then `./start-aquantai.sh`. Run `./stop-aquantai.sh` to stop the local services safely.
 
-The start launcher finds the repository root, checks Docker and the Docker daemon, creates `.env` from `.env.example` only when needed, and starts the existing Compose stack with `docker compose up --build -d`. It waits for the local health check, then opens `http://127.0.0.1:8200/dashboard`. It never overwrites an existing `.env`. The host port defaults to `8200` to avoid common Windows system-reserved ranges; set `AQUANTAI_PORT` before running a launcher to use a different available local port. If Docker is unavailable, the configured port is unavailable, or the health check times out, it prints the next action to take.
+The start launcher finds the repository root, checks Docker, Compose, the Docker daemon, and local Compose configuration, creates `.env` from `.env.example` only when needed, and starts the existing stack with `docker compose up --build -d`. It waits for the local health check, then opens `http://127.0.0.1:8000/dashboard`. It never overwrites an existing `.env`. If Docker cannot build dependencies, the configured port is unavailable, or the health check times out, it prints focused diagnostics and a safe next action. Set `AQUANTAI_PORT` before running a launcher only when port 8000 is unavailable.
 
 The Dashboard remains local, fixture/sample-data-only, and read-only. It is for research and learning only, not investment advice or a trading service.
 

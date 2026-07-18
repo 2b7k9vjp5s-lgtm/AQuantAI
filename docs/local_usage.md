@@ -18,14 +18,14 @@ Prerequisites: a repository checkout and Docker Desktop. The launchers do not in
 Double-click `start-aquantai.bat`. It finds the repository root, checks Docker, Docker Compose, and the Docker daemon, then starts the existing Compose stack in the background. It creates `.env` from `.env.example` only if `.env` is missing and never overwrites an existing `.env`. After a bounded health-check wait, it opens:
 
 ```text
-http://127.0.0.1:8200/dashboard
+http://127.0.0.1:8000/dashboard
 ```
 
 Double-click `stop-aquantai.bat` to stop the stack. It uses `docker compose down` and keeps volumes, images, `.env`, and local files.
 
-To use a different local port from Command Prompt, run `set AQUANTAI_PORT=8300` before `start-aquantai.bat`. The default is `8200`.
+The default port is `8000`. If Windows reports that this port is reserved or unavailable, open Command Prompt, run `set AQUANTAI_PORT=8200`, then run `start-aquantai.bat` in the same window. In PowerShell, use `$env:AQUANTAI_PORT = "8200"` followed by `.\start-aquantai.bat`.
 
-### macOS/Linux
+### macOS
 
 Make the scripts executable once:
 
@@ -40,15 +40,29 @@ Start and stop the local stack:
 ./stop-aquantai.sh
 ```
 
-The macOS/Linux scripts use the same Docker checks, `.env` preservation, bounded local health check, and safe `docker compose down` behavior. They try the standard system browser opener after the Dashboard is ready.
+The script uses the same Docker checks, `.env` preservation, bounded local health check, and safe `docker compose down` behavior. After the Dashboard is ready, macOS uses the standard `open` command.
 
-To use a different local port, run `AQUANTAI_PORT=8300 ./start-aquantai.sh`.
+To use another available local port, run `AQUANTAI_PORT=8200 ./start-aquantai.sh`.
+
+### Linux
+
+Make the scripts executable once, then start or stop the stack:
+
+```bash
+chmod +x start-aquantai.sh stop-aquantai.sh
+./start-aquantai.sh
+./stop-aquantai.sh
+```
+
+Linux uses `xdg-open` when available. If no browser opener is installed, the script prints the Dashboard URL. Use `AQUANTAI_PORT=8200 ./start-aquantai.sh` only when the default port is unavailable.
 
 Common fixes:
 
 - Docker command unavailable: install Docker Desktop and open a new terminal.
 - Docker daemon unavailable: start Docker Desktop and wait until it finishes starting.
-- Default port 8200 unavailable or health-check timeout: stop the conflicting local service, or set `AQUANTAI_PORT` to another available local port before running the launcher.
+- Compose configuration invalid: compare `.env` with `.env.example`; the launcher does not overwrite the existing file.
+- First-build package failure: check the internet or proxy used by Docker, then retry. The launcher does not download or execute remote scripts itself.
+- Port 8000 unavailable or health-check timeout: review the printed Compose status and app logs, stop the conflicting service, or set `AQUANTAI_PORT` to another local port.
 
 These launchers only start the existing local Compose stack. They do not provide production deployment, live data, persistence, accounts, brokers, orders, or trading.
 
@@ -74,16 +88,16 @@ The demo uses local fixtures. It does not require live market data, an LLM crede
 Start FastAPI:
 
 ```bash
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8200
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
 Open these local URLs in a browser or HTTP client:
 
-- http://127.0.0.1:8200/
-- http://127.0.0.1:8200/health
-- http://127.0.0.1:8200/dashboard
-- http://127.0.0.1:8200/dashboard/overview
-- http://127.0.0.1:8200/dashboard/report
+- http://127.0.0.1:8000/
+- http://127.0.0.1:8000/health
+- http://127.0.0.1:8000/dashboard
+- http://127.0.0.1:8000/dashboard/overview
+- http://127.0.0.1:8000/dashboard/report
 
 Expected results:
 
@@ -102,10 +116,10 @@ Build the image:
 docker build -t aquantai:v0.2 .
 ```
 
-Start it on port 8200:
+Start it on port 8000:
 
 ```bash
-docker run --rm -p 8200:8000 aquantai:v0.2
+docker run --rm -p 8000:8000 aquantai:v0.2
 ```
 
 Use the listed local URLs above to verify the API. Stop the foreground container with `Ctrl+C`.
@@ -124,7 +138,7 @@ Start the app and PostgreSQL services:
 docker compose up --build
 ```
 
-The app is available on host port 8200 by default and PostgreSQL is exposed on port 5432. Set `AQUANTAI_PORT` to use another available host port; the app remains on internal container port 8000. PostgreSQL starts to validate the Compose environment, but database persistence is not implemented in the v0.2 baseline. The app remains a local, fixture-oriented research service and does not claim persisted research data.
+The app is available on host port 8000 by default and PostgreSQL is exposed on port 5432. Set `AQUANTAI_PORT` before Compose startup to use another available host port; the app remains on internal container port 8000. PostgreSQL starts to validate the Compose environment, but database persistence is not implemented in the v0.2 baseline. The app remains a local, fixture-oriented research service and does not claim persisted research data.
 
 For ordinary local use, stop the stack without deleting volumes or `.env`:
 
@@ -141,6 +155,8 @@ If PowerShell cannot find `docker` immediately after installing Docker Desktop, 
 ```bash
 docker version
 ```
+
+If Windows reserves port 8000, `netsh interface ipv4 show excludedportrange protocol=tcp` displays the excluded ranges. Do not change system reservations for AQuantAI; use the documented `AQUANTAI_PORT=8200` override instead.
 
 ## v0.2 Boundaries
 

@@ -30,6 +30,14 @@ if errorlevel 1 (
   exit /b 1
 )
 
+docker compose config --quiet >nul 2>&1
+if errorlevel 1 (
+  echo Docker Compose could not read the local configuration. Check .env against .env.example and try again.
+  echo No volumes, images, .env files, or user files were deleted.
+  popd
+  exit /b 1
+)
+
 echo Stopping AQuantAI services. Your .env file, Docker volumes, images, and local files will be kept.
 docker compose down
 if errorlevel 1 (

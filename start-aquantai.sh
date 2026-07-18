@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -u
 
-AQUANTAI_PORT="${AQUANTAI_PORT:-8200}"
+AQUANTAI_PORT="${AQUANTAI_PORT:-8000}"
 export AQUANTAI_PORT
 DASHBOARD_URL="http://127.0.0.1:${AQUANTAI_PORT}/dashboard"
 HEALTH_URL="http://127.0.0.1:${AQUANTAI_PORT}/health"
@@ -28,8 +28,15 @@ else
   printf '%s\n' "Keeping your existing .env file unchanged."
 fi
 
+docker compose config --quiet >/dev/null 2>&1 || fail "Docker Compose could not read the local configuration. Check .env against .env.example; your existing .env was not changed."
+
 printf '%s\n' "Starting AQuantAI. The first launch may take a few minutes while Docker builds the local services."
-docker compose up --build -d || fail "Docker could not build or start AQuantAI. Check Docker Desktop, your internet connection for a first build, and whether port $AQUANTAI_PORT is available, then try again."
+if ! docker compose up --build -d; then
+  printf '%s\n' "Docker could not build or start AQuantAI. Review the Docker error above." >&2
+  printf '%s\n' "If it mentions pip, setuptools, or package downloads, check the internet or proxy used by Docker and retry." >&2
+  printf '%s\n' "If it mentions port $AQUANTAI_PORT, close the conflicting service or set AQUANTAI_PORT to another available local port." >&2
+  fail "No volumes, images, .env files, or user files were deleted."
+fi
 
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
@@ -51,4 +58,10 @@ while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
   attempt=$((attempt + 1))
 done
 
-fail "AQuantAI did not become ready. Check that Docker Desktop is running and that port $AQUANTAI_PORT is available."
+printf '%s\n' "AQuantAI did not become ready before the health-check timeout." >&2
+printf '%s\n' "Current Docker Compose status:" >&2
+docker compose ps >&2 || true
+printf '%s\n' "Recent app logs:" >&2
+docker compose logs --tail 30 app >&2 || true
+printf '%s\n' "Use ./stop-aquantai.sh to stop partially started services without deleting data." >&2
+fail "Check the messages above, confirm port $AQUANTAI_PORT is available, then run this launcher again."
