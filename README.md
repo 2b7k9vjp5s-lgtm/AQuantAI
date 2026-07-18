@@ -106,6 +106,17 @@ The current phase does not implement:
 
 For a complete local handoff covering Python, API, Docker, and Docker Compose usage, see [docs/local_usage.md](docs/local_usage.md).
 
+### One-Click Local Dashboard
+
+Prerequisites: a repository checkout and Docker Desktop. The launchers do not install Docker, Python, packages, or any other software.
+
+- Windows: double-click `start-aquantai.bat`. Double-click `stop-aquantai.bat` to stop the local services safely.
+- macOS/Linux: run `chmod +x start-aquantai.sh stop-aquantai.sh`, then `./start-aquantai.sh`. Run `./stop-aquantai.sh` to stop the local services safely.
+
+The start launcher finds the repository root, checks Docker, Compose, the Docker daemon, and local Compose configuration, creates `.env` from `.env.example` only when needed, and starts the existing stack with `docker compose up --build -d`. It waits for the local health check, then opens `http://127.0.0.1:8000/dashboard`. It never overwrites an existing `.env`. If Docker cannot build dependencies, port 8000 is unavailable, or the health check times out, it prints focused diagnostics and a safe next action. Windows double-click results remain visible for 10 seconds; terminal and automation callers can pass `--no-wait` while retaining the launcher exit code.
+
+The Dashboard remains local, fixture/sample-data-only, and read-only. It is for research and learning only, not investment advice or a trading service.
+
 Install dependencies:
 
 ```bash

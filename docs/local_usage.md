@@ -9,6 +9,64 @@ This guide describes the v0.2 local, read-only research Dashboard baseline. It i
 
 Run all commands from the repository root.
 
+## One-Click Local Dashboard
+
+Prerequisites: a repository checkout and Docker Desktop. The launchers do not install Docker, Python, packages, or other software.
+
+### Windows
+
+Double-click `start-aquantai.bat`. It finds the repository root, checks Docker, Docker Compose, and the Docker daemon, then starts the existing Compose stack in the background. It creates `.env` from `.env.example` only if `.env` is missing and never overwrites an existing `.env`. After a bounded health-check wait, it opens:
+
+```text
+http://127.0.0.1:8000/dashboard
+```
+
+Double-click `stop-aquantai.bat` to stop the stack. It uses `docker compose down` and keeps volumes, images, `.env`, and local files.
+
+The Dashboard always uses port `8000`. If startup reports a conflict, run `netstat -ano | findstr :8000`, identify the local process, close it safely, and rerun the launcher. The launcher returns a non-zero status when Docker cannot bind port 8000.
+
+When started by double-click, the Windows scripts keep the result visible for 10 seconds before closing. For terminal or automated use, run `start-aquantai.bat --no-wait` or `stop-aquantai.bat --no-wait`; success still returns 0 and failure returns non-zero.
+
+### macOS
+
+Make the scripts executable once:
+
+```bash
+chmod +x start-aquantai.sh stop-aquantai.sh
+```
+
+Start and stop the local stack:
+
+```bash
+./start-aquantai.sh
+./stop-aquantai.sh
+```
+
+The script uses the same Docker checks, `.env` preservation, bounded local health check, and safe `docker compose down` behavior. After the Dashboard is ready, macOS uses the standard `open` command.
+
+### Linux
+
+Make the scripts executable once, then start or stop the stack:
+
+```bash
+chmod +x start-aquantai.sh stop-aquantai.sh
+./start-aquantai.sh
+./stop-aquantai.sh
+```
+
+Linux uses `xdg-open` when available. macOS alone uses `open`. If the platform-specific opener is missing or fails, the script prints the exact Dashboard URL.
+
+Common fixes:
+
+- Docker command unavailable: install Docker Desktop and open a new terminal.
+- Docker daemon unavailable: start Docker Desktop and wait until it finishes starting.
+- Compose configuration invalid: compare `.env` with `.env.example`; the launcher does not overwrite the existing file.
+- First-build package failure: check the internet or proxy used by Docker, then retry. The launcher does not download or execute remote scripts itself.
+- Port 8000 unavailable: close the program using port 8000, then rerun the launcher. The launcher does not change ports or terminate processes automatically.
+- Health-check timeout: review the printed Compose status and app logs, then use the matching stop script if partial services should be stopped.
+
+These launchers only start the existing local Compose stack. They do not provide production deployment, live data, persistence, accounts, brokers, orders, or trading.
+
 ## Python Setup
 
 Install the runtime and development dependencies:
@@ -81,15 +139,15 @@ Start the app and PostgreSQL services:
 docker compose up --build
 ```
 
-The app is available on port 8000 and PostgreSQL is exposed on port 5432. PostgreSQL starts to validate the Compose environment, but database persistence is not implemented in the v0.2 baseline. The app remains a local, fixture-oriented research service and does not claim persisted research data.
+The app is available on host port 8000 and PostgreSQL is exposed on port 5432. PostgreSQL starts to validate the Compose environment, but database persistence is not implemented in the v0.2 baseline. The app remains a local, fixture-oriented research service and does not claim persisted research data.
 
-Stop and remove the test stack, including its volume:
+For ordinary local use, stop the stack without deleting volumes or `.env`:
 
 ```bash
-docker compose down -v --remove-orphans
+docker compose down
 ```
 
-Remove the temporary `.env` only if it was created from `.env.example` for this local test.
+The one-click stop scripts use the same safe command. Do not delete `.env` unless you intentionally want to recreate local configuration.
 
 ## Windows Docker Desktop Note
 
@@ -98,6 +156,8 @@ If PowerShell cannot find `docker` immediately after installing Docker Desktop, 
 ```bash
 docker version
 ```
+
+If Windows reserves port 8000, `netsh interface ipv4 show excludedportrange protocol=tcp` displays the excluded ranges. Do not remove system reservations automatically. Stop the launcher, resolve the Windows or Docker port reservation outside AQuantAI, and retry only after port 8000 is available.
 
 ## v0.2 Boundaries
 
