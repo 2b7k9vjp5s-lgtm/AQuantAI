@@ -1,6 +1,7 @@
 """Data provider contracts for AQuantAI."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Literal
 
 import pandas as pd
@@ -35,6 +36,15 @@ TRADE_CALENDAR_COLUMNS = [
     "is_open",
     "source",
 ]
+
+
+@dataclass(frozen=True)
+class MarketDataBundle:
+    """Existing normalized datasets grouped for one atomic persistence batch."""
+
+    stock_basic: pd.DataFrame
+    daily_price: pd.DataFrame
+    trade_calendar: pd.DataFrame
 
 
 class DataProvider(ABC):
