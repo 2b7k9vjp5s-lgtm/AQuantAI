@@ -23,7 +23,6 @@ from backend.database.models import (
 from backend.database.series import (
     SectorSeriesIdentity,
     build_sector_series_identity,
-    canonical_json_object,
 )
 from datasource.base import (
     SECTOR_DAILY_COLUMNS,
@@ -42,8 +41,35 @@ DEFAULT_SECTOR_TAXONOMY_ENDPOINT = "stock_board_industry_name_em"
 DEFAULT_SECTOR_HISTORY_ENDPOINT = "stock_board_industry_hist_em"
 DEFAULT_SECTOR_CLASSIFICATION_SYSTEM = "eastmoney_industry_board"
 DEFAULT_SECTOR_CLASSIFICATION_LEVEL: str | None = None
-DEFAULT_SECTOR_ADAPTER_VERSION = "aquantai.akshare-sector-adapter.v1"
+DEFAULT_SECTOR_ADAPTER_VERSION = "akshare-normalizer-v1"
+DEFAULT_SECTOR_ADAPTER_COMPATIBILITY_VERSION = (
+    "aquantai.akshare-sector-endpoints.v1.18.64"
+)
+DEFAULT_SECTOR_REVIEWED_AKSHARE_VERSION = "1.18.64"
 SECTOR_CODE_PATTERN = re.compile(r"^BK[0-9]+$")
+PUBLIC_METADATA_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+SECTOR_PROVIDER_METADATA_FIELDS = frozenset({
+    "taxonomy_endpoint",
+    "history_endpoint",
+    "classification_system",
+    "classification_level",
+    "frequency",
+    "adjust_type",
+    "sector_codes",
+    "start_date",
+    "end_date",
+    "network_mode",
+    "timeout_seconds",
+    "max_retries",
+    "akshare_package_version",
+    "definition_contract_version",
+    "daily_contract_version",
+    "adapter_version",
+    "adapter_compatibility_version",
+    "collection_timestamp_utc",
+    "effective_information_cutoff_date",
+})
+SECTOR_NETWORK_MODES = frozenset({"live-opt-in", "offline-fixture", "injected-mock"})
 SENSITIVE_METADATA_TERMS = {
     "api_key", "apikey", "cookie", "credential", "database_url", "password",
     "secret", "token",
@@ -108,7 +134,7 @@ def validate_sector_bundle(
     requested_scope: dict[str, Any],
     taxonomy_endpoint: str = DEFAULT_SECTOR_TAXONOMY_ENDPOINT,
     history_endpoint: str = DEFAULT_SECTOR_HISTORY_ENDPOINT,
-    adapter_compatibility_version: str = DEFAULT_SECTOR_ADAPTER_VERSION,
+    adapter_compatibility_version: str = DEFAULT_SECTOR_ADAPTER_COMPATIBILITY_VERSION,
     compatibility_parameters: dict[str, Any] | None = None,
 ) -> SectorValidationSummary:
     provider_text, start, end, cutoff, scope, series = _request_context(
@@ -151,7 +177,7 @@ class SectorPersistenceService:
         requested_scope: dict[str, Any],
         taxonomy_endpoint: str = DEFAULT_SECTOR_TAXONOMY_ENDPOINT,
         history_endpoint: str = DEFAULT_SECTOR_HISTORY_ENDPOINT,
-        adapter_compatibility_version: str = DEFAULT_SECTOR_ADAPTER_VERSION,
+        adapter_compatibility_version: str = DEFAULT_SECTOR_ADAPTER_COMPATIBILITY_VERSION,
         provider_request_metadata: dict[str, Any] | None = None,
         adapter_version: str = DEFAULT_SECTOR_ADAPTER_VERSION,
         compatibility_parameters: dict[str, Any] | None = None,
@@ -167,8 +193,16 @@ class SectorPersistenceService:
             adapter_compatibility_version=adapter_compatibility_version,
             compatibility_parameters=compatibility_parameters,
         )
-        metadata = _request_metadata(provider_request_metadata)
         normalized_adapter = _required_text(adapter_version, "adapter_version")
+        metadata = _request_metadata(
+            provider_request_metadata,
+            series=series,
+            scope=scope,
+            start=start,
+            end=end,
+            cutoff=cutoff,
+            adapter_version=normalized_adapter,
+        )
         raw_count = _raw_count(bundle)
         try:
             definitions, daily = _normalize_bundle(
@@ -268,7 +302,7 @@ class SectorPersistenceService:
         requested_scope: dict[str, Any],
         taxonomy_endpoint: str = DEFAULT_SECTOR_TAXONOMY_ENDPOINT,
         history_endpoint: str = DEFAULT_SECTOR_HISTORY_ENDPOINT,
-        adapter_compatibility_version: str = DEFAULT_SECTOR_ADAPTER_VERSION,
+        adapter_compatibility_version: str = DEFAULT_SECTOR_ADAPTER_COMPATIBILITY_VERSION,
         provider_request_metadata: dict[str, Any] | None = None,
         adapter_version: str = DEFAULT_SECTOR_ADAPTER_VERSION,
     ) -> int:
@@ -283,7 +317,16 @@ class SectorPersistenceService:
             adapter_compatibility_version=adapter_compatibility_version,
             compatibility_parameters=None,
         )
-        metadata = _request_metadata(provider_request_metadata)
+        normalized_adapter = _required_text(adapter_version, "adapter_version")
+        metadata = _request_metadata(
+            provider_request_metadata,
+            series=series,
+            scope=scope,
+            start=start,
+            end=end,
+            cutoff=cutoff,
+            adapter_version=normalized_adapter,
+        )
         run_id = self._create_pending_run(
             batch_identifier=_hash_payload({
                 "provider_failure": _error_summary(exc),
@@ -298,7 +341,7 @@ class SectorPersistenceService:
             scope=scope,
             series=series,
             metadata=metadata,
-            adapter_version=_required_text(adapter_version, "adapter_version"),
+            adapter_version=normalized_adapter,
             row_count=0,
             dataset_counts={SECTOR_DEFINITION_DATASET: 0, SECTOR_DAILY_DATASET: 0},
         )
@@ -601,10 +644,230 @@ def _records(frame: pd.DataFrame, columns: list[str], order: list[str]) -> list[
     return records
 
 
-def _request_metadata(value: dict[str, Any] | None) -> dict[str, Any]:
-    metadata = canonical_json_object(value, "provider_request_metadata")
+def _request_metadata(
+    value: dict[str, Any] | None,
+    *,
+    series: SectorSeriesIdentity,
+    scope: dict[str, Any],
+    start: date,
+    end: date,
+    cutoff: date,
+    adapter_version: str,
+) -> dict[str, Any]:
+    if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
+        raise SectorDataValidationError(
+            "provider_request_metadata must be a flat object with string keys."
+        )
+    metadata = dict(value)
     _reject_sensitive(metadata)
-    return metadata
+    unknown = sorted(set(metadata) - SECTOR_PROVIDER_METADATA_FIELDS)
+    missing = sorted(SECTOR_PROVIDER_METADATA_FIELDS - set(metadata))
+    if unknown or missing:
+        raise SectorDataValidationError(
+            "provider_request_metadata fields must match the fixed sector allowlist; "
+            f"unknown={unknown}, missing={missing}."
+        )
+    for field, item in metadata.items():
+        if isinstance(item, (dict, list)) and field != "sector_codes":
+            raise SectorDataValidationError(
+                f"provider_request_metadata.{field} must be a flat scalar value."
+            )
+
+    raw_codes = metadata["sector_codes"]
+    if not isinstance(raw_codes, list):
+        raise SectorDataValidationError(
+            "provider_request_metadata.sector_codes must be the exact flat list."
+        )
+    if any(not isinstance(item, str) for item in raw_codes):
+        raise SectorDataValidationError(
+            "provider_request_metadata.sector_codes must contain stable BK strings."
+        )
+    normalized_codes = sorted({_sector_code(item) for item in raw_codes})
+    if len(normalized_codes) != len(raw_codes):
+        raise SectorDataValidationError(
+            "provider_request_metadata.sector_codes must contain no duplicates."
+        )
+    normalized = {
+        "taxonomy_endpoint": _public_metadata_identifier(
+            metadata["taxonomy_endpoint"], "taxonomy_endpoint"
+        ),
+        "history_endpoint": _public_metadata_identifier(
+            metadata["history_endpoint"], "history_endpoint"
+        ),
+        "classification_system": _public_metadata_identifier(
+            metadata["classification_system"], "classification_system"
+        ),
+        "classification_level": _metadata_classification_level(
+            metadata["classification_level"]
+        ),
+        "frequency": _public_metadata_identifier(metadata["frequency"], "frequency"),
+        "adjust_type": _metadata_adjust_type(metadata["adjust_type"]),
+        "sector_codes": normalized_codes,
+        "start_date": _metadata_date(metadata["start_date"], "start_date"),
+        "end_date": _metadata_date(metadata["end_date"], "end_date"),
+        "network_mode": _metadata_network_mode(metadata["network_mode"]),
+        "timeout_seconds": _metadata_timeout(metadata["timeout_seconds"]),
+        "max_retries": _metadata_retries(metadata["max_retries"]),
+        "akshare_package_version": _metadata_package_version(
+            metadata["akshare_package_version"]
+        ),
+        "definition_contract_version": _public_metadata_identifier(
+            metadata["definition_contract_version"], "definition_contract_version"
+        ),
+        "daily_contract_version": _public_metadata_identifier(
+            metadata["daily_contract_version"], "daily_contract_version"
+        ),
+        "adapter_version": _public_metadata_identifier(
+            metadata["adapter_version"], "adapter_version"
+        ),
+        "adapter_compatibility_version": _public_metadata_identifier(
+            metadata["adapter_compatibility_version"],
+            "adapter_compatibility_version",
+        ),
+        "collection_timestamp_utc": _metadata_utc_timestamp(
+            metadata["collection_timestamp_utc"]
+        ),
+        "effective_information_cutoff_date": _metadata_date(
+            metadata["effective_information_cutoff_date"],
+            "effective_information_cutoff_date",
+        ),
+    }
+    canonical = series.canonical
+    expected = {
+        "taxonomy_endpoint": canonical["taxonomy_endpoint"],
+        "history_endpoint": canonical["history_endpoint"],
+        "classification_system": canonical["classification_system"],
+        "classification_level": canonical["classification_level"],
+        "frequency": canonical["frequency"],
+        "adjust_type": canonical["adjust_type"],
+        "sector_codes": scope["sector_codes"],
+        "start_date": _compact_date(start),
+        "end_date": _compact_date(end),
+        "definition_contract_version": canonical[
+            "sector_definition_contract_version"
+        ],
+        "daily_contract_version": canonical["sector_daily_contract_version"],
+        "adapter_version": adapter_version,
+        "adapter_compatibility_version": canonical[
+            "adapter_compatibility_version"
+        ],
+        "effective_information_cutoff_date": _compact_date(cutoff),
+    }
+    contradictions = sorted(
+        field for field, expected_value in expected.items()
+        if normalized[field] != expected_value
+    )
+    if contradictions:
+        raise SectorDataValidationError(
+            "provider_request_metadata contradicts the canonical sector request for fields: "
+            f"{contradictions}."
+        )
+    return normalized
+
+
+def _public_metadata_identifier(value: Any, field: str) -> str:
+    if not isinstance(value, str):
+        raise SectorDataValidationError(
+            f"provider_request_metadata.{field} must be a bounded public identifier."
+        )
+    normalized = _required_text(value, f"provider_request_metadata.{field}")
+    if PUBLIC_METADATA_PATTERN.fullmatch(normalized) is None:
+        raise SectorDataValidationError(
+            f"provider_request_metadata.{field} must be a bounded public identifier."
+        )
+    return normalized
+
+
+def _metadata_classification_level(value: Any) -> None:
+    if value is not None:
+        raise SectorDataValidationError(
+            "provider_request_metadata.classification_level must be explicitly null."
+        )
+    return None
+
+
+def _metadata_adjust_type(value: Any) -> str:
+    if not isinstance(value, str) or value != "":
+        raise SectorDataValidationError(
+            "provider_request_metadata.adjust_type must be the unadjusted empty value."
+        )
+    return value
+
+
+def _metadata_date(value: Any, field: str) -> str:
+    if not isinstance(value, str):
+        raise SectorDataValidationError(
+            f"provider_request_metadata.{field} must use YYYYMMDD format."
+        )
+    return _compact_date(_required_date(value, f"provider_request_metadata.{field}"))
+
+
+def _metadata_network_mode(value: Any) -> str:
+    normalized = _public_metadata_identifier(value, "network_mode")
+    if normalized not in SECTOR_NETWORK_MODES:
+        raise SectorDataValidationError(
+            "provider_request_metadata.network_mode must be one of "
+            f"{sorted(SECTOR_NETWORK_MODES)}."
+        )
+    return normalized
+
+
+def _metadata_timeout(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise SectorDataValidationError(
+            "provider_request_metadata.timeout_seconds must be finite and in (0, 120]."
+        )
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError) as exc:
+        raise SectorDataValidationError(
+            "provider_request_metadata.timeout_seconds must be finite and in (0, 120]."
+        ) from exc
+    if not math.isfinite(normalized) or not 0 < normalized <= 120:
+        raise SectorDataValidationError(
+            "provider_request_metadata.timeout_seconds must be finite and in (0, 120]."
+        )
+    return normalized
+
+
+def _metadata_retries(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 5:
+        raise SectorDataValidationError(
+            "provider_request_metadata.max_retries must be an integer between 0 and 5."
+        )
+    return value
+
+
+def _metadata_package_version(value: Any) -> str:
+    normalized = _public_metadata_identifier(value, "akshare_package_version")
+    if re.fullmatch(r"\d+\.\d+\.\d+", normalized) is None:
+        raise SectorDataValidationError(
+            "provider_request_metadata.akshare_package_version must use X.Y.Z format."
+        )
+    if normalized != DEFAULT_SECTOR_REVIEWED_AKSHARE_VERSION:
+        raise SectorDataValidationError(
+            "provider_request_metadata.akshare_package_version must equal the reviewed "
+            f"sector endpoint version {DEFAULT_SECTOR_REVIEWED_AKSHARE_VERSION}."
+        )
+    return normalized
+
+
+def _metadata_utc_timestamp(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise SectorDataValidationError(
+            "provider_request_metadata.collection_timestamp_utc must be timezone-aware UTC."
+        )
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise SectorDataValidationError(
+            "provider_request_metadata.collection_timestamp_utc must be timezone-aware UTC."
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+        raise SectorDataValidationError(
+            "provider_request_metadata.collection_timestamp_utc must be timezone-aware UTC."
+        )
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _reject_sensitive(value: Any, path: str = "provider_request_metadata") -> None:

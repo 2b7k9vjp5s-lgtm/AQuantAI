@@ -47,6 +47,10 @@ MAX_BENCHMARK_CODES_PER_REQUEST = 20
 MAX_SECTOR_CODES_PER_REQUEST = 30
 MIN_AKSHARE_VERSION = (1, 16, 0)
 MAX_AKSHARE_VERSION_EXCLUSIVE = (2, 0, 0)
+SECTOR_REVIEWED_AKSHARE_VERSION = "1.18.64"
+SECTOR_ENDPOINT_COMPATIBILITY_VERSION = (
+    "aquantai.akshare-sector-endpoints.v1.18.64"
+)
 
 RAW_CODE = "\u4ee3\u7801"
 RAW_NAME = "\u540d\u79f0"
@@ -94,6 +98,22 @@ def validate_akshare_runtime_version(package_version: str) -> str:
     if not MIN_AKSHARE_VERSION <= parsed < MAX_AKSHARE_VERSION_EXCLUSIVE:
         raise AkshareProviderError(
             f"Unsupported AKShare version {normalized!r}; this adapter supports [1.16.0, 2.0.0)."
+        )
+    return normalized
+
+
+def validate_sector_akshare_runtime_version(package_version: str) -> str:
+    """Require the exact AKShare release reviewed for the sector endpoint pair."""
+    normalized = str(package_version).strip()
+    if re.fullmatch(r"\d+\.\d+\.\d+", normalized) is None:
+        raise AkshareProviderError(
+            f"Unsupported AKShare version {normalized!r} for the reviewed sector endpoint "
+            f"contract; accepted version: {SECTOR_REVIEWED_AKSHARE_VERSION}."
+        )
+    if normalized != SECTOR_REVIEWED_AKSHARE_VERSION:
+        raise AkshareProviderError(
+            f"Unsupported AKShare version {normalized!r} for the reviewed sector endpoint "
+            f"contract; accepted version: {SECTOR_REVIEWED_AKSHARE_VERSION}."
         )
     return normalized
 
@@ -455,6 +475,7 @@ class AkshareDataProvider(DataProvider):
         end_date: str,
     ) -> SectorMarketBundle:
         """Normalize one exact stable-code Eastmoney industry-board snapshot."""
+        validate_sector_akshare_runtime_version(self.akshare_package_version)
         normalized_codes = sorted({str(value).strip().upper() for value in sector_codes})
         if not normalized_codes or len(normalized_codes) != len(sector_codes):
             raise AkshareProviderError(
@@ -575,6 +596,12 @@ class AkshareDataProvider(DataProvider):
         daily_contract_version: str,
         adapter_compatibility_version: str,
     ) -> dict[str, Any]:
+        validate_sector_akshare_runtime_version(self.akshare_package_version)
+        if adapter_compatibility_version != SECTOR_ENDPOINT_COMPATIBILITY_VERSION:
+            raise AkshareProviderError(
+                "Sector adapter_compatibility_version must equal the reviewed endpoint "
+                f"contract {SECTOR_ENDPOINT_COMPATIBILITY_VERSION}."
+            )
         return {
             "taxonomy_endpoint": SECTOR_TAXONOMY_ENDPOINT,
             "history_endpoint": SECTOR_HISTORY_ENDPOINT,

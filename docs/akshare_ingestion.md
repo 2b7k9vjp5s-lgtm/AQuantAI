@@ -43,7 +43,7 @@ Responses pass through the existing persistence validation: exact scope, strict 
 
 Live `--allow-network` collection records one timezone-aware UTC collection timestamp and requires `--cutoff` to equal that timestamp's UTC calendar date. A past or future live cutoff is rejected before provider construction, provider calls, database-engine creation, or ingestion-run creation. This prevents a current stock-basic response from being labeled as historical point-in-time data.
 
-Offline fixture and injected-mock modes may continue to use an explicit deterministic cutoff for repeatable tests. Provider request metadata records the collection timestamp, effective cutoff, installed AKShare package version, endpoints, scope, timeout, retries, and network mode. The adapter validates AKShare at runtime against the reviewed range `>=1.16.0,<2.0.0`; package patch versions are audited but do not change the canonical series key.
+Offline fixture and injected-mock modes may continue to use an explicit deterministic cutoff for repeatable tests. Provider request metadata records the collection timestamp, effective cutoff, installed AKShare package version, endpoints, scope, timeout, retries, and network mode. The generic equity/benchmark adapter validates AKShare against `>=1.16.0,<2.0.0`. Sector collection additionally requires exact reviewed version `1.18.64` before endpoint access or engine creation, and uses canonical compatibility version `aquantai.akshare-sector-endpoints.v1.18.64`. No broader sector version range is claimed.
 
 ## Commands
 
@@ -77,7 +77,7 @@ python -m scripts.ingest_akshare_market_data \
 
 ## Bounded Failure Behavior
 
-Live endpoint calls run in a child process with a finite timeout. A timed-out child is terminated. Retries are finite, and errors identify the endpoint and suggest reducing scope or retrying later. Provider request metadata stores the UTC collection timestamp, effective cutoff, installed AKShare package version, endpoint names, explicit scope, adjustment policy, network mode, timeout, retry count, and adapter version; sensitive credential-like fields are rejected.
+Live endpoint calls run in a child process with a finite timeout. A timed-out child is terminated. Retries are finite, and errors identify the endpoint and suggest reducing scope or retrying later. Equity and benchmark metadata retain their existing reviewed handling. Sector metadata uses the fixed flat allowlist documented in [sector_context.md](sector_context.md), cross-checks identity-bearing values against the canonical request, and rejects unknown or nested provider payloads in addition to sensitive credential-like fields.
 
 Provider or normalization failures leave zero market-data rows and retain an immutable failed ingestion attempt when persistence mode is active. Dry-run failures do not write audit rows because dry-run guarantees zero database writes.
 

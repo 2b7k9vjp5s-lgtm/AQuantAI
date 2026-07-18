@@ -211,6 +211,12 @@ python -m scripts.ingest_akshare_sector_data \
   --dry-run
 ```
 
+The generic equity/benchmark AKShare range does not authorize sector endpoints. Sector
+collection accepts exactly reviewed AKShare `1.18.64` and identifies that contract as
+`aquantai.akshare-sector-endpoints.v1.18.64` in its canonical series. Any other installed
+version fails before sector endpoint or database-engine activity. Offline fixtures also
+declare the accepted deterministic package version and remain network-free.
+
 Live use replaces `--offline-fixture` with `--allow-network`, requires cutoff to equal the UTC collection date, and accepts at most 30 exact Eastmoney `BK` industry-board identifiers. The reviewed endpoint pair is `stock_board_industry_name_em` plus `stock_board_industry_hist_em`; display names are never selectors and there is no endpoint fallback.
 
 For direct host-Python use, set `DATABASE_URL` to the exposed host address before running the same commands. The `.env.example` value uses hostname `postgres` inside Compose; use `127.0.0.1` only in the host process environment. See [database.md](database.md) for natural keys, provenance, cutoff behavior, and recovery.

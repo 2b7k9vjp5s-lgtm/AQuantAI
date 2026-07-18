@@ -15,6 +15,7 @@ from backend.database.models import (
     SectorDefinitionRecord,
 )
 from backend.database.sector_data import (
+    SECTOR_PROVIDER_METADATA_FIELDS,
     SectorDataValidationError,
     SectorPersistenceService,
     validate_sector_bundle,
@@ -24,6 +25,7 @@ from backend.database.series import (
     build_sector_series_identity,
 )
 from datasource.base import SectorMarketBundle
+from datasource.akshare import SECTOR_ENDPOINT_COMPATIBILITY_VERSION
 from market_cockpit.sector_fixtures import (
     SECTOR_FIXTURE_CODES,
     SECTOR_FIXTURE_CURRENT_CUTOFF,
@@ -62,6 +64,7 @@ def _ingest(
     revision: str = "current",
     cutoff: str = SECTOR_FIXTURE_CURRENT_CUTOFF,
     bundle: SectorMarketBundle | None = None,
+    metadata: dict | None = None,
 ):
     return service.ingest_bundle(
         bundle or build_sector_fixture(revision=revision),
@@ -74,14 +77,51 @@ def _ingest(
         history_endpoint="fixture_sector_history",
         adapter_compatibility_version="sector-fixture-v1",
         adapter_version="sector-fixture-v1",
-        provider_request_metadata={
-            "network_mode": "offline-fixture",
-            "akshare_package_version": "1.18.64",
-            "collection_timestamp_utc": "2026-04-05T12:00:00Z",
-            "effective_information_cutoff_date": cutoff,
-            "timeout_seconds": 20,
-            "max_retries": 2,
-        },
+        provider_request_metadata=(
+            metadata if metadata is not None else _metadata(cutoff=cutoff)
+        ),
+    )
+
+
+def _metadata(*, cutoff: str = SECTOR_FIXTURE_CURRENT_CUTOFF, **changes):
+    values = {
+        "taxonomy_endpoint": "fixture_sector_taxonomy",
+        "history_endpoint": "fixture_sector_history",
+        "classification_system": "eastmoney_industry_board",
+        "classification_level": None,
+        "frequency": "daily",
+        "adjust_type": "",
+        "sector_codes": list(SECTOR_FIXTURE_CODES),
+        "start_date": SECTOR_FIXTURE_START_DATE,
+        "end_date": SECTOR_FIXTURE_END_DATE,
+        "network_mode": "offline-fixture",
+        "timeout_seconds": 20,
+        "max_retries": 2,
+        "akshare_package_version": "1.18.64",
+        "definition_contract_version": "1.0",
+        "daily_contract_version": "1.0",
+        "adapter_version": "sector-fixture-v1",
+        "adapter_compatibility_version": "sector-fixture-v1",
+        "collection_timestamp_utc": "2026-04-05T12:00:00Z",
+        "effective_information_cutoff_date": cutoff,
+    }
+    values.update(changes)
+    return values
+
+
+def _record_failed_attempt(service: SectorPersistenceService, metadata: dict) -> int:
+    return service.record_failed_attempt(
+        RuntimeError("bounded provider failure"),
+        provider=SECTOR_FIXTURE_PROVIDER,
+        requested_start_date=SECTOR_FIXTURE_START_DATE,
+        requested_end_date=SECTOR_FIXTURE_END_DATE,
+        information_cutoff_date=SECTOR_FIXTURE_CURRENT_CUTOFF,
+        requested_scope=SECTOR_FIXTURE_SCOPE,
+        taxonomy_endpoint="fixture_sector_taxonomy",
+        history_endpoint="fixture_sector_history",
+        adapter_compatibility_version="sector-fixture-v1",
+        adapter_version="sector-fixture-v1",
+        provider_request_metadata=metadata,
     )
 
 
@@ -122,6 +162,91 @@ def test_sector_contract_builds_distinct_exact_series_and_preserves_null_metadat
         assert definition.classification_level is None
         assert definition.parent_sector_code is None
         assert definition.parent_sector_name is None
+
+
+def test_fixed_provider_metadata_allowlist_persists_only_normalized_reviewed_fields(database) -> None:
+    result = _ingest(
+        SectorPersistenceService(database),
+        metadata=_metadata(sector_codes=list(reversed(SECTOR_FIXTURE_CODES))),
+    )
+    with database() as session:
+        run = session.get(IngestionRun, result.ingestion_run_id)
+        assert run is not None
+        assert set(run.provider_request_metadata) == SECTOR_PROVIDER_METADATA_FIELDS
+        assert run.provider_request_metadata["sector_codes"] == SECTOR_FIXTURE_CODES
+        assert run.provider_request_metadata["classification_level"] is None
+        assert run.provider_request_metadata["collection_timestamp_utc"] == (
+            "2026-04-05T12:00:00Z"
+        )
+
+
+def test_missing_provider_metadata_field_is_rejected_without_audit_or_data_rows(database) -> None:
+    metadata = _metadata()
+    metadata.pop("history_endpoint")
+    with pytest.raises(SectorDataValidationError, match=r"missing=\['history_endpoint'\]"):
+        _ingest(SectorPersistenceService(database), metadata=metadata)
+    with database() as session:
+        assert session.scalar(select(func.count()).select_from(IngestionRun)) == 0
+        assert session.scalar(select(func.count()).select_from(SectorDefinitionRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(SectorDailyRecord)) == 0
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"unknown_scalar": "debug"}, "fixed sector allowlist"),
+        ({"raw_response": {"rows": [1, 2]}}, "fixed sector allowlist"),
+        ({"host_path": "C:/private/debug.json"}, "fixed sector allowlist"),
+        ({"api_token": "not-persisted"}, "Sensitive metadata field"),
+        ({"network_mode": {"raw": "offline-fixture"}}, "flat scalar"),
+        ({"classification_level": "level_1"}, "explicitly null"),
+        ({"taxonomy_endpoint": "other_taxonomy"}, "canonical sector request"),
+        ({"history_endpoint": "other_history"}, "canonical sector request"),
+        ({"sector_codes": ["BK0001"]}, "canonical sector request"),
+        ({"start_date": "20260106"}, "canonical sector request"),
+        ({"end_date": "20260402"}, "canonical sector request"),
+        ({"definition_contract_version": "2.0"}, "canonical sector request"),
+        ({"daily_contract_version": "2.0"}, "canonical sector request"),
+        ({"adapter_compatibility_version": "sector-fixture-v2"}, "canonical sector request"),
+        ({"collection_timestamp_utc": "2026-04-05T12:00:00"}, "timezone-aware UTC"),
+        ({"collection_timestamp_utc": "2026-04-05T20:00:00+08:00"}, "timezone-aware UTC"),
+        ({"timeout_seconds": float("inf")}, "finite and in"),
+        ({"timeout_seconds": "20"}, "finite and in"),
+        ({"timeout_seconds": "twenty"}, "finite and in"),
+        ({"max_retries": 2.0}, "integer between"),
+        ({"max_retries": 6}, "integer between"),
+        ({"akshare_package_version": "1.17.0"}, "reviewed sector endpoint version"),
+    ],
+)
+def test_provider_metadata_rejection_is_fail_closed_without_rows(
+    database, changes: dict, message: str
+) -> None:
+    with pytest.raises(SectorDataValidationError, match=message):
+        _ingest(
+            SectorPersistenceService(database),
+            bundle=build_sector_fixture(),
+            metadata=_metadata(**changes),
+        )
+    with database() as session:
+        assert session.scalar(select(func.count()).select_from(IngestionRun)) == 0
+        assert session.scalar(select(func.count()).select_from(SectorDefinitionRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(SectorDailyRecord)) == 0
+
+
+def test_failed_attempt_uses_the_same_fixed_metadata_contract(database) -> None:
+    service = SectorPersistenceService(database)
+    with pytest.raises(SectorDataValidationError, match="fixed sector allowlist"):
+        _record_failed_attempt(service, _metadata(debug_dump="not allowed"))
+    with database() as session:
+        assert session.scalar(select(func.count()).select_from(IngestionRun)) == 0
+
+    run_id = _record_failed_attempt(service, _metadata())
+    with database() as session:
+        run = session.get(IngestionRun, run_id)
+        assert run is not None and run.status == "failed"
+        assert set(run.provider_request_metadata) == SECTOR_PROVIDER_METADATA_FIELDS
+        assert session.scalar(select(func.count()).select_from(SectorDefinitionRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(SectorDailyRecord)) == 0
 
 
 @pytest.mark.parametrize(
@@ -277,7 +402,7 @@ def test_series_identity_isolates_every_normalized_compatibility_dimension() -> 
         history_endpoint="stock_board_industry_hist_em",
         classification_system="eastmoney_industry_board",
         classification_level=None,
-        adapter_compatibility_version="aquantai.akshare-sector-adapter.v1",
+        adapter_compatibility_version=SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
     )
     original = build_sector_series_identity(**base)
     changes = [
@@ -289,7 +414,11 @@ def test_series_identity_isolates_every_normalized_compatibility_dimension() -> 
         {"classification_system": "changed_taxonomy"},
         {"classification_level": "level_1"},
         {"sector_daily_contract_version": "2.0"},
-        {"adapter_compatibility_version": "aquantai.akshare-sector-adapter.v2"},
+        {
+            "adapter_compatibility_version": (
+                SECTOR_ENDPOINT_COMPATIBILITY_VERSION + ".next"
+            )
+        },
     ]
     assert all(
         build_sector_series_identity(**{**base, **change}).series_key != original.series_key

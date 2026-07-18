@@ -57,6 +57,7 @@ from market_cockpit.benchmark_fixtures import (
 )
 from market_cockpit.benchmark_repository import BenchmarkRepository
 from market_cockpit.sector_fixtures import (
+    SECTOR_FIXTURE_CODES,
     SECTOR_FIXTURE_CURRENT_CUTOFF,
     SECTOR_FIXTURE_END_DATE,
     SECTOR_FIXTURE_HISTORICAL_CUTOFF,
@@ -161,6 +162,29 @@ def test_postgres_sector_idempotency_and_current_as_of_selection(
             history_endpoint="fixture_sector_history",
             adapter_compatibility_version="sector-fixture-v1",
             adapter_version="sector-fixture-v1",
+            provider_request_metadata={
+                "taxonomy_endpoint": "fixture_sector_taxonomy",
+                "history_endpoint": "fixture_sector_history",
+                "classification_system": "eastmoney_industry_board",
+                "classification_level": None,
+                "frequency": "daily",
+                "adjust_type": "",
+                "sector_codes": list(SECTOR_FIXTURE_CODES),
+                "start_date": SECTOR_FIXTURE_START_DATE,
+                "end_date": SECTOR_FIXTURE_END_DATE,
+                "network_mode": "offline-fixture",
+                "timeout_seconds": 1.0,
+                "max_retries": 0,
+                "akshare_package_version": "1.18.64",
+                "definition_contract_version": "1.0",
+                "daily_contract_version": "1.0",
+                "adapter_version": "sector-fixture-v1",
+                "adapter_compatibility_version": "sector-fixture-v1",
+                "collection_timestamp_utc": (
+                    f"2026-04-{cutoff[-2:]}T12:00:00Z"
+                ),
+                "effective_information_cutoff_date": cutoff,
+            },
         )
 
     try:

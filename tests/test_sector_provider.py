@@ -10,7 +10,19 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun, SectorDailyRecord, SectorDefinitionRecord
-from datasource.akshare import AkshareDataProvider, AkshareProviderError
+from backend.database.sector_data import (
+    DEFAULT_SECTOR_ADAPTER_COMPATIBILITY_VERSION,
+    DEFAULT_SECTOR_REVIEWED_AKSHARE_VERSION,
+    SECTOR_PROVIDER_METADATA_FIELDS,
+)
+from datasource.akshare import (
+    SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
+    SECTOR_REVIEWED_AKSHARE_VERSION,
+    AkshareDataProvider,
+    AkshareProviderError,
+    validate_akshare_runtime_version,
+    validate_sector_akshare_runtime_version,
+)
 from datasource.akshare.provider import (
     RAW_AMOUNT,
     RAW_CLOSE,
@@ -89,13 +101,13 @@ def _request(**changes) -> SectorIngestionRequest:
     return SectorIngestionRequest(**values)
 
 
-def _provider(client=None) -> AkshareDataProvider:
+def _provider(client=None, *, package_version: str = SECTOR_REVIEWED_AKSHARE_VERSION) -> AkshareDataProvider:
     return AkshareDataProvider(
         client or _SectorClient(),
         request_timeout_seconds=3,
         max_retries=1,
         retry_delay_seconds=0,
-        akshare_package_version="1.18.64",
+        akshare_package_version=package_version,
     )
 
 
@@ -133,7 +145,7 @@ def test_request_metadata_records_endpoints_version_and_operational_settings() -
         network_mode="injected-mock",
         definition_contract_version="1.0",
         daily_contract_version="1.0",
-        adapter_compatibility_version="aquantai.akshare-sector-adapter.v1",
+        adapter_compatibility_version=SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
     )
     assert metadata["taxonomy_endpoint"] == SECTOR_TAXONOMY_ENDPOINT
     assert metadata["history_endpoint"] == SECTOR_HISTORY_ENDPOINT
@@ -141,6 +153,50 @@ def test_request_metadata_records_endpoints_version_and_operational_settings() -
     assert metadata["akshare_package_version"] == "1.18.64"
     assert metadata["timeout_seconds"] == 3
     assert metadata["max_retries"] == 1
+
+
+def test_sector_endpoint_compatibility_gate_is_exact_and_generic_gate_is_unchanged() -> None:
+    assert (
+        DEFAULT_SECTOR_ADAPTER_COMPATIBILITY_VERSION
+        == SECTOR_ENDPOINT_COMPATIBILITY_VERSION
+    )
+    assert DEFAULT_SECTOR_REVIEWED_AKSHARE_VERSION == SECTOR_REVIEWED_AKSHARE_VERSION
+    assert validate_sector_akshare_runtime_version("1.18.64") == "1.18.64"
+    assert validate_akshare_runtime_version("1.17.0") == "1.17.0"
+    for unsupported in ("1.17.0", "1.18.63", "1.18.65", "1.15.9", "2.0.0", "bad"):
+        with pytest.raises(
+            AkshareProviderError,
+            match="reviewed sector endpoint contract; accepted version: 1.18.64",
+        ):
+            validate_sector_akshare_runtime_version(unsupported)
+
+    with pytest.raises(AkshareProviderError, match="must equal the reviewed endpoint contract"):
+        _provider().sector_request_metadata(
+            sector_codes=["BK0001"],
+            start_date="20260401",
+            end_date="20260402",
+            network_mode="injected-mock",
+            definition_contract_version="1.0",
+            daily_contract_version="1.0",
+            adapter_compatibility_version="unreviewed-sector-contract",
+        )
+
+
+def test_generically_allowed_unreviewed_sector_version_fails_before_calls_or_engine() -> None:
+    client = _SectorClient()
+    provider = _provider(client, package_version="1.17.0")
+    engine_calls: list[bool] = []
+
+    def reject_engine(_url):
+        engine_calls.append(True)
+        raise AssertionError("engine must not be created")
+
+    with pytest.raises(AkshareProviderError, match="accepted version: 1.18.64"):
+        run_controlled_sector_ingestion(
+            _request(), provider=provider, engine_factory=reject_engine
+        )
+    assert client.calls == []
+    assert engine_calls == []
 
 
 def test_live_cutoff_is_rejected_before_provider_or_engine_creation() -> None:
@@ -192,6 +248,14 @@ def test_injected_persistence_is_idempotent_and_failure_preserves_audit(database
     )
     assert first["ingestion_run_id"] == second["ingestion_run_id"]
     assert second["idempotent"] is True and second["rows_written"] == 0
+    with database() as session:
+        succeeded = session.get(IngestionRun, first["ingestion_run_id"])
+        assert succeeded is not None
+        assert set(succeeded.provider_request_metadata) == SECTOR_PROVIDER_METADATA_FIELDS
+        assert succeeded.provider_request_metadata["akshare_package_version"] == "1.18.64"
+        assert succeeded.provider_request_metadata["adapter_compatibility_version"] == (
+            SECTOR_ENDPOINT_COMPATIBILITY_VERSION
+        )
 
     class BrokenClient(_SectorClient):
         def stock_board_industry_name_em(self) -> pd.DataFrame:

@@ -6,14 +6,17 @@ from datasource.akshare.provider import (
     BENCHMARK_INDEX_ENDPOINT,
     MAX_BENCHMARK_CODES_PER_REQUEST,
     MAX_SECTOR_CODES_PER_REQUEST,
+    SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
     SECTOR_CLASSIFICATION_SYSTEM,
     SECTOR_HISTORY_ENDPOINT,
+    SECTOR_REVIEWED_AKSHARE_VERSION,
     SECTOR_TAXONOMY_ENDPOINT,
     AkshareDataProvider,
     AkshareProviderError,
     AkshareProviderTimeout,
     installed_akshare_version,
     validate_akshare_runtime_version,
+    validate_sector_akshare_runtime_version,
 )
 
 __all__ = [
@@ -22,12 +25,15 @@ __all__ = [
     "BENCHMARK_INDEX_ENDPOINT",
     "MAX_BENCHMARK_CODES_PER_REQUEST",
     "MAX_SECTOR_CODES_PER_REQUEST",
+    "SECTOR_ENDPOINT_COMPATIBILITY_VERSION",
     "SECTOR_CLASSIFICATION_SYSTEM",
     "SECTOR_HISTORY_ENDPOINT",
+    "SECTOR_REVIEWED_AKSHARE_VERSION",
     "SECTOR_TAXONOMY_ENDPOINT",
     "AkshareDataProvider",
     "AkshareProviderError",
     "AkshareProviderTimeout",
     "installed_akshare_version",
     "validate_akshare_runtime_version",
+    "validate_sector_akshare_runtime_version",
 ]

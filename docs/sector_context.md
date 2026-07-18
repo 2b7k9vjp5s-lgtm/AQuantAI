@@ -8,8 +8,21 @@ coverage, an Industry Alpha conclusion, a signal, or advice.
 
 ## Reviewed AKShare Contract
 
-The reviewed runtime range remains AKShare `>=1.16.0,<2.0.0`; implementation was checked
-against `1.18.64`. Exactly two endpoints are authorized, with no fallback:
+The generic equity/benchmark adapter continues to accept AKShare `>=1.16.0,<2.0.0`.
+Sector collection has a separate, narrower fail-closed contract: it accepts exactly
+AKShare `1.18.64`. No other patch or generically accepted version is described as
+sector-compatible.
+
+This boundary is based on the official
+[`release-v1.18.64`](https://github.com/akfamily/akshare/releases/tag/release-v1.18.64)
+and its
+[`stock_board_industry_em.py`](https://github.com/akfamily/akshare/blob/release-v1.18.64/akshare/stock/stock_board_industry_em.py)
+source, plus deterministic local contract tests. That exact source exposes the reviewed
+taxonomy columns, recognizes `BK` identifiers directly in the history function, and
+accepts bounded start/end, daily period, and unadjusted arguments. Earlier releases were
+not proven from recorded evidence, so the implementation does not guess a lower bound.
+
+Exactly two endpoints are authorized, with no fallback:
 
 - `stock_board_industry_name_em`: returns Eastmoney industry-board `板块代码` and
   `板块名称`. The stable provider identifier is the exact `BK` code, not the display name.
@@ -36,17 +49,47 @@ adapter cannot reconstruct historical taxonomy membership or historical display 
 
 The definition contract is `sector_definition` version `1.0`, the daily contract is
 `sector_daily` version `1.0`, and adapter compatibility is
-`aquantai.akshare-sector-adapter.v1`. Changing endpoint, identifier semantics, taxonomy,
-mapping, contract, or adapter compatibility creates a different canonical series.
+`aquantai.akshare-sector-endpoints.v1.18.64`. Changing endpoint, identifier semantics,
+taxonomy, mapping, contract, or this sector endpoint compatibility version creates a
+different canonical series. The sector gate runs before endpoint access or database-engine
+creation. Offline fixtures and injected adapters state the accepted deterministic package
+version explicitly.
+
+## Fixed Provider Metadata Contract
+
+`IngestionRun.provider_request_metadata` accepts exactly these top-level fields:
+
+- `taxonomy_endpoint`, `history_endpoint`;
+- `classification_system`, `classification_level`;
+- `frequency`, `adjust_type`;
+- `sector_codes`, `start_date`, `end_date`;
+- `network_mode`, `timeout_seconds`, `max_retries`;
+- `akshare_package_version`;
+- `definition_contract_version`, `daily_contract_version`;
+- `adapter_version`, `adapter_compatibility_version`;
+- `collection_timestamp_utc`, `effective_information_cutoff_date`.
+
+The contract is flat except for the exact sorted unique `sector_codes` list. Unknown keys,
+nested provider responses, debug dumps, headers, environment values, filesystem paths, and
+other arbitrary payloads are rejected and never persisted. Sensitive-name rejection remains
+an additional defense.
+
+Every value is normalized and bounded. Dates use `YYYYMMDD`; collection time must be an
+explicit UTC timestamp; timeout is finite and positive; retry count is a bounded integer;
+classification level remains explicitly `null` for this endpoint pair. Endpoints,
+classification, frequency, adjustment, exact code/date scope, contracts, adapter version,
+compatibility version, and effective cutoff must agree with the canonical request. The same
+validation applies before recording successful or failed attempts.
 
 ## Canonical Series And Persistence
 
 The sector series key hashes canonical JSON containing the sector series schema,
 provider, both contract versions and datasets, exact endpoints, taxonomy and nullable
 level, exact sorted `BK` code scope, requested dates, daily frequency, unadjusted policy,
-complete snapshot mode, exact-scope semantics, and adapter compatibility version.
-Display names, timeout, retry count, network mode, collection timestamp, and installed
-patch version are request provenance and do not fragment a compatible series.
+complete snapshot mode, exact-scope semantics, and sector endpoint compatibility version.
+Display names, timeout, retry count, network mode, collection timestamp, and the separately
+audited installed-package field are request provenance; the canonical compatibility version
+already identifies the exact reviewed sector endpoint contract.
 
 Each physical attempt stores immutable definition and daily rows linked to one ingestion
 run. Successful snapshots are selected by cutoff descending, completion time descending,

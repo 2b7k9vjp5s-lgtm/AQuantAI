@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import build_engine, build_session_factory
 from backend.database.sector_data import (
-    DEFAULT_SECTOR_ADAPTER_VERSION,
     DEFAULT_SECTOR_CLASSIFICATION_LEVEL,
     DEFAULT_SECTOR_CLASSIFICATION_SYSTEM,
     DEFAULT_SECTOR_HISTORY_ENDPOINT,
@@ -31,7 +30,11 @@ from backend.database.sector_data import (
 from datasource.akshare import (
     ADAPTER_VERSION,
     MAX_SECTOR_CODES_PER_REQUEST,
+    SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
+    SECTOR_REVIEWED_AKSHARE_VERSION,
     AkshareDataProvider,
+    installed_akshare_version,
+    validate_sector_akshare_runtime_version,
 )
 from datasource.akshare.provider import (
     RAW_AMOUNT,
@@ -91,11 +94,20 @@ def run_controlled_sector_ingestion(
             "Live AKShare sector cutoff must equal the UTC collection date "
             f"{collection_date}; past and future live cutoffs are not permitted."
         )
-    provider = provider or AkshareDataProvider(
-        _FrozenSectorAkshareClient() if request.offline_fixture else None,
-        request_timeout_seconds=request.timeout_seconds,
-        max_retries=request.max_retries,
-    )
+    if provider is None:
+        package_version = (
+            SECTOR_REVIEWED_AKSHARE_VERSION
+            if request.offline_fixture
+            else installed_akshare_version()
+        )
+        validate_sector_akshare_runtime_version(package_version)
+        provider = AkshareDataProvider(
+            _FrozenSectorAkshareClient() if request.offline_fixture else None,
+            request_timeout_seconds=request.timeout_seconds,
+            max_retries=request.max_retries,
+            akshare_package_version=package_version,
+        )
+    validate_sector_akshare_runtime_version(provider.akshare_package_version)
     network_mode = (
         "live-opt-in"
         if request.allow_network
@@ -117,7 +129,7 @@ def run_controlled_sector_ingestion(
         network_mode=network_mode,
         definition_contract_version=SECTOR_DEFINITION_CONTRACT_VERSION,
         daily_contract_version=SECTOR_DAILY_CONTRACT_VERSION,
-        adapter_compatibility_version=DEFAULT_SECTOR_ADAPTER_VERSION,
+        adapter_compatibility_version=SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
     )
     metadata.update({
         "collection_timestamp_utc": collected_at.isoformat().replace("+00:00", "Z"),
@@ -146,7 +158,7 @@ def run_controlled_sector_ingestion(
                     requested_scope=scope,
                     taxonomy_endpoint=DEFAULT_SECTOR_TAXONOMY_ENDPOINT,
                     history_endpoint=DEFAULT_SECTOR_HISTORY_ENDPOINT,
-                    adapter_compatibility_version=DEFAULT_SECTOR_ADAPTER_VERSION,
+                    adapter_compatibility_version=SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
                     provider_request_metadata=metadata,
                     adapter_version=ADAPTER_VERSION,
                 )
@@ -161,7 +173,7 @@ def run_controlled_sector_ingestion(
                 requested_scope=scope,
                 taxonomy_endpoint=DEFAULT_SECTOR_TAXONOMY_ENDPOINT,
                 history_endpoint=DEFAULT_SECTOR_HISTORY_ENDPOINT,
-                adapter_compatibility_version=DEFAULT_SECTOR_ADAPTER_VERSION,
+                adapter_compatibility_version=SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
             )
             return {"mode": "dry-run", "network_mode": network_mode, **validation.to_dict()}
         assert service is not None
@@ -174,7 +186,7 @@ def run_controlled_sector_ingestion(
             requested_scope=scope,
             taxonomy_endpoint=DEFAULT_SECTOR_TAXONOMY_ENDPOINT,
             history_endpoint=DEFAULT_SECTOR_HISTORY_ENDPOINT,
-            adapter_compatibility_version=DEFAULT_SECTOR_ADAPTER_VERSION,
+            adapter_compatibility_version=SECTOR_ENDPOINT_COMPATIBILITY_VERSION,
             provider_request_metadata=metadata,
             adapter_version=ADAPTER_VERSION,
         )
