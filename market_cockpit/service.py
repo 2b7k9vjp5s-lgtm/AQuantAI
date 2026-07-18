@@ -19,6 +19,14 @@ from market_cockpit.contracts import (
 )
 from market_cockpit.repository import MarketCockpitRepository
 from market_cockpit.repository import PersistedMarketDataSnapshot
+from market_cockpit.sector_calculator import calculate_sector_metrics
+from market_cockpit.sector_contracts import (
+    SectorContext,
+    SectorCrossSection,
+    SectorProvenance,
+    SectorRankedMetric,
+)
+from market_cockpit.sector_repository import SectorRepository
 
 
 class MarketCockpitService:
@@ -29,10 +37,12 @@ class MarketCockpitService:
         repository: MarketCockpitRepository,
         *,
         benchmark_repository: BenchmarkRepository | None = None,
+        sector_repository: SectorRepository | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._repository = repository
         self._benchmark_repository = benchmark_repository
+        self._sector_repository = sector_repository
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
     def build_snapshot(
@@ -42,6 +52,7 @@ class MarketCockpitService:
         selector: SnapshotSeriesIdentity | None = None,
         as_of_cutoff: str | None = None,
         benchmark_series_key: str | None = None,
+        sector_series_key: str | None = None,
     ) -> MarketCockpitSnapshot:
         persisted = self._repository.load_snapshot(
             series_key=series_key,
@@ -64,6 +75,13 @@ class MarketCockpitService:
         )
         benchmark_context = self._build_benchmark_context(
             benchmark_series_key=benchmark_series_key,
+            as_of_cutoff=as_of_cutoff,
+            equity_snapshot=persisted,
+            equity_effective_session=calculation.effective_as_of_session,
+            generated_at=generated_at,
+        )
+        sector_context = self._build_sector_context(
+            sector_series_key=sector_series_key,
             as_of_cutoff=as_of_cutoff,
             equity_snapshot=persisted,
             equity_effective_session=calculation.effective_as_of_session,
@@ -115,6 +133,146 @@ class MarketCockpitService:
             warnings=warnings,
             unsupported_sections=_unsupported_sections(),
             benchmark_context=benchmark_context,
+            sector_context=sector_context,
+        )
+
+    def _build_sector_context(
+        self,
+        *,
+        sector_series_key: str | None,
+        as_of_cutoff: str | None,
+        equity_snapshot: PersistedMarketDataSnapshot,
+        equity_effective_session: str,
+        generated_at: datetime,
+    ) -> SectorContext | None:
+        if sector_series_key is None:
+            return None
+        if self._sector_repository is None:
+            raise ValueError("Sector repository is required when sector_series_key is provided.")
+        persisted = self._sector_repository.load_snapshot(
+            series_key=sector_series_key,
+            as_of_cutoff=as_of_cutoff,
+            permitted_end_session=equity_effective_session,
+        )
+        expected_sessions = _expected_sector_sessions(
+            equity_snapshot=equity_snapshot,
+            sector_information_cutoff=persisted.information_cutoff_date,
+            sector_requested_end=persisted.requested_end_date,
+            equity_effective_session=equity_effective_session,
+            as_of_cutoff=as_of_cutoff,
+        )
+        metrics, warnings = calculate_sector_metrics(
+            persisted, expected_sessions=expected_sessions
+        )
+        available = [metric for metric in metrics if metric.latest_session is not None]
+        latest_sessions = {metric.latest_session for metric in available}
+        missing_codes = sorted(
+            metric.sector_code for metric in metrics if metric.latest_session is None
+        )
+        aligned_count = sum(
+            metric.latest_session == equity_effective_session for metric in metrics
+        )
+        cutoff_status = (
+            "aligned"
+            if persisted.information_cutoff_date == equity_snapshot.information_cutoff_date
+            else "different_cutoff"
+        )
+        if missing_codes or len(latest_sessions) > 1:
+            session_status = "partial"
+        elif latest_sessions != {equity_effective_session}:
+            session_status = "different_session"
+        else:
+            session_status = "aligned"
+        if session_status == "partial":
+            alignment_status = "partial"
+        elif session_status == "different_session":
+            alignment_status = "different_session"
+        elif cutoff_status == "different_cutoff":
+            alignment_status = "different_cutoff"
+        else:
+            alignment_status = "aligned"
+        effective_sector_session = max(latest_sessions) if latest_sessions else None
+        if cutoff_status == "different_cutoff":
+            warnings.append(
+                "Equity and sector information cutoffs differ: "
+                f"equity={equity_snapshot.information_cutoff_date}, "
+                f"sector={persisted.information_cutoff_date}."
+            )
+        if missing_codes:
+            warnings.append(
+                f"Sector exact scope has no eligible row for codes: {missing_codes}."
+            )
+        if not available:
+            warnings.append(
+                "No requested sector has an eligible row in the selected persisted open-session sequence."
+            )
+        if len(latest_sessions) > 1:
+            warnings.append(
+                "Sectors have mixed latest eligible sessions: "
+                f"{sorted(session for session in latest_sessions if session is not None)}."
+            )
+        if effective_sector_session is not None and effective_sector_session != equity_effective_session:
+            warnings.append(
+                "Equity and sector effective sessions differ: "
+                f"equity={equity_effective_session}, sector={effective_sector_session}."
+            )
+        requested_cutoff = (
+            str(as_of_cutoff).strip().replace("-", "") if as_of_cutoff is not None else None
+        )
+        cross_section = _sector_cross_section(metrics)
+        return SectorContext(
+            provenance=SectorProvenance(
+                series_key=persisted.series_key,
+                ingestion_run_id=persisted.ingestion_run_id,
+                provider=persisted.provider,
+                source=persisted.provider,
+                definition_contract_version=persisted.definition_contract_version,
+                daily_contract_version=persisted.daily_contract_version,
+                adapter_version=persisted.adapter_version,
+                adapter_compatibility_version=persisted.adapter_compatibility_version,
+                taxonomy_endpoint=persisted.taxonomy_endpoint,
+                history_endpoint=persisted.history_endpoint,
+                taxonomy=persisted.classification_system,
+                classification_level=persisted.classification_level,
+                frequency=persisted.frequency,
+                adjust_type=persisted.adjust_type,
+                sector_codes=persisted.sector_codes,
+                requested_start_date=persisted.requested_start_date,
+                requested_end_date=persisted.requested_end_date,
+                information_cutoff_date=persisted.information_cutoff_date,
+                requested_as_of_cutoff=requested_cutoff,
+                effective_sector_session=effective_sector_session,
+                ingestion_imported_at_utc=persisted.ingestion_imported_at_utc,
+                ingestion_completed_at_utc=persisted.ingestion_completed_at_utc,
+                collection_timestamp_utc=persisted.collection_timestamp_utc,
+                effective_information_cutoff_date=persisted.effective_information_cutoff_date,
+                akshare_package_version=persisted.akshare_package_version,
+                network_mode=persisted.network_mode,
+                timeout_seconds=persisted.timeout_seconds,
+                max_retries=persisted.max_retries,
+                generated_at_utc=generated_at.astimezone(timezone.utc).isoformat().replace(
+                    "+00:00", "Z"
+                ),
+            ),
+            metrics=metrics,
+            cross_section=cross_section,
+            coverage_status="partial" if missing_codes else "complete",
+            alignment_status=alignment_status,
+            session_alignment_status=session_status,
+            cutoff_alignment_status=cutoff_status,
+            requested_sector_count=len(metrics),
+            available_sector_count=len(available),
+            aligned_sector_count=aligned_count,
+            missing_sector_codes=missing_codes,
+            equity_information_cutoff_date=equity_snapshot.information_cutoff_date,
+            sector_information_cutoff_date=persisted.information_cutoff_date,
+            equity_effective_session=equity_effective_session,
+            effective_sector_session=effective_sector_session,
+            expected_session_source="selected_equity_snapshot.persisted_trade_calendar",
+            expected_session_count=len(expected_sessions),
+            expected_session_start=expected_sessions[0],
+            expected_session_end=expected_sessions[-1],
+            warnings=warnings,
         )
 
     def _build_benchmark_context(
@@ -313,6 +471,87 @@ def _expected_benchmark_sessions(
     return sessions
 
 
+def _expected_sector_sessions(
+    *,
+    equity_snapshot: PersistedMarketDataSnapshot,
+    sector_information_cutoff: str,
+    sector_requested_end: str,
+    equity_effective_session: str,
+    as_of_cutoff: str | None,
+) -> list[str]:
+    calendar = equity_snapshot.trade_calendar.copy()
+    required = {"trade_date", "is_open"}
+    missing = sorted(required - set(calendar.columns))
+    if missing:
+        raise ValueError(
+            f"Selected equity snapshot trade calendar is incomplete; missing={missing}."
+        )
+    calendar["trade_date"] = calendar["trade_date"].map(_compact_date)
+    duplicates = sorted(
+        calendar.loc[calendar.duplicated(["trade_date"], keep=False), "trade_date"].unique()
+    )
+    if duplicates:
+        raise ValueError(
+            "Selected equity snapshot trade calendar is contradictory; duplicate sessions="
+            f"{duplicates}."
+        )
+    if calendar["is_open"].isna().any() or not is_bool_dtype(calendar["is_open"]):
+        raise ValueError(
+            "Selected equity snapshot trade calendar contains invalid open flags."
+        )
+    bound = min(value for value in (
+        equity_snapshot.information_cutoff_date,
+        equity_snapshot.requested_end_date,
+        sector_information_cutoff,
+        sector_requested_end,
+        equity_effective_session,
+        _compact_optional_date(as_of_cutoff),
+    ) if value is not None)
+    sessions = sorted(calendar.loc[
+        calendar["is_open"].eq(True) & calendar["trade_date"].le(bound), "trade_date"
+    ].unique())
+    if not sessions:
+        raise ValueError(
+            "Selected equity snapshot has no persisted open session eligible for sector context."
+        )
+    return sessions
+
+
+def _sector_cross_section(metrics: list) -> SectorCrossSection:
+    latest = [metric for metric in metrics if metric.latest_return is not None]
+    sma20 = [metric for metric in metrics if metric.above_sma20 is not None]
+    return_20 = [metric for metric in metrics if metric.return_20 is not None]
+
+    def ranked(values: list, field: str, *, reverse: bool) -> list[SectorRankedMetric]:
+        ordered = sorted(
+            values,
+            key=(
+                (lambda item: (-float(getattr(item, field)), item.sector_code))
+                if reverse
+                else (lambda item: (float(getattr(item, field)), item.sector_code))
+            ),
+        )[:5]
+        return [
+            SectorRankedMetric(item.sector_code, item.sector_name, float(getattr(item, field)))
+            for item in ordered
+        ]
+
+    positive_count = sum(float(metric.latest_return) > 0 for metric in latest)
+    above_count = sum(bool(metric.above_sma20) for metric in sma20)
+    return SectorCrossSection(
+        valid_latest_return_count=len(latest),
+        positive_latest_return_count=positive_count,
+        positive_latest_return_share=(positive_count / len(latest)) if latest else None,
+        valid_sma20_count=len(sma20),
+        above_sma20_count=above_count,
+        above_sma20_share=(above_count / len(sma20)) if sma20 else None,
+        top_latest_return=ranked(latest, "latest_return", reverse=True),
+        bottom_latest_return=ranked(latest, "latest_return", reverse=False),
+        top_return_20=ranked(return_20, "return_20", reverse=True),
+        bottom_return_20=ranked(return_20, "return_20", reverse=False),
+    )
+
+
 def _compact_optional_date(value: str | None) -> str | None:
     if value is None:
         return None
@@ -331,7 +570,6 @@ def _unsupported_sections() -> list[UnsupportedSection]:
     reason = "The required reviewed data source and coverage policy are not available in this slice."
     return [
         UnsupportedSection("official_indices", "Official index levels and returns", reason),
-        UnsupportedSection("sector_rotation", "Sector or industry rotation", reason),
         UnsupportedSection("style_analysis", "Size, value, and growth style analysis", reason),
         UnsupportedSection("valuation_breadth", "Valuation and market-cap breadth", reason),
         UnsupportedSection("crowding", "Crowding and positioning indicators", reason),

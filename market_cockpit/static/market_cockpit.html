@@ -78,6 +78,23 @@
         <div id="benchmark-warnings"></div>
       </section>
 
+      <section aria-labelledby="sector-heading">
+        <p class="section-kicker">Separate series, exact stable codes, descriptive context</p>
+        <h2 id="sector-heading">Selected-sector market context</h2>
+        <p id="sector-status">No sector series selected. Add an explicit <code>sector_series_key</code> to inspect bounded provider-attributed context.</p>
+        <p>Selected-scope observations only. This section does not provide sector constituents, company beneficiaries, Industry Alpha evidence or conclusions, scores, signals, or recommendations.</p>
+        <div id="sector-summary" class="metric-grid"></div>
+        <h3>Descriptive cross-section</h3>
+        <div id="sector-cross-section" class="metric-grid"></div>
+        <div id="sector-rankings" class="two-column"></div>
+        <h3>Exact sector metrics</h3>
+        <div id="sector-metrics" class="benchmark-grid"></div>
+        <h3>Sector provenance</h3>
+        <div id="sector-provenance" class="data-list"></div>
+        <h3>Sector warnings</h3>
+        <div id="sector-warnings"></div>
+      </section>
+
       <section class="two-column" aria-label="Data quality and limitations">
         <div>
           <p class="section-kicker">Completeness</p>
@@ -85,7 +102,7 @@
           <div id="warnings"></div>
         </div>
         <div>
-          <p class="section-kicker">Not supported in v0.4A; still unsupported in v0.4B</p>
+          <p class="section-kicker">Still unsupported after the bounded v0.4C slice</p>
           <h2>Unsupported sections</h2>
           <div id="unsupported"></div>
         </div>
@@ -101,8 +118,10 @@
           <li>Participation compares the current value with the median of the prior 20 sessions.</li>
           <li>Risk uses 20 complete selected-universe equal-weight returns and annualizes volatility by square root of 252.</li>
           <li>Benchmark context uses its own explicit series and the selected equity snapshot's persisted open-session calendar. Return, SMA, volatility, and drawdown require exact consecutive 2/20/60/21-session windows ending at each code's latest valid session.</li>
+          <li>Sector context uses exact Eastmoney <code>BK</code> identifiers and separate complete snapshots. Latest, 5-session, 20-session, SMA20, volatility, and drawdown metrics require exact 2/6/21/20/21-session windows.</li>
+          <li>Sector top/bottom lists are descriptive selected-scope observations. Null metrics are excluded from denominators and ties use the stable sector code.</li>
         </ul>
-        <p>Formula references: <code>docs/market_cockpit.md</code> and <code>docs/benchmark_context.md</code></p>
+        <p>Formula references: <code>docs/market_cockpit.md</code>, <code>docs/benchmark_context.md</code>, and <code>docs/sector_context.md</code></p>
       </section>
     </main>
     <footer class="site-footer">

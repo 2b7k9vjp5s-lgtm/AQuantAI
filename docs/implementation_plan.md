@@ -37,6 +37,10 @@ The first v0.4 slice is limited to deterministic selected-universe breadth, part
 
 The second v0.4 slice is limited to separate provider-attributed benchmark-index daily persistence, one reviewed bounded AKShare endpoint, explicit benchmark series selection, close-based context, provenance, cutoff/session alignment, and read-only presentation. It does not authorize sectors, style, valuation, crowding, relative-performance signals, recommendations, or automatic collection.
 
+### v0.4C Authorized Sector Market Context
+
+The third v0.4 slice is limited to a separate provider-attributed Eastmoney industry-board taxonomy and daily-history series, exact stable-code selection, deterministic exact-session descriptive metrics, provenance, cutoff/session alignment, and optional read-only Market Cockpit presentation. It does not authorize sector constituents, company beneficiaries, Industry Alpha evidence or conclusions, style, valuation, crowding, composite scores, recommendations, automatic collection, or trading behavior.
+
 ## v0.5 Industry Alpha Stage 1 And Evidence Infrastructure
 
 - **Objective:** model industry maps and evidence-backed causal research.

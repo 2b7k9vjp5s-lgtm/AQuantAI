@@ -12,6 +12,7 @@ from typing import Any
 
 SERIES_SCHEMA = "aquantai.snapshot-series.v1"
 BENCHMARK_SERIES_SCHEMA = "aquantai.benchmark-snapshot-series.v1"
+SECTOR_SERIES_SCHEMA = "aquantai.sector-snapshot-series.v1"
 ALLOWED_ADJUST_TYPES = {"", "qfq", "hfq"}
 STOCK_CODE_PATTERN = re.compile(r"^[0-9]{6}$")
 SERIES_KEY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -36,6 +37,150 @@ class BenchmarkSeriesIdentity:
 
     series_key: str
     canonical: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class SectorSeriesIdentity:
+    """Canonical selector for one exact provider sector snapshot series."""
+
+    series_key: str
+    canonical: dict[str, Any]
+
+
+def build_sector_series_identity(
+    *,
+    provider: str,
+    sector_definition_contract_version: str,
+    sector_daily_contract_version: str,
+    sector_codes: list[str],
+    requested_start_date: str,
+    requested_end_date: str,
+    taxonomy_endpoint: str,
+    history_endpoint: str,
+    classification_system: str,
+    classification_level: str | None,
+    adapter_compatibility_version: str,
+    frequency: str = "daily",
+    adjust_type: str = "",
+    snapshot_mode: str = "complete",
+    sector_code_semantics: str = "exact",
+    compatibility_parameters: dict[str, Any] | None = None,
+) -> SectorSeriesIdentity:
+    """Build a sector identity that cannot collide with equity or benchmark series."""
+    codes = sorted({_sector_code(value) for value in sector_codes})
+    if not codes:
+        raise SnapshotSeriesError("sector_codes must not be empty.")
+    if len(codes) != len(sector_codes):
+        raise SnapshotSeriesError("sector_codes must not contain duplicates.")
+    start_date = _compact_date(requested_start_date, "requested_start_date")
+    end_date = _compact_date(requested_end_date, "requested_end_date")
+    if start_date > end_date:
+        raise SnapshotSeriesError("requested_start_date must not be after requested_end_date.")
+    if frequency != "daily":
+        raise SnapshotSeriesError("frequency must be 'daily'.")
+    if adjust_type != "":
+        raise SnapshotSeriesError("sector adjust_type must be the unadjusted empty value.")
+    if snapshot_mode != "complete":
+        raise SnapshotSeriesError("snapshot_mode must be 'complete'.")
+    if sector_code_semantics != "exact":
+        raise SnapshotSeriesError("sector_code_semantics must be 'exact'.")
+    canonical = {
+        "series_schema": SECTOR_SERIES_SCHEMA,
+        "provider": _required_text(provider, "provider"),
+        "datasets": ["sector_daily", "sector_definition"],
+        "sector_definition_contract_version": _required_text(
+            sector_definition_contract_version, "sector_definition_contract_version"
+        ),
+        "sector_daily_contract_version": _required_text(
+            sector_daily_contract_version, "sector_daily_contract_version"
+        ),
+        "sector_codes": codes,
+        "requested_start_date": start_date,
+        "requested_end_date": end_date,
+        "frequency": frequency,
+        "adjust_type": adjust_type,
+        "snapshot_mode": snapshot_mode,
+        "sector_code_semantics": sector_code_semantics,
+        "taxonomy_endpoint": _public_identity(taxonomy_endpoint, "taxonomy_endpoint"),
+        "history_endpoint": _public_identity(history_endpoint, "history_endpoint"),
+        "classification_system": _public_identity(
+            classification_system, "classification_system"
+        ),
+        "classification_level": (
+            _public_identity(classification_level, "classification_level")
+            if classification_level is not None
+            else None
+        ),
+        "adapter_compatibility_version": _public_identity(
+            adapter_compatibility_version, "adapter_compatibility_version"
+        ),
+        "compatibility_parameters": _canonical_json_value(
+            compatibility_parameters or {}, "compatibility_parameters"
+        ),
+    }
+    return SectorSeriesIdentity(_series_key(canonical), canonical)
+
+
+def validate_sector_series_identity(identity: SectorSeriesIdentity) -> SectorSeriesIdentity:
+    """Reject incomplete, forged, or non-sector canonical selectors."""
+    if not isinstance(identity, SectorSeriesIdentity):
+        raise SnapshotSeriesError("selector must be a SectorSeriesIdentity.")
+    canonical = canonical_json_object(identity.canonical, "selector.canonical")
+    required = {
+        "series_schema",
+        "provider",
+        "datasets",
+        "sector_definition_contract_version",
+        "sector_daily_contract_version",
+        "sector_codes",
+        "requested_start_date",
+        "requested_end_date",
+        "frequency",
+        "adjust_type",
+        "snapshot_mode",
+        "sector_code_semantics",
+        "taxonomy_endpoint",
+        "history_endpoint",
+        "classification_system",
+        "classification_level",
+        "adapter_compatibility_version",
+        "compatibility_parameters",
+    }
+    if set(canonical) != required:
+        raise SnapshotSeriesError(
+            "sector selector canonical fields are incomplete or contain unknown fields."
+        )
+    if canonical["series_schema"] != SECTOR_SERIES_SCHEMA:
+        raise SnapshotSeriesError(
+            f"sector selector series_schema must be {SECTOR_SERIES_SCHEMA!r}."
+        )
+    rebuilt = build_sector_series_identity(
+        provider=canonical["provider"],
+        sector_definition_contract_version=canonical[
+            "sector_definition_contract_version"
+        ],
+        sector_daily_contract_version=canonical["sector_daily_contract_version"],
+        sector_codes=canonical["sector_codes"],
+        requested_start_date=canonical["requested_start_date"],
+        requested_end_date=canonical["requested_end_date"],
+        taxonomy_endpoint=canonical["taxonomy_endpoint"],
+        history_endpoint=canonical["history_endpoint"],
+        classification_system=canonical["classification_system"],
+        classification_level=canonical["classification_level"],
+        adapter_compatibility_version=canonical["adapter_compatibility_version"],
+        frequency=canonical["frequency"],
+        adjust_type=canonical["adjust_type"],
+        snapshot_mode=canonical["snapshot_mode"],
+        sector_code_semantics=canonical["sector_code_semantics"],
+        compatibility_parameters=canonical["compatibility_parameters"],
+    )
+    if canonical["datasets"] != ["sector_daily", "sector_definition"]:
+        raise SnapshotSeriesError("sector selector datasets are not normalized.")
+    if rebuilt.canonical != canonical:
+        raise SnapshotSeriesError("sector selector canonical payload is not normalized.")
+    if validate_series_key(identity.series_key) != rebuilt.series_key:
+        raise SnapshotSeriesError("sector selector series_key does not match its payload.")
+    return rebuilt
 
 
 def build_benchmark_series_identity(
@@ -317,6 +462,13 @@ def _index_code(value: Any) -> str:
     normalized = _required_text(value, "index_codes")
     if not STOCK_CODE_PATTERN.fullmatch(normalized):
         raise SnapshotSeriesError("index_codes must contain six-digit index codes.")
+    return normalized
+
+
+def _sector_code(value: Any) -> str:
+    normalized = _required_text(value, "sector_codes").upper()
+    if not re.fullmatch(r"BK[0-9]+", normalized):
+        raise SnapshotSeriesError("sector_codes must contain stable Eastmoney BK identifiers.")
     return normalized
 
 

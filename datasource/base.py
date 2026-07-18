@@ -49,6 +49,29 @@ BENCHMARK_INDEX_DAILY_COLUMNS = [
     "amount",
 ]
 
+SECTOR_DEFINITION_COLUMNS = [
+    "source",
+    "sector_code",
+    "sector_name",
+    "classification_system",
+    "classification_level",
+    "parent_sector_code",
+    "parent_sector_name",
+]
+
+SECTOR_DAILY_COLUMNS = [
+    "source",
+    "sector_code",
+    "trade_date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+    "turnover_rate",
+]
+
 
 @dataclass(frozen=True)
 class MarketDataBundle:
@@ -64,6 +87,14 @@ class BenchmarkIndexBundle:
     """One bounded complete snapshot of normalized benchmark-index rows."""
 
     benchmark_index_daily: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class SectorMarketBundle:
+    """One bounded complete snapshot of sector definitions and daily observations."""
+
+    sector_definition: pd.DataFrame
+    sector_daily: pd.DataFrame
 
 
 class DataProvider(ABC):

@@ -86,6 +86,12 @@ class IngestionRun(Base):
     benchmark_index_daily_rows: Mapped[list[BenchmarkIndexDailyRecord]] = relationship(
         back_populates="ingestion_run"
     )
+    sector_definition_rows: Mapped[list[SectorDefinitionRecord]] = relationship(
+        back_populates="ingestion_run"
+    )
+    sector_daily_rows: Mapped[list[SectorDailyRecord]] = relationship(
+        back_populates="ingestion_run"
+    )
 
 
 class StockBasicRecord(Base):
@@ -218,3 +224,105 @@ class BenchmarkIndexDailyRecord(Base):
     ingestion_run: Mapped[IngestionRun] = relationship(
         back_populates="benchmark_index_daily_rows"
     )
+
+
+class SectorDefinitionRecord(Base):
+    __tablename__ = "sector_definition"
+    __table_args__ = (
+        UniqueConstraint(
+            "ingestion_run_id",
+            "source",
+            "classification_system",
+            "sector_code",
+            name="uq_sector_definition_run_natural_key",
+        ),
+        Index(
+            "ix_sector_definition_run_class_code",
+            "ingestion_run_id",
+            "classification_system",
+            "classification_level",
+            "sector_code",
+        ),
+        Index(
+            "ix_sector_definition_source_class_code",
+            "source",
+            "classification_system",
+            "sector_code",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(IDENTITY_TYPE, primary_key=True, autoincrement=True)
+    ingestion_run_id: Mapped[int] = mapped_column(
+        ForeignKey("ingestion_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    sector_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    sector_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    classification_system: Mapped[str] = mapped_column(String(128), nullable=False)
+    classification_level: Mapped[str | None] = mapped_column(String(64))
+    parent_sector_code: Mapped[str | None] = mapped_column(String(32))
+    parent_sector_name: Mapped[str | None] = mapped_column(String(200))
+
+    ingestion_run: Mapped[IngestionRun] = relationship(
+        back_populates="sector_definition_rows"
+    )
+
+
+class SectorDailyRecord(Base):
+    __tablename__ = "sector_daily"
+    __table_args__ = (
+        UniqueConstraint(
+            "ingestion_run_id",
+            "source",
+            "sector_code",
+            "trade_date",
+            name="uq_sector_daily_run_natural_key",
+        ),
+        CheckConstraint("close > 0", name="ck_sector_daily_close_positive"),
+        CheckConstraint("open IS NULL OR open > 0", name="ck_sector_daily_open_positive"),
+        CheckConstraint("high IS NULL OR high > 0", name="ck_sector_daily_high_positive"),
+        CheckConstraint("low IS NULL OR low > 0", name="ck_sector_daily_low_positive"),
+        CheckConstraint("volume IS NULL OR volume >= 0", name="ck_sector_daily_volume_nonnegative"),
+        CheckConstraint("amount IS NULL OR amount >= 0", name="ck_sector_daily_amount_nonnegative"),
+        CheckConstraint(
+            "turnover_rate IS NULL OR turnover_rate >= 0",
+            name="ck_sector_daily_turnover_nonnegative",
+        ),
+        CheckConstraint(
+            "open IS NULL OR high IS NULL OR low IS NULL OR (low <= open AND open <= high)",
+            name="ck_sector_daily_open_range",
+        ),
+        CheckConstraint(
+            "high IS NULL OR low IS NULL OR (low <= close AND close <= high)",
+            name="ck_sector_daily_close_range",
+        ),
+        Index(
+            "ix_sector_daily_run_code_date",
+            "ingestion_run_id",
+            "sector_code",
+            "trade_date",
+        ),
+        Index(
+            "ix_sector_daily_source_code_date",
+            "source",
+            "sector_code",
+            "trade_date",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(IDENTITY_TYPE, primary_key=True, autoincrement=True)
+    ingestion_run_id: Mapped[int] = mapped_column(
+        ForeignKey("ingestion_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    sector_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    trade_date: Mapped[date] = mapped_column(Date, nullable=False)
+    open: Mapped[float | None] = mapped_column(Float)
+    high: Mapped[float | None] = mapped_column(Float)
+    low: Mapped[float | None] = mapped_column(Float)
+    close: Mapped[float] = mapped_column(Float, nullable=False)
+    volume: Mapped[float | None] = mapped_column(Float)
+    amount: Mapped[float | None] = mapped_column(Float)
+    turnover_rate: Mapped[float | None] = mapped_column(Float)
+
+    ingestion_run: Mapped[IngestionRun] = relationship(back_populates="sector_daily_rows")

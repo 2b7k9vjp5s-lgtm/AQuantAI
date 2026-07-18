@@ -18,6 +18,7 @@ import backend.api.market_cockpit as market_cockpit_api
 from backend.api.market_cockpit import get_market_cockpit_session_factory
 from backend.database.engine import build_session_factory
 from backend.database.market_data import MarketDataPersistenceService
+from backend.database.sector_data import SectorPersistenceService
 from backend.database.models import Base
 from backend.main import app
 from datasource.akshare.provider import SubprocessAkshareRunner
@@ -33,6 +34,15 @@ from market_cockpit.fixtures import (
     build_market_cockpit_fixture,
 )
 from market_cockpit.repository import MarketCockpitRepository
+from market_cockpit.sector_fixtures import (
+    SECTOR_FIXTURE_CODES,
+    SECTOR_FIXTURE_CURRENT_CUTOFF,
+    SECTOR_FIXTURE_END_DATE,
+    SECTOR_FIXTURE_PROVIDER,
+    SECTOR_FIXTURE_SCOPE,
+    SECTOR_FIXTURE_START_DATE,
+    build_sector_fixture,
+)
 from scripts.demo_market_cockpit import build_persisted_market_cockpit_demo
 
 
@@ -84,6 +94,42 @@ def _ingest(session_factory: sessionmaker[Session], *, revision: str, cutoff: st
     )
 
 
+def _ingest_sector(session_factory: sessionmaker[Session]):
+    return SectorPersistenceService(session_factory).ingest_bundle(
+        build_sector_fixture(),
+        provider=SECTOR_FIXTURE_PROVIDER,
+        requested_start_date=SECTOR_FIXTURE_START_DATE,
+        requested_end_date=SECTOR_FIXTURE_END_DATE,
+        information_cutoff_date=SECTOR_FIXTURE_CURRENT_CUTOFF,
+        requested_scope=SECTOR_FIXTURE_SCOPE,
+        taxonomy_endpoint="fixture_sector_taxonomy",
+        history_endpoint="fixture_sector_history",
+        adapter_compatibility_version="sector-fixture-v1",
+        adapter_version="sector-fixture-v1",
+        provider_request_metadata={
+            "taxonomy_endpoint": "fixture_sector_taxonomy",
+            "history_endpoint": "fixture_sector_history",
+            "classification_system": "eastmoney_industry_board",
+            "classification_level": None,
+            "frequency": "daily",
+            "adjust_type": "",
+            "sector_codes": list(SECTOR_FIXTURE_CODES),
+            "start_date": SECTOR_FIXTURE_START_DATE,
+            "end_date": SECTOR_FIXTURE_END_DATE,
+            "network_mode": "offline-fixture",
+            "timeout_seconds": 1.0,
+            "max_retries": 0,
+            "akshare_package_version": "1.18.64",
+            "definition_contract_version": "1.0",
+            "daily_contract_version": "1.0",
+            "adapter_version": "sector-fixture-v1",
+            "adapter_compatibility_version": "sector-fixture-v1",
+            "collection_timestamp_utc": "2026-04-05T12:00:00Z",
+            "effective_information_cutoff_date": SECTOR_FIXTURE_CURRENT_CUTOFF,
+        },
+    )
+
+
 def test_missing_selector_fails_before_database_engine_creation(monkeypatch) -> None:
     def reject_engine(*_args, **_kwargs):
         raise AssertionError("database engine must not be created without a selector")
@@ -102,11 +148,53 @@ def test_invalid_selector_and_cutoff_have_clear_client_errors() -> None:
     invalid_cutoff = client.get(
         "/market-cockpit/snapshot?series_key=" + "a" * 64 + "&as_of_cutoff=bad-date"
     )
+    invalid_sector = client.get(
+        "/market-cockpit/snapshot?series_key=" + "a" * 64 + "&sector_series_key=name-only"
+    )
 
     assert invalid_key.status_code == 422
     assert "64-character" in invalid_key.json()["detail"]
     assert invalid_cutoff.status_code == 422
     assert "YYYYMMDD" in invalid_cutoff.json()["detail"]
+    assert invalid_sector.status_code == 422
+    assert "64-character" in invalid_sector.json()["detail"]
+
+
+def test_api_adds_sector_context_only_for_an_explicit_valid_sector_series(client) -> None:
+    test_client, session_factory = client
+    equity = _ingest(
+        session_factory, revision="current", cutoff=COCKPIT_FIXTURE_CURRENT_CUTOFF
+    )
+    sector = _ingest_sector(session_factory)
+
+    equity_only = test_client.get(
+        "/market-cockpit/snapshot?series_key=" + equity.series_key
+    )
+    with_sector = test_client.get(
+        "/market-cockpit/snapshot?series_key="
+        + equity.series_key
+        + "&sector_series_key="
+        + sector.series_key
+    )
+    missing_sector = test_client.get(
+        "/market-cockpit/snapshot?series_key="
+        + equity.series_key
+        + "&sector_series_key="
+        + "f" * 64
+    )
+
+    assert equity_only.status_code == 200
+    assert equity_only.json()["sector_context"] is None
+    assert with_sector.status_code == 200
+    context = with_sector.json()["sector_context"]
+    assert context["provenance"]["series_key"] == sector.series_key
+    assert context["provenance"]["effective_sector_session"] == SECTOR_FIXTURE_END_DATE
+    assert context["requested_sector_count"] == 2
+    assert context["coverage_status"] == "complete"
+    assert context["read_only"] is True
+    assert "recommendation" not in str(context).lower()
+    assert missing_sector.status_code == 404
+    assert "No successful complete sector snapshot" in missing_sector.json()["detail"]
 
 
 def test_missing_database_configuration_returns_503(monkeypatch) -> None:
@@ -217,7 +305,10 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "One ingestion run, no cross-series stitching" in page.text
     assert "Coverage confidence is unverified" in page.text
     assert "Current-session health and latest-return eligibility" in page.text
-    assert "Not supported in v0.4A" in page.text
+    assert "Selected-sector market context" in page.text
+    assert "exact stable codes" in page.text
+    assert "does not provide sector constituents" in page.text
+    assert "Still unsupported after the bounded v0.4C slice" in page.text
     assert "Read-only" in page.text
     assert "<form" not in page.text.lower()
     assert "<button" not in page.text.lower()
@@ -237,6 +328,9 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "Current-session stale, invalid, or missing" in script.text
     assert "Current-session no-trade" in script.text
     assert "Latest-return unavailable" in script.text
+    assert "sector_series_key" in script.text
+    assert "Exact stable sector codes" in script.text
+    assert "No sector series was requested" in script.text
     for forbidden_claim in ("全市场", "A 股市场宽度", "官方指数宽度"):
         assert forbidden_claim not in page.text
 

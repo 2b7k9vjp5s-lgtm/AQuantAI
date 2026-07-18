@@ -194,7 +194,7 @@ def test_downgrade_fails_closed_before_schema_changes_for_multi_series_history()
                     runs.c.batch_identifier == batch_identifier
                 )
             ) == 2
-            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260718_0003"
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260718_0004"
         assert "benchmark_index_daily" in inspect(engine).get_table_names()
     finally:
         with engine.begin() as connection:
