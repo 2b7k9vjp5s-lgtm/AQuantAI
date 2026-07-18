@@ -140,3 +140,44 @@ Benchmark context is provider-attributed, not an official exchange statement or 
 v0.4C adds an independently selected `sector_series_key`. The sector repository selects one complete physical snapshot and uses this selected equity snapshot's persisted open-session calendar for exact latest, 5-session, 20-session, SMA20-distance, volatility, and drawdown windows. Cross-sectional output is limited to transparent counts, shares, and deterministic top/bottom lists over the exact requested stable `BK` code scope.
 
 Without a sector key, `sector_context` is `null` and all accepted equity-only and equity-plus-benchmark responses remain compatible. Sector output is Eastmoney-provider-attributed, selected-scope, non-official, descriptive, read-only, and non-advisory. It contains no constituents, company beneficiaries, Industry Alpha conclusions, scores, signals, recommendations, or trading behavior. See [sector_context.md](sector_context.md).
+
+## v0.4D Liquidity Distribution Context
+
+v0.4D adds a nested `liquidity_context` to every successfully selected equity snapshot. It does not accept another selector. It consumes the exact same physical `PersistedMarketDataSnapshot`, accepted effective session, filtered price rows, and persisted open-session sequence used by v0.4A. It never selects or stitches another ingestion run, series, or calendar.
+
+The only liquidity input is provider-attributed `daily_price.amount`. Amount units are preserved as supplied by the selected provider and are not normalized into a currency claim or financial advice. A stock/session amount is eligible only when the accepted traded-record rules pass and amount is finite and strictly positive. Missing, duplicate, future, out-of-calendar, wrong-scope, wrong-adjustment, non-finite, negative, zero, and no-trade rows are unavailable. Values are never filled, shortened, interpolated, forward-filled, or converted to zero.
+
+### Latest distribution
+
+For effective session `t`, let `E_t` contain selected stocks with eligible amount `A(i,t)`:
+
+```text
+latest_total_amount(t) = sum(A(i,t), i in E_t)
+latest_median_amount(t) = median(A(i,t), i in E_t)
+```
+
+Eligible stocks are sorted by amount descending and stock code ascending for ties. Top-5 uses `min(5, len(E_t))` members. Top decile uses `max(1, ceil(0.10 * len(E_t)))` members, including universes smaller than ten. Each concentration share divides the selected members' amount by the eligible latest total, never by the requested-scope total. When `E_t` is empty, totals and shares are `null`; member counts are zero.
+
+### Exact matched-cohort activity
+
+For `w` equal to 5 or 20, the exact window contains `t` and exactly `w` preceding persisted open sessions. `E_w` is one fixed cohort containing only selected stocks with an eligible amount on every required session:
+
+```text
+matched_total_w(s) = sum(A(i,s), i in E_w)
+baseline_total_w(t) = median(matched_total_w(s), s in the exact w prior sessions)
+activity_ratio_w(t) = matched_total_w(t) / baseline_total_w(t)
+```
+
+One missing or invalid observation removes that stock from the entire matched cohort rather than changing the cohort by session. The response reports matched count and sorted unavailable codes. Fewer than `w + 1` expected sessions, an empty cohort, or a non-positive/non-finite baseline returns `null` baseline and ratio with an explicit diagnostic. A partial calendar window is never substituted.
+
+For every stock in `E_20`, the individual baseline is the median amount over the exact 20 prior sessions. Latest-above-baseline uses strict `A(i,t) > baseline(i,t)`; equality is not above. An empty `E_20` returns count zero and share `null`.
+
+### Status and diagnostics
+
+- `complete`: latest distribution and both exact windows cover every selected stock, with no accepted-path source exclusion;
+- `partial`: at least one latest observation or matched-cohort member is unavailable, while a latest distribution remains calculable;
+- `unavailable`: no latest selected stock has an eligible amount.
+
+Structured diagnostics contain sorted latest issues and bounded accepted-path source exclusions for future, out-of-calendar, wrong-scope, wrong-adjustment, and duplicate rows. Exact excluded-row counts remain visible even when identifiers are bounded. Warnings cover latest gaps, incomplete 5/20-session windows, empty cohorts, invalid baselines, and source exclusions. No provider raw payload, local path, credential, or arbitrary request metadata is exposed.
+
+Trading concentration here is a descriptive selected-universe distribution statistic only. It is not evidence of crowding, a market regime, a score, a signal, a recommendation, or investment attractiveness. v0.4D adds no provider, endpoint, network call, ingestion path, database table, migration, independent liquidity series, second calendar, scheduler, automatic refresh, style or valuation analysis, Industry Alpha workflow, broker, order, or trading behavior.

@@ -185,6 +185,9 @@ def test_api_adds_sector_context_only_for_an_explicit_valid_sector_series(client
 
     assert equity_only.status_code == 200
     assert equity_only.json()["sector_context"] is None
+    assert equity_only.json()["liquidity_context"]["effective_session"] == (
+        COCKPIT_FIXTURE_END_DATE
+    )
     assert with_sector.status_code == 200
     context = with_sector.json()["sector_context"]
     assert context["provenance"]["series_key"] == sector.series_key
@@ -279,6 +282,14 @@ def test_api_returns_current_and_historical_persisted_snapshots(client) -> None:
         "latest_return_unavailable_count": 0,
         "latest_return_issues": [],
     }
+    liquidity = current_payload["liquidity_context"]
+    assert liquidity["effective_session"] == COCKPIT_FIXTURE_END_DATE
+    assert liquidity["requested_stock_count"] == 3
+    assert liquidity["latest_eligible_count"] == 3
+    assert liquidity["activity_5"]["matched_cohort_count"] == 3
+    assert liquidity["activity_20"]["matched_cohort_count"] == 3
+    assert liquidity["read_only"] is True
+    assert liquidity["scope_label"] == "selected universe"
     assert current_payload["read_only"] is True
     assert current_payload["allowed_actions"] == ["view", "inspect"]
     assert current_payload["unsupported_sections"]
@@ -308,7 +319,10 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "Selected-sector market context" in page.text
     assert "exact stable codes" in page.text
     assert "does not provide sector constituents" in page.text
-    assert "Still unsupported after the bounded v0.4C slice" in page.text
+    assert "Liquidity distribution and trading concentration" in page.text
+    assert "descriptive distribution statistic" in page.text
+    assert "not a crowding conclusion" in page.text
+    assert "Still unsupported after the bounded v0.4D slice" in page.text
     assert "Read-only" in page.text
     assert "<form" not in page.text.lower()
     assert "<button" not in page.text.lower()
@@ -331,6 +345,10 @@ def test_page_and_assets_are_read_only_and_show_scope_provenance_and_limitations
     assert "sector_series_key" in script.text
     assert "Exact stable sector codes" in script.text
     assert "No sector series was requested" in script.text
+    assert "renderLiquidityContext" in script.text
+    assert "Top-decile concentration" in script.text
+    assert "No liquidity source-exclusion diagnostics" in script.text
+    assert "Number.isFinite" in script.text
     for forbidden_claim in ("全市场", "A 股市场宽度", "官方指数宽度"):
         assert forbidden_claim not in page.text
 

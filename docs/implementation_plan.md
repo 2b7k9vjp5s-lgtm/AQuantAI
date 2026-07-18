@@ -41,6 +41,10 @@ The second v0.4 slice is limited to separate provider-attributed benchmark-index
 
 The third v0.4 slice is limited to a separate provider-attributed Eastmoney industry-board taxonomy and daily-history series, exact stable-code selection, deterministic exact-session descriptive metrics, provenance, cutoff/session alignment, and optional read-only Market Cockpit presentation. It does not authorize sector constituents, company beneficiaries, Industry Alpha evidence or conclusions, style, valuation, crowding, composite scores, recommendations, automatic collection, or trading behavior.
 
+### v0.4D Authorized Liquidity Distribution Context
+
+The fourth v0.4 slice is limited to deterministic liquidity-distribution statistics over the same selected-equity complete snapshot, effective session, and persisted open-session sequence already selected for v0.4A. It uses only eligible positive `daily_price.amount` observations and adds latest total/median amount, descriptive top-5/top-decile concentration, exact fixed-cohort 5/20-prior-session activity ratios, and above-prior-20-median participation. It adds no provider endpoint, ingestion, persistence, migration, independent series, calendar, style, valuation, crowding conclusion, signal, recommendation, or automatic collection.
+
 ## v0.5 Industry Alpha Stage 1 And Evidence Infrastructure
 
 - **Objective:** model industry maps and evidence-backed causal research.

@@ -20,6 +20,12 @@ from market_cockpit.contracts import (
     RiskMetrics,
     WindowBreadthMetrics,
 )
+from market_cockpit.liquidity_calculator import calculate_liquidity_context
+from market_cockpit.liquidity_contracts import (
+    LiquidityContext,
+    LiquiditySourceExclusion,
+    LiquiditySourceExclusionReason,
+)
 from market_cockpit.repository import PersistedMarketDataSnapshot
 
 RETURN_EPSILON = 1e-12
@@ -36,6 +42,7 @@ class MarketCockpitCalculation:
     available_stock_count: int
     calculation_status: CalculationStatus
     latest_data_diagnostics: LatestDataDiagnostics
+    liquidity_context: LiquidityContext
     warnings: list[str]
 
 
@@ -54,6 +61,7 @@ def calculate_market_cockpit(
     """Calculate selected-universe metrics from one physical snapshot only."""
     expected_codes = sorted(snapshot.stock_codes)
     warnings: list[str] = []
+    liquidity_exclusions: list[LiquiditySourceExclusion] = []
     bound = min(
         value
         for value in (
@@ -90,18 +98,29 @@ def calculate_market_cockpit(
     prices["trade_date"] = prices["trade_date"].map(_compact_date)
     future_rows = prices["trade_date"].gt(effective_session)
     if future_rows.any():
+        liquidity_exclusions.append(
+            _liquidity_source_exclusion("future_price_rows", prices.loc[future_rows])
+        )
         warnings.append(
             f"Excluded {int(future_rows.sum())} price rows after effective session {effective_session}."
         )
     prices = prices.loc[~future_rows]
     out_of_calendar = ~prices["trade_date"].isin(sessions)
     if out_of_calendar.any():
+        liquidity_exclusions.append(
+            _liquidity_source_exclusion(
+                "out_of_calendar_price_rows", prices.loc[out_of_calendar]
+            )
+        )
         warnings.append(
             f"Excluded {int(out_of_calendar.sum())} price rows outside persisted open sessions."
         )
     prices = prices.loc[~out_of_calendar]
     wrong_scope = ~prices["stock_code"].isin(expected_codes)
     if wrong_scope.any():
+        liquidity_exclusions.append(
+            _liquidity_source_exclusion("wrong_scope_price_rows", prices.loc[wrong_scope])
+        )
         warnings.append(
             f"Excluded price rows outside the exact selected scope: "
             f"{sorted(prices.loc[wrong_scope, 'stock_code'].astype(str).unique())}."
@@ -109,12 +128,22 @@ def calculate_market_cockpit(
     prices = prices.loc[~wrong_scope]
     wrong_adjust = ~prices["adjust_type"].fillna("").eq(snapshot.adjust_type)
     if wrong_adjust.any():
+        liquidity_exclusions.append(
+            _liquidity_source_exclusion(
+                "wrong_adjustment_price_rows", prices.loc[wrong_adjust]
+            )
+        )
         warnings.append(
             f"Excluded {int(wrong_adjust.sum())} rows with an incompatible adjustment policy."
         )
     prices = prices.loc[~wrong_adjust]
     duplicate_keys = prices.duplicated(["trade_date", "stock_code"], keep=False)
     if duplicate_keys.any():
+        liquidity_exclusions.append(
+            _liquidity_source_exclusion(
+                "duplicate_stock_session_price_rows", prices.loc[duplicate_keys]
+            )
+        )
         duplicate_labels = sorted(
             prices.loc[duplicate_keys, ["trade_date", "stock_code"]]
             .astype(str)
@@ -165,6 +194,15 @@ def calculate_market_cockpit(
         "amount", expected_codes, sessions, price_lookup, warnings
     )
     risk = _risk_metrics(expected_codes, sessions, price_lookup, warnings)
+    liquidity_context = calculate_liquidity_context(
+        stock_codes=expected_codes,
+        expected_sessions=sessions,
+        effective_session=effective_session,
+        price_lookup=price_lookup,
+        source_exclusions=liquidity_exclusions,
+        is_no_trade=_is_no_trade,
+        is_valid_traded_record=_is_valid_traded_record,
+    )
     available_count = (
         latest.advancing_count + latest.declining_count + latest.unchanged_count
     )
@@ -191,6 +229,7 @@ def calculate_market_cockpit(
         available_stock_count=available_count,
         calculation_status=calculation_status,
         latest_data_diagnostics=latest_diagnostics,
+        liquidity_context=liquidity_context,
         warnings=warnings,
     )
 
@@ -661,3 +700,22 @@ def _compact_date(value: object) -> str:
 
 def _compact_optional_date(value: str | None) -> str | None:
     return _compact_date(value) if value is not None else None
+
+
+def _liquidity_source_exclusion(
+    reason: LiquiditySourceExclusionReason,
+    rows: pd.DataFrame,
+) -> LiquiditySourceExclusion:
+    identifiers = sorted(
+        rows.loc[:, ["trade_date", "stock_code"]]
+        .astype(str)
+        .agg(":".join, axis=1)
+        .unique()
+    )
+    bounded = identifiers[:20]
+    return LiquiditySourceExclusion(
+        reason=reason,
+        excluded_row_count=len(rows),
+        identifiers=bounded,
+        identifiers_truncated=len(identifiers) > len(bounded),
+    )

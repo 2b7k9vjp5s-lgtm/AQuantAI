@@ -60,6 +60,20 @@
         </div>
       </section>
 
+      <section aria-labelledby="liquidity-heading">
+        <p class="section-kicker">Same selected-equity snapshot and persisted open-session sequence</p>
+        <h2 id="liquidity-heading">Liquidity distribution and trading concentration</h2>
+        <p id="liquidity-status">Liquidity context is loading with the selected-equity snapshot.</p>
+        <p>Provider-attributed raw trading amount for the selected universe only. Concentration is a descriptive distribution statistic, not a crowding conclusion, regime, signal, recommendation, or attractiveness score.</p>
+        <div id="liquidity-summary" class="metric-grid"></div>
+        <h3>Exact matched-cohort activity windows</h3>
+        <div id="liquidity-windows" class="metric-grid"></div>
+        <h3>Liquidity diagnostics</h3>
+        <div id="liquidity-latest-issues"></div>
+        <div id="liquidity-source-exclusions"></div>
+        <div id="liquidity-warnings"></div>
+      </section>
+
       <section aria-labelledby="provenance-heading">
         <p class="section-kicker">One ingestion run, no cross-series stitching</p>
         <h2 id="provenance-heading">Scope and provenance</h2>
@@ -102,7 +116,7 @@
           <div id="warnings"></div>
         </div>
         <div>
-          <p class="section-kicker">Still unsupported after the bounded v0.4C slice</p>
+          <p class="section-kicker">Still unsupported after the bounded v0.4D slice</p>
           <h2>Unsupported sections</h2>
           <div id="unsupported"></div>
         </div>
@@ -116,6 +130,9 @@
           <li>A zero-volume and zero-amount row is no-trade and is excluded from breadth, participation, rolling close, and risk windows.</li>
           <li>20/60-session metrics require every close in the full persisted calendar window.</li>
           <li>Participation compares the current value with the median of the prior 20 sessions.</li>
+          <li>Liquidity distribution uses finite, strictly positive amount observations on the existing effective session. Top-decile membership is <code>max(1, ceil(10% * eligible count))</code>, with amount-descending and stock-code-ascending tie order.</li>
+          <li>Liquidity activity uses one fixed matched cohort with eligible amount on the effective session and every exact prior 5 or 20 open sessions. The ratio divides the cohort's current total by the median of its prior session totals.</li>
+          <li>Above-baseline liquidity uses the exact 20-prior-session matched cohort and a strict greater-than comparison against each stock's own prior median.</li>
           <li>Risk uses 20 complete selected-universe equal-weight returns and annualizes volatility by square root of 252.</li>
           <li>Benchmark context uses its own explicit series and the selected equity snapshot's persisted open-session calendar. Return, SMA, volatility, and drawdown require exact consecutive 2/20/60/21-session windows ending at each code's latest valid session.</li>
           <li>Sector context uses exact Eastmoney <code>BK</code> identifiers and separate complete snapshots. Latest, 5-session, 20-session, SMA20, volatility, and drawdown metrics require exact 2/6/21/20/21-session windows.</li>
