@@ -102,6 +102,7 @@ def _write_posix_shims(shim_dir: Path, *, include_docker: bool = True) -> None:
     shim_dir.mkdir()
     shims = {
         "dirname": """#!/bin/sh
+[ "$1" = "--" ] && shift
 case "$1" in
   */*) printf '%s\n' "${1%/*}" ;;
   *) printf '%s\n' "." ;;
