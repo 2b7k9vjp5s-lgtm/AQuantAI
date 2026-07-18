@@ -25,7 +25,10 @@ def get_industry_alpha_session_factory() -> Iterator[sessionmaker[Session]]:
     except (RuntimeError, SQLAlchemyError) as exc:
         raise HTTPException(
             status_code=503,
-            detail=f"Industry Alpha database configuration is unavailable: {exc}",
+            detail=(
+                "Industry Alpha database configuration is unavailable. "
+                "Verify local database settings and try again."
+            ),
         ) from exc
     try:
         yield build_session_factory(engine)

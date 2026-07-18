@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from backend.api.industry_alpha import get_industry_alpha_session_factory
+import backend.api.industry_alpha as industry_alpha_api
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
 from backend.main import app
@@ -42,6 +43,27 @@ from industry_alpha.repository import EvidenceLedgerRepository
 
 def utc(day: int) -> datetime:
     return datetime(2026, 1, day, 12, tzinfo=timezone.utc)
+
+
+def utc_hour(day: int, hour: int) -> datetime:
+    return datetime(2026, 1, day, hour, tzinfo=timezone.utc)
+
+
+def ledger_counts(session_factory) -> tuple[int, ...]:
+    models = (
+        ResearchCase,
+        ResearchCaseRevision,
+        EvidenceItem,
+        Claim,
+        ClaimRevision,
+        ClaimEvidenceLink,
+        CaseRevisionClaimLink,
+        VerificationItem,
+    )
+    with session_factory() as session:
+        return tuple(
+            session.scalar(select(func.count()).select_from(model)) for model in models
+        )
 
 
 @pytest.fixture
@@ -530,3 +552,477 @@ def test_same_case_concurrent_revision_numbers_are_unique(session_factory):
     with ThreadPoolExecutor(max_workers=2) as pool:
         numbers = sorted(pool.map(append, [1, 2]))
     assert numbers == [2, 3]
+
+
+def test_case_revision_chronology_rejects_backdating_and_rolls_back(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="case creation"):
+        service.append_case_revision(
+            case.id,
+            title="Backdated",
+            research_question="Must not appear early",
+            information_cutoff_date=date(2026, 1, 2),
+            recorded_at_utc=utc_hour(2, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+    service.append_case_revision(
+        case.id,
+        title="Accepted second revision",
+        research_question="Chronological",
+        information_cutoff_date=date(2026, 1, 3),
+        recorded_at_utc=utc_hour(3, 12),
+    )
+    accepted = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="previous case revision"):
+        service.append_case_revision(
+            case.id,
+            title="Back before previous",
+            research_question="Must roll back",
+            information_cutoff_date=date(2026, 1, 3),
+            recorded_at_utc=utc_hour(3, 11),
+        )
+    assert ledger_counts(session_factory) == accepted
+
+
+def test_claim_revision_chronology_rejects_backdating_and_rolls_back(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    claim = service.create_claim(
+        case.id,
+        claim_key="chronology-claim",
+        statement="Initial draft.",
+        claim_kind="fact",
+        claim_status="draft",
+        information_cutoff_date=date(2026, 1, 3),
+        recorded_at_utc=utc_hour(3, 12),
+    )
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="claim creation"):
+        service.append_claim_revision(
+            claim.id,
+            statement="Backdated draft.",
+            claim_kind="fact",
+            claim_status="draft",
+            information_cutoff_date=date(2026, 1, 3),
+            recorded_at_utc=utc_hour(3, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+    service.append_claim_revision(
+        claim.id,
+        statement="Accepted second draft.",
+        claim_kind="fact",
+        claim_status="draft",
+        information_cutoff_date=date(2026, 1, 4),
+        recorded_at_utc=utc_hour(4, 12),
+    )
+    accepted = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="previous claim revision"):
+        service.append_claim_revision(
+            claim.id,
+            statement="Before previous revision.",
+            claim_kind="fact",
+            claim_status="draft",
+            information_cutoff_date=date(2026, 1, 4),
+            recorded_at_utc=utc_hour(4, 11),
+        )
+    assert ledger_counts(session_factory) == accepted
+
+
+def test_evidence_and_supersession_chronology_are_monotonic(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="case creation"):
+        service.add_evidence(
+            case.id,
+            evidence_grade="A",
+            source_kind="official",
+            source_title="Backdated evidence",
+            information_date=date(2026, 1, 2),
+            summary="Must roll back.",
+            recorded_at_utc=utc_hour(2, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+    evidence = add_evidence(service, case.id, "A", 3)
+    accepted = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="superseded evidence"):
+        service.add_evidence(
+            case.id,
+            evidence_grade="A",
+            source_kind="official",
+            source_title="Backdated correction",
+            information_date=date(2026, 1, 3),
+            summary="Must not rewrite history.",
+            supersedes_evidence_id=evidence.id,
+            recorded_at_utc=utc_hour(3, 11),
+        )
+    assert ledger_counts(session_factory) == accepted
+
+
+@pytest.mark.parametrize("claim_status,relation", [("supported", "supports"), ("disputed", "contradicts")])
+def test_claim_revision_cannot_use_later_recorded_evidence(
+    session_factory, claim_status, relation
+):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    evidence = service.add_evidence(
+        case.id,
+        evidence_grade="A" if relation == "supports" else "C",
+        source_kind="official" if relation == "supports" else "research",
+        source_title="Later same-day evidence",
+        information_date=date(2026, 1, 5),
+        summary="Recorded after the attempted claim revision.",
+        recorded_at_utc=utc_hour(5, 12),
+    )
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="linked evidence"):
+        service.create_claim(
+            case.id,
+            claim_key=f"later-evidence-{claim_status}",
+            statement="Must not use future-recorded evidence.",
+            claim_kind="fact",
+            claim_status=claim_status,
+            information_cutoff_date=date(2026, 1, 5),
+            evidence_links=(EvidenceLinkInput(evidence.id, relation),),
+            recorded_at_utc=utc_hour(5, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+
+
+def test_standalone_link_cannot_predate_either_endpoint(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    evidence = add_evidence(service, case.id, "A", 3)
+    claim = service.create_claim(
+        case.id,
+        claim_key="standalone-link-time",
+        statement="Draft claim.",
+        claim_kind="fact",
+        claim_status="draft",
+        information_cutoff_date=date(2026, 1, 4),
+        recorded_at_utc=utc_hour(4, 12),
+    )
+    with session_factory() as session:
+        revision = session.scalar(
+            select(ClaimRevision).where(ClaimRevision.claim_id == claim.id)
+        )
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="claim revision"):
+        service.link_evidence(
+            revision.id,
+            evidence.id,
+            relation="context",
+            recorded_at_utc=utc_hour(4, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+
+    later_evidence = service.add_evidence(
+        case.id,
+        evidence_grade="B",
+        source_kind="research",
+        source_title="Later evidence endpoint",
+        information_date=date(2026, 1, 5),
+        summary="Recorded at noon.",
+        recorded_at_utc=utc_hour(5, 12),
+    )
+    later_claim = service.create_claim(
+        case.id,
+        claim_key="link-before-evidence",
+        statement="Draft with a day-five cutoff.",
+        claim_kind="fact",
+        claim_status="draft",
+        information_cutoff_date=date(2026, 1, 5),
+        recorded_at_utc=utc_hour(5, 10),
+    )
+    with session_factory() as session:
+        later_revision = session.scalar(
+            select(ClaimRevision).where(ClaimRevision.claim_id == later_claim.id)
+        )
+    before_evidence_link = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="evidence timestamp"):
+        service.link_evidence(
+            later_revision.id,
+            later_evidence.id,
+            relation="context",
+            recorded_at_utc=utc_hour(5, 11),
+        )
+    assert ledger_counts(session_factory) == before_evidence_link
+
+
+def test_supported_case_cannot_freeze_later_qualifying_claim(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    evidence = service.add_evidence(
+        case.id,
+        evidence_grade="A",
+        source_kind="official",
+        source_title="Supported conclusion evidence",
+        information_date=date(2026, 1, 5),
+        summary="Recorded at noon.",
+        recorded_at_utc=utc_hour(5, 12),
+    )
+    claim = service.create_claim(
+        case.id,
+        claim_key="supported-later-claim",
+        statement="Supported only at noon.",
+        claim_kind="fact",
+        claim_status="supported",
+        information_cutoff_date=date(2026, 1, 5),
+        evidence_links=(EvidenceLinkInput(evidence.id, "supports"),),
+        recorded_at_utc=utc_hour(5, 12),
+    )
+    with session_factory() as session:
+        revision = session.scalar(
+            select(ClaimRevision).where(ClaimRevision.claim_id == claim.id)
+        )
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="linked claim revision"):
+        service.append_case_revision(
+            case.id,
+            title="Too early supported conclusion",
+            research_question="Can later support leak?",
+            conclusion_status="supported",
+            information_cutoff_date=date(2026, 1, 5),
+            claim_links=(CaseClaimInput(revision.id, "conclusion"),),
+            recorded_at_utc=utc_hour(5, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+
+
+def test_case_conclusion_cannot_freeze_later_qualifying_links(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    contradiction = add_evidence(service, case.id, "C", 3)
+    claim = service.create_claim(
+        case.id,
+        claim_key="later-conflict-link",
+        statement="Draft claim awaiting conflict review.",
+        claim_kind="fact",
+        claim_status="draft",
+        information_cutoff_date=date(2026, 1, 5),
+        recorded_at_utc=utc_hour(5, 9),
+    )
+    with session_factory() as session:
+        revision = session.scalar(
+            select(ClaimRevision).where(ClaimRevision.claim_id == claim.id)
+        )
+    service.link_evidence(
+        revision.id,
+        contradiction.id,
+        relation="contradicts",
+        recorded_at_utc=utc_hour(5, 12),
+    )
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="disputed case conclusions"):
+        service.append_case_revision(
+            case.id,
+            title="Too early for conflict link",
+            research_question="Can later links leak?",
+            conclusion_status="disputed",
+            information_cutoff_date=date(2026, 1, 5),
+            claim_links=(CaseClaimInput(revision.id, "conclusion"),),
+            recorded_at_utc=utc_hour(5, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+
+
+def test_verification_item_chronology_is_monotonic(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    with session_factory() as session:
+        revision = session.scalar(
+            select(ResearchCaseRevision).where(ResearchCaseRevision.case_id == case.id)
+        )
+    initial = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="case revision"):
+        service.add_verification_item(
+            revision.id,
+            description="Backdated checklist item.",
+            recorded_at_utc=utc_hour(2, 11),
+        )
+    assert ledger_counts(session_factory) == initial
+    service.add_verification_item(
+        revision.id,
+        description="Accepted checklist item.",
+        recorded_at_utc=utc_hour(3, 12),
+    )
+    accepted = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="latest verification"):
+        service.add_verification_item(
+            revision.id,
+            description="Moves backward.",
+            recorded_at_utc=utc_hour(3, 11),
+        )
+    assert ledger_counts(session_factory) == accepted
+
+
+def test_rejected_backdating_never_changes_earlier_or_current_history(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    with session_factory() as session:
+        query = EvidenceLedgerQueryService(EvidenceLedgerRepository(session))
+        before_current = query.get_case(case.id).to_dict()
+        before_historical = query.get_case(
+            case.id, as_of_cutoff=date(2026, 1, 2)
+        ).to_dict()
+    with pytest.raises(EvidenceLedgerValidationError):
+        service.append_case_revision(
+            case.id,
+            title="Rejected historical rewrite",
+            research_question="Must not leak",
+            information_cutoff_date=date(2026, 1, 2),
+            recorded_at_utc=utc_hour(2, 11),
+        )
+    with session_factory() as session:
+        query = EvidenceLedgerQueryService(EvidenceLedgerRepository(session))
+        assert query.get_case(case.id).to_dict() == before_current
+        assert query.get_case(
+            case.id, as_of_cutoff=date(2026, 1, 2)
+        ).to_dict() == before_historical
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("case_key", 123), ("title", object()), ("research_question", None)],
+)
+def test_required_text_rejects_non_strings_atomically(
+    session_factory, field, value
+):
+    service = EvidenceLedgerCommandService(session_factory)
+    kwargs = {
+        "case_key": "strict-required",
+        "title": "Strict text",
+        "research_question": "Are values strings?",
+        "information_cutoff_date": date(2026, 1, 2),
+        "recorded_at_utc": utc(2),
+    }
+    kwargs[field] = value
+    with pytest.raises(EvidenceLedgerValidationError, match="must be a string"):
+        service.create_case(**kwargs)
+    assert ledger_counts(session_factory) == (0,) * 8
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("summary", 123),
+        ("publisher_or_author", object()),
+        ("source_locator", ["not", "text"]),
+        ("content_fingerprint", 456),
+    ],
+)
+def test_optional_text_rejects_non_strings_atomically(
+    session_factory, field, value
+):
+    service = EvidenceLedgerCommandService(session_factory)
+    if field == "summary":
+        with pytest.raises(EvidenceLedgerValidationError, match="string or None"):
+            service.create_case(
+                case_key="strict-optional-case",
+                title="Strict text",
+                research_question="Are optional values strings?",
+                summary=value,
+                information_cutoff_date=date(2026, 1, 2),
+                recorded_at_utc=utc(2),
+            )
+        assert ledger_counts(session_factory) == (0,) * 8
+        return
+    case = create_case(service)
+    before = ledger_counts(session_factory)
+    kwargs = {
+        "evidence_grade": "A",
+        "source_kind": "official",
+        "source_title": "Strict optional evidence",
+        "information_date": date(2026, 1, 3),
+        "summary": "Valid summary.",
+        "recorded_at_utc": utc(3),
+        field: value,
+    }
+    with pytest.raises(EvidenceLedgerValidationError, match="string or None"):
+        service.add_evidence(case.id, **kwargs)
+    assert ledger_counts(session_factory) == before
+
+
+def test_claim_link_and_checklist_text_boundaries_do_not_coerce(session_factory):
+    service = EvidenceLedgerCommandService(session_factory)
+    case = create_case(service)
+    evidence = add_evidence(service, case.id, "A", 3)
+    before_claim = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="statement must be a string"):
+        service.create_claim(
+            case.id,
+            claim_key="non-string-statement",
+            statement=123,
+            claim_kind="fact",
+            claim_status="draft",
+            information_cutoff_date=date(2026, 1, 3),
+            recorded_at_utc=utc(3),
+        )
+    with pytest.raises(EvidenceLedgerValidationError, match="inference_basis must be a string"):
+        service.create_claim(
+            case.id,
+            claim_key="non-string-basis",
+            statement="Valid statement.",
+            claim_kind="inference",
+            claim_status="draft",
+            inference_confidence="low",
+            inference_basis=object(),
+            information_cutoff_date=date(2026, 1, 3),
+            recorded_at_utc=utc(3),
+        )
+    assert ledger_counts(session_factory) == before_claim
+    claim = service.create_claim(
+        case.id,
+        claim_key="strict-link-note",
+        statement="Valid draft.",
+        claim_kind="fact",
+        claim_status="draft",
+        information_cutoff_date=date(2026, 1, 3),
+        recorded_at_utc=utc(3),
+    )
+    with session_factory() as session:
+        claim_revision = session.scalar(
+            select(ClaimRevision).where(ClaimRevision.claim_id == claim.id)
+        )
+        case_revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == case.id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+    before_relations = ledger_counts(session_factory)
+    with pytest.raises(EvidenceLedgerValidationError, match="link_note must be a string"):
+        service.link_evidence(
+            claim_revision.id,
+            evidence.id,
+            relation="context",
+            link_note=123,
+            recorded_at_utc=utc(4),
+        )
+    with pytest.raises(EvidenceLedgerValidationError, match="description must be a string"):
+        service.add_verification_item(
+            case_revision.id,
+            description=123,
+            recorded_at_utc=utc(4),
+        )
+    assert ledger_counts(session_factory) == before_relations
+
+
+def test_configuration_503_never_echoes_exception_details(monkeypatch):
+    sentinel = "secret-password@private/path/database"
+
+    def fail_engine():
+        raise RuntimeError(sentinel)
+
+    monkeypatch.setattr(industry_alpha_api, "build_engine", fail_engine)
+    client = TestClient(app)
+    response = client.get("/industry-alpha/cases")
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["detail"] == (
+        "Industry Alpha database configuration is unavailable. "
+        "Verify local database settings and try again."
+    )
+    assert sentinel not in response.text

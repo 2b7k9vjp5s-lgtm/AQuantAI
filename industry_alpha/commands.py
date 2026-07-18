@@ -43,6 +43,7 @@ from industry_alpha.validation import (
     utc_timestamp,
     validate_claim_fields,
     validate_recorded_cutoff,
+    validate_utc_chronology,
 )
 
 _REVISION_LOCKS_GUARD = Lock()
@@ -175,13 +176,20 @@ class EvidenceLedgerCommandService:
         validate_recorded_cutoff(information_date, recorded)
         with self._translate_integrity("evidence fingerprint already exists in this case"):
             with self._session_factory.begin() as session:
-                self._require_case(session, case_id)
+                case = self._require_case(session, case_id)
+                validate_utc_chronology(
+                    recorded, ("case creation timestamp", _stored_utc(case.created_at_utc))
+                )
                 if supersedes_evidence_id is not None:
                     previous = session.get(EvidenceItem, supersedes_evidence_id)
                     if previous is None or previous.case_id != case_id:
                         raise EvidenceLedgerValidationError(
                             "supersedes_evidence_id must identify evidence in the same case."
                         )
+                    validate_utc_chronology(
+                        recorded,
+                        ("superseded evidence timestamp", _stored_utc(previous.recorded_at_utc)),
+                    )
                 item = EvidenceItem(
                     case_id=case_id,
                     evidence_grade=grade,
@@ -218,7 +226,10 @@ class EvidenceLedgerCommandService:
         validate_recorded_cutoff(information_cutoff_date, recorded)
         with self._translate_integrity("claim_key already exists in this case"):
             with self._session_factory.begin() as session:
-                self._require_case(session, case_id)
+                case = self._require_case(session, case_id)
+                validate_utc_chronology(
+                    recorded, ("case creation timestamp", _stored_utc(case.created_at_utc))
+                )
                 claim = Claim(case_id=case_id, claim_key=key, created_at_utc=recorded)
                 session.add(claim)
                 session.flush()
@@ -289,6 +300,11 @@ class EvidenceLedgerCommandService:
                     raise EvidenceLedgerValidationError(
                         "linked evidence information_date exceeds the claim revision cutoff."
                     )
+                validate_utc_chronology(
+                    recorded,
+                    ("claim revision timestamp", _stored_utc(revision.recorded_at_utc)),
+                    ("evidence timestamp", _stored_utc(evidence.recorded_at_utc)),
+                )
                 existing = list(
                     session.scalars(
                         select(ClaimEvidenceLink).where(
@@ -338,6 +354,20 @@ class EvidenceLedgerCommandService:
                         raise EvidenceLedgerNotFound(
                             f"Case revision {case_revision_id} was not found."
                         )
+                    latest_item = session.scalar(
+                        select(VerificationItem)
+                        .where(VerificationItem.case_revision_id == case_revision_id)
+                        .order_by(VerificationItem.item_no.desc())
+                        .limit(1)
+                    )
+                    chronology = [
+                        ("case revision timestamp", _stored_utc(case_revision.recorded_at_utc))
+                    ]
+                    if latest_item is not None:
+                        chronology.append(
+                            ("latest verification item timestamp", _stored_utc(latest_item.recorded_at_utc))
+                        )
+                    validate_utc_chronology(recorded, *chronology)
                     latest_no = session.scalar(
                         select(func.max(VerificationItem.item_no)).where(
                             VerificationItem.case_revision_id == case_revision_id
@@ -386,6 +416,12 @@ class EvidenceLedgerCommandService:
             .order_by(ResearchCaseRevision.revision_no.desc())
             .limit(1)
         )
+        chronology = [("case creation timestamp", _stored_utc(case.created_at_utc))]
+        if prior is not None:
+            chronology.append(
+                ("previous case revision timestamp", _stored_utc(prior.recorded_at_utc))
+            )
+        validate_utc_chronology(recorded_at_utc, *chronology)
         memberships: list[tuple[str, ClaimRevision]] = []
         for spec in claim_links:
             role = reviewed_value(spec.role, "role", CLAIM_ROLES)
@@ -401,12 +437,14 @@ class EvidenceLedgerCommandService:
                 raise EvidenceLedgerValidationError(
                     "linked claim revision cutoff exceeds the case revision cutoff."
                 )
-            if _recorded_date(claim_revision.recorded_at_utc) > _recorded_date(recorded_at_utc):
-                raise EvidenceLedgerValidationError(
-                    "linked claim revision was recorded after the case revision timestamp."
-                )
+            validate_utc_chronology(
+                recorded_at_utc,
+                ("linked claim revision timestamp", _stored_utc(claim_revision.recorded_at_utc)),
+            )
             memberships.append((role, claim_revision))
-        self._validate_case_conclusion(session, conclusion, memberships)
+        self._validate_case_conclusion(
+            session, conclusion, memberships, recorded_at_utc=recorded_at_utc
+        )
         revision = ResearchCaseRevision(
             case_id=case.id,
             revision_no=1 if prior is None else prior.revision_no + 1,
@@ -467,6 +505,18 @@ class EvidenceLedgerCommandService:
             .order_by(ClaimRevision.revision_no.desc())
             .limit(1)
         )
+        case = session.get(ResearchCase, claim.case_id)
+        if case is None:
+            raise EvidenceLedgerNotFound(f"Research case {claim.case_id} was not found.")
+        chronology = [
+            ("case creation timestamp", _stored_utc(case.created_at_utc)),
+            ("claim creation timestamp", _stored_utc(claim.created_at_utc)),
+        ]
+        if prior is not None:
+            chronology.append(
+                ("previous claim revision timestamp", _stored_utc(prior.recorded_at_utc))
+            )
+        validate_utc_chronology(recorded_at_utc, *chronology)
         resolved: list[tuple[EvidenceLinkInput, EvidenceItem]] = []
         seen: set[tuple[UUID, str]] = set()
         for spec in evidence_links:
@@ -478,6 +528,10 @@ class EvidenceLedgerCommandService:
                 raise EvidenceLedgerValidationError(
                     "claim revision and evidence must belong to the same case."
                 )
+            validate_utc_chronology(
+                recorded_at_utc,
+                ("linked evidence timestamp", _stored_utc(evidence.recorded_at_utc)),
+            )
             key = (evidence.id, relation)
             if key in seen:
                 raise EvidenceLedgerValidationError("duplicate claim/evidence relation in command.")
@@ -540,6 +594,8 @@ class EvidenceLedgerCommandService:
         session: Session,
         conclusion: str,
         memberships: list[tuple[str, ClaimRevision]],
+        *,
+        recorded_at_utc: datetime,
     ) -> None:
         conclusion_claims = [revision for role, revision in memberships if role == "conclusion"]
         if conclusion == "supported":
@@ -556,17 +612,24 @@ class EvidenceLedgerCommandService:
                     )
                 )
                 evidence = [session.get(EvidenceItem, link.evidence_id) for link in links]
+                visible_pairs = [
+                    (link, item)
+                    for link, item in zip(links, evidence, strict=True)
+                    if item is not None
+                    and _stored_utc(link.recorded_at_utc) <= recorded_at_utc
+                    and _stored_utc(item.recorded_at_utc) <= recorded_at_utc
+                ]
                 if revision.claim_status != "supported":
                     raise EvidenceLedgerValidationError(
                         "every supported conclusion membership must freeze a supported claim revision."
                     )
-                if any(link.relation == "contradicts" for link in links):
+                if any(link.relation == "contradicts" for link, _item in visible_pairs):
                     raise EvidenceLedgerValidationError(
                         "supported case conclusions cannot freeze contradictory conclusion claims."
                     )
                 if not any(
                     link.relation == "supports" and item is not None and item.evidence_grade in {"A", "B", "C"}
-                    for link, item in zip(links, evidence, strict=True)
+                    for link, item in visible_pairs
                 ):
                     raise EvidenceLedgerValidationError(
                         "supported conclusion claims require A/B/C supporting evidence."
@@ -578,15 +641,21 @@ class EvidenceLedgerCommandService:
                 )
             valid = False
             for revision in conclusion_claims:
-                has_conflict = session.scalar(
-                    select(func.count())
-                    .select_from(ClaimEvidenceLink)
-                    .where(
-                        ClaimEvidenceLink.claim_revision_id == revision.id,
-                        ClaimEvidenceLink.relation == "contradicts",
+                conflict_links = list(
+                    session.scalars(
+                        select(ClaimEvidenceLink).where(
+                            ClaimEvidenceLink.claim_revision_id == revision.id,
+                            ClaimEvidenceLink.relation == "contradicts",
+                        )
                     )
                 )
-                valid = valid or revision.claim_status == "disputed" or bool(has_conflict)
+                has_visible_conflict = any(
+                    _stored_utc(link.recorded_at_utc) <= recorded_at_utc
+                    and (item := session.get(EvidenceItem, link.evidence_id)) is not None
+                    and _stored_utc(item.recorded_at_utc) <= recorded_at_utc
+                    for link in conflict_links
+                )
+                valid = valid or has_visible_conflict
             if not valid:
                 raise EvidenceLedgerValidationError(
                     "disputed case conclusions require a disputed or contradicted conclusion claim."
@@ -647,7 +716,8 @@ class EvidenceLedgerCommandService:
         return cls._IntegrityTranslation(message)
 
 
-def _recorded_date(value: datetime) -> date:
+def _stored_utc(value: datetime) -> datetime:
+    """Restore UTC tzinfo lost by SQLite while keeping comparisons aware."""
     if value.tzinfo is None:
-        return value.date()
-    return value.astimezone(timezone.utc).date()
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

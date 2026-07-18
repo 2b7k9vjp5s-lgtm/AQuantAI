@@ -41,7 +41,9 @@ MAX_LENGTHS = {
 
 
 def required_text(value: str, field: str) -> str:
-    normalized = str(value).strip()
+    if not isinstance(value, str):
+        raise EvidenceLedgerValidationError(f"{field} must be a string.")
+    normalized = value.strip()
     if not normalized:
         raise EvidenceLedgerValidationError(f"{field} must not be blank.")
     maximum = MAX_LENGTHS[field]
@@ -53,7 +55,9 @@ def required_text(value: str, field: str) -> str:
 def optional_text(value: str | None, field: str) -> str | None:
     if value is None:
         return None
-    normalized = str(value).strip()
+    if not isinstance(value, str):
+        raise EvidenceLedgerValidationError(f"{field} must be a string or None.")
+    normalized = value.strip()
     if not normalized:
         return None
     maximum = MAX_LENGTHS[field]
@@ -63,7 +67,9 @@ def optional_text(value: str | None, field: str) -> str | None:
 
 
 def reviewed_value(value: str, field: str, allowed: Iterable[str]) -> str:
-    normalized = str(value).strip()
+    if not isinstance(value, str):
+        raise EvidenceLedgerValidationError(f"{field} must be a string.")
+    normalized = value.strip()
     if normalized not in allowed:
         choices = ", ".join(sorted(allowed))
         raise EvidenceLedgerValidationError(f"{field} must be one of: {choices}.")
@@ -84,6 +90,20 @@ def validate_recorded_cutoff(information_date: date, recorded_at_utc: datetime) 
         )
 
 
+def validate_utc_chronology(
+    recorded_at_utc: datetime,
+    *predecessors: tuple[str, datetime],
+) -> None:
+    """Reject an exact UTC timestamp earlier than any accepted predecessor."""
+    candidate = utc_timestamp(recorded_at_utc)
+    for label, predecessor in predecessors:
+        previous = utc_timestamp(predecessor)
+        if candidate < previous:
+            raise EvidenceLedgerValidationError(
+                f"recorded_at_utc must not be before {label}."
+            )
+
+
 def validate_claim_fields(
     claim_kind: str,
     confidence: str | None,
@@ -100,5 +120,7 @@ def validate_claim_fields(
     normalized_confidence = reviewed_value(
         confidence, "inference_confidence", INFERENCE_CONFIDENCES
     )
-    normalized_basis = required_text(basis or "", "inference_basis")
+    normalized_basis = required_text(
+        basis if basis is not None else "", "inference_basis"
+    )
     return normalized_confidence, normalized_basis

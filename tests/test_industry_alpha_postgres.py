@@ -8,13 +8,24 @@ from datetime import date, datetime, timezone
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect, select, text
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.engine import make_url
 
 from backend.database.engine import build_engine, build_session_factory
-from industry_alpha.commands import EvidenceLedgerCommandService
-from industry_alpha.errors import EvidenceLedgerImmutableError
-from industry_alpha.models import ClaimRevision, ResearchCase, ResearchCaseRevision
+from industry_alpha.commands import EvidenceLedgerCommandService, EvidenceLinkInput
+from industry_alpha.errors import (
+    EvidenceLedgerImmutableError,
+    EvidenceLedgerValidationError,
+)
+from industry_alpha.models import (
+    Claim,
+    ClaimEvidenceLink,
+    ClaimRevision,
+    EvidenceItem,
+    ResearchCase,
+    ResearchCaseRevision,
+    VerificationItem,
+)
 
 
 @pytest.fixture(scope="module")
@@ -164,3 +175,87 @@ def test_postgres_immutable_guard_rolls_back(postgres_database_url):
         session.rollback()
     with factory() as session:
         assert session.get(ResearchCase, case.id).case_key == "postgres-immutable"
+
+
+def test_postgres_chronology_failures_roll_back_without_history_leak(
+    postgres_database_url,
+):
+    factory = build_session_factory(build_engine(postgres_database_url))
+    service = EvidenceLedgerCommandService(factory)
+    case = service.create_case(
+        case_key="postgres-chronology",
+        title="Chronology",
+        research_question="Can later operations rewrite history?",
+        information_cutoff_date=date(2026, 2, 2),
+        recorded_at_utc=datetime(2026, 2, 2, 12, tzinfo=timezone.utc),
+    )
+
+    def counts() -> tuple[int, ...]:
+        with factory() as session:
+            return tuple(
+                session.scalar(select(func.count()).select_from(model))
+                for model in (
+                    ResearchCase,
+                    ResearchCaseRevision,
+                    EvidenceItem,
+                    Claim,
+                    ClaimRevision,
+                    ClaimEvidenceLink,
+                    VerificationItem,
+                )
+            )
+
+    initial = counts()
+    with pytest.raises(EvidenceLedgerValidationError, match="case creation"):
+        service.append_case_revision(
+            case.id,
+            title="Backdated",
+            research_question="Must roll back",
+            information_cutoff_date=date(2026, 2, 2),
+            recorded_at_utc=datetime(2026, 2, 2, 11, tzinfo=timezone.utc),
+        )
+    assert counts() == initial
+
+    evidence = service.add_evidence(
+        case.id,
+        evidence_grade="A",
+        source_kind="official",
+        source_title="PostgreSQL chronology evidence",
+        information_date=date(2026, 2, 3),
+        summary="Recorded at noon.",
+        recorded_at_utc=datetime(2026, 2, 3, 12, tzinfo=timezone.utc),
+    )
+    before_claim = counts()
+    with pytest.raises(EvidenceLedgerValidationError, match="linked evidence"):
+        service.create_claim(
+            case.id,
+            claim_key="postgres-backdated-claim",
+            statement="Must not use later evidence.",
+            claim_kind="fact",
+            claim_status="supported",
+            information_cutoff_date=date(2026, 2, 3),
+            evidence_links=(EvidenceLinkInput(evidence.id, "supports"),),
+            recorded_at_utc=datetime(2026, 2, 3, 11, tzinfo=timezone.utc),
+        )
+    assert counts() == before_claim
+
+    with factory() as session:
+        first_revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == case.id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+    service.add_verification_item(
+        first_revision.id,
+        description="Accepted PostgreSQL verification item.",
+        recorded_at_utc=datetime(2026, 2, 3, 13, tzinfo=timezone.utc),
+    )
+    accepted = counts()
+    with pytest.raises(EvidenceLedgerValidationError, match="latest verification"):
+        service.add_verification_item(
+            first_revision.id,
+            description="Backdated PostgreSQL verification item.",
+            recorded_at_utc=datetime(2026, 2, 3, 12, tzinfo=timezone.utc),
+        )
+    assert counts() == accepted

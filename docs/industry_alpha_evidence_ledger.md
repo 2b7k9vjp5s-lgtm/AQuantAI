@@ -40,6 +40,10 @@ Command services provide transactional operations for case creation, case revisi
 
 Accepted rows have no update/delete repository method. A SQLAlchemy session guard rejects ordinary ORM updates and deletes and rolls back the transaction. Corrections use a new revision or superseding evidence record. Duplicate identities, duplicate fingerprints, invalid status promotion, and cross-case links reject the complete command without partial rows.
 
+Every append also enforces exact monotonic UTC recording time. A revision cannot predate its stable identity or prior revision; evidence cannot predate its case or superseded evidence; links cannot predate either endpoint; frozen conclusion membership cannot depend on later-recorded qualifying evidence or links; and checklist items cannot move backward relative to their case revision or prior item. Invalid timestamps are rejected without clamping and the complete command rolls back.
+
+Required text fields accept strings only. Optional text fields accept only strings or `None`; blank optional strings normalize to `None`. Numbers and arbitrary objects are never converted with `str()`.
+
 ## Historical Cutoff
 
 For `as_of_cutoff=D`, a dated row is visible only when both are true:
@@ -61,6 +65,8 @@ GET /industry-alpha/cases/{case_id}
 ```
 
 Both routes accept optional ISO `as_of_cutoff=YYYY-MM-DD`. A missing or cutoff-invisible case returns 404, an invalid cutoff returns 422, and unavailable database configuration/schema returns 503. Responses include evidence grades, explicit contradiction entries, frozen memberships, `verification_items`, the Chinese `后续验证清单` label, and research-only disclaimers. POST, PUT, PATCH, and DELETE routes are not present.
+
+Configuration failures use a fixed public 503 message. Database URLs, passwords, local paths, driver errors, and exception details are never echoed in the response.
 
 ## Offline Demo
 
