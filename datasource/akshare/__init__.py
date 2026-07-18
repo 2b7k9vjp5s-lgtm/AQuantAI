@@ -3,6 +3,8 @@
 from datasource.akshare.provider import (
     ADAPTER_COMPATIBILITY_VERSION,
     ADAPTER_VERSION,
+    BENCHMARK_INDEX_ENDPOINT,
+    MAX_BENCHMARK_CODES_PER_REQUEST,
     AkshareDataProvider,
     AkshareProviderError,
     AkshareProviderTimeout,
@@ -13,6 +15,8 @@ from datasource.akshare.provider import (
 __all__ = [
     "ADAPTER_COMPATIBILITY_VERSION",
     "ADAPTER_VERSION",
+    "BENCHMARK_INDEX_ENDPOINT",
+    "MAX_BENCHMARK_CODES_PER_REQUEST",
     "AkshareDataProvider",
     "AkshareProviderError",
     "AkshareProviderTimeout",

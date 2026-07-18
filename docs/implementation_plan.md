@@ -33,6 +33,10 @@ This plan is prospective. Each stage requires a separate authorized review issue
 
 The first v0.4 slice is limited to deterministic selected-universe breadth, participation, realized-volatility, drawdown, provenance, and completeness from existing persisted stock-basic, daily-price, and trade-calendar snapshots. Official indices, sectors, style, valuation, crowding, derived-snapshot persistence, and automatic refresh require later separately reviewed data coverage and are explicitly unsupported in v0.4A.
 
+### v0.4B Authorized Benchmark Context
+
+The second v0.4 slice is limited to separate provider-attributed benchmark-index daily persistence, one reviewed bounded AKShare endpoint, explicit benchmark series selection, close-based context, provenance, cutoff/session alignment, and read-only presentation. It does not authorize sectors, style, valuation, crowding, relative-performance signals, recommendations, or automatic collection.
+
 ## v0.5 Industry Alpha Stage 1 And Evidence Infrastructure
 
 - **Objective:** model industry maps and evidence-backed causal research.

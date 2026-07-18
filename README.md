@@ -8,7 +8,7 @@ Current version: `0.2.0`.
 
 This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
 
-The v0.4A development branch adds a separate database-backed, read-only Market Cockpit for one explicit persisted snapshot series. It monitors only the selected universe and does not claim full-market or official-index coverage. The released version, fixture Dashboard payloads, and Quant Core calculations remain unchanged.
+The v0.4A foundation adds a separate database-backed, read-only Market Cockpit for one explicit equity snapshot series. The authorized v0.4B slice adds an optional, separately selected provider-attributed benchmark-index series and close-based context. Neither domain claims full-market coverage or official exchange authorship. The released version, fixture Dashboard payloads, and Quant Core calculations remain unchanged.
 
 ## Planned Personal Research Architecture
 
@@ -62,6 +62,7 @@ Phase 0 through Phase 6, the correctness hardening pass, and the local Dashboard
 - Canonical snapshot-series keys that isolate incompatible stock scopes, date ranges, adjustment policies, contracts, and compatibility parameters
 - Manual AKShare normalization and persistence CLI with explicit network opt-in, hard timeouts, finite retries, and dry-run support
 - Database-backed selected-universe Market Cockpit contracts, deterministic breadth/risk calculations, explicit series/cutoff selection, and a read-only local page
+- Separate benchmark-index daily persistence, bounded manual ingestion, explicit series selection, and deterministic close-based context
 - Mocked provider tests
 - Factor contracts for values and scores
 - Initial value, growth, quality, momentum, and risk factors
@@ -185,6 +186,14 @@ python -m scripts.ingest_akshare_market_data \
 
 Inspect normalization and the canonical series key without database writes by adding `--dry-run`. For deterministic offline verification, replace `--allow-network` with `--offline-fixture`. The live stock-basic endpoint has no historical date selector, so it cannot reconstruct a historical stock universe; rows describe information available at collection time. No AKShare call occurs during imports, FastAPI startup, Dashboard use, tests, CI, or the fixture demo. See [controlled AKShare ingestion](docs/akshare_ingestion.md).
 
+Benchmark collection is a separate command and series. It uses only the reviewed `index_zh_a_hist` endpoint, accepts at most 20 explicit codes, and has the same explicit network/cutoff discipline:
+
+```bash
+python -m scripts.ingest_akshare_benchmark_data --index-code 000001 --start-date 20260105 --end-date 20260403 --cutoff 20260405 --offline-fixture --dry-run
+```
+
+See [benchmark index context](docs/benchmark_context.md) for endpoint mapping, series identity, formulas, and provider-attribution limits.
+
 ### Database-Backed Market Cockpit
 
 After migrating PostgreSQL and persisting a compatible snapshot series, inspect the read-only JSON endpoint with an explicit series key:
@@ -199,7 +208,13 @@ Open the local page with the same selector:
 http://127.0.0.1:8000/market-cockpit?series_key=<series-key>&as_of_cutoff=YYYYMMDD
 ```
 
-The API never performs provider-only selection and never falls back to fixture Dashboard data. It reports exact scope, calculation readiness, unverified scope coverage, conservative overall completeness, allowlisted immutable ingestion provenance, cutoff, adjustment policy, stale/no-trade diagnostics, warnings, and unsupported sections. An internally ready result still describes only the selected universe and remains overall `partial` because v0.4A has no reviewed representative-coverage policy. Exact formulas and minimum windows are documented in [Market Cockpit v0.4A](docs/market_cockpit.md).
+Optionally add a separate explicit benchmark selector to either URL:
+
+```text
+&benchmark_series_key=<benchmark-series-key>
+```
+
+The API never performs provider-only selection and never falls back to fixture Dashboard data. Equity and benchmark runs are selected independently and never stitched. Without a benchmark key, the accepted equity-only response remains compatible and benchmark context is unavailable. Exact formulas and minimum windows are documented in [Market Cockpit v0.4A](docs/market_cockpit.md) and [benchmark index context](docs/benchmark_context.md).
 
 Run tests:
 

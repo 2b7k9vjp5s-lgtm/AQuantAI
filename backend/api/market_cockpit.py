@@ -13,6 +13,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.database import build_engine, build_session_factory
 from backend.database.series import SnapshotSeriesError, validate_series_key
 from market_cockpit.calculator import MarketCockpitCalculationError
+from market_cockpit.benchmark_calculator import BenchmarkCalculationError
+from market_cockpit.benchmark_repository import (
+    BenchmarkRepository,
+    BenchmarkSelectionError,
+    BenchmarkSnapshotNotFound,
+)
 from market_cockpit.repository import (
     MarketCockpitRepository,
     MarketCockpitSelectionError,
@@ -26,11 +32,13 @@ router = APIRouter(prefix="/market-cockpit", tags=["market-cockpit"])
 @dataclass(frozen=True)
 class MarketCockpitRequest:
     series_key: str
+    benchmark_series_key: str | None
     as_of_cutoff: str | None
 
 
 def require_market_cockpit_request(
     series_key: str | None = Query(default=None),
+    benchmark_series_key: str | None = Query(default=None),
     as_of_cutoff: str | None = Query(default=None),
 ) -> MarketCockpitRequest:
     """Validate selection before any database engine can be constructed."""
@@ -41,10 +49,15 @@ def require_market_cockpit_request(
         )
     try:
         validated_key = validate_series_key(series_key)
+        validated_benchmark_key = (
+            validate_series_key(benchmark_series_key)
+            if benchmark_series_key is not None
+            else None
+        )
         validated_cutoff = _optional_compact_date(as_of_cutoff)
     except (SnapshotSeriesError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return MarketCockpitRequest(validated_key, validated_cutoff)
+    return MarketCockpitRequest(validated_key, validated_benchmark_key, validated_cutoff)
 
 
 def get_market_cockpit_session_factory(
@@ -71,14 +84,27 @@ def market_cockpit_snapshot(
 ) -> dict:
     try:
         with session_factory() as session:
-            snapshot = MarketCockpitService(MarketCockpitRepository(session)).build_snapshot(
+            snapshot = MarketCockpitService(
+                MarketCockpitRepository(session),
+                benchmark_repository=BenchmarkRepository(session),
+            ).build_snapshot(
                 series_key=request.series_key,
                 as_of_cutoff=request.as_of_cutoff,
+                benchmark_series_key=request.benchmark_series_key,
             )
         return snapshot.to_dict()
     except MarketCockpitSnapshotNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except (MarketCockpitSelectionError, MarketCockpitCalculationError, SnapshotSeriesError) as exc:
+    except BenchmarkSnapshotNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (
+        MarketCockpitSelectionError,
+        MarketCockpitCalculationError,
+        BenchmarkSelectionError,
+        BenchmarkCalculationError,
+        SnapshotSeriesError,
+        ValueError,
+    ) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(

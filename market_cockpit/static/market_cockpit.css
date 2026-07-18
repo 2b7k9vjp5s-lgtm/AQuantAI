@@ -133,6 +133,17 @@ h2 {
   gap: 12px;
 }
 
+.benchmark-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.benchmark-item {
+  min-width: 0;
+}
+
 .metric-card {
   padding: 14px;
 }

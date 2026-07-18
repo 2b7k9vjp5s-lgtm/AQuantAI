@@ -12,10 +12,12 @@ from typing import Any
 import pandas as pd
 
 from datasource.base import (
+    BENCHMARK_INDEX_DAILY_COLUMNS,
     DAILY_PRICE_COLUMNS,
     STOCK_BASIC_COLUMNS,
     TRADE_CALENDAR_COLUMNS,
     AdjustType,
+    BenchmarkIndexBundle,
     DataProvider,
     MarketDataBundle,
 )
@@ -25,8 +27,15 @@ ADAPTER_COMPATIBILITY_VERSION = "aquantai.akshare-adapter.v1"
 STOCK_BASIC_ENDPOINT = "stock_info_a_code_name"
 DAILY_PRICE_ENDPOINT = "stock_zh_a_hist"
 TRADE_CALENDAR_ENDPOINT = "tool_trade_date_hist_sina"
-ALLOWED_ENDPOINTS = {STOCK_BASIC_ENDPOINT, DAILY_PRICE_ENDPOINT, TRADE_CALENDAR_ENDPOINT}
+BENCHMARK_INDEX_ENDPOINT = "index_zh_a_hist"
+ALLOWED_ENDPOINTS = {
+    STOCK_BASIC_ENDPOINT,
+    DAILY_PRICE_ENDPOINT,
+    TRADE_CALENDAR_ENDPOINT,
+    BENCHMARK_INDEX_ENDPOINT,
+}
 MAX_STOCK_CODES_PER_REQUEST = 50
+MAX_BENCHMARK_CODES_PER_REQUEST = 20
 MIN_AKSHARE_VERSION = (1, 16, 0)
 MAX_AKSHARE_VERSION_EXCLUSIVE = (2, 0, 0)
 
@@ -330,6 +339,101 @@ class AkshareDataProvider(DataProvider):
             "network_mode": network_mode,
             "timeout_seconds": self.request_timeout_seconds,
             "max_retries": self.max_retries,
+        }
+
+    def get_benchmark_index_daily(
+        self,
+        index_codes: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> BenchmarkIndexBundle:
+        """Normalize one explicit bounded set from index_zh_a_hist only."""
+        normalized_codes = sorted({str(value).strip() for value in index_codes})
+        if not normalized_codes or len(normalized_codes) != len(index_codes):
+            raise AkshareProviderError(
+                "index_codes must be a non-empty list without duplicates."
+            )
+        if len(normalized_codes) > MAX_BENCHMARK_CODES_PER_REQUEST:
+            raise AkshareProviderError(
+                f"At most {MAX_BENCHMARK_CODES_PER_REQUEST} benchmark codes are allowed."
+            )
+        if any(len(code) != 6 or not code.isdigit() for code in normalized_codes):
+            raise AkshareProviderError("Every benchmark index code must be six digits.")
+        frames: list[pd.DataFrame] = []
+        for code in normalized_codes:
+            raw = self._call(
+                BENCHMARK_INDEX_ENDPOINT,
+                symbol=code,
+                period="daily",
+                start_date=_compact_date(start_date),
+                end_date=_compact_date(end_date),
+            )
+            _require_frame(raw, BENCHMARK_INDEX_ENDPOINT)
+            _require_columns(
+                raw,
+                [RAW_DATE, RAW_OPEN, RAW_HIGH, RAW_LOW, RAW_CLOSE],
+                BENCHMARK_INDEX_ENDPOINT,
+            )
+            frame = raw.rename(
+                columns={
+                    RAW_DATE: "trade_date",
+                    RAW_OPEN: "open",
+                    RAW_HIGH: "high",
+                    RAW_LOW: "low",
+                    RAW_CLOSE: "close",
+                    RAW_VOLUME: "volume",
+                    RAW_AMOUNT: "amount",
+                }
+            )
+            frame = _ensure_columns(
+                frame,
+                BENCHMARK_INDEX_DAILY_COLUMNS,
+                defaults={
+                    "source": self.source_name,
+                    "index_code": code,
+                    "volume": pd.NA,
+                    "amount": pd.NA,
+                },
+            )
+            frame["source"] = self.source_name
+            frame["index_code"] = code
+            frame["trade_date"] = _normalize_date(frame["trade_date"])
+            frame = frame[
+                frame["trade_date"].between(
+                    _compact_date(start_date), _compact_date(end_date)
+                )
+            ]
+            frames.append(frame[BENCHMARK_INDEX_DAILY_COLUMNS])
+        combined = (
+            pd.concat(frames, ignore_index=True)
+            if frames
+            else _empty_frame(BENCHMARK_INDEX_DAILY_COLUMNS)
+        )
+        return BenchmarkIndexBundle(benchmark_index_daily=combined)
+
+    def benchmark_request_metadata(
+        self,
+        *,
+        index_codes: list[str],
+        start_date: str,
+        end_date: str,
+        network_mode: str,
+        contract_version: str,
+        adapter_compatibility_version: str,
+    ) -> dict[str, Any]:
+        return {
+            "collection_endpoint": BENCHMARK_INDEX_ENDPOINT,
+            "frequency": "daily",
+            "index_codes": sorted(index_codes),
+            "start_date": _compact_date(start_date),
+            "end_date": _compact_date(end_date),
+            "network_mode": network_mode,
+            "timeout_seconds": self.request_timeout_seconds,
+            "max_retries": self.max_retries,
+            "akshare_package_version": self.akshare_package_version,
+            "contract_version": contract_version,
+            "adapter_version": ADAPTER_VERSION,
+            "adapter_compatibility_version": adapter_compatibility_version,
         }
 
     def _call(self, endpoint: str, **kwargs: Any) -> Any:

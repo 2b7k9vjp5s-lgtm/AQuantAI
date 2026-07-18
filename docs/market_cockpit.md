@@ -128,3 +128,9 @@ The immutable provenance view uses a fixed allowlist only: ingestion import and 
 - crowding or positioning indicators.
 
 The page and API are read-only, research-only, and non-advisory. v0.4A adds no collection endpoint, scheduler, automatic refresh, recommendation, broker action, order, or trading behavior.
+
+## Optional v0.4B Benchmark Context
+
+v0.4B preserves every equity calculation and selector above. A caller may additionally provide an explicit `benchmark_series_key`. The benchmark repository independently selects one successful complete benchmark run and bounds its rows by requested cutoff and the equity effective session. The response adds `benchmark_context`; without the key it is `null` and the equity-only payload remains compatible.
+
+Benchmark context is provider-attributed, not an official exchange statement or a full-market claim. It exposes exact codes, separate series/run/cutoff/provenance, alignment status, latest close/return, SMA20/SMA60 position, 20-return sample volatility and drawdown, counts, and warnings. It does not calculate beta, alpha, correlation, excess return, relative strength, timing signals, or recommendations. See [benchmark_context.md](benchmark_context.md) for the complete contract.

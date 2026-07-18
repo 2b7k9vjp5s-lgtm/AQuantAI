@@ -61,6 +61,10 @@ Controlled AKShare collection uses `python -m scripts.ingest_akshare_market_data
 
 The v0.4A Market Cockpit adds no table or migration. Its repository adapter selects one successful complete ingestion run by explicit series/cutoff ordering and reads all three datasets by that physical run ID. The public view carries a fixed allowlist of immutable import/completion/collection and canonical endpoint/adapter provenance while excluding opaque request metadata. Database construction remains request-lazy and injectable; the API never performs provider-only selection or falls back to fixture Dashboard data.
 
+Migration `20260718_0003` adds only `benchmark_index_daily`. Its natural key is `(ingestion_run_id, source, index_code, trade_date)`; close is required finite/positive, optional OHLC values are validated as a complete coherent group, and optional activity values are finite/nonnegative. Run/code/date and source/code/date indexes support bounded one-run reads. Rows use a restrictive foreign key to immutable ingestion attempts. Downgrade drops only this table and its indexes; ingestion history and all existing equity rows remain unchanged.
+
+Benchmark canonical identity uses its own schema and includes provider, contract/dataset, exact code scope, requested dates, daily frequency, complete/exact semantics, endpoint, and adapter compatibility. It can never equal or replace an equity series. See [benchmark_context.md](benchmark_context.md).
+
 Inside Compose, run the commands with `docker compose exec app`. The public `.env.example` URL uses service hostname `postgres`. For direct host execution, set `DATABASE_URL` to the exposed host address, for example `postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai`.
 
 After a failed import, correct the fixture, configuration, or database availability and retry. The failed attempt remains available for audit, while the retry receives a new ingestion-run ID. A failed run has no partial market rows. Do not use `Base.metadata.create_all()` for local operation.

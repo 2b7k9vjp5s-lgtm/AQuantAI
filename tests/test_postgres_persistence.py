@@ -16,7 +16,14 @@ from sqlalchemy.exc import IntegrityError
 from backend.database.engine import build_engine, build_session_factory
 import backend.database.market_data as market_data_module
 from backend.database.market_data import FAILED, MarketDataPersistenceService, MarketDataRepository, MarketDataValidationError
-from backend.database.models import DailyPriceRecord, IngestionRun, StockBasicRecord, TradeCalendarRecord
+from backend.database.benchmark_data import BenchmarkPersistenceService
+from backend.database.models import (
+    BenchmarkIndexDailyRecord,
+    DailyPriceRecord,
+    IngestionRun,
+    StockBasicRecord,
+    TradeCalendarRecord,
+)
 from datasource.base import MarketDataBundle
 from datasource.fixtures import (
     FIXTURE_CUTOFF_DATE,
@@ -36,6 +43,16 @@ from market_cockpit.fixtures import (
     COCKPIT_FIXTURE_START_DATE,
     build_market_cockpit_fixture,
 )
+from market_cockpit.benchmark_fixtures import (
+    BENCHMARK_FIXTURE_CURRENT_CUTOFF,
+    BENCHMARK_FIXTURE_END_DATE,
+    BENCHMARK_FIXTURE_HISTORICAL_CUTOFF,
+    BENCHMARK_FIXTURE_PROVIDER,
+    BENCHMARK_FIXTURE_SCOPE,
+    BENCHMARK_FIXTURE_START_DATE,
+    build_benchmark_fixture,
+)
+from market_cockpit.benchmark_repository import BenchmarkRepository
 from market_cockpit.repository import MarketCockpitRepository, MarketCockpitSelectionError
 from market_cockpit.service import MarketCockpitService
 
@@ -64,7 +81,7 @@ def clean_postgres_tables(postgres_database_url: str) -> Iterator[None]:
         with engine.begin() as connection:
             connection.execute(
                 text(
-                    "TRUNCATE TABLE trade_calendar, daily_price, stock_basic, ingestion_runs "
+                    "TRUNCATE TABLE benchmark_index_daily, trade_calendar, daily_price, stock_basic, ingestion_runs "
                     "RESTART IDENTITY CASCADE"
                 )
             )
@@ -100,7 +117,67 @@ def test_clean_postgres_migration_creates_expected_tables(postgres_database_url:
         tables = set(inspect(engine).get_table_names())
     finally:
         engine.dispose()
-    assert {"alembic_version", "ingestion_runs", "stock_basic", "daily_price", "trade_calendar"} <= tables
+    assert {
+        "alembic_version",
+        "ingestion_runs",
+        "stock_basic",
+        "daily_price",
+        "trade_calendar",
+        "benchmark_index_daily",
+    } <= tables
+
+
+def test_postgres_benchmark_idempotency_constraints_and_cutoff_selection(
+    postgres_database_url: str,
+) -> None:
+    engine = build_engine(postgres_database_url)
+    session_factory = build_session_factory(engine)
+    service = BenchmarkPersistenceService(session_factory)
+
+    def ingest(revision: str, cutoff: str):
+        return service.ingest_bundle(
+            build_benchmark_fixture(revision=revision),
+            provider=BENCHMARK_FIXTURE_PROVIDER,
+            requested_start_date=BENCHMARK_FIXTURE_START_DATE,
+            requested_end_date=BENCHMARK_FIXTURE_END_DATE,
+            information_cutoff_date=cutoff,
+            requested_scope=BENCHMARK_FIXTURE_SCOPE,
+            endpoint="fixture_index_history",
+            adapter_compatibility_version="benchmark-fixture-v1",
+            adapter_version="benchmark-fixture-v1",
+        )
+
+    try:
+        historical = ingest("historical", BENCHMARK_FIXTURE_HISTORICAL_CUTOFF)
+        current = ingest("current", BENCHMARK_FIXTURE_CURRENT_CUTOFF)
+        duplicate = ingest("current", BENCHMARK_FIXTURE_CURRENT_CUTOFF)
+        assert historical.series_key == current.series_key
+        assert duplicate.ingestion_run_id == current.ingestion_run_id
+        assert duplicate.rows_written == 0
+        with session_factory() as session:
+            repository = BenchmarkRepository(session)
+            current_snapshot = repository.load_snapshot(series_key=current.series_key)
+            historical_snapshot = repository.load_snapshot(
+                series_key=current.series_key,
+                as_of_cutoff=BENCHMARK_FIXTURE_HISTORICAL_CUTOFF,
+            )
+            assert current_snapshot.ingestion_run_id == current.ingestion_run_id
+            assert historical_snapshot.ingestion_run_id == historical.ingestion_run_id
+            row = session.scalar(select(BenchmarkIndexDailyRecord).limit(1))
+            assert row is not None
+            session.add(
+                BenchmarkIndexDailyRecord(
+                    ingestion_run_id=row.ingestion_run_id,
+                    source=row.source,
+                    index_code=row.index_code,
+                    trade_date=row.trade_date,
+                    close=row.close,
+                )
+            )
+            with pytest.raises(IntegrityError):
+                session.commit()
+    finally:
+        engine.dispose()
 
 
 def test_postgres_fixture_import_constraints_and_idempotency(postgres_database_url: str) -> None:

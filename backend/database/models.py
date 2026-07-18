@@ -83,6 +83,9 @@ class IngestionRun(Base):
     stock_basic_rows: Mapped[list[StockBasicRecord]] = relationship(back_populates="ingestion_run")
     daily_price_rows: Mapped[list[DailyPriceRecord]] = relationship(back_populates="ingestion_run")
     trade_calendar_rows: Mapped[list[TradeCalendarRecord]] = relationship(back_populates="ingestion_run")
+    benchmark_index_daily_rows: Mapped[list[BenchmarkIndexDailyRecord]] = relationship(
+        back_populates="ingestion_run"
+    )
 
 
 class StockBasicRecord(Base):
@@ -158,3 +161,60 @@ class TradeCalendarRecord(Base):
     source: Mapped[str] = mapped_column(String(64), nullable=False)
 
     ingestion_run: Mapped[IngestionRun] = relationship(back_populates="trade_calendar_rows")
+
+
+class BenchmarkIndexDailyRecord(Base):
+    __tablename__ = "benchmark_index_daily"
+    __table_args__ = (
+        UniqueConstraint(
+            "ingestion_run_id",
+            "source",
+            "index_code",
+            "trade_date",
+            name="uq_benchmark_index_daily_run_natural_key",
+        ),
+        CheckConstraint("close > 0", name="ck_benchmark_index_daily_close_positive"),
+        CheckConstraint("open IS NULL OR open > 0", name="ck_benchmark_index_daily_open_positive"),
+        CheckConstraint("high IS NULL OR high > 0", name="ck_benchmark_index_daily_high_positive"),
+        CheckConstraint("low IS NULL OR low > 0", name="ck_benchmark_index_daily_low_positive"),
+        CheckConstraint("volume IS NULL OR volume >= 0", name="ck_benchmark_index_daily_volume_nonnegative"),
+        CheckConstraint("amount IS NULL OR amount >= 0", name="ck_benchmark_index_daily_amount_nonnegative"),
+        CheckConstraint(
+            "open IS NULL OR high IS NULL OR low IS NULL OR (low <= open AND open <= high)",
+            name="ck_benchmark_index_daily_open_range",
+        ),
+        CheckConstraint(
+            "high IS NULL OR low IS NULL OR (low <= close AND close <= high)",
+            name="ck_benchmark_index_daily_close_range",
+        ),
+        Index(
+            "ix_benchmark_index_daily_run_code_date",
+            "ingestion_run_id",
+            "index_code",
+            "trade_date",
+        ),
+        Index(
+            "ix_benchmark_index_daily_source_code_date",
+            "source",
+            "index_code",
+            "trade_date",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(IDENTITY_TYPE, primary_key=True, autoincrement=True)
+    ingestion_run_id: Mapped[int] = mapped_column(
+        ForeignKey("ingestion_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    index_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    trade_date: Mapped[date] = mapped_column(Date, nullable=False)
+    open: Mapped[float | None] = mapped_column(Float)
+    high: Mapped[float | None] = mapped_column(Float)
+    low: Mapped[float | None] = mapped_column(Float)
+    close: Mapped[float] = mapped_column(Float, nullable=False)
+    volume: Mapped[float | None] = mapped_column(Float)
+    amount: Mapped[float | None] = mapped_column(Float)
+
+    ingestion_run: Mapped[IngestionRun] = relationship(
+        back_populates="benchmark_index_daily_rows"
+    )
