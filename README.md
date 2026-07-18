@@ -58,7 +58,7 @@ Phase 0 through Phase 6, the correctness hardening pass, and the local Dashboard
 - AKShare provider skeleton
 - Normalized stock basic, daily price, and trade calendar contracts
 - Explicit SQLAlchemy engine/session boundary and Alembic market-data migration
-- Versioned PostgreSQL market-data rows with ingestion provenance, cutoff dates, deterministic batch IDs, transactional writes, and idempotent fixture imports
+- Complete-snapshot PostgreSQL market-data versions with immutable ingestion attempts, cutoff-aware deterministic reads, exact stock-code scopes, transactional reconciliation, and concurrent-safe idempotent fixture imports
 - Mocked provider tests
 - Factor contracts for values and scores
 - Initial value, growth, quality, momentum, and risk factors

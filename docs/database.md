@@ -12,9 +12,9 @@ Schema changes are applied only through Alembic. Importing or starting FastAPI n
 
 ## Ingestion Provenance
 
-`ingestion_runs` records provider, dataset, import/completion timestamps, requested date range and scope, information cutoff, contract version, status, row counts, deterministic SHA-256 batch identifier, and a concise failure summary.
+`ingestion_runs` records every physical import attempt: provider, dataset, import/completion timestamps, requested date range and scope, information cutoff, contract version, status, row counts, deterministic SHA-256 batch identifier, snapshot mode, and a concise failure summary.
 
-The batch identifier covers normalized, deterministically ordered records plus provider, scope, date range, cutoff, and contract version. Repeating the identical fixture batch reuses the successful ingestion run and writes zero rows. All market-data rows reference an ingestion run by foreign key. A failed write rolls back every market-data row, then records the failed run separately with zero written rows.
+The batch identifier covers normalized, deterministically ordered records plus provider, scope, date range, cutoff, contract version, and snapshot mode. Attempts are immutable: a failed attempt remains `failed`, and a retry creates another run with the same batch identifier. A partial unique index permits only one successful run per deterministic batch. Repeating a successfully imported fixture batch returns that successful run and writes zero rows. Concurrent identical imports converge on the same successful run without exposing a unique-key failure to callers. All market-data rows reference their successful ingestion attempt by foreign key; failed writes retain no market rows.
 
 ## Natural Keys And Corrections
 
@@ -24,11 +24,21 @@ Logical natural keys are:
 - daily price: `(source, stock_code, trade_date, adjust_type)`;
 - trade calendar: `(source, trade_date)`.
 
-Physical uniqueness adds `ingestion_run_id` to each logical key. A corrected newer batch adds a new immutable version instead of overwriting the old row. Deterministic readback selects the highest successful ingestion run for each logical key, optionally restricted to `information_cutoff_date <= as_of_cutoff`. Prior values and batch provenance remain queryable.
+Physical uniqueness adds `ingestion_run_id` to each logical key. A corrected batch adds a new immutable version instead of overwriting the old row.
+
+Each accepted batch is a **complete snapshot**, not a partial revision. `requested_scope.stock_codes` is an **exact scope**: stock-basic and daily-price code sets must both equal the declared set. A later eligible snapshot that omits an earlier key does not carry that key forward. Partial revisions and tombstones are not implemented in v0.3A and are rejected rather than interpreted ambiguously.
+
+Current and as-of readback first select one eligible successful complete snapshot, ordered by:
+
+1. `information_cutoff_date DESC`;
+2. `completed_at DESC`;
+3. `ingestion_run_id DESC` as the deterministic final tie-break.
+
+`as_of_cutoff` additionally requires `information_cutoff_date <= as_of_cutoff`. Rows are then read only from the selected snapshot. Prior values, failed attempts, and batch provenance remain queryable for audit.
 
 ## Validation And Transactions
 
-Before commit, the service validates contract columns, missing/blank identifiers, six-digit stock codes, declared provider and scope, strict dates, duplicates, finite/non-negative numeric data, OHLC consistency, adjustment values, booleans, requested date range, and cutoff. The three datasets write in one transaction; any validation, constraint, or insert failure leaves no partial market-data rows.
+Before commit, the service validates contract columns, missing/blank identifiers, six-digit stock codes, declared provider and exact scope, complete-snapshot mode, strict dates, duplicates, finite/non-negative numeric data, OHLC consistency, adjustment values, booleans, requested date range, and cutoff. Every daily-price date must also exist in the same batch's trade calendar and be marked open. The three datasets write in one transaction; any validation, reconciliation, constraint, or insert failure leaves no partial market-data rows.
 
 ## Migration And Fixture Import
 
@@ -45,7 +55,7 @@ The first import writes 2 stock-basic rows, 4 daily-price rows, and 2 trade-cale
 
 Inside Compose, run the commands with `docker compose exec app`. The public `.env.example` URL uses service hostname `postgres`. For direct host execution, set `DATABASE_URL` to the exposed host address, for example `postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai`.
 
-After a failed import, correct the fixture, configuration, or database availability and retry. A failed run has no partial market rows. Do not use `Base.metadata.create_all()` for local operation.
+After a failed import, correct the fixture, configuration, or database availability and retry. The failed attempt remains available for audit, while the retry receives a new ingestion-run ID. A failed run has no partial market rows. Do not use `Base.metadata.create_all()` for local operation.
 
 ## stock_basic
 

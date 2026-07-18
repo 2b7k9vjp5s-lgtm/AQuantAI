@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -34,13 +35,22 @@ class IngestionRun(Base):
     __tablename__ = "ingestion_runs"
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'succeeded', 'failed')", name="ck_ingestion_runs_status"),
+        CheckConstraint("snapshot_mode = 'complete'", name="ck_ingestion_runs_snapshot_mode"),
         CheckConstraint("row_count_received >= 0", name="ck_ingestion_runs_received_nonnegative"),
         CheckConstraint("row_count_written >= 0", name="ck_ingestion_runs_written_nonnegative"),
+        Index("ix_ingestion_runs_batch_identifier", "batch_identifier"),
         Index("ix_ingestion_runs_provider_dataset_cutoff", "provider", "dataset", "information_cutoff_date"),
+        Index(
+            "uq_ingestion_runs_successful_batch",
+            "batch_identifier",
+            unique=True,
+            postgresql_where=text("status = 'succeeded'"),
+            sqlite_where=text("status = 'succeeded'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(IDENTITY_TYPE, primary_key=True, autoincrement=True)
-    batch_identifier: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    batch_identifier: Mapped[str] = mapped_column(String(64), nullable=False)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     dataset: Mapped[str] = mapped_column(String(64), nullable=False)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -49,6 +59,7 @@ class IngestionRun(Base):
     requested_end_date: Mapped[date] = mapped_column(Date, nullable=False)
     information_cutoff_date: Mapped[date] = mapped_column(Date, nullable=False)
     requested_scope: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    snapshot_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     contract_version: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     row_count_received: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

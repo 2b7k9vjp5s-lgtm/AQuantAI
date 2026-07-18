@@ -12,7 +12,8 @@ from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.models import DailyPriceRecord, IngestionRun, StockBasicRecord, TradeCalendarRecord
@@ -26,6 +27,8 @@ PENDING = "pending"
 STOCK_CODE_PATTERN = re.compile(r"^[0-9]{6}$")
 ALLOWED_ADJUST_TYPES = {"", "qfq", "hfq"}
 AUTHORIZED_DATASETS = {"stock_basic", "daily_price", "trade_calendar"}
+SNAPSHOT_MODE = "complete"
+STOCK_CODE_SCOPE_SEMANTICS = "exact"
 
 
 class MarketDataValidationError(ValueError):
@@ -110,6 +113,7 @@ class MarketDataPersistenceService:
             information_cutoff_date=cutoff_date,
             requested_scope=scope,
             contract_version=contract_version,
+            snapshot_mode=SNAPSHOT_MODE,
         )
 
         try:
@@ -123,7 +127,7 @@ class MarketDataPersistenceService:
             )
         except Exception as exc:
             counts = _raw_counts(bundle)
-            run_id = self._ensure_pending_run(
+            run_id = self._create_pending_run(
                 batch_identifier=raw_batch_identifier,
                 provider=provider,
                 start_date=start_date,
@@ -144,12 +148,13 @@ class MarketDataPersistenceService:
             information_cutoff_date=cutoff_date,
             requested_scope=scope,
             contract_version=contract_version,
+            snapshot_mode=SNAPSHOT_MODE,
         )
         existing = self._find_successful_run(batch_identifier)
         if existing is not None:
             return _result_from_run(existing, idempotent=True, rows_written=0)
 
-        run_id = self._ensure_pending_run(
+        run_id = self._create_pending_run(
             batch_identifier=batch_identifier,
             provider=provider,
             start_date=start_date,
@@ -169,6 +174,18 @@ class MarketDataPersistenceService:
                 run.row_count_written = normalized.total_rows
                 run.error_summary = None
                 run.completed_at = datetime.now(timezone.utc)
+        except IntegrityError as exc:
+            concurrent_success = self._find_successful_run(batch_identifier)
+            if concurrent_success is not None:
+                self._mark_failed(
+                    run_id,
+                    RuntimeError(
+                        f"Concurrent identical batch completed as ingestion run {concurrent_success.id}."
+                    ),
+                )
+                return _result_from_run(concurrent_success, idempotent=True, rows_written=0)
+            self._mark_failed(run_id, exc)
+            raise
         except Exception as exc:
             self._mark_failed(run_id, exc)
             raise
@@ -188,7 +205,7 @@ class MarketDataPersistenceService:
                 )
             )
 
-    def _ensure_pending_run(
+    def _create_pending_run(
         self,
         *,
         batch_identifier: str,
@@ -201,33 +218,23 @@ class MarketDataPersistenceService:
         dataset_counts: dict[str, int],
     ) -> int:
         with self._session_factory.begin() as session:
-            run = session.scalar(
-                select(IngestionRun).where(IngestionRun.batch_identifier == batch_identifier).with_for_update()
+            run = IngestionRun(
+                batch_identifier=batch_identifier,
+                provider=provider,
+                dataset=MARKET_DATASET,
+                requested_start_date=start_date,
+                requested_end_date=end_date,
+                information_cutoff_date=cutoff_date,
+                requested_scope=requested_scope,
+                snapshot_mode=SNAPSHOT_MODE,
+                contract_version=contract_version,
+                status=PENDING,
+                row_count_received=sum(dataset_counts.values()),
+                row_count_written=0,
+                dataset_counts=dataset_counts,
             )
-            if run is None:
-                run = IngestionRun(
-                    batch_identifier=batch_identifier,
-                    provider=provider,
-                    dataset=MARKET_DATASET,
-                    requested_start_date=start_date,
-                    requested_end_date=end_date,
-                    information_cutoff_date=cutoff_date,
-                    requested_scope=requested_scope,
-                    contract_version=contract_version,
-                    status=PENDING,
-                    row_count_received=sum(dataset_counts.values()),
-                    row_count_written=0,
-                    dataset_counts=dataset_counts,
-                )
-                session.add(run)
-                session.flush()
-            elif run.status == SUCCEEDED:
-                return run.id
-            else:
-                run.status = PENDING
-                run.error_summary = None
-                run.completed_at = None
-                run.row_count_written = 0
+            session.add(run)
+            session.flush()
             return run.id
 
     def _mark_failed(self, run_id: int, exc: Exception) -> None:
@@ -311,7 +318,11 @@ class MarketDataRepository:
                 StockBasicRecord.stock_code == _stock_code(stock_code, "stock_code"),
                 IngestionRun.status == SUCCEEDED,
             )
-            .order_by(IngestionRun.id)
+            .order_by(
+                IngestionRun.information_cutoff_date,
+                IngestionRun.completed_at,
+                IngestionRun.id,
+            )
         ).mappings()
         return [dict(row) for row in rows]
 
@@ -341,16 +352,39 @@ def _normalize_bundle(
         information_cutoff_date,
     )
     stock_basic_codes = {row["stock_code"] for row in stock_basic}
+    daily_price_codes = {row["stock_code"] for row in daily_price}
     missing_stock_basic = {row["stock_code"] for row in daily_price} - stock_basic_codes
     if missing_stock_basic:
         raise MarketDataValidationError(
             f"daily_price contains stock codes missing from stock_basic: {sorted(missing_stock_basic)}"
         )
     declared_codes = set(requested_scope["stock_codes"])
-    observed_codes = {row["stock_code"] for row in stock_basic} | {row["stock_code"] for row in daily_price}
-    undeclared = observed_codes - declared_codes
-    if undeclared:
-        raise MarketDataValidationError(f"Rows contain stock codes outside requested_scope: {sorted(undeclared)}")
+    if stock_basic_codes != declared_codes:
+        raise MarketDataValidationError(
+            "stock_basic stock codes must exactly match requested_scope.stock_codes; "
+            f"missing={sorted(declared_codes - stock_basic_codes)}, "
+            f"unexpected={sorted(stock_basic_codes - declared_codes)}."
+        )
+    if daily_price_codes != declared_codes:
+        raise MarketDataValidationError(
+            "daily_price stock codes must exactly match requested_scope.stock_codes; "
+            f"missing={sorted(declared_codes - daily_price_codes)}, "
+            f"unexpected={sorted(daily_price_codes - declared_codes)}."
+        )
+    calendar = {row["trade_date"]: row["is_open"] for row in trade_calendar}
+    price_dates = {row["trade_date"] for row in daily_price}
+    missing_calendar_dates = sorted(price_dates - set(calendar))
+    if missing_calendar_dates:
+        raise MarketDataValidationError(
+            "daily_price dates are missing from trade_calendar: "
+            f"{[_compact_date(value) for value in missing_calendar_dates]}."
+        )
+    closed_price_dates = sorted(value for value in price_dates if not calendar[value])
+    if closed_price_dates:
+        raise MarketDataValidationError(
+            "daily_price dates must be open in trade_calendar: "
+            f"{[_compact_date(value) for value in closed_price_dates]}."
+        )
     return _NormalizedBundle(stock_basic=stock_basic, daily_price=daily_price, trade_calendar=trade_calendar)
 
 
@@ -437,32 +471,11 @@ def _insert_bundle(session: Session, bundle: _NormalizedBundle, run_id: int) -> 
 
 
 def _latest_stock_basic_statement(provider: str, cutoff: date | None) -> Select[Any]:
-    ranked = (
-        select(
-            StockBasicRecord.stock_code,
-            StockBasicRecord.stock_name,
-            StockBasicRecord.exchange,
-            StockBasicRecord.industry,
-            StockBasicRecord.listing_date,
-            StockBasicRecord.status,
-            StockBasicRecord.source,
-            func.row_number()
-            .over(
-                partition_by=(StockBasicRecord.source, StockBasicRecord.stock_code),
-                order_by=(IngestionRun.id.desc(), StockBasicRecord.id.desc()),
-            )
-            .label("version_rank"),
-        )
-        .join(IngestionRun, IngestionRun.id == StockBasicRecord.ingestion_run_id)
-        .where(StockBasicRecord.source == provider, IngestionRun.status == SUCCEEDED)
-    )
-    if cutoff is not None:
-        ranked = ranked.where(IngestionRun.information_cutoff_date <= cutoff)
-    subquery = ranked.subquery()
+    run_id = _latest_successful_run_id(provider, cutoff)
     return (
-        select(*(subquery.c[column] for column in STOCK_BASIC_COLUMNS))
-        .where(subquery.c.version_rank == 1)
-        .order_by(subquery.c.stock_code, subquery.c.source)
+        select(*(getattr(StockBasicRecord, column) for column in STOCK_BASIC_COLUMNS))
+        .where(StockBasicRecord.ingestion_run_id == run_id)
+        .order_by(StockBasicRecord.stock_code, StockBasicRecord.source)
     )
 
 
@@ -473,41 +486,15 @@ def _latest_daily_price_statement(
     end_date: date | None,
     as_of_cutoff: date | None,
 ) -> Select[Any]:
-    ranked = (
-        select(
-            DailyPriceRecord.trade_date,
-            DailyPriceRecord.stock_code,
-            DailyPriceRecord.open,
-            DailyPriceRecord.high,
-            DailyPriceRecord.low,
-            DailyPriceRecord.close,
-            DailyPriceRecord.volume,
-            DailyPriceRecord.amount,
-            DailyPriceRecord.adjust_type,
-            DailyPriceRecord.source,
-            func.row_number()
-            .over(
-                partition_by=(
-                    DailyPriceRecord.source,
-                    DailyPriceRecord.stock_code,
-                    DailyPriceRecord.trade_date,
-                    DailyPriceRecord.adjust_type,
-                ),
-                order_by=(IngestionRun.id.desc(), DailyPriceRecord.id.desc()),
-            )
-            .label("version_rank"),
-        )
-        .join(IngestionRun, IngestionRun.id == DailyPriceRecord.ingestion_run_id)
-        .where(DailyPriceRecord.source == provider, IngestionRun.status == SUCCEEDED)
+    statement = select(*(getattr(DailyPriceRecord, column) for column in DAILY_PRICE_COLUMNS)).where(
+        DailyPriceRecord.ingestion_run_id == _latest_successful_run_id(provider, as_of_cutoff)
     )
-    ranked = _apply_date_filters(ranked, DailyPriceRecord.trade_date, start_date, end_date)
-    if as_of_cutoff is not None:
-        ranked = ranked.where(IngestionRun.information_cutoff_date <= as_of_cutoff)
-    subquery = ranked.subquery()
-    return (
-        select(*(subquery.c[column] for column in DAILY_PRICE_COLUMNS))
-        .where(subquery.c.version_rank == 1)
-        .order_by(subquery.c.trade_date, subquery.c.stock_code, subquery.c.adjust_type, subquery.c.source)
+    statement = _apply_date_filters(statement, DailyPriceRecord.trade_date, start_date, end_date)
+    return statement.order_by(
+        DailyPriceRecord.trade_date,
+        DailyPriceRecord.stock_code,
+        DailyPriceRecord.adjust_type,
+        DailyPriceRecord.source,
     )
 
 
@@ -518,29 +505,30 @@ def _latest_trade_calendar_statement(
     end_date: date | None,
     as_of_cutoff: date | None,
 ) -> Select[Any]:
-    ranked = (
-        select(
-            TradeCalendarRecord.trade_date,
-            TradeCalendarRecord.is_open,
-            TradeCalendarRecord.source,
-            func.row_number()
-            .over(
-                partition_by=(TradeCalendarRecord.source, TradeCalendarRecord.trade_date),
-                order_by=(IngestionRun.id.desc(), TradeCalendarRecord.id.desc()),
-            )
-            .label("version_rank"),
-        )
-        .join(IngestionRun, IngestionRun.id == TradeCalendarRecord.ingestion_run_id)
-        .where(TradeCalendarRecord.source == provider, IngestionRun.status == SUCCEEDED)
+    statement = select(*(getattr(TradeCalendarRecord, column) for column in TRADE_CALENDAR_COLUMNS)).where(
+        TradeCalendarRecord.ingestion_run_id == _latest_successful_run_id(provider, as_of_cutoff)
     )
-    ranked = _apply_date_filters(ranked, TradeCalendarRecord.trade_date, start_date, end_date)
-    if as_of_cutoff is not None:
-        ranked = ranked.where(IngestionRun.information_cutoff_date <= as_of_cutoff)
-    subquery = ranked.subquery()
+    statement = _apply_date_filters(statement, TradeCalendarRecord.trade_date, start_date, end_date)
+    return statement.order_by(TradeCalendarRecord.trade_date, TradeCalendarRecord.source)
+
+
+def _latest_successful_run_id(provider: str, cutoff: date | None) -> Any:
+    statement = select(IngestionRun.id).where(
+        IngestionRun.provider == provider,
+        IngestionRun.dataset == MARKET_DATASET,
+        IngestionRun.status == SUCCEEDED,
+        IngestionRun.snapshot_mode == SNAPSHOT_MODE,
+    )
+    if cutoff is not None:
+        statement = statement.where(IngestionRun.information_cutoff_date <= cutoff)
     return (
-        select(*(subquery.c[column] for column in TRADE_CALENDAR_COLUMNS))
-        .where(subquery.c.version_rank == 1)
-        .order_by(subquery.c.trade_date, subquery.c.source)
+        statement.order_by(
+            IngestionRun.information_cutoff_date.desc(),
+            IngestionRun.completed_at.desc(),
+            IngestionRun.id.desc(),
+        )
+        .limit(1)
+        .scalar_subquery()
     )
 
 
@@ -614,10 +602,19 @@ def _validate_scope(scope: dict[str, Any]) -> dict[str, Any]:
         raise MarketDataValidationError(f"requested_scope.datasets must contain {sorted(AUTHORIZED_DATASETS)}.")
     if not isinstance(stock_codes, list) or not stock_codes:
         raise MarketDataValidationError("requested_scope.stock_codes must be a non-empty list.")
+    if scope.get("stock_code_semantics", STOCK_CODE_SCOPE_SEMANTICS) != STOCK_CODE_SCOPE_SEMANTICS:
+        raise MarketDataValidationError("requested_scope.stock_code_semantics must be 'exact'.")
+    if scope.get("snapshot_mode", SNAPSHOT_MODE) != SNAPSHOT_MODE:
+        raise MarketDataValidationError("requested_scope.snapshot_mode must be 'complete'.")
     normalized_codes = sorted({_stock_code(value, "requested_scope.stock_codes") for value in stock_codes})
     if len(normalized_codes) != len(stock_codes):
         raise MarketDataValidationError("requested_scope.stock_codes contains duplicates.")
-    return {"datasets": sorted(AUTHORIZED_DATASETS), "stock_codes": normalized_codes}
+    return {
+        "datasets": sorted(AUTHORIZED_DATASETS),
+        "stock_codes": normalized_codes,
+        "stock_code_semantics": STOCK_CODE_SCOPE_SEMANTICS,
+        "snapshot_mode": SNAPSHOT_MODE,
+    }
 
 
 def _required_text(value: Any, field: str) -> str:

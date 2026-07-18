@@ -29,6 +29,7 @@ def upgrade() -> None:
         sa.Column("requested_end_date", sa.Date(), nullable=False),
         sa.Column("information_cutoff_date", sa.Date(), nullable=False),
         sa.Column("requested_scope", sa.JSON(), nullable=False),
+        sa.Column("snapshot_mode", sa.String(length=16), nullable=False),
         sa.Column("contract_version", sa.String(length=32), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False),
         sa.Column("row_count_received", sa.Integer(), nullable=False),
@@ -39,14 +40,23 @@ def upgrade() -> None:
             "row_count_received >= 0", name="ck_ingestion_runs_received_nonnegative"
         ),
         sa.CheckConstraint("row_count_written >= 0", name="ck_ingestion_runs_written_nonnegative"),
+        sa.CheckConstraint("snapshot_mode = 'complete'", name="ck_ingestion_runs_snapshot_mode"),
         sa.CheckConstraint("status IN ('pending', 'succeeded', 'failed')", name="ck_ingestion_runs_status"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("batch_identifier"),
     )
+    op.create_index("ix_ingestion_runs_batch_identifier", "ingestion_runs", ["batch_identifier"])
     op.create_index(
         "ix_ingestion_runs_provider_dataset_cutoff",
         "ingestion_runs",
         ["provider", "dataset", "information_cutoff_date"],
+    )
+    op.create_index(
+        "uq_ingestion_runs_successful_batch",
+        "ingestion_runs",
+        ["batch_identifier"],
+        unique=True,
+        postgresql_where=sa.text("status = 'succeeded'"),
+        sqlite_where=sa.text("status = 'succeeded'"),
     )
 
     op.create_table(
@@ -132,5 +142,7 @@ def downgrade() -> None:
     op.drop_table("daily_price")
     op.drop_index("ix_stock_basic_natural_key", table_name="stock_basic")
     op.drop_table("stock_basic")
+    op.drop_index("uq_ingestion_runs_successful_batch", table_name="ingestion_runs")
     op.drop_index("ix_ingestion_runs_provider_dataset_cutoff", table_name="ingestion_runs")
+    op.drop_index("ix_ingestion_runs_batch_identifier", table_name="ingestion_runs")
     op.drop_table("ingestion_runs")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import socket
 from collections.abc import Callable, Iterator
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -51,6 +52,7 @@ def _ingest(
     bundle: MarketDataBundle | None = None,
     *,
     cutoff: str = FIXTURE_CUTOFF_DATE,
+    scope: dict | None = None,
 ):
     return MarketDataPersistenceService(session_factory).ingest_bundle(
         bundle or build_market_data_fixture(),
@@ -58,7 +60,7 @@ def _ingest(
         requested_start_date=FIXTURE_START_DATE,
         requested_end_date=FIXTURE_END_DATE,
         information_cutoff_date=cutoff,
-        requested_scope=FIXTURE_SCOPE,
+        requested_scope=scope or FIXTURE_SCOPE,
     )
 
 
@@ -126,7 +128,10 @@ def test_ingestion_run_tracks_scope_cutoff_contract_and_counts(database) -> None
         assert run.requested_scope == {
             "datasets": ["daily_price", "stock_basic", "trade_calendar"],
             "stock_codes": ["000001", "600000"],
+            "stock_code_semantics": "exact",
+            "snapshot_mode": "complete",
         }
+        assert run.snapshot_mode == "complete"
         assert run.contract_version == "1.0"
         assert run.dataset_counts == {"stock_basic": 2, "daily_price": 4, "trade_calendar": 2}
         assert run.row_count_received == 8
@@ -197,32 +202,149 @@ def test_database_failure_rolls_back_entire_batch(database) -> None:
         assert session.scalar(select(func.count()).select_from(TradeCalendarRecord)) == 0
 
 
-def test_newer_correction_is_current_while_prior_provenance_remains_readable(database) -> None:
+def test_failed_attempt_is_immutable_and_successful_retry_is_a_new_attempt(database) -> None:
     _, session_factory = database
-    first = _ingest(session_factory)
-    corrected = build_market_data_fixture()
-    corrected.stock_basic.loc[0, "stock_name"] = "Ping An Bank Corrected"
-    corrected.daily_price.loc[
-        (corrected.daily_price["trade_date"] == "20260709")
-        & (corrected.daily_price["stock_code"] == "000001"),
-        "close",
-    ] = 10.8
 
-    second = _ingest(session_factory, corrected, cutoff="20260710")
+    def fail_daily_insert(_mapper, _connection, _target) -> None:
+        raise RuntimeError("injected first-attempt failure")
 
-    assert second.ingestion_run_id != first.ingestion_run_id
+    event.listen(DailyPriceRecord, "before_insert", fail_daily_insert)
+    try:
+        with pytest.raises(RuntimeError, match="injected first-attempt failure"):
+            _ingest(session_factory)
+    finally:
+        event.remove(DailyPriceRecord, "before_insert", fail_daily_insert)
+
+    successful = _ingest(session_factory)
+    duplicate = _ingest(session_factory)
+
+    with session_factory() as session:
+        runs = session.scalars(select(IngestionRun).order_by(IngestionRun.id)).all()
+        assert len(runs) == 2
+        failed, succeeded = runs
+        assert failed.status == FAILED
+        assert failed.completed_at is not None
+        assert failed.error_summary == "RuntimeError: injected first-attempt failure"
+        assert succeeded.status == "succeeded"
+        assert failed.id != succeeded.id
+        assert failed.batch_identifier == succeeded.batch_identifier
+        assert duplicate.ingestion_run_id == succeeded.id == successful.ingestion_run_id
+        assert duplicate.rows_written == 0
+        assert duplicate.idempotent is True
+
+
+def test_cutoff_then_completion_then_run_id_selects_current_and_as_of_versions(database) -> None:
+    _, session_factory = database
+    high_cutoff = build_market_data_fixture()
+    high_cutoff.stock_basic.loc[0, "stock_name"] = "Cutoff 20260710"
+    high = _ingest(session_factory, high_cutoff, cutoff="20260710")
+    low_cutoff = build_market_data_fixture()
+    low_cutoff.stock_basic.loc[0, "stock_name"] = "Cutoff 20260709 imported later"
+    low = _ingest(session_factory, low_cutoff, cutoff="20260709")
+
     with session_factory() as session:
         repository = MarketDataRepository(session)
         current = repository.read_stock_basic(FIXTURE_PROVIDER)
         historical = repository.read_stock_basic(FIXTURE_PROVIDER, as_of_cutoff="20260709")
+    assert current.loc[current["stock_code"] == "000001", "stock_name"].item() == "Cutoff 20260710"
+    assert historical.loc[historical["stock_code"] == "000001", "stock_name"].item() == (
+        "Cutoff 20260709 imported later"
+    )
+
+    same_cutoff_revision = build_market_data_fixture()
+    same_cutoff_revision.stock_basic.loc[0, "stock_name"] = "Same-cutoff revision"
+    revision = _ingest(session_factory, same_cutoff_revision, cutoff="20260710")
+    tied_completion = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    with session_factory.begin() as session:
+        session.get(IngestionRun, high.ingestion_run_id).completed_at = tied_completion
+        session.get(IngestionRun, revision.ingestion_run_id).completed_at = tied_completion
+    with session_factory() as session:
+        repository = MarketDataRepository(session)
+        current = repository.read_stock_basic(FIXTURE_PROVIDER)
         versions = repository.stock_basic_versions(FIXTURE_PROVIDER, "000001")
-    assert current.loc[current["stock_code"] == "000001", "stock_name"].item() == "Ping An Bank Corrected"
-    assert historical.loc[historical["stock_code"] == "000001", "stock_name"].item() == "Ping An Bank"
+    assert current.loc[current["stock_code"] == "000001", "stock_name"].item() == "Same-cutoff revision"
     assert [version["ingestion_run_id"] for version in versions] == [
-        first.ingestion_run_id,
-        second.ingestion_run_id,
+        low.ingestion_run_id,
+        high.ingestion_run_id,
+        revision.ingestion_run_id,
     ]
-    assert len({version["batch_identifier"] for version in versions}) == 2
+    assert len({version["batch_identifier"] for version in versions}) == 3
+
+
+def test_complete_snapshot_does_not_carry_forward_keys_omitted_by_new_exact_scope(database) -> None:
+    _, session_factory = database
+    _ingest(session_factory)
+    fixture = build_market_data_fixture()
+    one_stock = MarketDataBundle(
+        stock_basic=fixture.stock_basic.loc[fixture.stock_basic["stock_code"] == "000001"].copy(),
+        daily_price=fixture.daily_price.loc[fixture.daily_price["stock_code"] == "000001"].copy(),
+        trade_calendar=fixture.trade_calendar.copy(),
+    )
+    one_stock_scope = {
+        "datasets": sorted(FIXTURE_SCOPE["datasets"]),
+        "stock_codes": ["000001"],
+    }
+
+    _ingest(session_factory, one_stock, cutoff="20260710", scope=one_stock_scope)
+
+    with session_factory() as session:
+        repository = MarketDataRepository(session)
+        current = repository.read_stock_basic(FIXTURE_PROVIDER)
+        historical = repository.read_stock_basic(FIXTURE_PROVIDER, as_of_cutoff="20260709")
+    assert current["stock_code"].tolist() == ["000001"]
+    assert historical["stock_code"].tolist() == ["000001", "600000"]
+
+
+def test_requested_stock_codes_are_an_exact_scope(database) -> None:
+    _, session_factory = database
+    one_stock_scope = {
+        "datasets": sorted(FIXTURE_SCOPE["datasets"]),
+        "stock_codes": ["000001"],
+    }
+
+    with pytest.raises(MarketDataValidationError, match="must exactly match"):
+        _ingest(session_factory, scope=one_stock_scope)
+
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(StockBasicRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(DailyPriceRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(TradeCalendarRecord)) == 0
+
+
+def test_partial_scope_or_snapshot_semantics_are_rejected(database) -> None:
+    _, session_factory = database
+    incompatible_scope = {
+        **FIXTURE_SCOPE,
+        "stock_code_semantics": "upper_bound",
+        "snapshot_mode": "partial",
+    }
+
+    with pytest.raises(MarketDataValidationError, match="stock_code_semantics must be 'exact'"):
+        _ingest(session_factory, scope=incompatible_scope)
+
+
+@pytest.mark.parametrize("calendar_failure", ["missing", "closed"])
+def test_daily_price_calendar_reconciliation_rejects_entire_batch(database, calendar_failure: str) -> None:
+    _, session_factory = database
+    bundle = build_market_data_fixture()
+    if calendar_failure == "missing":
+        bundle = MarketDataBundle(
+            stock_basic=bundle.stock_basic,
+            daily_price=bundle.daily_price,
+            trade_calendar=bundle.trade_calendar.loc[bundle.trade_calendar["trade_date"] != "20260709"].copy(),
+        )
+        message = "missing from trade_calendar"
+    else:
+        bundle.trade_calendar.loc[bundle.trade_calendar["trade_date"] == "20260709", "is_open"] = False
+        message = "must be open"
+
+    with pytest.raises(MarketDataValidationError, match=message):
+        _ingest(session_factory, bundle)
+
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(StockBasicRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(DailyPriceRecord)) == 0
+        assert session.scalar(select(func.count()).select_from(TradeCalendarRecord)) == 0
 
 
 def test_fixture_command_runs_twice_without_network_or_duplicate_rows(tmp_path: Path, monkeypatch) -> None:
