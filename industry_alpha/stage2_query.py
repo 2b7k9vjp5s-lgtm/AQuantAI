@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -11,6 +11,14 @@ from industry_alpha.errors import EvidenceLedgerNotFound, EvidenceLedgerNotVisib
 from industry_alpha.stage2_contracts import (
     Stage2CompanyResearchDetailContract,
     Stage2CompanyResearchListContract,
+)
+from industry_alpha.stage2_query_values import (
+    date_text as _date,
+    dated_visible as _dated_visible,
+    recorded_visible as _recorded_visible,
+    stored_utc as _stored_utc,
+    timestamp_text as _timestamp,
+    uuid_text as _uuid,
 )
 from industry_alpha.stage2_repository import Stage2CompanyResearchRepository, Stage2Rows
 
@@ -476,35 +484,3 @@ class Stage2CompanyResearchQueryService:
             "conflicts": sorted(conflicts, key=lambda item: (item["claim_key"], item["evidence_id"])),
             "missing_evidence": sorted(missing, key=lambda item: item["claim_key"]),
         }
-
-
-def _dated_visible(
-    information_date: date, recorded_at: datetime, cutoff: date | None
-) -> bool:
-    return cutoff is None or (
-        information_date <= cutoff and _stored_utc(recorded_at).date() <= cutoff
-    )
-
-
-def _recorded_visible(recorded_at: datetime, cutoff: date | None) -> bool:
-    return cutoff is None or _stored_utc(recorded_at).date() <= cutoff
-
-
-def _stored_utc(value: datetime | None) -> datetime:
-    if value is None:
-        raise EvidenceLedgerNotVisible("required UTC timestamp is unavailable.")
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
-def _timestamp(value: datetime | None) -> str:
-    return _stored_utc(value).isoformat().replace("+00:00", "Z")
-
-
-def _date(value: date | None) -> str | None:
-    return None if value is None else value.isoformat()
-
-
-def _uuid(value: UUID | None) -> str | None:
-    return None if value is None else str(value)
