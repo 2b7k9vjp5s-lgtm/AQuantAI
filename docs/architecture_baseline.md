@@ -6,11 +6,11 @@ This document is the authoritative architecture and current-state baseline. `.co
 
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
-- Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`.
+- Accepted application/consolidation implementation baseline: `a2688b6e244743ef5e3bdcaedfc6c6717d7a7d8c`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
-Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 concluded that evidence read serializers should remain domain-local.
+Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 kept evidence read serializers domain-local; PR #97 characterized command integrity translation; PR #99 implemented the neutral integrity translator.
 
 ## Product boundary
 
@@ -32,13 +32,14 @@ market-data evidence
 
 Downstream records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state or rewrite historical meaning.
 
-Three neutral Stage 2 infrastructure boundaries are accepted:
+Four neutral Stage 2 infrastructure boundaries are accepted:
 
 - `industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B frozen-boundary mechanics used by v0.6C and v0.6D;
 - `industry_alpha.stage2_repository_rows` owns stateless ordered scalar row loading used through repository-local wrappers;
-- `industry_alpha.stage2_query_values` owns required UTC normalization, date-granular visibility and timestamp/date/UUID formatting used by v0.6A-v0.6C query modules.
+- `industry_alpha.stage2_query_values` owns required UTC normalization, date-granular visibility and timestamp/date/UUID formatting used by v0.6A-v0.6C query modules;
+- `industry_alpha.stage2_integrity` owns stateless SQLAlchemy `IntegrityError` translation to `EvidenceLedgerConflictError` while preserving the caller-provided message and original cause.
 
-Domain semantics remain local. Repository graph assembly, optional-ID normalization, link-field selection, missing-parent policy, sessions and transactions remain repository-local. Evidence read serialization, claim projection, missing-evidence wording, link selection, payload sorting, notices, aggregate errors and v0.6D timestamp-null policy remain query-module-local by the accepted PR #93 decision.
+Domain semantics remain local. Repository graph assembly, optional-ID normalization, link-field selection, missing-parent policy, sessions and transactions remain repository-local. Evidence read serialization, claim projection, missing-evidence wording, link selection, payload sorting, notices, aggregate errors and v0.6D timestamp-null policy remain query-module-local by the accepted PR #93 decision. Command modules retain conflict-message policy, transaction boundaries, rollback ownership, process-local locks, database row locks, revision allocation, supersession and retry policy.
 
 The current implementable path does not include v0.6E price judgment, timing judgment, Watchlist tasks, Paper Portfolio, simulated trades, portfolio analysis or Quant Core workflow state. Issue #70 and PR #71 remain superseded and closed without merge.
 
@@ -49,10 +50,10 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | v0.3 market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Canonical arbitrary market-price measurement semantics are not a standalone evidence contract |
 | v0.4A-v0.4E Market Cockpit | Read-only selected-scope breadth/risk, context, liquidity and descriptive price behavior | No official full-market, valuation, regime, signal or recommendation claims |
 | v0.5A-v0.5C | Evidence ledger, industry maps, beneficiary classifications and candidate-pool handoff | Evidence qualification and frozen-link patterns remain repeated downstream |
-| v0.6A | Company research and hypotheses | Command lifecycle and revision allocation remain local |
+| v0.6A | Company research and hypotheses | Integrity translation is consolidated; revision allocation and locks remain local |
 | v0.6B | Expectations and valuation observations with optional price provenance | `observed_value` is not automatically comparison eligible; reduced evidence claim shape remains local |
-| v0.6C | Catalyst and risk assessments | Frozen-boundary, ordered-row and query-value mechanics are consolidated; evidence serializer remains local |
-| v0.6D | Industry/company quality judgments | Query-value and evidence serializer policies remain local; lifecycle repetition needs separate review |
+| v0.6C | Catalyst and risk assessments | Frozen-boundary, ordered-row, query-value and integrity mechanics are consolidated; evidence serializer remains local |
+| v0.6D | Industry/company quality judgments | Integrity translation is consolidated; query-value/evidence serializer policies and revision allocation remain local |
 | v0.6E | Superseded planning only | Not implemented or authorized |
 | v0.7+ | Prospective only | Requires Architecture Preflight and Definition of Ready |
 
@@ -71,6 +72,8 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | Ordered scalar repository row loading | `stage2_repository_rows.py` | Explicit `IN` filtering and caller-owned ordering only |
 | v0.6A-v0.6C pure query values | `stage2_query_values.py` | Required UTC, date-granular visibility and text formatting only |
 | Evidence read serialization | v0.6B-v0.6D domain query modules | Reviewed in PR #93 and intentionally remains local |
+| SQLAlchemy integrity translation | `stage2_integrity.py` | Translate only `IntegrityError`; exact messages and transaction ownership remain command-local |
+| Revision allocation and lock strategy | Stage 2 command modules | Current process/database locking and supersession policy remain local pending characterization |
 | “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities |
 
 A linked local `daily_price` row remains provenance/context. It is not a canonical comparison value merely because a valuation record also stores a numeric string and currency.
@@ -97,7 +100,7 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 - **D1 Documentation drift — controlled:** architecture/status synchronization follows accepted implementations and characterization decisions.
 - **D2 Repeated Stage 2 structure — partially reduced:** frozen-boundary and ordered-row mechanics are consolidated; generic graph loading remains unjustified.
 - **D3 Read utilities — reviewed:** v0.6A-v0.6C pure query values are consolidated. Evidence serializers remain local because no neutral claim contract reaches Definition of Ready; v0.6D query-value policy remains local.
-- **D4 Command lifecycle and concurrency — next characterization candidate:** conflict/integrity translation, revision allocation and locks affect rollback and error compatibility.
+- **D4 Command lifecycle and concurrency — partially reduced:** integrity translation is consolidated; revision allocation, process-local locks, row locks and retry policy require the next independent characterization.
 - **D5 ORM lifecycle — deferred:** dynamic link-model factories and append-only listeners are mapper/event sensitive.
 - **D6 Test-matrix growth:** shared invariant tests and domain-semantic tests must remain distinct.
 - **D7 Fixture-versus-production reachability:** success paths need production-realistic offline adapter parity.
@@ -123,16 +126,17 @@ Completed:
 4. ordered-row characterization and implementation — PRs #81 and #83;
 5. query-value characterization and implementation — PRs #87 and #89;
 6. evidence read-serialization characterization — PR #93; decision: keep serializers local and open no implementation Issue;
-7. Issue #94 and its linked PR synchronize that decision without changing runtime behavior.
+7. command integrity characterization and implementation — PRs #97 and #99;
+8. Issue #100 and its linked PR synchronize the completed integrity boundary without changing runtime behavior.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
 Prospective and separately authorized:
 
-8. characterize command conflict/integrity behavior and error compatibility;
-9. separately characterize revision allocation/locks and ORM lifecycle concerns;
-10. decide whether canonical market-price evidence has independent user value;
-11. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
-12. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
+9. characterize revision allocation and lock strategy;
+10. separately characterize ORM lifecycle concerns;
+11. decide whether canonical market-price evidence has independent user value;
+12. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
+13. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
 
 No prospective item is authorized by this document alone.
