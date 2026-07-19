@@ -1,58 +1,59 @@
-# Issue #64 — v0.6B Deterministic Fixture Follow-up
+# Issue #64 — v0.6B Acceptance Handoff
 
 ## State
 
 - Repository: `2b7k9vjp5s-lgtm/AQuantAI`
 - Issue: `#64`
 - Branch: `feat/v06b-expectations-valuation`
-- Draft PR: `#65`
+- Pull Request: `#65`
 - Required base: `c94c5ecbac66e43c2c369f36ba64c9b7a13655b6`
-- Re-reviewed implementation Head: `490ba647db14ab4d8bf186f67d77002e76bdd999`
-- Re-review COMMENT: `4729972569`
-- Implementation CI: `29672819935` — success
+- Accepted implementation Head: `152e593750aba85cc801cccfcc75d4a2da725a96`
+- Acceptance COMMENT review: `4730078685`
+- Implementation CI: `29673381172` — success
 - Version remains `0.2.0`
 
-Read `.codex/WORKFLOW.md`, Issue #64, PR #65, review `4729972569`, and this task before editing.
+Read `.codex/WORKFLOW.md`, Issue #64, PR #65, acceptance review `4730078685`, and this handoff before taking any action.
 
-Keep PR #65 Draft/Open/unmerged and Issue #64 Open. Do not merge, release/tag, change version, begin v0.6C, or modify PR #38.
+## Acceptance result
 
-## Review result
+The v0.6B implementation is accepted with no remaining blocking findings.
 
-The three blockers from review `4729846016` are closed. Preserve those accepted fixes unchanged.
+Accepted boundaries include:
 
-One deterministic-fixture blocker remains in `build_stage2_expectation_valuation_fixture()`:
+- append-only, cutoff-aware market-expectation and valuation-snapshot identities and revisions;
+- exact accepted v0.6A research/hypothesis and v0.5A claim/evidence boundaries;
+- supported/disputed evidence rules, explicit conflicts and missing-data behavior;
+- exact local `daily_price` and successful ingestion provenance with valid import/completion chronology;
+- deterministic bounded decimal persistence and coherent observed-value versus `missing_data` state;
+- deterministic fixture revision IDs, with initial valuation revision 1 and later revision 2 proven distinct on SQLite and PostgreSQL;
+- read-only deterministic strict-JSON API behavior, no-network fixture/demo, append-only guards, rollback and PostgreSQL concurrency coverage;
+- migration `20260719_0009` only.
 
-- after both valuation revisions exist, `valuation_revision_id` is populated by selecting `Stage2ValuationSnapshotRevision` using only `valuation_id`;
-- without an exact `revision_no` predicate or explicit deterministic ordering, SQL may return either revision;
-- this can make `valuation_revision_id` backend/query-plan dependent or equal to `later_valuation_revision_id`, violating the stable fixture-ID contract.
+## Locked implementation
 
-## Required fix
+Treat `152e593750aba85cc801cccfcc75d4a2da725a96` as the locked implementation Head.
 
-1. Make `valuation_revision_id` deterministically identify the intended initial valuation revision (`revision_no == 1`). Prefer capturing the exact revision before the later append or selecting it with an exact revision predicate.
-2. Keep `later_valuation_revision_id` bound to the later revision and prove the two IDs are distinct.
-3. Add focused SQLite and PostgreSQL assertions that:
-   - `valuation_revision_id` resolves to revision number 1;
-   - `later_valuation_revision_id` resolves to revision number 2;
-   - the IDs differ;
-   - repeated fixture construction in clean databases preserves these semantics.
-4. Do not change the domain model, migration `20260719_0009`, API routes, command/query behavior, dependencies, CI, Docker, launchers, docs unrelated to this correction, or any other roadmap stage.
+No implementation, migration, test, documentation, dependency, route, CI, Docker, launcher, version or unrelated file changes are authorized after that commit. The only permitted branch change is this task-only acceptance handoff and status synchronization.
 
-## Validation
+## Recorded validation
 
-Run and report exact results for:
+- Focused SQLite v0.6B: `21 passed, 1 existing warning`
+- Focused PostgreSQL v0.6B: `6 passed`
+- Full offline suite: `458 passed, 46 skipped, 1 existing warning`
+- Full PostgreSQL persistence/Industry Alpha suite: `33 passed`
+- Explicit no-network: `1 passed, 20 deselected, 1 existing warning`
+- PostgreSQL Alembic `base -> head`: success
+- Migration `20260719_0009 -> 20260719_0008 -> 20260719_0009`: success
+- `python -m alembic check`: no new upgrade operations detected
+- All 10 offline demos: success
+- `python -m compileall -q backend industry_alpha scripts tests`: success
+- `git diff --check`: success
+- GitHub Actions run `29673381172`: success
 
-- focused SQLite v0.6B tests;
-- focused PostgreSQL v0.6B tests;
-- full offline suite;
-- full PostgreSQL persistence/Industry Alpha suite when available;
-- clean Alembic `base -> head`;
-- `20260719_0009 -> 20260719_0008 -> 20260719_0009`;
-- `python -m alembic check`;
-- all offline demos;
-- explicit no-network coverage;
-- `python -m compileall -q backend industry_alpha scripts tests`;
-- `git diff --check`.
+The warning is the existing Starlette TestClient/httpx deprecation warning.
 
-## Delivery
+## Next action
 
-Update PR #65 and Issue #64 with the new Head, exact changed files and exact validation results. Keep PR Draft and Issue Open, then stop for ChatGPT re-review. Do not merge, begin v0.6C, release/tag, change version, or modify PR #38.
+After this task-only commit passes CI, PR #65 may be marked Ready for owner review. Keep Issue #64 Open and keep the PR unmerged.
+
+Do not run another implementation cycle. Do not merge, close Issue #64, create a release/tag, change version, begin v0.6C, rebase/force-push reviewed history, or modify PR #38 without explicit owner authorization synchronized to GitHub.
