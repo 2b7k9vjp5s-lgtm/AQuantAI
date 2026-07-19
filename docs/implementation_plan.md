@@ -91,6 +91,10 @@ The second v0.6 slice is limited to append-only market-expectation and valuation
 
 The third v0.6 slice is limited to append-only catalyst and company-risk judgment snapshots. Every revision freezes one exact v0.6A company-research revision, its selected accepted hypotheses, at least one exact v0.6B expectation or valuation revision, and the exact claim/evidence links already frozen upstream. Supported/disputed status is evidence-gated, missing public evidence stays explicit, and dual cutoff/UTC chronology prevents later records from leaking into historical views. These records are not monitoring tasks, alerts, reminders, scores, ranks, final conclusions, good-price/good-timing outputs, recommendations, portfolios, broker actions, orders, or trades.
 
+### v0.6D Authorized Industry And Company Quality Judgments
+
+The fourth v0.6 slice adds append-only manual industry-quality and company-quality judgments. Every revision freezes one exact v0.6A research boundary, its accepted hypotheses, exact v0.6B expectation/valuation revisions, exact v0.6C catalyst/risk revisions, and exact claim/evidence links. Outcomes and evidence states are separate reviewed fields; facts, inferences, conflicts, missing evidence, uncertainty, and bounded `后续验证清单` notes remain visible. These judgments are not formal research conclusions, good-price/good-timing decisions, watchlist states, task lifecycles, Quant Core scores, rankings, recommendations, or trading actions. See [stage2_quality_judgments.md](stage2_quality_judgments.md).
+
 ## v0.7 Watchlist And Verification Tasks
 
 - **Objective:** manage personal research follow-up and historical status changes.

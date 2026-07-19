@@ -30,6 +30,11 @@ from industry_alpha.stage2_assessments_query import (
     Stage2RiskQueryService,
 )
 from industry_alpha.stage2_assessments_repository import Stage2AssessmentRepository
+from industry_alpha.stage2_judgments_query import (
+    Stage2CompanyJudgmentQueryService,
+    Stage2IndustryJudgmentQueryService,
+)
+from industry_alpha.stage2_judgments_repository import Stage2JudgmentRepository
 
 router = APIRouter(prefix="/industry-alpha", tags=["industry-alpha"])
 
@@ -384,6 +389,67 @@ def get_stage2_risk_assessment(
             status_code=503,
             detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
         ) from exc
+
+
+def _judgment_query(kind: str, session: Session):
+    repository = Stage2JudgmentRepository(session)
+    return Stage2IndustryJudgmentQueryService(repository) if kind == "industry" else Stage2CompanyJudgmentQueryService(repository)
+
+
+@router.get("/industry-judgments")
+def list_stage2_industry_judgments(
+    company_research_id: UUID | None = Query(default=None),
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return _judgment_query("industry", session).list_judgments(company_research_id=company_research_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.") from exc
+
+
+@router.get("/industry-judgments/{judgment_id}")
+def get_stage2_industry_judgment(
+    judgment_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return _judgment_query("industry", session).get_judgment(judgment_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.") from exc
+
+
+@router.get("/company-judgments")
+def list_stage2_company_judgments(
+    company_research_id: UUID | None = Query(default=None),
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return _judgment_query("company", session).list_judgments(company_research_id=company_research_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.") from exc
+
+
+@router.get("/company-judgments/{judgment_id}")
+def get_stage2_company_judgment(
+    judgment_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return _judgment_query("company", session).get_judgment(judgment_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.") from exc
 
 
 @router.get("/cases")

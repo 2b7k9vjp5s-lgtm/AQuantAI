@@ -25,8 +25,8 @@ Market observations can create research cases. Research produces evidence-backed
 | --- | --- | --- |
 | Home | Local market summary, recent research changes, and verification reminders. | Planned |
 | Market Cockpit | Selected-universe breadth, participation, liquidity distribution, price-behavior proxies, risk, provenance, completeness, and optional separately selected provider-attributed benchmark and sector context. | v0.4A-v0.4E merged; canonical style, valuation, regime, and crowding conclusions unsupported |
-| Industry Alpha | Stage 1 industry mapping and Stage 2 company research with evidence and cutoff dates. | v0.5A-v0.5C merged; v0.6A adds exact-membership company research; v0.6B adds expectation and valuation observations; v0.6C adds bounded catalyst/risk judgments; scoring, recommendations, and trading unsupported |
-| Stock Research | Company role, beneficiary relationship, bounded financial-transmission hypotheses, expectations, valuation, catalysts, and risks. | v0.6A-v0.6C foundations implemented; no target prices, fair values, expected returns, scoring, monitoring, recommendations, or final conclusions |
+| Industry Alpha | Stage 1 industry mapping and Stage 2 company research with evidence and cutoff dates. | v0.5A-v0.5C merged; v0.6A-v0.6D add exact-boundary company research, expectations/valuation, catalyst/risk, and manual quality judgments; scoring, recommendations, and trading unsupported |
+| Stock Research | Company role, beneficiary relationship, bounded financial-transmission hypotheses, expectations, valuation, catalysts, risks, and manual quality judgments. | v0.6A-v0.6D foundations implemented; no target prices, fair values, expected returns, scoring, monitoring, recommendations, or formal conclusions |
 | Watchlist | Research status, catalysts, risks, verification tasks, and status history. | Planned |
 | Paper Portfolio | Multiple simulated portfolios, manual simulated trades, positions, cash, NAV, benchmarks, concentration, and thesis snapshots. | Planned |
 | Settings | Local market-data and LLM-provider configuration. | Planned |
@@ -51,6 +51,7 @@ Quant Core -> product-domain validation and review inputs
 - Stage 2 may begin only from an exact frozen v0.5C candidate-pool membership. It preserves the Stage 1 beneficiary, map, company snapshot, claims and evidence boundary rather than selecting a newer compatible-looking record.
 - Stage 2 expectation and valuation observations must bind exact company-research revisions, hypothesis revisions, claim revisions, and frozen evidence links. Local price context is provenance only and must not become a target price, expected return, rank, score, recommendation, or trading action.
 - Stage 2 catalyst and risk assessments are dated append-only judgments over exact accepted v0.6A/v0.6B and evidence boundaries. They are not monitors, alerts, task lifecycles, scores, good-price/good-timing judgments, recommendations, or trading actions.
+- Stage 2 industry/company quality judgments freeze exact accepted v0.6A/v0.6B/v0.6C and claim/evidence boundaries. Their reviewed outcome is separate from evidence state and is not a formal conclusion, score, rank, recommendation, watchlist state, or task lifecycle.
 
 ## Research Discipline And Safety
 

@@ -18,6 +18,11 @@ from industry_alpha.stage2_assessments_query import (
     Stage2CatalystQueryService,
     Stage2RiskQueryService,
 )
+from industry_alpha.stage2_judgments_commands import Stage2JudgmentCommandService
+from industry_alpha.stage2_judgments_query import (
+    Stage2CompanyJudgmentQueryService,
+    Stage2IndustryJudgmentQueryService,
+)
 
 __all__ = [
     "EvidenceLedgerCommandService",
@@ -34,4 +39,7 @@ __all__ = [
     "Stage2AssessmentCommandService",
     "Stage2CatalystQueryService",
     "Stage2RiskQueryService",
+    "Stage2JudgmentCommandService",
+    "Stage2IndustryJudgmentQueryService",
+    "Stage2CompanyJudgmentQueryService",
 ]
