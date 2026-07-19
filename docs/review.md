@@ -7,9 +7,9 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 - Review date: 2026-07-19
 - Released software version: `0.2.0`
 - Merged capability stage: v0.6D
-- Accepted application/consolidation implementation baseline: `a2688b6e244743ef5e3bdcaedfc6c6717d7a7d8c`
+- Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Most recent architecture synchronization: Issue #100 and its linked synchronization PR
+- Most recent accepted consolidation implementation: Issues #102/#104 and PRs #103/#105
 - Active application or consolidation implementation authorization: none
 - New migration authorization: none
 
@@ -25,6 +25,7 @@ Docs-only commits may advance `main` without changing release, capability or run
 - Issues #86/#88 and PRs #87/#89 characterized and implemented v0.6A-v0.6C pure query values.
 - Issue #92 / PR #93 kept evidence read serializers domain-local because no neutral claim projection reached Definition of Ready.
 - Issues #96/#98 and PRs #97/#99 characterized and implemented neutral command integrity translation.
+- Issues #102/#104 and PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry.
 
 ## Command integrity implementation acceptance
 
@@ -43,6 +44,22 @@ Independent review confirmed:
 
 No migration, API, schema, fixture, dependency, release, version, v0.6E, v0.7 or PR #38 change occurred.
 
+## Revision-lock implementation acceptance
+
+PR #105 was accepted at fixed head `d1266de8369906af90f481d3727f08fb5552e8fa` and merged as `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
+
+Independent review confirmed:
+
+- `industry_alpha.stage2_revision_locks` owns only one guarded process-local `(kind, UUID) -> RLock` registry;
+- all eight labels (`research`, `hypothesis`, `expectation`, `valuation`, `catalyst`, `risk`, `industry`, `company`) are unchanged;
+- lock -> integrity translator -> transaction nesting is unchanged;
+- same-key identity, different-key isolation, reentrancy and same-key thread exclusion are covered directly;
+- row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry remain command-local;
+- no cross-process or cross-host guarantee was added, and SQLite/PostgreSQL concurrency limitations remain unchanged;
+- Actions `29688711474`, full tests and the fixture demo succeeded.
+
+No migration, runtime-surface, API, schema, release, version, v0.6E, v0.7 or PR #38 change occurred.
+
 ## Current review conclusion
 
 Neutral ownership exists for:
@@ -50,14 +67,15 @@ Neutral ownership exists for:
 - shared Stage 2 frozen-boundary mechanics;
 - ordered scalar repository row loading;
 - v0.6A-v0.6C pure query-value mechanics;
-- SQLAlchemy integrity-error translation.
+- SQLAlchemy integrity-error translation;
+- the process-local keyed revision-lock registry.
 
-Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text and transaction boundaries. Remaining consolidation risk is revision allocation/locking and ORM event complexity.
+Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. The next consolidation gate is ORM lifecycle characterization.
 
 ## Locked exclusions
 
 - no evidence serializer extraction or projection DTOs without a re-evaluation trigger and new preflight;
-- no revision-lock, row-lock, revision-allocation, supersession or retry refactor without accepted characterization;
+- no row-lock, latest-revision, revision-allocation, supersession, cleanup/eviction or retry refactor without accepted characterization;
 - no model-factory or append-only-listener refactor;
 - no application/provider behavior change or migration;
 - no v0.6E price or timing judgment;
@@ -68,6 +86,6 @@ Evidence read serialization intentionally remains domain-local. Command modules 
 
 ## Next development gate
 
-The next candidate is a separate characterization of revision allocation and lock strategy. It must inventory process-local `RLock` registries, database `SELECT ... FOR UPDATE`, latest-revision reads, revision number and supersession allocation, concurrent PostgreSQL behavior, SQLite limitations, retry policy and lifecycle/cleanup risks.
+The next gate is a separate ORM lifecycle characterization of dynamic link-model factories and append-only listener registration. It must inventory mapper/event registration, import-order and test-isolation behavior before any implementation decision.
 
-Characterization may conclude that the current approach should remain local. It does not authorize implementation. No Codex application implementation command is active after this synchronization.
+Dynamic model factories and append-only listeners remain deferred. Characterization may conclude that they should remain local. It does not authorize implementation. No Codex application implementation command is active after this synchronization.

@@ -10,7 +10,8 @@ This is the design record for accepted Stage 2 consolidation work.
 - Query-value characterization and implementation: Issues #86/#88, PRs #87/#89.
 - Evidence read-serialization characterization: Issue #92 / PR #93.
 - Command integrity characterization and implementation: Issues #96/#98, PRs #97/#99.
-- Accepted application/consolidation implementation baseline: `a2688b6e244743ef5e3bdcaedfc6c6717d7a7d8c`.
+- Revision-lock characterization and implementation: Issues #102/#104, PRs #103/#105.
+- Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
 - Migration decision for all accepted implementation slices: no migration.
 
 This report records completed work and remaining candidates. It does not authorize another implementation.
@@ -19,7 +20,7 @@ This report records completed work and remaining candidates. It does not authori
 
 ### Frozen boundary
 
-`industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B base-boundary loading, UTC/cutoff visibility and company-research locking used by v0.6C and v0.6D. Domain semantics and revision locks remain local.
+`industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B base-boundary loading, UTC/cutoff visibility and company-research locking used by v0.6C and v0.6D. Domain semantics and process-lock call placement remain local.
 
 ### Ordered repository rows
 
@@ -33,7 +34,11 @@ This report records completed work and remaining candidates. It does not authori
 
 `industry_alpha.stage2_integrity.translate_integrity` owns only stateless translation of SQLAlchemy `IntegrityError` into `EvidenceLedgerConflictError` with the exact caller-provided message and the original exception as cause.
 
-The command modules retain conflict-message policy, `session_factory.begin()` transaction ownership, rollback behavior, process-local revision locks, database row locks, latest-revision selection, revision-number/supersession allocation and any future retry policy.
+The command modules retain conflict-message policy, `session_factory.begin()` transaction ownership, rollback behavior, database row locks, latest-revision selection, revision-number/supersession allocation, cleanup/eviction policy and any future retry policy.
+
+### Process-local revision locks
+
+`industry_alpha.stage2_revision_locks.revision_lock` owns only the guarded process-local `(kind, UUID) -> RLock` registry. The eight existing kind labels and lock -> integrity translator -> transaction nesting remain caller-owned and unchanged. The helper adds no cleanup or eviction and makes no cross-process or cross-host guarantee; database and allocation behavior remains command-local.
 
 ## Reviewed local boundary: evidence read serialization
 
@@ -54,6 +59,7 @@ The accepted decision is not deferred implementation. Evidence serializer extrac
 - PR #89 preserved public query payloads and v0.6D edge policy while sharing v0.6A-v0.6C pure query values.
 - PR #93 documented the evidence serializer no-extraction decision after comparing exact fields, wording, link ownership and error semantics.
 - PR #99 preserved every conflict message, transaction nesting, rollback ownership and lock/allocation behavior while sharing integrity translation.
+- PR #105 preserved all eight kind labels, command nesting, row locks and allocation behavior while sharing only process-local lock identity.
 
 All accepted implementation slices are source-only and require no database downgrade or data repair. Characterization PRs are docs-only.
 
@@ -65,10 +71,11 @@ All accepted implementation slices are source-only and require no database downg
 | Ordered scalar repository row loading | Completed in PR #83 |
 | v0.6A-v0.6C pure query values | Completed in PR #89 |
 | SQLAlchemy integrity translation | Completed in PR #99 |
+| Process-local keyed revision-lock registry | Completed in PR #105 |
 | v0.6D query-value null/error policy | Remains local |
 | Repository graph assembly and missing-parent semantics | Remain local |
 | Evidence read serialization | Reviewed in PR #93; remains local; no implementation DoR |
-| Revision allocation and lock strategy | Next characterization candidate |
+| Row locks, latest-revision reads, allocation, supersession, cleanup and retry | Remain command-local after PR #105 |
 | Dynamic model factories | Deferred, ORM-sensitive |
 | Append-only listener registration | Deferred, ORM-sensitive |
 | Schema and migrations | No change required |
@@ -77,8 +84,7 @@ All accepted implementation slices are source-only and require no database downg
 
 Separate reviewed work may later consider:
 
-1. revision allocation and lock strategy;
-2. append-only listener registration and dynamic model construction.
+1. append-only listener registration and dynamic model construction.
 
 A characterization may conclude that a candidate should remain duplicated. Completed neutral boundaries are not blanket authorization for any remaining item.
 
@@ -86,6 +92,6 @@ Evidence read serialization may be reconsidered only under the triggers recorded
 
 ## Next gate
 
-The next candidate begins with a separate characterization Issue for revision allocation and lock strategy. It must inventory process-local `RLock` registries, database `SELECT ... FOR UPDATE`, latest-revision reads, revision-number and supersession allocation, SQLite behavior, PostgreSQL concurrency evidence, retry policy and lifecycle/cleanup implications before proposing any neutral primitive.
+The next gate begins with a separate ORM lifecycle characterization Issue. It must inventory dynamic link-model factories, append-only listener registration, mapper/event sensitivity, import-order behavior and test isolation before proposing any neutral primitive.
 
-No revision/lock implementation, command retry, evidence serializer extraction, v0.6E, v0.7 or new migration is authorized by this record.
+Dynamic model factories and append-only listeners remain deferred. No ORM lifecycle implementation, row-lock/allocation/supersession/cleanup/retry change, evidence serializer extraction, v0.6E, v0.7 or new migration is authorized by this record.

@@ -2,9 +2,9 @@
 
 ## Status
 
-Issue #102 reviews Stage 2 revision locking and allocation at current `main` commit `46ee0f78908cbdff3a611ed158f43cb17fa28f8d`.
+Issue #102 and PR #103 characterized Stage 2 revision locking and allocation at `main` commit `46ee0f78908cbdff3a611ed158f43cb17fa28f8d`. Issue #104 implemented the accepted neutral boundary in PR #105 at fixed head `d1266de8369906af90f481d3727f08fb5552e8fa`, merged as `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
 
-This is characterization only. Released version remains `0.2.0`, capability stage remains v0.6D, and no migration is required.
+The characterization and its minimal implementation are complete. Released version remains `0.2.0`, capability stage remains v0.6D, and no migration was required.
 
 ## Reviewed scope
 
@@ -41,7 +41,7 @@ The layers have different ownership and guarantees. They must not be treated as 
 
 ## Process-local lock inventory
 
-All four command modules currently define the same mechanics:
+Before PR #105, all four command modules defined the same mechanics:
 
 ```python
 _LOCKS_GUARD = Lock()
@@ -75,7 +75,7 @@ The `RLock`:
 - remains held around integrity translation and the complete transaction;
 - keeps each created lock in a module-level registry for the process lifetime.
 
-The current registries have no cleanup, weak-reference or eviction policy. A first extraction must preserve that behavior rather than claim to solve registry lifetime.
+The accepted shared registry has no cleanup, weak-reference or eviction policy. PR #105 preserved that behavior rather than claiming to solve registry lifetime.
 
 ## Database row locking
 
@@ -114,7 +114,7 @@ Safe, but duplicates the exact same stateless key-to-`RLock` factory and guard m
 
 ### Option B: extract one neutral keyed `RLock` registry
 
-Accepted as the smallest safe implementation candidate.
+Accepted and completed as the smallest safe implementation in PR #105.
 
 A module such as `industry_alpha.stage2_revision_locks` may expose a function equivalent to:
 
@@ -143,7 +143,7 @@ Rejected. Retry semantics and database error classification are not currently ac
 
 ## Accepted neutral contract
 
-A later implementation may add one process-local keyed `RLock` factory with these requirements:
+`industry_alpha.stage2_revision_locks` now provides one process-local keyed `RLock` factory with these requirements:
 
 1. accept the existing caller-provided `kind` string and UUID identity unchanged;
 2. key exactly by `(kind, identity)`;
@@ -166,9 +166,9 @@ Direct helper tests must prove:
 
 Existing v0.6A-v0.6D command tests and PostgreSQL concurrency tests remain integration evidence that command behavior, row locking and allocation are unchanged.
 
-## First implementation candidate
+## Completed implementation
 
-A separate implementation Issue may authorize only:
+Issue #104 and PR #105 completed only:
 
 1. add `industry_alpha/stage2_revision_locks.py`;
 2. replace the four local lock registries/factories with imports under the existing private alias;
@@ -176,10 +176,12 @@ A separate implementation Issue may authorize only:
 4. add direct helper tests;
 5. run focused Stage 2 command tests, available PostgreSQL concurrency tests, the full workflow and fixture demo.
 
-No model, constraint, row-lock, transaction, integrity-message, revision-number, supersession, retry or lifecycle policy change belongs in that implementation.
+No model, constraint, row-lock, transaction, integrity-message, revision-number, supersession, cleanup/eviction, retry or lifecycle policy changed in that implementation.
 
 ## Definition of Ready conclusions
 
-The neutral process-local keyed `RLock` factory reaches Definition of Ready for a separate minimal implementation Issue.
+The neutral process-local keyed `RLock` factory passed independent implementation review and is the fifth accepted neutral Stage 2 boundary.
 
-Generic database row locking, revision allocation, supersession, cleanup and retry do not reach Definition of Ready and remain local. This report does not authorize their implementation or redesign.
+Generic database row locking, latest-revision reads, revision allocation, supersession, cleanup/eviction and retry remain command-local. The registry provides no cross-process or cross-host guarantee, and this report does not expand SQLite or PostgreSQL concurrency claims.
+
+The next independent gate is ORM lifecycle characterization. Dynamic model factories and append-only listeners remain deferred pending that review; no implementation is authorized here.
