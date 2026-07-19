@@ -1,155 +1,80 @@
-# Issue #66 — v0.6C Catalyst And Risk Assessment Snapshots
+# Issue #66 — v0.6C Blocking Review Cycle
 
 ## State
 
 - Repository: `2b7k9vjp5s-lgtm/AQuantAI`
 - Issue: `#66`
+- Draft PR: `#67`
 - Branch: `feat/v06c-catalyst-risk-assessments`
-- Draft PR: create `[v0.6C] Add evidence-backed catalyst and risk assessments`
 - Required base and ancestor: `571fa9396a9318f2e6c409e1d8b7a25ec2120b2f`
+- Reviewed implementation Head: `7c78826016bbbaed19e5649da0d20f67acca4643`
+- Blocking COMMENT review: `4730246609`
+- Implementation CI: `29675419647` — success
 - Version must remain `0.2.0`
 
-Read `.codex/WORKFLOW.md`, Issue #66, this task and the Draft PR before editing. The Issue is authoritative.
+Read `.codex/WORKFLOW.md`, Issue #66, PR #67, review `4730246609`, and this task before editing. The Issue and review are authoritative.
 
-Keep Issue #66 Open and the PR Draft/Open/unmerged. Do not release/tag, change version, begin v0.6D/v0.7, rebase/force-push reviewed history, or modify PR #38.
+## Review result
 
-## Objective
+The v0.6C persistence, migration, command, chronology, cutoff, append-only, API-route and PostgreSQL concurrency foundations are retained. Do not redesign them.
 
-Implement the smallest reviewed Stage 2 slice after v0.6B: local append-only, cutoff-aware catalyst and company-risk assessment snapshots. These are immutable research judgments over exact accepted upstream revisions, not monitoring tasks, alerts, scores, recommendations, timing outputs or trades.
+One blocker remains: the read model drops the canonical frozen claim fact/inference provenance.
 
-## Required domain boundary
+`ClaimRevision` already stores:
 
-Create stable catalyst-assessment and risk-assessment identities attached to one `Stage2CompanyResearch` identity and canonical keys. Add immutable sequential revisions with supersedes chains.
+- `claim_kind` (`fact` or `inference`);
+- `inference_confidence`;
+- `inference_basis`;
+- `recorded_at_utc`.
 
-Catalyst revisions must contain bounded explicit fields for:
+The catalyst/risk claim payload currently returns statement, status, cutoff and evidence but omits these fields. Consumers therefore cannot distinguish a frozen fact from a frozen inference or inspect its explicit basis/confidence.
 
-- catalyst category and subject;
-- expected observation window;
-- assessment status and confidence;
-- trigger/observation criteria;
-- evidence-based rationale and uncertainty;
-- information cutoff and timezone-aware UTC recorded timestamp.
+## Authorized fix
 
-Risk revisions must contain bounded explicit fields for:
+Make the smallest focused change:
 
-- risk category and subject;
-- downside path;
-- thesis-invalidation condition;
-- mitigants;
-- assessment status and confidence;
-- evidence-based rationale and uncertainty;
-- information cutoff and timezone-aware UTC recorded timestamp.
+1. In the v0.6C query/read payload, expose the exact frozen claim revision fields:
+   - `claim_kind`;
+   - `inference_confidence`;
+   - `inference_basis`;
+   - `recorded_at_utc`.
+2. Preserve `None` for fact-only inference fields; do not synthesize values.
+3. Add focused query/API regressions proving:
+   - a frozen fact is returned with `claim_kind == "fact"` and null inference fields;
+   - a frozen inference is returned with its exact confidence and basis;
+   - current and historical cutoff payloads preserve the same frozen provenance;
+   - payloads remain deterministic and strict-JSON safe.
+4. Update directly relevant documentation only if the response contract is documented there.
 
-Use strict reviewed enums and bounded text. Do not add numeric scoring, likelihood/impact points, weights, ranks, expected-loss calculations, risk-reward ratios, price conclusions or final recommendation fields.
+## Locked boundaries
 
-## Exact frozen handoff
+Do not change:
 
-Every catalyst/risk revision must freeze:
+- models, migrations, tables or persisted domain fields;
+- create/append command semantics or evidence/status rules;
+- routes or HTTP methods;
+- fixture domain scope except the minimal test data needed to expose both a fact and inference;
+- dependencies, CI, Docker, launchers, authentication or version metadata;
+- v0.6D/v0.7 scope;
+- PR #38.
 
-1. one exact accepted v0.6A company-research revision from its own company-research identity;
-2. the selected exact financial-transmission hypothesis revisions accepted by that research boundary;
-3. at least one exact relevant v0.6B expectation or valuation revision from the same company-research identity;
-4. exact v0.5A claim revisions and exact visible claim-evidence links supporting the material assertion.
-
-Fail closed on cross-research links, invisible revisions, later links, incomplete handoff, backdating or mismatched identity ownership. Later research, hypothesis, expectation, valuation, claim/evidence or price additions must not rewrite the frozen snapshot.
-
-## Evidence/status rules
-
-- `supported` requires at least one bound claim revision that is itself `supported`, has visible A/B/C supporting evidence at the frozen claim boundary, and has no visible contradiction.
-- D-only evidence cannot independently support a catalyst or risk revision.
-- `disputed` requires a disputed claim revision or visible contradiction.
-- Missing public evidence remains explicit as `尚未获得可靠公开证据`; confidence wording cannot upgrade it.
-- Keep fact/inference labels and uncertainty visible.
-
-Do not fabricate customers, orders, certification, capacity, policy effects, event dates, financial outcomes, mitigants or invalidation signals.
-
-## Persistence and append-only rules
-
-- Add exactly one migration after `20260719_0009`; expected revision is `20260719_0010`.
-- Reuse the existing SQLAlchemy Base/session/repository conventions and append-only guards.
-- Accepted identities, revisions and frozen link rows must reject ordinary ORM update/delete operations.
-- Corrections append deterministic revisions and preserve exact supersedes chains.
-- Multi-row create/append commands must be one transaction and fully rollback on all validation, evidence, chronology, uniqueness and cross-research failures.
-- PostgreSQL revision numbering must remain deterministic under concurrency.
-
-## Query and HTTP boundary
-
-Add deterministic strict-JSON query contracts and read-only routes under `/industry-alpha` for:
-
-- catalyst-assessment list/detail;
-- risk-assessment list/detail;
-- optional `as_of_cutoff=YYYY-MM-DD` using both information-date and UTC recorded-date visibility.
-
-No POST, PUT, PATCH or DELETE HTTP routes and no browser editing UI.
-
-## Deterministic fixture/demo
-
-Add one no-network fixture/demo containing:
-
-- exact accepted v0.6A research/hypothesis revisions;
-- exact v0.6B expectation and valuation revisions;
-- one supported A/B/C-backed catalyst with explicit observation criteria;
-- one disputed or explicit-missing-evidence catalyst;
-- one supported company risk with bounded downside path and thesis-invalidation condition;
-- one disputed or explicit-missing-evidence risk;
-- later upstream revisions/evidence additions that are visible currently but excluded from earlier cutoff views.
-
-All returned IDs and collection order must be deterministic across clean SQLite and PostgreSQL databases. Payloads must be strict JSON safe and contain no non-finite values.
-
-## Tests
-
-Add focused SQLite and PostgreSQL coverage for:
-
-- migration `20260719_0010`, clean `base -> head`, down/up round trip and Alembic check;
-- exact v0.6A/v0.6B handoff and same-research enforcement;
-- stable identities, sequential revisions and supersedes chains;
-- strict enum/text/date/time validation;
-- supported, disputed, D-only and missing-evidence behavior;
-- chronology and historical non-leakage;
-- later upstream revisions/links not mutating accepted snapshots;
-- append-only update/delete guards;
-- atomic rollback with unchanged row counts;
-- deterministic PostgreSQL concurrent revision allocation;
-- deterministic fixture IDs/order and strict JSON;
-- read-only API behavior and invalid cutoff handling;
-- no-network startup/import/demo behavior;
-- all existing regressions and demos.
-
-## Expected files
-
-Keep implementation focused around new `stage2_assessments` model/contract/command/repository/query/fixture modules, one migration, read-only route registration, one demo, focused tests and directly relevant documentation. Reuse accepted v0.6A/v0.6B boundary helpers where safe rather than duplicating incompatible semantics.
-
-Do not change dependencies, Docker, CI, launchers, authentication, version metadata or unrelated modules.
-
-## Explicit exclusions
-
-No good-industry/good-company/good-price/good-timing conclusion, crowding model, Market Cockpit timing model, expected return, target/fair-value price, upside/downside percentage, score, weight, rank, investment-priority field, final research-conclusion status, automated monitoring, alerts, reminders, task owners, due dates, verification-task lifecycle, watchlists, Quant Core automatic scoring, provider collection, scraping, live network, LLM execution, portfolios, brokers, orders or trading.
+Do not rebase or force-push reviewed history. Keep PR #67 Draft/Open/unmerged and Issue #66 Open.
 
 ## Validation
 
-Run and report exact results for:
+Run and record exact results for:
 
 - focused SQLite v0.6C tests;
-- focused PostgreSQL v0.6C tests;
+- focused PostgreSQL v0.6C tests when available;
 - full offline suite;
 - full PostgreSQL persistence/Industry Alpha suite when available;
-- clean PostgreSQL Alembic `base -> head`;
-- `20260719_0010 -> 20260719_0009 -> 20260719_0010`;
-- `python -m alembic check`;
 - all offline demos;
 - explicit no-network coverage;
 - `python -m compileall -q backend industry_alpha scripts tests`;
 - `git diff --check`.
 
+No migration change is authorized; confirm `python -m alembic check` still reports no new upgrade operations.
+
 ## Delivery
 
-Update Draft PR #67 and Issue #66 with:
-
-- base and final Head SHA;
-- architecture and data-contract decisions;
-- exact changed files;
-- exact test/pass/skip/warning counts;
-- migration and demo results;
-- known limitations and exclusions.
-
-Keep PR #67 Draft and Issue #66 Open. Stop for ChatGPT review. Do not merge or start another slice.
+Update PR #67 and Issue #66 with the new Head, exact changed files and exact validation counts. Keep the PR Draft and stop for ChatGPT re-review. Do not merge, close Issue #66, create a release/tag, change version, begin another slice, or modify PR #38.
