@@ -13,6 +13,11 @@ from industry_alpha.stage2_expectations_query import (
     Stage2ValuationQueryService,
 )
 from industry_alpha.stage2_query import Stage2CompanyResearchQueryService
+from industry_alpha.stage2_assessments_commands import Stage2AssessmentCommandService
+from industry_alpha.stage2_assessments_query import (
+    Stage2CatalystQueryService,
+    Stage2RiskQueryService,
+)
 
 __all__ = [
     "EvidenceLedgerCommandService",
@@ -26,4 +31,7 @@ __all__ = [
     "Stage2ExpectationCommandService",
     "Stage2ExpectationQueryService",
     "Stage2ValuationQueryService",
+    "Stage2AssessmentCommandService",
+    "Stage2CatalystQueryService",
+    "Stage2RiskQueryService",
 ]

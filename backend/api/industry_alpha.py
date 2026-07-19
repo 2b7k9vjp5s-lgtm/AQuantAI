@@ -25,6 +25,11 @@ from industry_alpha.stage2_expectations_query import (
     Stage2ValuationQueryService,
 )
 from industry_alpha.stage2_expectations_repository import Stage2ExpectationRepository
+from industry_alpha.stage2_assessments_query import (
+    Stage2CatalystQueryService,
+    Stage2RiskQueryService,
+)
+from industry_alpha.stage2_assessments_repository import Stage2AssessmentRepository
 
 router = APIRouter(prefix="/industry-alpha", tags=["industry-alpha"])
 
@@ -290,6 +295,88 @@ def get_stage2_valuation_snapshot(
             return Stage2ValuationQueryService(
                 Stage2ExpectationRepository(session)
             ).get_valuation(valuation_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/catalyst-assessments")
+def list_stage2_catalyst_assessments(
+    company_research_id: UUID | None = Query(default=None),
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage2CatalystQueryService(
+                Stage2AssessmentRepository(session)
+            ).list_catalysts(
+                company_research_id=company_research_id,
+                as_of_cutoff=as_of_cutoff,
+            ).to_dict()
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/catalyst-assessments/{catalyst_id}")
+def get_stage2_catalyst_assessment(
+    catalyst_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage2CatalystQueryService(
+                Stage2AssessmentRepository(session)
+            ).get_catalyst(catalyst_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/risk-assessments")
+def list_stage2_risk_assessments(
+    company_research_id: UUID | None = Query(default=None),
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage2RiskQueryService(
+                Stage2AssessmentRepository(session)
+            ).list_risks(
+                company_research_id=company_research_id,
+                as_of_cutoff=as_of_cutoff,
+            ).to_dict()
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/risk-assessments/{risk_id}")
+def get_stage2_risk_assessment(
+    risk_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage2RiskQueryService(
+                Stage2AssessmentRepository(session)
+            ).get_risk(risk_id, as_of_cutoff=as_of_cutoff).to_dict()
     except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
