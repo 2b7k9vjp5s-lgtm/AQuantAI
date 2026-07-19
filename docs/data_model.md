@@ -1,62 +1,117 @@
 # Personal Research Conceptual Data Model
 
-This document defines conceptual entities and relationships for later reviewed persistence work. It is not a database schema, migration plan, ORM model, or API contract.
+This document describes conceptual entities and ownership through the merged v0.6D capability stage. It is not a database schema, migration plan or implementation authorization.
 
-## Research And Market Context
+`docs/architecture_baseline.md` is authoritative for current state, dependencies, invariants and future delivery gates.
 
-- **Market snapshot:** timestamped local view of indices, breadth, style, liquidity, sector rotation, crowding, and market risk.
-- **Research case:** versioned work container with mode, scope, cutoff date, separate lifecycle and conclusion statuses, conclusions, and linked revisions.
-- **Research scope:** market, industry, company universe, geography, horizon, and exclusion context for a research case.
-- **Industry driver, chain node, bottleneck, and value-pool shift:** linked industry-map concepts that explain a proposed causal path.
-- **Company beneficiary relationship:** a company's proposed relationship to a chain node, driver, product, customer, or bottleneck, including its financial transmission assumptions.
+## Market-data evidence
 
-## Evidence And Research Judgment
+- **Ingestion run:** immutable attempt metadata including provider, status, scope, cutoff, contract/adapter provenance and canonical series identity.
+- **Snapshot series:** canonical identity separating incompatible stock scopes, datasets, date ranges, adjustment policies, contracts and compatibility parameters.
+- **Stock-basic, daily-price and trade-calendar rows:** persisted provider-attributed observations belonging to an explicit ingestion run/series.
+- **Market Cockpit context:** deterministic selected-series breadth, risk, benchmark/sector, liquidity and price-behavior read models. These are descriptive context, not workflow conclusions.
 
-- **Evidence:** dated source artifact with provenance and grade: A for official or primary evidence, B for reliable industry evidence, C for auxiliary media or research evidence, and D for leads or rumors. D-grade evidence cannot independently support a conclusion.
-- **Claim:** a factual statement or explicitly labeled `推断` belonging to a research case. Every material claim records source, source date, information cutoff date, evidence grade, summary, inference flag, inference basis, confidence, conflicts, and pending verification. Missing support is recorded as `尚未获得可靠公开证据`.
-- **Claim-evidence link:** the relationship that states whether evidence supports, contradicts, or contextualizes a claim.
-- **Conflict:** a reviewed disagreement between evidence items or claims, with an explicit resolution state.
-- **Screen, expectation, valuation snapshot, catalyst, and risk:** dated assessment artifacts linked to a research case or company relationship.
-- **Case lifecycle status:** versioned workflow progress using `draft`, `evidence-gathering`, `under-review`, `watching`, `verified`, `invalidated`, or `archived`.
-- **Research conclusion status:** a separate versioned conclusion using one of eight canonical values: `核心研究候选`, `估值合理，可持续跟踪`, `公司优秀但价格偏贵`, `等待业绩验证`, `认证期高赔率观察`, `周期拐点观察`, `产业相关但受益纯度低`, or `逻辑证伪或排除`.
-- **Verification task:** the task used to confirm, weaken, contradict, or leave unresolved a linked claim or thesis. Pending tasks form the mandatory `后续验证清单` at the end of each completed research output.
-- **Stage 1 beneficiary classification:** identifies a company as a direct, secondary, or potential beneficiary. Only companies with one of these Stage 1 classifications can enter a Stage 2 candidate pool.
-- **Stage 2 company-research identity:** a stable identity created only from one exact frozen candidate-pool membership. It retains the exact pool revision, membership, beneficiary revision, map revision, Stage 1 assertion links, successful `stock_basic` row and handoff claim/evidence boundary.
-- **Stage 2 research-file revision:** an immutable lifecycle/conclusion snapshot containing a research question, bounded summary, cutoff, UTC timestamp, exact accepted hypothesis revisions and a completed-state `后续验证清单`.
-- **Financial-transmission hypothesis revision:** an explicitly labeled inference from an exact Stage 1 assertion to an operating metric and financial-statement line. It freezes direction, lag/horizon, confidence, basis, exact claim revisions, exact evidence links, conflicts and missing evidence.
-- **Stage 2 market-expectation revision:** an immutable observation of a market or research expectation. It freezes one exact company-research revision, accepted hypothesis revisions, exact claim revisions, and exact evidence links. It is descriptive only and has no score, rank, recommendation, or trading meaning.
-- **Stage 2 valuation snapshot revision:** an immutable valuation-context observation. It freezes the same Stage 2 boundaries and may optionally bind one exact local `daily_price` row from a successful ingestion run. It records observed context or explicit missing data; it does not produce target price, fair value, expected return, upside/downside, or good-price/good-timing output.
-- **Stage 2 catalyst/risk assessment revision:** an immutable dated research judgment that freezes one exact v0.6A research/hypothesis boundary, at least one exact v0.6B expectation or valuation revision, and the exact visible claim/evidence links already frozen upstream. It is not a monitor, score, timing signal, recommendation, or trading action.
+A provider row does not automatically possess every downstream semantic meaning. In particular, a canonical reusable market-price evidence object with explicit measurement kind, unit and currency is not yet an implemented standalone domain contract.
 
-## Watchlists And History
+## Evidence ledger
 
-- **Watchlist:** a personal collection of research cases or companies.
-- **Watchlist entry:** current research status, catalysts, risks, verification tasks, and references to source cases.
-- **Revision:** immutable historical snapshot of a conclusion, status change, or material thesis update.
+- **Research case:** stable work container with immutable revisions, workflow state, conclusion state, cutoff and UTC chronology.
+- **Evidence item:** dated source artifact with provenance and A/B/C/D source-strength grade.
+- **Claim revision:** fact or explicit inference with source, cutoff, basis, confidence, uncertainty and missing-evidence semantics.
+- **Claim-evidence link:** support, contradiction or context relation between exact claim and evidence revisions.
+- **Conflict:** reviewed disagreement preserved with resolution state.
+- **Verification metadata:** bounded follow-up items stored with research outputs. These are not yet scheduled tasks or reminders.
 
-## Paper Portfolio
+D-grade evidence cannot independently support a conclusion. Missing support remains explicit as `尚未获得可靠公开证据`.
 
-- **Paper portfolio:** a named, simulated portfolio with base currency, benchmark reference, and local-only purpose.
-- **Simulated order and simulated trade:** manual paper records only; they have no broker, real-order, or execution meaning.
-- **Position, cash ledger, NAV, benchmark, and corporate action:** time-series records used to reconstruct simulated portfolio state and comparison.
-- **Thesis snapshot:** an immutable copy of the relevant research conclusion, risks, catalysts, and evidence state associated with a simulated position at a point in time.
+## Stage 1 Industry Alpha
 
-## Quant Core Records
+- **Industry map identity/revision:** versioned map scope and cutoff.
+- **Node and relationship identities/revisions:** explicit chain structure and direction.
+- **Driver, bottleneck and value-pool observations:** evidence-bound assertions included in an exact map revision.
+- **Beneficiary identity/revision:** direct, secondary or potential company relationship bound to exact Stage 1 assertions, claims/evidence and one exact successful stock-basic snapshot.
+- **Candidate-pool revision:** frozen set of exact supported beneficiary revisions from one accepted map boundary; it has no score, weight, rank or recommendation meaning.
 
-Existing Quant Core concepts remain reusable records: normalized provider data, factor values and scores, ranking outputs, backtest results, ML feature/label/prediction artifacts, research reports, and read-only Dashboard payloads. Later product records reference these outputs as versioned validation inputs; Quant Core does not own product workflow state.
+## Stage 2 company research
 
-## Relationship Summary
+### v0.6A company-research boundary
+
+- **Company-research identity:** stable identity created only from one exact frozen candidate-pool membership.
+- **Company-research revision:** immutable workflow/conclusion snapshot with research question, summary, cutoff, UTC timestamp and bounded follow-up verification.
+- **Financial-transmission hypothesis identity/revision:** explicit inference from accepted Stage 1 assertions to operating metrics and financial-statement effects, with direction, lag/horizon, confidence, basis and exact evidence boundary.
+
+### v0.6B expectations and valuation observations
+
+- **Market-expectation identity/revision:** immutable descriptive expectation over one exact company-research revision, accepted hypotheses and exact claim/evidence links.
+- **Valuation-snapshot identity/revision:** immutable valuation-context observation with method, metric context, optional canonical numeric text, unit/currency as recorded, comparison description, assumptions, status, confidence and explicit missing-data state.
+- **Optional local-price provenance:** one exact `daily_price` row from a successful ingestion run may be linked for context and chronology.
+
+A generic valuation `observed_value` is not automatically eligible as a price-comparison point. An optional local-price link remains provenance/context and does not by itself define canonical measurement kind, unit or currency semantics.
+
+### v0.6C catalyst and risk assessments
+
+- **Catalyst assessment identity/revision:** immutable dated assessment over exact v0.6A/v0.6B and evidence boundaries.
+- **Risk assessment identity/revision:** immutable downside, thesis-invalidation and mitigant assessment over exact accepted upstream boundaries.
+
+These are not monitoring jobs, alerts, reminders, task lifecycles, scores or recommendations.
+
+### v0.6D quality judgments
+
+- **Industry-quality judgment identity/revision:** manual outcome and evidence-state record with driver durability, value-pool direction, chain/bottleneck support, rationale, uncertainty, criteria and follow-up verification.
+- **Company-quality judgment identity/revision:** manual outcome and evidence-state record with beneficiary credibility, financial-transmission credibility, execution risks, rationale, uncertainty, criteria and follow-up verification.
+- **Frozen links:** exact company-research, hypothesis, expectation, valuation, catalyst, risk, claim and evidence revisions.
+
+Outcome and evidence state remain separate. These records are not formal recommendations, price/timing judgments, Watchlist states or portfolio actions.
+
+## Not implemented
+
+The following conceptual entities are not current runtime models:
+
+- price judgment;
+- timing judgment;
+- Watchlist and Watchlist-entry lifecycle;
+- scheduled verification task/reminder;
+- Paper Portfolio, simulated order/trade, position, cash ledger or NAV;
+- thesis snapshot attached to a simulated position;
+- product-workflow Quant Core score/link.
+
+Issue #70 and PR #71 are superseded and closed without merge. No v0.6E table, migration or API exists.
+
+## Ownership rules
+
+| Information | Owner |
+| --- | --- |
+| Provider rows, ingestion status, scope, cutoff and series identity | Market-data persistence |
+| Canonical reusable market-price measurement/value/unit/currency semantics | Future separately reviewed market-data/evidence contract |
+| Evidence grades, claims, conflicts and support relations | v0.5 evidence ledger |
+| Company-research state and financial-transmission hypotheses | v0.6A |
+| Expectations and valuation observations | v0.6B |
+| Catalyst and risk assessment state | v0.6C |
+| Industry/company quality outcome and evidence state | v0.6D |
+| Price/timing interpretation | Future conceptual workflow; not implemented |
+
+A downstream module must not create missing upstream meaning through names, free text, identifier patterns, provider labels, copied currency or defaults.
+
+## Shared historical rules
+
+- Stable identities have append-only immutable revisions where applicable.
+- Accepted downstream records bind exact upstream revisions and links.
+- Corrections append revisions rather than updating accepted history.
+- Information cutoff and actual UTC chronology both govern visibility.
+- Current and historical reads use explicit selectors, deterministic ordering and strict JSON.
+- Multi-row creation is atomic; failure rolls back the complete new boundary.
+- Fixtures must use production-reachable fields and preserve cross-database semantic determinism.
+
+## Relationship summary
 
 ```text
-Market snapshot -> research case -> claims <-> evidence
-Research case -> industry map -> Stage 1 beneficiary classification -> Stage 2 candidate pool
-Stage 2 candidate-pool membership -> company research -> financial-transmission hypotheses / verification items
-Research case -> screens / valuation snapshots / catalysts / risks / verification tasks
-Research case -> watchlist entry -> revision history
-Research case -> thesis snapshot -> paper portfolio -> simulated trades / positions / NAV
-Quant Core records -> research-case validation inputs
+market-data evidence
+  -> research case -> claims <-> evidence/conflicts
+  -> industry map -> beneficiary classification -> candidate pool
+  -> company research -> financial-transmission hypotheses
+  -> expectations / valuation observations
+  -> catalyst / risk assessments
+  -> industry / company quality judgments
 ```
 
-The merged v0.5B boundary provides stable map, node, relationship, and observation identities with immutable revisions. The v0.5C boundary adds append-only Stage 1 beneficiary identities and revisions that freeze one exact local `stock_basic` row, one exact map revision, exact contained map assertions, and exact v0.5A claim revisions. Candidate-pool revisions freeze only exact supported beneficiary revisions from the same map boundary, without scores, weights, ranks, recommendations, or Stage 2 conclusions.
-
-The v0.6A boundary starts from one exact candidate-pool membership and adds append-only Stage 2 research-file and financial-transmission hypothesis revisions. It freezes exact Stage 1 and evidence boundaries, applies dual cutoff visibility, and adds no valuation, score, rank, target price, recommendation or trading semantics. The v0.6B boundary adds append-only expectation and valuation-context observations over exact v0.6A boundaries, while preserving the same cutoff anti-leakage and non-advisory constraints. The v0.6C boundary adds append-only catalyst and risk judgments over exact accepted v0.6A/v0.6B and evidence boundaries without adding monitoring, scoring, final conclusions, recommendations, or trading behavior.
+No later conceptual entity is authorized by this relationship summary. New persistence requires a separate accepted Issue and migration decision.
