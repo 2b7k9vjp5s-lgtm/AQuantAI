@@ -6,11 +6,11 @@ This document is the authoritative architecture and current-state baseline. `.co
 
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
-- Accepted application/consolidation implementation baseline: `e424fa3a95e35b20f5fe8d8ada211821d9661efd`.
+- Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
-Docs-only commits may advance `main` without changing the released version, capability stage or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #81 characterized ordered repository row loading; PR #83 implemented the neutral ordered row loader. Issue #84 and its linked synchronization PR record the resulting state.
+Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #81 characterized ordered repository row loading; PR #83 implemented the neutral row loader; PR #87 characterized query-value mechanics; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary.
 
 ## Product boundary
 
@@ -32,28 +32,29 @@ market-data evidence
 
 Downstream records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state or rewrite historical meaning.
 
-Two neutral Stage 2 infrastructure boundaries are now accepted:
+Three neutral Stage 2 infrastructure boundaries are accepted:
 
 - `industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B frozen-boundary mechanics used by v0.6C and v0.6D;
-- `industry_alpha.stage2_repository_rows` owns one stateless ordered scalar row-loading primitive used through repository-local private wrappers.
+- `industry_alpha.stage2_repository_rows` owns stateless ordered scalar row loading used through repository-local wrappers;
+- `industry_alpha.stage2_query_values` owns required UTC normalization, date-granular visibility and timestamp/date/UUID formatting used by v0.6A-v0.6C query modules.
 
-Catalyst/risk and quality-judgment semantics remain in their domain modules. Repository graph assembly, v0.6B `None` normalization, link-field selection, missing-parent policy and session/transaction ownership remain local.
+Domain semantics remain local. Repository graph assembly, optional-ID normalization, link-field selection, missing-parent policy, sessions and transactions remain repository-local. Evidence serialization, link selection, payload sorting, notices, aggregate errors and v0.6D timestamp-null policy remain query-module-local.
 
 The current implementable path does not include v0.6E price judgment, timing judgment, Watchlist tasks, Paper Portfolio, simulated trades, portfolio analysis or Quant Core workflow state. Issue #70 and PR #71 remain superseded and closed without merge.
 
 ## Capability matrix
 
-| Capability | Merged boundary | Explicit boundary and remaining debt |
+| Capability | Merged boundary | Remaining boundary |
 | --- | --- | --- |
-| v0.3 market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Manual bounded ingestion; canonical market-price measurement kind/unit/currency is not a standalone evidence contract |
-| v0.4A-v0.4E Market Cockpit | Selected-scope breadth/risk, benchmark/sector context, liquidity and descriptive price behavior | Read-only and non-advisory; no official full-market, valuation, regime, signal or recommendation claims |
-| v0.5A-v0.5C | Evidence ledger, industry-chain maps, beneficiary classifications and candidate-pool handoff | Evidence qualification and exact frozen-link patterns remain repeated downstream |
-| v0.6A | Company research and financial-transmission hypotheses | Revision allocation, append-only and evidence checks remain repeated |
-| v0.6B | Expectations and valuation observations with optional local-price provenance | Generic `observed_value` is not automatically comparison eligible; no target/fair value or timing output |
-| v0.6C | Catalyst and risk assessments over exact frozen boundaries | Base-boundary and ordered-row mechanics are consolidated; query/concurrency/ORM repetition remains |
-| v0.6D | Independent industry/company quality judgments | Incorrect private dependency and repeated ordered-row mechanics are removed; remaining query and lifecycle infrastructure needs separate review |
+| v0.3 market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Canonical arbitrary market-price measurement semantics are not a standalone evidence contract |
+| v0.4A-v0.4E Market Cockpit | Read-only selected-scope breadth/risk, context, liquidity and descriptive price behavior | No official full-market, valuation, regime, signal or recommendation claims |
+| v0.5A-v0.5C | Evidence ledger, industry maps, beneficiary classifications and candidate-pool handoff | Evidence qualification and frozen-link patterns remain repeated downstream |
+| v0.6A | Company research and hypotheses | Command lifecycle and revision allocation remain local |
+| v0.6B | Expectations and valuation observations with optional price provenance | `observed_value` is not automatically comparison eligible |
+| v0.6C | Catalyst and risk assessments | Frozen-boundary, ordered-row and query-value mechanics are consolidated; domain read serialization remains local |
+| v0.6D | Industry/company quality judgments | Query-value helpers remain local because malformed-null semantics differ; lifecycle repetition needs separate review |
 | v0.6E | Superseded planning only | Not implemented or authorized |
-| v0.7+ | Prospective only | Not authorized; requires Architecture Preflight and Definition of Ready |
+| v0.7+ | Prospective only | Requires Architecture Preflight and Definition of Ready |
 
 ## Field and infrastructure ownership
 
@@ -63,91 +64,75 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | Canonical market-price value, measurement kind, unit, currency and decimal normalization | Future separately reviewed market-data/evidence contract | Downstream judgment code must not invent it |
 | Evidence grades, claims, links and conflicts | v0.5 evidence ledger | Downstream slices freeze exact revisions and links |
 | Company-research workflow and hypotheses | v0.6A | Downstream records bind exact revisions |
-| Expectations and valuation observations | v0.6B | Recorded context remains generic unless a later contract grants comparison eligibility |
+| Expectations and valuation observations | v0.6B | Recorded context remains generic without later comparison eligibility |
 | Catalyst and risk state | v0.6C | Not monitors, alerts or task lifecycles |
-| Industry/company quality outcome and evidence state | v0.6D | Does not automatically generate price, timing or recommendation state |
-| Shared v0.6A/v0.6B frozen-boundary mechanics | Neutral Stage 2 infrastructure | `stage2_boundary.py` owns exact base-boundary loading and visibility; domain semantics remain local |
-| Ordered scalar repository row loading | Neutral Stage 2 infrastructure | `stage2_repository_rows.py` executes explicit `IN` filtering and caller-owned ordering; all normalization and graph semantics remain local |
+| Industry/company quality outcome and evidence state | v0.6D | Does not generate price, timing or recommendation state |
+| Shared frozen-boundary mechanics | `stage2_boundary.py` | Exact base-boundary loading and visibility; domain semantics remain local |
+| Ordered scalar repository row loading | `stage2_repository_rows.py` | Explicit `IN` filtering and caller-owned ordering only |
+| v0.6A-v0.6C pure query values | `stage2_query_values.py` | Required UTC, date-granular visibility and text formatting only |
+| Evidence read serialization | Domain query modules pending a neutral contract | No shared serializer is authorized |
 | “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities |
 
 A linked local `daily_price` row remains provenance/context. It is not a canonical comparison value merely because a valuation record also stores a numeric string and currency.
 
 ## Shared architecture invariants
 
-1. **Local and non-advisory:** no advice, performance promise, broker, real order or automated trading.
-2. **Deterministic ownership:** deterministic calculations and state stay outside LLM ownership.
-3. **No hidden network:** imports, startup, tests, CI, fixture demos and ordinary reads perform no external network access.
-4. **Explicit selection:** exact IDs, series keys, scopes, dates and revisions are required; names, free text and defaults are not substitutes.
-5. **Exact revision boundaries:** downstream accepted records freeze exact revisions and links.
-6. **Append-only history:** corrections append revisions; accepted history is not mutated through ordinary paths.
-7. **Dual visibility:** information cutoff and actual UTC chronology both prevent later-information leakage.
-8. **Visible uncertainty:** conflicts, contradictions, missing evidence and uncertainty remain explicit.
-9. **Atomicity:** identity, revision and links commit together or roll back together.
-10. **Determinism:** ordering, revision allocation, decimal text and strict JSON are deterministic across supported databases.
-11. **Fixture/provider parity:** fixture success paths must use fields reachable through the reviewed adapter boundary.
-12. **Read-only by default:** mutations, notifications, tasks and portfolio state need separate authorization.
-13. **Secrets and diagnostics:** credentials and raw connection details never enter source, fixtures, Issues, PRs, logs or user errors.
-14. **Release independence:** merging capability or consolidation work does not change the released version without a separate release decision.
+1. Local and non-advisory: no advice, performance promise, broker, real order or automated trading.
+2. Deterministic calculations and state stay outside LLM ownership.
+3. Imports, startup, tests, CI, fixture demos and ordinary reads perform no hidden external network access.
+4. Exact IDs, series keys, scopes, dates and revisions are explicit.
+5. Downstream accepted records freeze exact revisions and links.
+6. Corrections append revisions; accepted history is not mutated through ordinary paths.
+7. Information cutoff and UTC chronology both prevent later-information leakage.
+8. Conflicts, contradictions, missing evidence and uncertainty remain visible.
+9. Identity, revision and links commit or roll back together.
+10. Ordering, revision allocation, decimal text and strict JSON are deterministic across supported databases.
+11. Fixture success paths must be reachable through reviewed production adapters.
+12. Mutations, notifications, tasks and portfolio state require separate authorization.
+13. Credentials and raw connection details never enter source, fixtures, Issues, PRs, logs or user errors.
+14. Capability/consolidation merges do not change the released version without a separate release decision.
 
 ## Architecture debt register
 
-- **D1 Documentation drift — controlled:** architecture/status synchronization is required after accepted implementation changes.
-- **D2 Repeated Stage 2 structure — partially reduced:** PR #77 consolidated the neutral frozen boundary and PR #83 consolidated ordered scalar row loading. Generic graph loading remains unjustified.
-- **D3 Read and validation utilities — partially reduced:** pure query visibility/date/UTC/UUID formatting is the next characterization candidate; evidence serialization still requires a neutral contract.
-- **D4 Command lifecycle and concurrency — deferred:** revision allocation, lock strategy and integrity translation affect rollback and error compatibility.
-- **D5 ORM lifecycle — deferred:** dynamic link-model factories and append-only listeners are mapper/event sensitive and may remain duplicated.
-- **D6 Test-matrix growth:** future slices must separate shared invariant tests from domain-specific semantic tests.
-- **D7 Fixture-versus-production reachability:** every success path needs production-realistic offline adapter parity.
+- **D1 Documentation drift — controlled:** architecture/status synchronization follows accepted implementations.
+- **D2 Repeated Stage 2 structure — partially reduced:** frozen-boundary and ordered-row mechanics are consolidated; generic graph loading remains unjustified.
+- **D3 Read utilities — partially reduced:** v0.6A-v0.6C pure query values are consolidated. Evidence read serialization still requires a neutral contract; v0.6D query-value policy remains local.
+- **D4 Command lifecycle and concurrency — deferred:** integrity translation, revision allocation and locks affect rollback and error compatibility.
+- **D5 ORM lifecycle — deferred:** dynamic link-model factories and append-only listeners are mapper/event sensitive.
+- **D6 Test-matrix growth:** shared invariant tests and domain-semantic tests must remain distinct.
+- **D7 Fixture-versus-production reachability:** success paths need production-realistic offline adapter parity.
 - **D8 Missing canonical market-price semantics:** `DailyPriceRecord` is not a complete arbitrary price-comparison evidence object.
-- **D9 Consolidation cadence:** review is mandatory after every two domain slices and earlier when duplication or ownership ambiguity appears.
+- **D9 Consolidation cadence:** review after every two domain slices and earlier when ownership ambiguity appears.
 
 ## Development gates
 
-### Gate 1: Architecture Preflight
-
-Before a feature or consolidation implementation Issue, document the user or maintenance problem, ownership, real inputs where applicable, one reachable golden path, a failure path, migration/dependency impact, document conflicts, smallest slice and exclusions.
-
-### Gate 2: Definition of Ready
-
-Require one objective, accepted contracts, ownership, a reachable golden path, applicable fixture/provider parity, explicit selectors and chronology, a migration decision, bounded scope, acceptance tests and stop conditions.
-
-### Gate 3: Planning and implementation separation
-
-Architecture decisions precede a concise Issue. A task file is an executable snapshot, not a place to discover fundamental ownership. Application code begins only after planning acceptance is synchronized to GitHub.
-
-### Gate 4: Reset threshold
-
-Reset rather than patch repeatedly when foundational blockers recur, a production adapter cannot reach the success path, ownership is ambiguous, core semantics depend on inference/defaults, one slice introduces multiple infrastructure boundaries, or project documents materially disagree.
-
-### Gate 5: Consolidation cadence
-
-After every two domain slices, review documentation, duplicated infrastructure, schema/link growth, test-matrix growth, API consistency and next-stage input reachability.
-
-### Gate 6: Review evidence
-
-Green CI is necessary but not sufficient. Review must also establish ownership, production reachability, fixture parity, explicit semantics and coherent scope.
+1. **Architecture Preflight:** document the problem, ownership, inputs, golden/failure paths, migration/dependency impact, conflicts, smallest slice and exclusions.
+2. **Definition of Ready:** require one objective, accepted contracts, ownership, reachable paths, explicit selectors/chronology, migration decision, bounded tests and stop conditions.
+3. **Planning before implementation:** architecture decisions precede the Issue; task files execute accepted decisions.
+4. **Reset threshold:** reset when ownership is ambiguous, semantics depend on inference/defaults, production cannot reach the path, or documents materially disagree.
+5. **Consolidation cadence:** review documentation, duplicated infrastructure, schema/link growth, tests, APIs and next-stage reachability.
+6. **Review evidence:** green CI is necessary but not sufficient; ownership, reachability, semantics and scope must also pass.
 
 ## Near-term sequence
 
 Completed:
 
-1. unified architecture baseline accepted in PR #73;
-2. Stage 2 consolidation characterized in PR #75;
-3. neutral Stage 2 frozen-boundary extraction accepted in PR #77;
-4. ordered repository row loading characterized in PR #81;
-5. neutral ordered scalar row loader accepted in PR #83;
-6. Issue #84 and its linked PR synchronize those outcomes without changing application behavior.
+1. unified architecture baseline — PR #73;
+2. Stage 2 consolidation characterization — PR #75;
+3. neutral frozen-boundary extraction — PR #77;
+4. ordered-row characterization and implementation — PRs #81 and #83;
+5. query-value characterization and implementation — PRs #87 and #89;
+6. Issue #90 and its linked PR synchronize the query-value outcome without changing runtime behavior.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
 Prospective and separately authorized:
 
-7. characterize pure query visibility/date/UTC/UUID formatting;
-8. consider a minimal pure-helper implementation only if semantics and payload compatibility are proven identical;
-9. characterize evidence read serialization only after defining a neutral contract;
+7. characterize a neutral evidence read-serialization contract; characterization may conclude serializers should remain local;
+8. only if accepted, consider the smallest behavior-preserving serializer implementation;
+9. separately characterize command integrity/conflict handling, revision allocation/locks and ORM lifecycle concerns;
 10. decide whether canonical market-price evidence has independent user value;
-11. only then consider structured valuation comparison eligibility;
-12. re-evaluate whether price judgment needs persisted state or a deterministic read model;
-13. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
+11. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
+12. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
 
 No prospective item is authorized by this document alone.
