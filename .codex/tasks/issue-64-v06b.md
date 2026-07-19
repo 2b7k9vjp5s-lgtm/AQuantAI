@@ -1,118 +1,111 @@
-# Issue #64 — v0.6B Expectations And Valuation Snapshots
+# Issue #64 — v0.6B Focused Revision
 
 ## State
 
 - Repository: `2b7k9vjp5s-lgtm/AQuantAI`
 - Issue: `#64`
 - Branch: `feat/v06b-expectations-valuation`
-- Draft PR: `[v0.6B] Add evidence-backed expectations and valuation snapshots`
+- Draft PR: `#65`
 - Required base: `c94c5ecbac66e43c2c369f36ba64c9b7a13655b6`
+- Reviewed implementation Head: `0dea8098dedc718d55969fab956d804c5287f0f8`
+- Blocking COMMENT review: `4729846016`
+- Implementation CI: `29671888552` — success
 - Version remains `0.2.0`
 
-Read `.codex/WORKFLOW.md`, Issue #64, merged v0.3/v0.5/v0.6A contracts, `docs/research_workflow.md`, `docs/data_model.md`, and `docs/implementation_plan.md` before editing.
+Read `.codex/WORKFLOW.md`, Issue #64, PR #65 and review `4729846016` before editing.
 
-Keep the PR Draft/Open/unmerged and Issue #64 Open. Do not modify PR #38, create release/tag, change version, begin v0.6C, or broaden the feature.
+Keep PR #65 Draft/Open/unmerged and Issue #64 Open. Do not merge, release/tag, change version, begin v0.6C or modify PR #38.
 
 ## Objective
 
-Implement a local, append-only, cutoff-aware foundation for market expectations and valuation snapshots attached to exact accepted v0.6A company-research revisions. Preserve evidence, assumptions, uncertainty, price provenance and historical views without generating scores, rankings, target prices, final recommendations or trading actions.
+Revise only the three blockers identified in review `4729846016`. Preserve the accepted v0.6B domain, migration `20260719_0009`, routes and exclusions. Do not add a migration or broaden functionality.
 
-## Required domain model
+## Blocker 1 — Exact price provenance chronology and payload
 
-Add stable identities and immutable revisions for:
+Fix the exact local `daily_price` provenance boundary:
 
-1. **Market expectations**
-   - one Stage 2 company-research identity plus canonical expectation key;
-   - revision number, subject, period/horizon, expectation kind, direction, status, confidence, basis, information cutoff, UTC timestamp and supersedes pointer;
-   - exact frozen company-research revision and exact accepted financial-hypothesis revisions;
-   - exact claim revisions and exact visible claim-evidence links.
+- reject a successful ingestion run when `completed_at` is missing or earlier than `imported_at`;
+- keep valuation `recorded_at_utc` no earlier than both valid ingestion timestamps;
+- correct the offline fixture so import precedes completion;
+- expose deterministic `imported_at_utc` and `completed_at_utc` in `price_reference` together with the existing row/run/source/code/date/adjust/close/series/cutoff fields;
+- keep exact-ID selection; do not add implicit latest/provider-only lookup;
+- validation failure must rollback the valuation identity, revision and all link rows.
 
-2. **Valuation snapshots**
-   - one Stage 2 company-research identity plus canonical valuation key;
-   - revision number, valuation method, metric/business context, observed value(s) or explicit missing-data state, unit/currency, comparison basis, assumptions, confidence, information cutoff, UTC timestamp and supersedes pointer;
-   - exact frozen company-research revision and exact accepted financial-hypothesis revisions;
-   - exact claim revisions and exact visible claim-evidence links;
-   - optional exact local `daily_price` row plus its successful ingestion run and series provenance.
+Add regressions for:
 
-Use strict reviewed enums and bounded text. Numeric fields must use finite deterministic decimal semantics; do not store NaN/Infinity or binary-float-dependent values.
+- impossible `completed_at < imported_at` rejected with a reviewed domain error and unchanged row counts;
+- valid provenance visible in both detail and list latest-revision payloads;
+- earlier cutoff continues to hide later valuation revisions/references.
 
-## Evidence and status rules
+## Blocker 2 — Complete deterministic fixture and non-leakage matrix
 
-- `supported` requires at least one bound claim revision whose `claim_status` is `supported`, with visible A/B/C `supports` evidence and no visible contradiction at the expectation/valuation revision boundary.
-- D-only evidence is insufficient.
-- `disputed` requires a disputed claim revision or visible contradiction.
-- Missing evidence or metrics remain explicit using `尚未获得可靠公开证据`; do not fabricate consensus, forecasts, guidance, comparables, multiples or operating/financial values.
-- Later Stage 2 revisions, hypotheses, claim/evidence links, price rows or ingestion runs must never rewrite accepted historical snapshots.
-- A valuation snapshot is a dated research artifact only. Do not infer good price, good timing, expected return or investment priority.
+Extend the existing no-network fixture without adding a new domain:
 
-## Exact price-reference boundary
+- retain the supported expectation with A/B/C evidence;
+- add one draft or disputed expectation with explicit missing evidence or visible contradiction;
+- retain the observed-value valuation with exact local price provenance;
+- add one valuation snapshot with `valuation_method="missing_data"`, no observed value and explicit `尚未获得可靠公开证据`-style reason;
+- append later Stage 2 research/hypothesis, claim-evidence and price/run records after an earlier v0.6B snapshot boundary;
+- prove current views can expose only newly created later revisions when explicitly bound, while the earlier accepted expectation/valuation snapshot remains frozen and earlier `as_of_cutoff` views do not leak later research, evidence or price provenance.
 
-When a price reference is present:
+Return stable fixture IDs needed by tests. Keep all data deterministic and offline.
 
-- bind one exact existing local `daily_price` row;
-- require its ingestion run to be successful and visible at the valuation cutoff/time;
-- require source and stock code to match the frozen Stage 2 company identity;
-- expose source, stock code, trade date, adjustment type, close, ingestion run ID, series key, information cutoff and import/completion provenance;
-- reject provider-only or implicit latest selection;
-- reject price rows after the valuation cutoff or recorded boundary;
-- keep the reference immutable after acceptance.
+Add focused query/API tests for:
 
-## Append-only, chronology and transactions
+- supported, draft/disputed and missing-data records;
+- conflicts and missing-evidence payloads;
+- current versus earlier-cutoff behavior;
+- later research/evidence/price additions not rewriting existing frozen snapshots;
+- deterministic ordering and strict JSON.
 
-- Ordinary ORM update/delete of identities, revisions and frozen link rows must fail.
-- Corrections append deterministic revisions and supersedes chains.
-- Validate timezone-aware UTC chronology against research identity/revision, hypotheses, claims, evidence, price row/run and prior revisions.
-- Cross-case, cross-company, cross-research and incompatible price references fail closed.
-- Every command is a single transaction; validation, uniqueness, chronology or evidence failure leaves no partial identities, revisions or links.
-- PostgreSQL concurrent revision creation must produce deterministic unique revision numbers or a reviewed domain error without partial rows.
+## Blocker 3 — Bounded decimal and coherent missing-data state
 
-## Persistence and API
+Harden valuation input validation before any database write:
 
-- Add exactly one migration after `20260719_0008`; expected revision is `20260719_0009`.
-- Reuse the existing Base/session/repository patterns.
-- Add read-only GET list/detail routes under `/industry-alpha` for expectations and valuation snapshots.
-- Support optional `as_of_cutoff=YYYY-MM-DD` using dual information-date and UTC recorded-date visibility.
-- Return deterministic strict JSON with explicit conflicts, missing evidence, exact research/hypothesis/claim/evidence links and optional price provenance.
-- Add no HTTP mutation routes and no browser editing UI.
+- accept only `str`, `Decimal` or `None` as already designed;
+- reject NaN, positive/negative Infinity and invalid decimal text;
+- canonicalize deterministically without binary-float input;
+- reject a canonical observed value that cannot fit the reviewed `String(64)` persistence boundary; raise `EvidenceLedgerValidationError`, not a dialect-specific database exception;
+- `valuation_method="missing_data"` must require `observed_value is None` and a nonblank explicit `missing_data_reason`;
+- every other valuation method must require an observed value and must reject `missing_data_reason`;
+- preserve optional unit/currency and existing no-target-price boundary;
+- all failures must leave all v0.6B table counts unchanged.
 
-## Offline fixture/demo
+Add SQLite and PostgreSQL regressions for:
 
-Provide a deterministic no-network fixture containing:
+- huge exponent / over-64-character canonical value;
+- NaN and both infinities;
+- `missing_data` plus observed value;
+- `missing_data` without a reason;
+- non-missing method without observed value;
+- non-missing method with a missing-data reason;
+- valid bounded decimal canonicalization.
 
-- one accepted v0.6A company-research revision with supported financial-transmission hypotheses;
-- one supported expectation with A/B/C-backed evidence;
-- one draft or disputed expectation with missing evidence or contradiction;
-- one valuation snapshot with structured observed metric context and an exact local daily-price reference;
-- one valuation snapshot with explicit missing data;
-- later research/evidence/price additions excluded from earlier cutoff views.
+## Allowed changes
 
-Add an offline demo script for the new read model and include it in regression validation without changing CI configuration.
+Limit implementation changes to the existing v0.6B command, query, fixture, contracts/docs and focused tests as needed. Migration `20260719_0009` should remain unchanged unless a discovered schema defect makes that impossible; do not create `0010`.
+
+Do not change API route paths, dependencies, Docker/Compose, CI, launchers, version, release metadata or unrelated stages.
 
 ## Validation
 
 Run and report exact results for:
 
 - focused SQLite/domain/API tests;
-- focused PostgreSQL tests when `TEST_DATABASE_URL` is available;
+- focused PostgreSQL v0.6B tests;
 - full offline suite;
 - full PostgreSQL suite when available;
 - clean Alembic `base -> head`;
-- `20260719_0009 -> 20260719_0008 -> 20260719_0009` round trip;
+- `20260719_0009 -> 20260719_0008 -> 20260719_0009`;
 - `python -m alembic check`;
-- all existing offline demos plus the new v0.6B demo;
+- all offline demos including `python -m scripts.demo_stage2_expectations_valuation`;
 - explicit no-network coverage;
 - `python -m compileall -q backend industry_alpha scripts tests`;
 - `git diff --check`.
 
-Cover exact v0.6A handoff, stable identities/revisions, strict enums/text/decimal/date validation, exact price provenance, A/B/C versus D-only rules, conflicts/missing evidence, chronology, cutoff non-leakage, append-only guards, atomic rollback, PostgreSQL concurrency, deterministic JSON and read-only API behavior.
-
-## Exclusions
-
-No automated consensus collection, financial-statement ingestion, scraping, live provider calls, valuation engine, DCF execution, automatic comparable selection, target/fair-value share prices, expected returns, upside/downside percentages, scores, weights, rankings, investment-attractiveness conclusions, final recommendations, catalyst/risk judgment workflow, good-price/good-timing conclusions, Quant Core automatic scoring, watchlists, portfolios, LLM/provider execution, brokers, orders, trading, authentication, SaaS, dependency/Docker/CI/launcher/version/release/tag changes, v0.6C, or PR #38 changes.
-
 ## Delivery
 
-1. Implement only Issue #64 on `feat/v06b-expectations-valuation`.
-2. Update the Draft PR and Issue with final Head, exact changed files and exact validation results.
-3. Keep the PR Draft and Issue Open.
-4. Stop for ChatGPT review. Do not merge, close Issue #64, release/tag, change version, start v0.6C or modify PR #38.
+1. Implement only these focused fixes.
+2. Update PR #65 and Issue #64 with the new Head, exact changed files and exact validation results.
+3. Keep PR #65 Draft and Issue #64 Open.
+4. Stop for ChatGPT re-review. Do not merge, begin v0.6C, release/tag, change version or modify PR #38.
