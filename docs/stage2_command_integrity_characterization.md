@@ -2,9 +2,13 @@
 
 ## Status
 
-Issue #96 reviews the v0.6A-v0.6D command-side SQLAlchemy integrity translation at accepted `main` commit `03756aa7009c738e4c183845fbb8eb9e09906663`.
+Issue #96 / PR #97 characterized v0.6A-v0.6D command-side SQLAlchemy integrity translation. Issue #98 / PR #99 implemented the accepted neutral helper.
 
-This is characterization only. Released version remains `0.2.0`, capability stage remains v0.6D, and no migration is required.
+- Accepted characterization base: `03756aa7009c738e4c183845fbb8eb9e09906663`.
+- Accepted implementation head: `b0dc58b2adb27e9a6ec6f1a2dce3699bd2bab9ff`.
+- Accepted implementation baseline: `a2688b6e244743ef5e3bdcaedfc6c6717d7a7d8c`.
+- Released version remains `0.2.0`; capability stage remains v0.6D.
+- Migration decision: no migration.
 
 ## Reviewed scope
 
@@ -14,14 +18,14 @@ The review compared:
 - `industry_alpha/stage2_expectations_commands.py`;
 - `industry_alpha/stage2_assessments_commands.py`;
 - `industry_alpha/stage2_judgments_commands.py`;
-- the corresponding SQLite atomicity tests;
-- the corresponding PostgreSQL concurrency and rollback tests.
+- corresponding SQLite atomicity tests;
+- corresponding PostgreSQL concurrency and rollback tests.
 
-Revision locking and allocation were inspected only to preserve their boundary. They are not authorized for change by this report.
+Revision locking and allocation were inspected only to preserve their boundary. They were not changed by PR #99.
 
-## Existing behavior
+## Accepted behavior
 
-All four command modules wrap their transaction context with an integrity translator:
+All four command modules keep this nesting:
 
 ```text
 integrity translator
@@ -29,42 +33,25 @@ integrity translator
        -> validation, identity/revision/link writes and flushes
 ```
 
-The transaction context exits first. Therefore a database integrity failure is rolled back by SQLAlchemy before the outer translator maps the exception.
+The transaction context exits first. SQLAlchemy therefore rolls back a database integrity failure before the outer translator maps the exception.
 
-Every implementation currently has the same semantic contract:
+`industry_alpha.stage2_integrity.translate_integrity(message)` now owns exactly this contract:
 
 1. enter without changing transaction or session state;
 2. allow successful execution to return normally;
 3. catch only `sqlalchemy.exc.IntegrityError`;
 4. raise `EvidenceLedgerConflictError` with the caller-provided message;
 5. retain the original `IntegrityError` through `raise ... from exc`;
-6. return or propagate all other exception types unchanged;
+6. propagate all other exception types unchanged;
 7. perform no explicit commit, rollback, retry, logging or constraint inspection.
-
-## Current implementation forms
-
-### v0.6A and v0.6B
-
-Each service defines a nested `_IntegrityTranslation` context-manager class plus a `_translate_integrity(message)` constructor method.
-
-### v0.6C and v0.6D
-
-Each service defines an equivalent `@contextmanager` method named `_integrity(message)`.
-
-The difference is syntactic. There is no accepted domain-specific behavior in the helper bodies.
 
 ## Caller-owned policy
 
-Conflict wording remains command and operation specific. Examples include:
+Conflict wording remains command and operation specific, including duplicate identity keys, revision conflicts and verification-item conflicts.
 
-- duplicate company-research membership;
-- duplicate hypothesis, expectation, valuation, catalyst, risk or judgment keys;
-- research, hypothesis, expectation, valuation, assessment and judgment revision conflicts;
-- verification-item conflicts.
+The neutral helper accepts the exact message as an argument. It does not infer operation names, parse constraint names, normalize text or branch by database backend.
 
-A neutral helper must accept the exact message as an argument and must not infer operation names, parse constraint names or normalize text.
-
-The current broad mapping of any `IntegrityError` inside the bounded transaction is also preserved. A first extraction must not introduce backend-specific constraint-name branching.
+The existing broad mapping of any `IntegrityError` inside the bounded transaction is preserved.
 
 ## Transaction and rollback ownership
 
@@ -75,62 +62,38 @@ The current broad mapping of any `IntegrityError` inside the bounded transaction
 - rollback on validation or database failure;
 - expiring/closing transaction state.
 
-The neutral helper must remain outside the transaction context at every call site. It must not receive a session, call `rollback()`, retry work or suppress an exception.
+The neutral helper remains outside the transaction context at every call site. It does not receive a session, call `rollback()`, retry work or suppress an exception.
 
-Existing SQLite tests verify atomic rollback for invalid commands. Existing PostgreSQL tests verify deterministic concurrent revision allocation and rollback of invalid state. Those tests remain integration evidence; they do not become helper responsibilities.
+Existing SQLite tests remain the evidence for atomic rollback. Existing PostgreSQL tests remain the evidence for deterministic concurrent revision allocation where the required database environment is available; they are not helper responsibilities.
 
 ## Options evaluated
 
-### Option A: keep four local helpers
+### Keep four local helpers
 
-Safe but unnecessarily duplicated. The four bodies encode no domain policy beyond a caller-supplied string, and two different implementation styles obscure that their behavior must remain identical.
+Safe but unnecessarily duplicated. The prior bodies encoded no domain policy beyond a caller-supplied string.
 
-### Option B: one neutral context manager
+### One neutral context manager
 
-Accepted as the smallest safe slice.
+Accepted and implemented in PR #99 as the smallest safe slice.
 
-A module such as `industry_alpha.stage2_integrity` may expose one function equivalent to:
+### Constraint-aware conflict classification
 
-```python
-@contextmanager
-def translate_integrity(message: str) -> Iterator[None]:
-    try:
-        yield
-    except IntegrityError as exc:
-        raise EvidenceLedgerConflictError(message) from exc
-```
+Rejected. Constraint names and driver payloads differ across SQLite and PostgreSQL and would change the current compatibility boundary.
 
-Each command module may import it under its current private name or use one private alias. Call-site messages and nesting remain unchanged.
+### Combine translation with revision locks or retries
 
-### Option C: constraint-aware conflict classification
+Rejected. Process-local `RLock`, database row locks, revision-number allocation, supersession and retry policy have separate concurrency semantics and require independent characterization.
 
-Rejected. Constraint names and driver payloads differ across SQLite and PostgreSQL. Classification would add backend coupling and could change current public errors.
+## Implementation acceptance
 
-### Option D: combine translation with revision locks or retries
+PR #99 changed exactly:
 
-Rejected. Process-local `RLock`, database row locks, revision-number allocation and retry policy have separate concurrency semantics and require their own characterization.
+- `.codex/tasks/issue-98-stage2-integrity-translation.md`;
+- `industry_alpha/stage2_integrity.py`;
+- the four Stage 2 command modules;
+- `tests/test_stage2_integrity.py`.
 
-## Accepted neutral contract
-
-A later implementation may add one stateless context manager with these requirements:
-
-1. accept a caller-provided message without modification;
-2. translate only `IntegrityError`;
-3. raise `EvidenceLedgerConflictError(message)` from the original exception;
-4. pass non-integrity exceptions through unchanged;
-5. perform no session or transaction operation;
-6. perform no retry, logging, constraint inspection or backend branching;
-7. preserve the existing outer-helper/inner-transaction nesting at every command call site.
-
-## First implementation candidate
-
-A separate implementation Issue may authorize only:
-
-1. add `industry_alpha/stage2_integrity.py`;
-2. replace the four local translator implementations with imports/private aliases;
-3. keep all conflict message strings at their current call sites;
-4. add direct helper tests for success, exact translation/cause and non-integrity passthrough;
-5. run existing v0.6A-v0.6D SQLite tests, available PostgreSQL tests, the full offline workflow and fixture demo.
+Independent fixed-head review confirmed exact caller messages, original-cause chaining, same-object non-integrity passthrough and unchanged transaction/lock/allocation behavior. Actions `29687524781`, full tests and the fixture demo succeeded. PostgreSQL-focused tests were reported as skipped when the required test URL was unavailable; no unsupported success claim was made.
 
 ## Responsibilities that remain local
 
@@ -144,25 +107,15 @@ The command modules continue to own:
 - process-local revision locks;
 - revision-number and supersession allocation;
 - domain exceptions other than database integrity translation;
-- exact atomic unit of work.
+- exact atomic unit of work;
+- any future retry policy.
 
-## Test requirements
+## Compatibility
 
-Direct neutral-helper tests must prove:
+The implementation is source-only. It requires no schema migration, downgrade, data repair, dependency, API, fixture, provider, CI, version or release change.
 
-- successful entry/exit performs no transformation;
-- an `IntegrityError` becomes the exact conflict message;
-- `__cause__` is the original `IntegrityError` object;
-- a representative non-integrity exception is the same object after propagation.
+## Next gate
 
-Existing command tests remain the proof that application validation and rollback behavior is unchanged. Existing PostgreSQL concurrency tests remain the proof that revision locks and row locking are unaffected.
+Integrity translation is completed and does not authorize broader command-lifecycle changes.
 
-## Migration and compatibility
-
-The candidate is source-only. It requires no schema migration, downgrade, data repair, dependency, API, fixture, provider, CI, version or release change.
-
-## Definition of Ready conclusion
-
-The neutral integrity translator reaches Definition of Ready for a separate minimal implementation Issue.
-
-The contract, ownership, exact exception behavior, test surface, no-migration decision and stop conditions are explicit. This conclusion does not authorize revision-lock, revision-allocation, retry or constraint-classification work.
+The next independent characterization may review revision allocation and lock strategy. It must treat process-local locks, row locks, latest-revision selection, revision-number allocation, supersession, SQLite limitations, PostgreSQL concurrency and lifecycle/cleanup as one compatibility-sensitive boundary. No implementation is authorized by this record.
