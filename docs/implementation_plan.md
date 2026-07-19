@@ -83,6 +83,10 @@ The third v0.5 slice is limited to append-only direct, secondary, and potential 
 
 The first v0.6 slice is limited to append-only company-research files created from exact frozen v0.5C candidate-pool memberships and evidence-bound financial-transmission hypotheses. It freezes the exact beneficiary, map, company snapshot, claim and evidence boundaries; keeps UTC chronology and historical cutoffs fail-closed; and requires a `后续验证清单` for completed revisions. It does not authorize valuation, scores, weights, rankings, target prices, recommendations, Quant Core automatic scoring, LLM/provider execution, scraping, portfolios, brokers, orders or trading.
 
+### v0.6B Authorized Expectation And Valuation Snapshots
+
+The second v0.6 slice is limited to append-only market-expectation and valuation-observation snapshots bound to exact v0.6A company-research revisions, exact supported/disputed hypothesis revisions, and exact claim/evidence boundaries. Valuation snapshots may optionally bind one exact local `daily_price` row from a successful ingestion run for provenance. They never compute target price, fair value, expected return, upside/downside, score, rank, recommendation, good-price/good-timing, catalyst/risk judgment, provider collection, LLM output, portfolio action, broker action, order, or trade.
+
 ## v0.7 Watchlist And Verification Tasks
 
 - **Objective:** manage personal research follow-up and historical status changes.
