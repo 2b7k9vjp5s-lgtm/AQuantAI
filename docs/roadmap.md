@@ -10,7 +10,7 @@
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
-Merged capability and consolidation work does not automatically publish a release. Docs-only commits may advance `main` without changing these axes.
+Docs-only commits may advance `main` without changing these axes.
 
 ## Completed product foundations
 
@@ -26,14 +26,14 @@ These capabilities remain research-only, cutoff-aware and non-advisory. They do 
 
 - PR #73 established the unified architecture baseline and delivery gates.
 - PR #75 characterized Stage 2 duplication and safe extraction order.
-- PR #77 extracted shared frozen-boundary mechanics into `industry_alpha.stage2_boundary`.
-- Issue #78 / PR #79 synchronized that result.
-- PR #81 characterized repeated ordered row loading; PR #83 added `industry_alpha.stage2_repository_rows.load_ordered_rows`.
-- Issue #84 and its linked PR synchronized the row-loader result.
-- PR #87 characterized pure query-value mechanics and the v0.6D edge difference.
-- PR #89 added `industry_alpha.stage2_query_values` and delegated only v0.6A-v0.6C required UTC, date-granular visibility and timestamp/date/UUID formatting.
-- v0.6D query-value behavior, evidence serialization, link selection, payload ordering, notices and aggregate errors remain domain-local.
-- No schema, migration, public API, fixture, domain-semantic or released-version change resulted from these consolidation slices.
+- PR #77 extracted shared frozen-boundary mechanics.
+- PRs #81/#83 characterized and implemented ordered scalar row loading.
+- PRs #87/#89 characterized and implemented v0.6A-v0.6C pure query values.
+- PR #93 characterized v0.6B-v0.6D evidence read serialization and accepted the decision to keep the serializers local.
+
+The serializer decision is not unfinished implementation work. It records that no neutral claim projection reaches Definition of Ready, domain missing-evidence wording must remain visible, and v0.6D timestamp error behavior remains independent.
+
+No schema, migration, public API, fixture, domain-semantic or released-version change resulted from these consolidation reviews.
 
 ## Superseded path
 
@@ -43,18 +43,19 @@ No v0.6E implementation or migration is authorized.
 
 ## Remaining Stage 2 consolidation candidates
 
-1. a neutral evidence read-serialization contract;
-2. command conflict/integrity primitives;
-3. revision allocation and lock strategy;
-4. append-only listener registration and dynamic link-model construction.
+1. command conflict/integrity primitives and error compatibility;
+2. revision allocation and lock strategy;
+3. append-only listener registration and dynamic link-model construction.
 
-The next candidate is only an independent characterization of item 1. It must inventory the v0.6B-v0.6D evidence serializers, prove which fields and ordering are truly invariant, preserve domain-specific missing-evidence text and boundaries, and allow a decision to keep the serializers local.
+The next candidate is only an independent characterization of item 1. It must inventory repeated database conflict handling, rollback boundaries, exception classes/messages and cross-database behavior before any implementation decision.
+
+Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs.
 
 ## Prospective sequence
 
-1. characterize a neutral evidence read-serialization contract;
-2. implement only the smallest serializer boundary if characterization is accepted;
-3. separately characterize command integrity/conflict handling, revision allocation/locks and ORM lifecycle concerns;
+1. characterize command conflict/integrity handling;
+2. implement only a minimal primitive if exact rollback and error compatibility are proven;
+3. separately characterize revision allocation/locks and ORM lifecycle concerns;
 4. decide whether canonical market-price evidence has independent user value;
 5. decide whether valuation observations need comparison-eligibility semantics;
 6. re-evaluate whether price judgment needs persisted state or a deterministic read model;
@@ -64,8 +65,9 @@ Every item requires separate Architecture Preflight and GitHub authorization.
 
 ## Not authorized
 
-- evidence serializer implementation without accepted characterization;
-- command integrity, revision-lock or append-only-listener refactoring;
+- evidence serializer extraction or projection DTOs;
+- command conflict/integrity implementation without accepted characterization;
+- revision-lock or append-only-listener refactoring;
 - v0.6D query-value policy changes;
 - v0.6E price or timing judgment;
 - v0.7 Watchlist or verification-task behavior;
