@@ -2,93 +2,68 @@
 
 ## Status
 
-Issue #86 reviews the Stage 2 query modules at accepted `main` commit `cacf46ac9ccb37d0480e1fd3f02ea5f10da7cb70`. This report is characterization only. Version remains `0.2.0`, capability stage remains v0.6D, and no migration is required.
+Issue #86 / PR #87 characterized the Stage 2 query-value mechanics. Issue #88 / PR #89 implemented the accepted v0.6A-v0.6C boundary and was squash-merged as `782b2362e1252aa87b21f7aa58f764837f5adb71`.
+
+- Released version remains `0.2.0`.
+- Merged capability stage remains v0.6D.
+- Migration decision: no migration.
+- This record documents completed work and does not authorize another implementation.
 
 ## Reviewed scope
 
-The review compared:
+The characterization compared:
 
 - `stage2_query.py`;
 - `stage2_expectations_query.py`;
 - `stage2_assessments_query.py`;
 - `stage2_judgments_query.py`.
 
-Corresponding SQLite tests import public query services rather than private query helpers.
+The corresponding tests exercise public query services rather than private helpers.
 
-## Shared mechanics
+## Accepted shared mechanics
 
-v0.6A-v0.6C implement the same behavior for:
+v0.6A-v0.6C had identical behavior for:
 
 - required UTC normalization;
-- interpreting naive datetimes as UTC;
+- interpreting naive datetimes as UTC without changing wall-clock fields;
 - converting aware datetimes to UTC;
-- raising `EvidenceLedgerNotVisible` with the exact text `required UTC timestamp is unavailable.` when a required timestamp is absent;
+- raising `EvidenceLedgerNotVisible` with the exact text `required UTC timestamp is unavailable.` for a missing required timestamp;
 - recorded-date visibility against an optional cutoff;
 - combined information-date and recorded-date visibility;
 - UTC timestamp text ending in `Z`;
 - optional ISO date text;
 - optional UUID text.
 
-The visibility rules remain date-granular. They do not introduce a time-of-day cutoff.
+Visibility remains calendar-date granular and inclusive. It does not introduce a time-of-day cutoff.
 
-v0.6B and v0.6C wrap the dated predicate in local revision-list functions. Those collection wrappers must remain local.
+## Implemented neutral boundary
 
-## v0.6D difference
+`industry_alpha.stage2_query_values` now owns:
 
-v0.6D has equivalent behavior for valid datetimes, but its local UTC and timestamp helpers require non-null values and do not translate `None` into the domain visibility error.
+- `stored_utc`;
+- `timestamp_text`;
+- `date_text`;
+- `uuid_text`;
+- `recorded_visible`;
+- `dated_visible`.
 
-Replacing them in the first slice would change malformed-input exception behavior. Therefore the first implementation must leave `stage2_judgments_query.py` unchanged. A coherent A/B/C extraction is safer than a mixed nullable contract.
+The v0.6A-v0.6C query modules import these functions under their established private aliases. v0.6B and v0.6C retain local revision-list collection wrappers and delegate only the dated predicate.
 
-## Safe neutral boundary
+## Preserved v0.6D difference
 
-A separate implementation Issue may add `industry_alpha/stage2_query_values.py` containing only stateless value functions equivalent to:
+v0.6D has equivalent valid-datetime conversion but its local UTC/timestamp helpers require non-null values and do not translate `None` into the shared domain visibility error.
 
-- required stored-UTC normalization;
-- timestamp, date and UUID text formatting;
-- recorded visibility;
-- combined information-date and recorded-date visibility.
-
-Required behavior:
-
-1. missing required timestamps keep the exact existing exception class and text;
-2. naive datetime wall-clock fields are preserved and assigned UTC;
-3. aware datetimes use normal UTC conversion;
-4. timestamp text uses ISO 8601 with `Z`;
-5. optional date and UUID values preserve `None`;
-6. visibility predicates preserve equal-date visibility;
-7. no repository, session, payload or database behavior is added.
-
-## First implementation candidate
-
-A later implementation Issue may authorize only:
-
-1. add the neutral query-value module;
-2. delegate existing private helpers in v0.6A-v0.6C through import aliases or equivalent minimal wrappers;
-3. keep v0.6B/v0.6C revision-list collection logic local while using the neutral dated predicate;
-4. leave v0.6D unchanged;
-5. add direct helper tests;
-6. run all existing Stage 2 SQLite/PostgreSQL tests and the full offline Actions workflow.
-
-Direct tests must cover:
-
-- exact missing-timestamp error;
-- naive and non-UTC aware datetime conversion;
-- trailing-`Z` formatting;
-- optional date and UUID formatting;
-- cutoff absent, before, equal and after boundaries;
-- late recorded date with visible information date;
-- late information date with visible recorded date.
-
-Existing payload tests remain the proof that public API output is unchanged.
+`stage2_judgments_query.py` therefore remains unchanged. The accepted implementation does not create a mixed nullable contract or silently alter malformed-input behavior.
 
 ## Responsibilities that remain local
 
-The neutral module must not own:
+The neutral module does not own:
 
 - evidence payload construction or grade counts;
 - conflict and missing-evidence text;
 - claim, evidence or frozen-link selection;
 - ID collection and sorting;
+- revision collection wrappers;
 - list/detail payload fields or ordering;
 - notices;
 - aggregate not-found and visibility messages;
@@ -96,14 +71,22 @@ The neutral module must not own:
 - public contracts;
 - v0.6D nullable timestamp policy.
 
-The similar v0.6B-v0.6D evidence serializers are explicitly excluded. They contain different claim fields, missing-evidence reasons and domain boundaries and require a separate neutral read contract before extraction.
+The similar v0.6B-v0.6D evidence serializers remain explicitly excluded. They contain different claim fields, missing-evidence reasons and domain boundaries and require a separate neutral read contract before any extraction.
 
-## Explicit exclusions
+## Acceptance evidence
 
-No v0.6D helper migration, evidence serializer unification, link-ID consolidation, public query change, cutoff-granularity change, timezone configuration, dependency, repository, command, model, schema, fixture, API, migration, v0.6E, v0.7, release, UI, deployment or PR #38 work.
+Independent implementation review confirmed:
 
-## Definition of Ready
+- exact six-file inventory;
+- unchanged public payloads, sorting, notices and aggregate errors;
+- unchanged v0.6D query module;
+- direct coverage for exact missing-timestamp errors, naive/aware UTC conversion, trailing-`Z` formatting, optional date/UUID formatting and cutoff boundaries;
+- successful GitHub Actions tests, local fixture demo and cleanup;
+- honest reporting that PostgreSQL-focused tests were skipped where `AQUANTAI_TEST_POSTGRES_URL` was unavailable;
+- no repository, command, model, schema, fixture, API, provider, dependency, CI, UI, release or migration change.
 
-A minimal v0.6A-v0.6C query-value extraction is ready for a separate implementation Issue. Shared behavior, exact error text, the v0.6D edge difference, direct tests, no-migration decision and stop conditions are explicit.
+## Current conclusion
 
-This report does not authorize implementation.
+The minimal v0.6A-v0.6C query-value extraction is complete. No additional query-value implementation is active.
+
+The next candidate is an independent characterization of a neutral evidence read-serialization contract. That work may conclude the serializers should remain local and does not receive implementation authorization from this report.
