@@ -10,7 +10,7 @@ This document is the authoritative architecture and current-state baseline. `.co
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
-Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #81 characterized ordered repository row loading; PR #83 implemented the neutral row loader; PR #87 characterized query-value mechanics; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary.
+Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 concluded that evidence read serializers should remain domain-local.
 
 ## Product boundary
 
@@ -38,7 +38,7 @@ Three neutral Stage 2 infrastructure boundaries are accepted:
 - `industry_alpha.stage2_repository_rows` owns stateless ordered scalar row loading used through repository-local wrappers;
 - `industry_alpha.stage2_query_values` owns required UTC normalization, date-granular visibility and timestamp/date/UUID formatting used by v0.6A-v0.6C query modules.
 
-Domain semantics remain local. Repository graph assembly, optional-ID normalization, link-field selection, missing-parent policy, sessions and transactions remain repository-local. Evidence serialization, link selection, payload sorting, notices, aggregate errors and v0.6D timestamp-null policy remain query-module-local.
+Domain semantics remain local. Repository graph assembly, optional-ID normalization, link-field selection, missing-parent policy, sessions and transactions remain repository-local. Evidence read serialization, claim projection, missing-evidence wording, link selection, payload sorting, notices, aggregate errors and v0.6D timestamp-null policy remain query-module-local by the accepted PR #93 decision.
 
 The current implementable path does not include v0.6E price judgment, timing judgment, Watchlist tasks, Paper Portfolio, simulated trades, portfolio analysis or Quant Core workflow state. Issue #70 and PR #71 remain superseded and closed without merge.
 
@@ -50,9 +50,9 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | v0.4A-v0.4E Market Cockpit | Read-only selected-scope breadth/risk, context, liquidity and descriptive price behavior | No official full-market, valuation, regime, signal or recommendation claims |
 | v0.5A-v0.5C | Evidence ledger, industry maps, beneficiary classifications and candidate-pool handoff | Evidence qualification and frozen-link patterns remain repeated downstream |
 | v0.6A | Company research and hypotheses | Command lifecycle and revision allocation remain local |
-| v0.6B | Expectations and valuation observations with optional price provenance | `observed_value` is not automatically comparison eligible |
-| v0.6C | Catalyst and risk assessments | Frozen-boundary, ordered-row and query-value mechanics are consolidated; domain read serialization remains local |
-| v0.6D | Industry/company quality judgments | Query-value helpers remain local because malformed-null semantics differ; lifecycle repetition needs separate review |
+| v0.6B | Expectations and valuation observations with optional price provenance | `observed_value` is not automatically comparison eligible; reduced evidence claim shape remains local |
+| v0.6C | Catalyst and risk assessments | Frozen-boundary, ordered-row and query-value mechanics are consolidated; evidence serializer remains local |
+| v0.6D | Industry/company quality judgments | Query-value and evidence serializer policies remain local; lifecycle repetition needs separate review |
 | v0.6E | Superseded planning only | Not implemented or authorized |
 | v0.7+ | Prospective only | Requires Architecture Preflight and Definition of Ready |
 
@@ -70,7 +70,7 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | Shared frozen-boundary mechanics | `stage2_boundary.py` | Exact base-boundary loading and visibility; domain semantics remain local |
 | Ordered scalar repository row loading | `stage2_repository_rows.py` | Explicit `IN` filtering and caller-owned ordering only |
 | v0.6A-v0.6C pure query values | `stage2_query_values.py` | Required UTC, date-granular visibility and text formatting only |
-| Evidence read serialization | Domain query modules pending a neutral contract | No shared serializer is authorized |
+| Evidence read serialization | v0.6B-v0.6D domain query modules | Reviewed in PR #93 and intentionally remains local |
 | “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities |
 
 A linked local `daily_price` row remains provenance/context. It is not a canonical comparison value merely because a valuation record also stores a numeric string and currency.
@@ -94,10 +94,10 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 
 ## Architecture debt register
 
-- **D1 Documentation drift — controlled:** architecture/status synchronization follows accepted implementations.
+- **D1 Documentation drift — controlled:** architecture/status synchronization follows accepted implementations and characterization decisions.
 - **D2 Repeated Stage 2 structure — partially reduced:** frozen-boundary and ordered-row mechanics are consolidated; generic graph loading remains unjustified.
-- **D3 Read utilities — partially reduced:** v0.6A-v0.6C pure query values are consolidated. Evidence read serialization still requires a neutral contract; v0.6D query-value policy remains local.
-- **D4 Command lifecycle and concurrency — deferred:** integrity translation, revision allocation and locks affect rollback and error compatibility.
+- **D3 Read utilities — reviewed:** v0.6A-v0.6C pure query values are consolidated. Evidence serializers remain local because no neutral claim contract reaches Definition of Ready; v0.6D query-value policy remains local.
+- **D4 Command lifecycle and concurrency — next characterization candidate:** conflict/integrity translation, revision allocation and locks affect rollback and error compatibility.
 - **D5 ORM lifecycle — deferred:** dynamic link-model factories and append-only listeners are mapper/event sensitive.
 - **D6 Test-matrix growth:** shared invariant tests and domain-semantic tests must remain distinct.
 - **D7 Fixture-versus-production reachability:** success paths need production-realistic offline adapter parity.
@@ -122,15 +122,15 @@ Completed:
 3. neutral frozen-boundary extraction — PR #77;
 4. ordered-row characterization and implementation — PRs #81 and #83;
 5. query-value characterization and implementation — PRs #87 and #89;
-6. Issue #90 and its linked PR synchronize the query-value outcome without changing runtime behavior.
+6. evidence read-serialization characterization — PR #93; decision: keep serializers local and open no implementation Issue;
+7. Issue #94 and its linked PR synchronize that decision without changing runtime behavior.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
 Prospective and separately authorized:
 
-7. characterize a neutral evidence read-serialization contract; characterization may conclude serializers should remain local;
-8. only if accepted, consider the smallest behavior-preserving serializer implementation;
-9. separately characterize command integrity/conflict handling, revision allocation/locks and ORM lifecycle concerns;
+8. characterize command conflict/integrity behavior and error compatibility;
+9. separately characterize revision allocation/locks and ORM lifecycle concerns;
 10. decide whether canonical market-price evidence has independent user value;
 11. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
 12. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.

@@ -9,7 +9,7 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 - Merged capability stage: v0.6D
 - Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Most recent architecture synchronization: Issue #90 and its linked synchronization PR
+- Most recent architecture synchronization: Issue #94 and its linked synchronization PR
 - Active application or consolidation implementation authorization: none
 - New migration authorization: none
 
@@ -18,56 +18,44 @@ Docs-only commits may advance `main` without changing release, capability or run
 ## Accepted architecture decisions
 
 - Issue #70 / PR #71 for v0.6E price judgment were closed without merge.
-- Issue #72 / PR #73 established the unified baseline, ownership, invariants, debt register and delivery gates.
+- Issue #72 / PR #73 established the unified baseline and delivery gates.
 - Issue #74 / PR #75 characterized Stage 2 infrastructure.
-- Issue #76 / PR #77 moved shared frozen-boundary mechanics to `industry_alpha.stage2_boundary` and removed the v0.6D dependency on v0.6C private helpers.
-- Issue #78 / PR #79 synchronized that first consolidation result.
-- Issue #80 / PR #81 characterized repeated ordered scalar row loading.
-- Issue #82 / PR #83 implemented `industry_alpha.stage2_repository_rows.load_ordered_rows`; Issue #84 and its linked PR synchronized the result.
+- Issue #76 / PR #77 extracted the neutral frozen boundary.
+- Issues #80/#82 and PRs #81/#83 characterized and implemented ordered scalar row loading.
+- Issues #86/#88 and PRs #87/#89 characterized and implemented v0.6A-v0.6C pure query values.
 
-## Query-value acceptance
+## Evidence read characterization acceptance
 
-Issue #86 / PR #87 characterized pure Stage 2 query-value mechanics.
+Issue #92 / PR #93 compared the v0.6B-v0.6D private evidence payload builders.
 
-The accepted design established that v0.6A-v0.6C share identical behavior for:
+Independent review confirmed that the serializers share evidence-item fields, contradiction projection, A-D grade counts and deterministic sorting, but also have material differences:
 
-- required UTC normalization, including the exact missing-timestamp visibility error;
-- naive and aware datetime conversion to UTC;
-- date-granular recorded and information-date visibility;
-- trailing-`Z` timestamp formatting;
-- optional date and UUID text formatting.
+- v0.6B emits a reduced nested claim shape;
+- v0.6B uses domain-specific missing-evidence wording;
+- owner revision fields and source-link container names differ;
+- v0.6D retains a separate timestamp-null/error policy;
+- a whole serializer would require reflection, callbacks or adapter objects;
+- neutral projection DTOs would add conversion code without an accepted neutral claim contract.
 
-v0.6D remains local because its required non-null helper has different malformed-input behavior.
+The accepted decision is to keep the serializers local. Evidence serializer implementation does not reach Definition of Ready, and no implementation Issue follows from PR #93.
 
-Issue #88 / PR #89 implemented `industry_alpha.stage2_query_values` and delegated only those mechanics from v0.6A-v0.6C. Independent review confirmed:
-
-- exact six-file inventory;
-- unchanged evidence payload construction, link selection, sorting, notices, aggregate errors and public contracts;
-- unchanged `stage2_judgments_query.py`;
-- direct tests for exact error text, UTC conversion, formatting and cutoff boundaries;
-- successful GitHub Actions tests, local fixture demo and cleanup;
-- PostgreSQL-focused cases were not falsely reported as executed when the required URL was unavailable;
-- no model, schema, migration, fixture, API, repository, command, dependency, CI, UI, release or version change.
-
-PR #89 was squash-merged as `782b2362e1252aa87b21f7aa58f764837f5adb71`. Issue #88 closed completed.
+PR #93 was squash-merged as `e97762eba916e64299965a33b574870b1dad46e0`. Issue #92 closed completed. Actions tests, fixture demo and cleanup passed; no migration or runtime change occurred.
 
 ## Current review conclusion
 
-The repository retains deterministic persistence, exact revision/provenance links, cutoff plus UTC chronology, read-only Stage 1/Stage 2 surfaces and no-network fixture discipline.
-
-Neutral ownership now exists for:
+Neutral ownership exists for:
 
 - shared Stage 2 frozen-boundary mechanics;
 - ordered scalar repository row loading;
 - v0.6A-v0.6C pure query-value mechanics.
 
-Remaining risk is evidence read-serialization duplication, command lifecycle/concurrency repetition and ORM event complexity.
+Evidence read serialization intentionally remains domain-local. Remaining consolidation risk is command conflict/integrity and rollback compatibility, revision allocation/locking, and ORM event complexity.
 
 ## Locked exclusions
 
-- no evidence serializer implementation without accepted characterization;
-- no v0.6D query-value policy change;
-- no command integrity, revision-lock, model-factory or append-only-listener refactor;
+- no evidence serializer extraction or projection DTOs without a re-evaluation trigger and new preflight;
+- no command conflict/integrity implementation without accepted characterization;
+- no revision-lock, model-factory or append-only-listener refactor;
 - no application/provider behavior change or migration;
 - no v0.6E price or timing judgment;
 - no v0.7 Watchlist or verification-task behavior;
@@ -77,6 +65,6 @@ Remaining risk is evidence read-serialization duplication, command lifecycle/con
 
 ## Next development gate
 
-The next candidate is a separate characterization of a neutral evidence read-serialization contract across the v0.6B-v0.6D query modules. It must identify truly invariant claim/evidence fields and ordering while preserving domain-specific boundaries, missing-evidence text, conflicts, collection types and public payloads.
+The next candidate is a separate characterization of command conflict/integrity behavior. It must inventory repeated `IntegrityError` handling, rollback ownership, domain exception translation, exact messages, revision/link atomicity and SQLite/PostgreSQL differences.
 
-Characterization may conclude that serializers should remain local. It does not authorize implementation. No Codex application implementation command is active after this synchronization.
+Characterization may conclude that conflict handling should remain local. It does not authorize implementation. No Codex application implementation command is active after this synchronization.
