@@ -9,12 +9,10 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.models import IngestionRun, StockBasicRecord
 from industry_alpha.errors import (
-    EvidenceLedgerConflictError,
     EvidenceLedgerNotFound,
     EvidenceLedgerValidationError,
 )
@@ -47,6 +45,7 @@ from industry_alpha.stage2_models import (
     Stage2ResearchHypothesisLink,
     Stage2VerificationItem,
 )
+from industry_alpha.stage2_integrity import translate_integrity as _translate_integrity
 from industry_alpha.validation import (
     CONCLUSION_STATUSES,
     INFERENCE_CONFIDENCES,
@@ -101,7 +100,7 @@ class Stage2CompanyResearchCommandService:
             information_cutoff_date, "information_cutoff_date"
         )
         validate_recorded_cutoff(information_cutoff_date, recorded)
-        with self._translate_integrity("this exact Stage 1 membership already has a Stage 2 research file"):
+        with _translate_integrity("this exact Stage 1 membership already has a Stage 2 research file"):
             with self._session_factory.begin() as session:
                 handoff = self._exact_handoff(
                     session,
@@ -163,7 +162,7 @@ class Stage2CompanyResearchCommandService:
         )
         validate_recorded_cutoff(information_cutoff_date, recorded)
         with _revision_lock("research", company_research_id):
-            with self._translate_integrity("company-research revision conflicts with accepted history"):
+            with _translate_integrity("company-research revision conflicts with accepted history"):
                 with self._session_factory.begin() as session:
                     research = self._locked_research(session, company_research_id)
                     revision = self._insert_research_revision(
@@ -204,7 +203,7 @@ class Stage2CompanyResearchCommandService:
         )
         validate_recorded_cutoff(information_cutoff_date, recorded)
         key = _required_text(hypothesis_key, "hypothesis_key", 96)
-        with self._translate_integrity("hypothesis key already exists in this company research file"):
+        with _translate_integrity("hypothesis key already exists in this company research file"):
             with self._session_factory.begin() as session:
                 research = self._locked_research(session, company_research_id)
                 assertion_link = session.get(Stage1BeneficiaryAssertionLink, stage1_assertion_link_id)
@@ -277,7 +276,7 @@ class Stage2CompanyResearchCommandService:
         )
         validate_recorded_cutoff(information_cutoff_date, recorded)
         with _revision_lock("hypothesis", hypothesis_id):
-            with self._translate_integrity("hypothesis revision conflicts with accepted history"):
+            with _translate_integrity("hypothesis revision conflicts with accepted history"):
                 with self._session_factory.begin() as session:
                     hypothesis = self._locked_hypothesis(session, hypothesis_id)
                     research = self._locked_research(session, hypothesis.company_research_id)
@@ -309,7 +308,7 @@ class Stage2CompanyResearchCommandService:
         recorded_at_utc: datetime | None = None,
     ) -> Stage2VerificationItem:
         recorded = utc_timestamp(recorded_at_utc)
-        with self._translate_integrity("verification item conflicts with accepted history"):
+        with _translate_integrity("verification item conflicts with accepted history"):
             with self._session_factory.begin() as session:
                 revision = session.scalar(
                     select(Stage2CompanyResearchRevision)
@@ -729,23 +728,6 @@ class Stage2CompanyResearchCommandService:
         if row is None:
             raise EvidenceLedgerNotFound(f"Stage 2 hypothesis {identity} was not found.")
         return row
-
-    class _IntegrityTranslation:
-        def __init__(self, message: str) -> None:
-            self.message = message
-
-        def __enter__(self) -> None:
-            return None
-
-        def __exit__(self, _kind: type[BaseException] | None, exc: BaseException | None, _tb: object) -> bool:
-            if isinstance(exc, IntegrityError):
-                raise EvidenceLedgerConflictError(self.message) from exc
-            return False
-
-    @classmethod
-    def _translate_integrity(cls, message: str) -> _IntegrityTranslation:
-        return cls._IntegrityTranslation(message)
-
 
 def _required_text(value: str, field: str, maximum: int) -> str:
     if not isinstance(value, str):

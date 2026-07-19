@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from threading import Lock, RLock
-from typing import Any, Iterator
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from industry_alpha.errors import EvidenceLedgerConflictError, EvidenceLedgerNotFound, EvidenceLedgerValidationError
+from industry_alpha.errors import EvidenceLedgerNotFound, EvidenceLedgerValidationError
 from industry_alpha.stage2_assessments_models import (
     Stage2CatalystAssessment, Stage2CatalystAssessmentRevision, Stage2CatalystClaimLink,
     Stage2CatalystEvidenceLink, Stage2CatalystExpectationLink, Stage2CatalystHypothesisLink,
@@ -42,6 +40,7 @@ from industry_alpha.stage2_judgments_models import (
     Stage2IndustryJudgmentRevision, Stage2IndustryJudgmentRiskLink,
     Stage2IndustryJudgmentValuationLink,
 )
+from industry_alpha.stage2_integrity import translate_integrity as _integrity
 from industry_alpha.stage2_models import Stage2CompanyResearch
 from industry_alpha.validation import INFERENCE_CONFIDENCES, reviewed_value, validate_utc_chronology
 
@@ -83,7 +82,7 @@ class Stage2JudgmentCommandService:
     def _create(self, kind: str, company_research_id: UUID, key: str, data: dict[str, Any]) -> Any:
         recorded, cutoff = _time_boundary(data)
         identity_model = Stage2IndustryJudgment if kind == "industry" else Stage2CompanyJudgment
-        with self._integrity(f"{kind} judgment key already exists"):
+        with _integrity(f"{kind} judgment key already exists"):
             with self._session_factory.begin() as session:
                 research = _locked_research(session, company_research_id)
                 identity = identity_model(
@@ -99,7 +98,7 @@ class Stage2JudgmentCommandService:
     def _append(self, kind: str, judgment_id: UUID, data: dict[str, Any]) -> Any:
         recorded, cutoff = _time_boundary(data)
         identity_model = Stage2IndustryJudgment if kind == "industry" else Stage2CompanyJudgment
-        with _revision_lock(kind, judgment_id), self._integrity(f"{kind} judgment revision conflicts with history"):
+        with _revision_lock(kind, judgment_id), _integrity(f"{kind} judgment revision conflicts with history"):
             with self._session_factory.begin() as session:
                 identity = session.scalar(select(identity_model).where(identity_model.id == judgment_id).with_for_update())
                 if identity is None:
@@ -153,14 +152,6 @@ class Stage2JudgmentCommandService:
         _insert_links(session, kind, revision.id, boundary, recorded)
         session.flush()
         return revision
-
-    @contextmanager
-    def _integrity(self, message: str) -> Iterator[None]:
-        try:
-            yield
-        except IntegrityError as exc:
-            raise EvidenceLedgerConflictError(message) from exc
-
 
 def _judgment_boundary(session: Session, research: Stage2CompanyResearch, *, catalyst_revision_ids: tuple[UUID, ...] = (), risk_revision_ids: tuple[UUID, ...] = (), cutoff: date, recorded: datetime, **data: Any) -> _JudgmentBoundary:
     base = _frozen_boundary(session, research, cutoff=cutoff, recorded=recorded, **data)

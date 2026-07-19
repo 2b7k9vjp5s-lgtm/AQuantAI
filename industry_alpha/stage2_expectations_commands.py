@@ -9,12 +9,10 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.models import DailyPriceRecord, IngestionRun
 from industry_alpha.errors import (
-    EvidenceLedgerConflictError,
     EvidenceLedgerNotFound,
     EvidenceLedgerValidationError,
 )
@@ -39,6 +37,7 @@ from industry_alpha.stage2_expectations_models import (
     Stage2ValuationSnapshot,
     Stage2ValuationSnapshotRevision,
 )
+from industry_alpha.stage2_integrity import translate_integrity as _translate_integrity
 from industry_alpha.validation import (
     INFERENCE_CONFIDENCES,
     reviewed_value,
@@ -97,7 +96,7 @@ class Stage2ExpectationCommandService:
         cutoff = _required_date(information_cutoff_date, "information_cutoff_date")
         validate_recorded_cutoff(cutoff, recorded)
         key = _required_text(expectation_key, "expectation_key", 96)
-        with self._translate_integrity("expectation key already exists"):
+        with _translate_integrity("expectation key already exists"):
             with self._session_factory.begin() as session:
                 research = _locked_research(session, company_research_id)
                 identity = Stage2MarketExpectation(
@@ -147,7 +146,7 @@ class Stage2ExpectationCommandService:
         cutoff = _required_date(information_cutoff_date, "information_cutoff_date")
         validate_recorded_cutoff(cutoff, recorded)
         with _revision_lock("expectation", expectation_id):
-            with self._translate_integrity("expectation revision conflicts with history"):
+            with _translate_integrity("expectation revision conflicts with history"):
                 with self._session_factory.begin() as session:
                     identity = _locked_expectation(session, expectation_id)
                     research = _locked_research(session, identity.company_research_id)
@@ -199,7 +198,7 @@ class Stage2ExpectationCommandService:
         observed, missing = _valuation_value_state(
             method, observed_value, missing_data_reason
         )
-        with self._translate_integrity("valuation key already exists"):
+        with _translate_integrity("valuation key already exists"):
             with self._session_factory.begin() as session:
                 research = _locked_research(session, company_research_id)
                 identity = Stage2ValuationSnapshot(
@@ -261,7 +260,7 @@ class Stage2ExpectationCommandService:
             method, observed_value, missing_data_reason
         )
         with _revision_lock("valuation", valuation_id):
-            with self._translate_integrity("valuation revision conflicts with history"):
+            with _translate_integrity("valuation revision conflicts with history"):
                 with self._session_factory.begin() as session:
                     identity = _locked_valuation(session, valuation_id)
                     research = _locked_research(session, identity.company_research_id)
@@ -379,20 +378,6 @@ class Stage2ExpectationCommandService:
             session.add(Stage2ValuationEvidenceLink(valuation_revision_id=revision.id, claim_revision_id=claim.id, claim_evidence_link_id=link.id, evidence_id=item.id, recorded_at_utc=data["recorded_at_utc"]))
         session.flush()
         return revision
-
-    class _IntegrityTranslation:
-        def __init__(self, message: str) -> None:
-            self.message = message
-        def __enter__(self) -> None:
-            return None
-        def __exit__(self, _kind: type[BaseException] | None, exc: BaseException | None, _tb: object) -> bool:
-            if isinstance(exc, IntegrityError):
-                raise EvidenceLedgerConflictError(self.message) from exc
-            return False
-    @classmethod
-    def _translate_integrity(cls, message: str) -> _IntegrityTranslation:
-        return cls._IntegrityTranslation(message)
-
 
 def _boundary(session: Session, research: Stage2CompanyResearch, revision_id: UUID, hypothesis_ids: tuple[UUID, ...], cutoff: date, recorded: datetime) -> tuple[Stage2CompanyResearchRevision, list[Stage2FinancialHypothesisRevision]]:
     boundary = session.get(Stage2CompanyResearchRevision, revision_id)
