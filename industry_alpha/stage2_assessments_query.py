@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 from uuid import UUID
 
 from industry_alpha.errors import EvidenceLedgerNotFound, EvidenceLedgerNotVisible
 from industry_alpha.stage2_assessments_contracts import Stage2AssessmentDetailContract, Stage2AssessmentListContract
 from industry_alpha.stage2_assessments_repository import Stage2AssessmentRepository, Stage2AssessmentRows
+from industry_alpha.stage2_query_values import (
+    date_text as _date,
+    dated_visible as _dated_visible,
+    recorded_visible as _recorded_visible,
+    stored_utc as _stored_utc,
+    timestamp_text as _timestamp,
+    uuid_text as _uuid,
+)
 
 
 V06C_NOTICES = {
@@ -180,28 +188,12 @@ def _link_ids(links: tuple[Any, ...], revision_id: UUID, kind: str, value_field:
 
 
 def _visible_revisions(revisions: tuple[Any, ...], cutoff: date | None) -> list[Any]:
-    return [item for item in revisions if cutoff is None or (item.information_cutoff_date <= cutoff and _stored_utc(item.recorded_at_utc).date() <= cutoff)]
-
-
-def _recorded_visible(recorded_at: datetime, cutoff: date | None) -> bool:
-    return cutoff is None or _stored_utc(recorded_at).date() <= cutoff
-
-
-def _stored_utc(value: datetime | None) -> datetime:
-    if value is None:
-        raise EvidenceLedgerNotVisible("required UTC timestamp is unavailable.")
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
-def _timestamp(value: datetime | None) -> str:
-    return _stored_utc(value).isoformat().replace("+00:00", "Z")
-
-
-def _date(value: date | None) -> str | None:
-    return None if value is None else value.isoformat()
-
-
-def _uuid(value: UUID | None) -> str | None:
-    return None if value is None else str(value)
+    return [
+        item
+        for item in revisions
+        if _dated_visible(
+            item.information_cutoff_date,
+            item.recorded_at_utc,
+            cutoff,
+        )
+    ]
