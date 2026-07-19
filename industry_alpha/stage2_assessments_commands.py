@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from datetime import date, datetime
 from threading import Lock, RLock
-from typing import Any, Iterator
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from industry_alpha.errors import EvidenceLedgerConflictError, EvidenceLedgerNotFound, EvidenceLedgerValidationError
+from industry_alpha.errors import EvidenceLedgerNotFound, EvidenceLedgerValidationError
 from industry_alpha.stage2_assessments_models import (
     Stage2CatalystAssessment, Stage2CatalystAssessmentRevision, Stage2CatalystClaimLink,
     Stage2CatalystEvidenceLink, Stage2CatalystExpectationLink, Stage2CatalystHypothesisLink,
@@ -30,6 +28,7 @@ from industry_alpha.stage2_boundary import (
     time_boundary as _time_boundary,
     visible_upstream as _visible_upstream,
 )
+from industry_alpha.stage2_integrity import translate_integrity as _integrity
 from industry_alpha.stage2_models import Stage2CompanyResearch
 from industry_alpha.validation import INFERENCE_CONFIDENCES, reviewed_value, validate_utc_chronology
 
@@ -52,7 +51,7 @@ class Stage2AssessmentCommandService:
 
     def create_catalyst(self, company_research_id: UUID, *, catalyst_key: str, **data: Any) -> Stage2CatalystAssessment:
         recorded, cutoff = _time_boundary(data)
-        with self._integrity("catalyst key already exists"):
+        with _integrity("catalyst key already exists"):
             with self._session_factory.begin() as session:
                 research = _locked_research(session, company_research_id)
                 identity = Stage2CatalystAssessment(
@@ -67,7 +66,7 @@ class Stage2AssessmentCommandService:
 
     def append_catalyst_revision(self, catalyst_id: UUID, **data: Any) -> Stage2CatalystAssessmentRevision:
         recorded, cutoff = _time_boundary(data)
-        with _revision_lock("catalyst", catalyst_id), self._integrity("catalyst revision conflicts with history"):
+        with _revision_lock("catalyst", catalyst_id), _integrity("catalyst revision conflicts with history"):
             with self._session_factory.begin() as session:
                 identity = _locked_identity(session, Stage2CatalystAssessment, catalyst_id, "catalyst")
                 research = _locked_research(session, identity.company_research_id)
@@ -75,7 +74,7 @@ class Stage2AssessmentCommandService:
 
     def create_risk(self, company_research_id: UUID, *, risk_key: str, **data: Any) -> Stage2RiskAssessment:
         recorded, cutoff = _time_boundary(data)
-        with self._integrity("risk key already exists"):
+        with _integrity("risk key already exists"):
             with self._session_factory.begin() as session:
                 research = _locked_research(session, company_research_id)
                 identity = Stage2RiskAssessment(
@@ -90,7 +89,7 @@ class Stage2AssessmentCommandService:
 
     def append_risk_revision(self, risk_id: UUID, **data: Any) -> Stage2RiskAssessmentRevision:
         recorded, cutoff = _time_boundary(data)
-        with _revision_lock("risk", risk_id), self._integrity("risk revision conflicts with history"):
+        with _revision_lock("risk", risk_id), _integrity("risk revision conflicts with history"):
             with self._session_factory.begin() as session:
                 identity = _locked_identity(session, Stage2RiskAssessment, risk_id, "risk")
                 research = _locked_research(session, identity.company_research_id)
@@ -152,14 +151,6 @@ class Stage2AssessmentCommandService:
         _insert_links(session, "risk", revision.id, boundary, recorded)
         session.flush()
         return revision
-
-    @contextmanager
-    def _integrity(self, message: str) -> Iterator[None]:
-        try:
-            yield
-        except IntegrityError as exc:
-            raise EvidenceLedgerConflictError(message) from exc
-
 
 def _validate_status(status: str, boundary: _Boundary) -> None:
     has_supported_abc = any(claim.claim_status == "supported" and link.relation == "supports" and item.evidence_grade in {"A", "B", "C"} for claim, link, item in boundary.evidence)
