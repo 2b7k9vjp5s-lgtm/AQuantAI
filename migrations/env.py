@@ -14,6 +14,7 @@ import industry_alpha.chain_map_models  # noqa: F401 - register v0.5B metadata
 import industry_alpha.stage1_models  # noqa: F401 - register v0.5C metadata
 import industry_alpha.stage2_models  # noqa: F401 - register v0.6A metadata
 import industry_alpha.stage2_expectations_models  # noqa: F401 - register v0.6B metadata
+import industry_alpha.stage2_assessments_models  # noqa: F401 - register v0.6C metadata
 
 config = context.config
 

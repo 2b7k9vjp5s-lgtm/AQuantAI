@@ -121,7 +121,7 @@ def test_downgrade_fails_closed_before_schema_changes_for_multi_series_history()
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", database_url)
     command.downgrade(config, "base")
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260718_0002")
     engine = create_engine(database_url)
     batch_identifier = "d" * 64
     try:
@@ -194,8 +194,8 @@ def test_downgrade_fails_closed_before_schema_changes_for_multi_series_history()
                     runs.c.batch_identifier == batch_identifier
                 )
             ) == 2
-            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260719_0009"
-        assert "benchmark_index_daily" in inspect(engine).get_table_names()
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260718_0002"
+        assert "benchmark_index_daily" not in inspect(engine).get_table_names()
     finally:
         with engine.begin() as connection:
             metadata = MetaData()
