@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from threading import Lock, RLock
 from typing import Any
 from uuid import UUID
 
@@ -46,6 +45,7 @@ from industry_alpha.stage2_models import (
     Stage2VerificationItem,
 )
 from industry_alpha.stage2_integrity import translate_integrity as _translate_integrity
+from industry_alpha.stage2_revision_locks import revision_lock as _revision_lock
 from industry_alpha.validation import (
     CONCLUSION_STATUSES,
     INFERENCE_CONFIDENCES,
@@ -59,15 +59,6 @@ from industry_alpha.validation import (
 
 HYPOTHESIS_STATUSES = frozenset({"draft", "supported", "disputed", "rejected"})
 HYPOTHESIS_DIRECTIONS = frozenset({"positive", "negative", "mixed", "uncertain"})
-
-_LOCKS_GUARD = Lock()
-_LOCKS: dict[tuple[str, UUID], RLock] = {}
-
-
-def _revision_lock(kind: str, identity: UUID) -> RLock:
-    key = (kind, identity)
-    with _LOCKS_GUARD:
-        return _LOCKS.setdefault(key, RLock())
 
 
 @dataclass(frozen=True)

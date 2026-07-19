@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from threading import Lock, RLock
 from typing import Any
 from uuid import UUID
 
@@ -42,13 +41,12 @@ from industry_alpha.stage2_judgments_models import (
 )
 from industry_alpha.stage2_integrity import translate_integrity as _integrity
 from industry_alpha.stage2_models import Stage2CompanyResearch
+from industry_alpha.stage2_revision_locks import revision_lock as _revision_lock
 from industry_alpha.validation import INFERENCE_CONFIDENCES, reviewed_value, validate_utc_chronology
 
 
 OUTCOMES = frozenset({"affirmed", "not_affirmed", "uncertain", "not_assessed"})
 EVIDENCE_STATES = frozenset({"supported", "disputed", "insufficient_evidence"})
-_LOCKS_GUARD = Lock()
-_LOCKS: dict[tuple[str, UUID], RLock] = {}
 
 
 @dataclass(frozen=True)
@@ -56,11 +54,6 @@ class _JudgmentBoundary:
     base: _Boundary
     catalysts: tuple[Stage2CatalystAssessmentRevision, ...]
     risks: tuple[Stage2RiskAssessmentRevision, ...]
-
-
-def _revision_lock(kind: str, identity: UUID) -> RLock:
-    with _LOCKS_GUARD:
-        return _LOCKS.setdefault((kind, identity), RLock())
 
 
 class Stage2JudgmentCommandService:
