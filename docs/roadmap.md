@@ -1,99 +1,132 @@
 # Roadmap
 
-Development must proceed phase by phase. Do not start a later phase until the current sprint is completed and reviewed.
+`docs/architecture_baseline.md` is the authoritative current-state and architecture source. This roadmap summarizes sequencing; it does not authorize work by itself.
 
-## Phase 0: Project Initialization
+## Current state
 
-- Goal: Create the repository, project structure, documentation, basic FastAPI app, tests, and Docker skeleton.
-- Input: Project requirements and fixed technology stack.
-- Output: Initialized repository with Phase 0 files.
-- Completion standard: FastAPI app responds on `/` and `/health`, tests pass, documentation exists, and Git repository is initialized.
-- Current status: Completed.
+AQuantAI uses three independent status axes:
 
-## Phase 1: A-share Data Center
+- released software version: `0.2.0`;
+- merged capability stage on `main`: v0.6D;
+- runtime surfaces: the local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 
-- Goal: Build the A-share data source boundary and normalized data contracts.
-- Input: AKShare as the first provider and PostgreSQL planning from Phase 0.
-- Output: Data provider interface, AKShare provider skeleton, normalized data contracts, mocked tests, and a lightweight script placeholder.
-- Completion standard: Provider methods return stable DataFrame schemas with mocked tests and no later-phase business logic.
-- Current status: Completed.
+Merged capability stages do not automatically publish a new release.
 
-## Phase 2: Multi-factor Scoring System
+## Completed foundations
 
-- Goal: Implement factor calculation contracts and scoring utilities.
-- Input: Normalized data contracts from Phase 1 and local DataFrame fixtures.
-- Output: Value, growth, quality, momentum, and risk calculators plus percentile and composite scoring.
-- Completion standard: Factor values and factor scores can be generated deterministically from local DataFrames with tests.
-- Current status: Completed.
+### Phase 0-6 and stabilization
 
-## Phase 3: VectorBT Backtesting System
+Project initialization, provider boundaries, deterministic factor/scoring utilities, backtest foundations, ML contracts, research-report contracts, Dashboard contracts, local fixture demo and correctness hardening are complete.
 
-- Goal: Add deterministic weekly rebalancing backtest foundations for factor-ranked portfolios.
-- Input: Factor scores and price data.
-- Output: Backtest contracts, Top-N equal-weight selection, equity curves, and core performance metrics.
-- Completion standard: A weekly rebalanced portfolio can be backtested from local fixtures with repeatable results.
-- Current status: Completed.
+### v0.2 baseline
 
-## Phase 4: Qlib Machine Learning Models
+The released `0.2.0` metadata and local fixture-backed Dashboard baseline remain unchanged.
 
-- Goal: Create guarded Qlib/ML research contracts and adapter boundaries.
-- Input: Normalized market data, factor outputs, score outputs, and local fixture datasets.
-- Output: ML experiment configuration, feature/label/prediction contracts, lazy Qlib adapter boundary, and deterministic baseline predictions.
-- Completion standard: ML contracts and baseline predictions are testable from local fixtures without production training or live data calls.
-- Current status: Completed.
+### v0.3 market-data persistence
 
-## Phase 5: AI Research Agent
+Completed:
 
-- Goal: Add research-only agent and report-generation contracts.
-- Input: Data contracts, factor scores, backtest metrics, ML predictions, and source references.
-- Output: Deterministic research reports, safety disclaimers, source refs, and lazy LLM adapter boundary.
-- Completion standard: Reports are structured, auditable, deterministic from local fixtures, and avoid investment-advice wording.
-- Current status: Completed.
+- PostgreSQL market-data persistence and migrations;
+- immutable ingestion attempts and complete-snapshot reconciliation;
+- canonical snapshot-series identities and exact selectors;
+- controlled manual AKShare ingestion with explicit network opt-in;
+- cutoff-aware deterministic reads and offline fixtures.
 
-## Phase 6: Dashboard
+### v0.4A-v0.4E Market Cockpit
 
-- Goal: Provide a read-only dashboard foundation for research workflows and results.
-- Input: Data, scores, backtests, and reports from previous phases.
-- Output: Dashboard data contracts, read-only payload builders, and sample FastAPI JSON endpoints.
-- Completion standard: Users can inspect project, factor, backtest, ML, and report summaries through read-only payloads.
-- Current status: Completed.
+Completed reviewed slices:
 
-## Post-Phase-6 Stabilization
+- selected-universe breadth and risk;
+- optional independently selected benchmark context;
+- provider-attributed sector context;
+- liquidity distribution and concentration context;
+- descriptive price-behavior proxies.
 
-- Goal: Consolidate Phase 0-6 into a clean, testable local research baseline.
-- Input: Existing contracts, local fixtures, report outputs, and dashboard payloads.
-- Output: Documentation consistency, end-to-end fixture demo, cross-module integration tests, and shared safety validation.
-- Completion standard: Local demo and tests pass without network, trading, broker, or production deployment behavior.
-- Current status: Completed.
+These remain selected-scope, descriptive, read-only and non-advisory. They do not provide canonical valuation, regime, crowding, signals or recommendations.
 
-## v0.1 Baseline Freeze & Release Readiness
+### v0.5A-v0.5C Industry Alpha Stage 1
 
-- Goal: Freeze the local research-only v0.1 baseline and prepare release documentation.
-- Input: Completed Phase 0-6 work, post-Phase-6 stabilization, local tests, and fixture demo.
-- Output: Version/status consistency, changelog, release checklist, local-only CI workflow, and future work boundary documentation.
-- Completion standard: Version `0.1.0` is consistent, local tests and demo pass, documentation avoids production-readiness claims, and future work remains outside the v0.1 baseline.
-- Current status: Ready for review.
+Completed reviewed slices:
 
-## v0.2 Local Read-Only Research Dashboard Baseline
+- research-case and evidence ledger;
+- evidence-backed industry chain maps;
+- Stage 1 company-beneficiary classifications and candidate-pool handoff.
 
-- Goal: Align the accepted correctness hardening and local Dashboard delivery into the active, local research-only baseline.
-- Input: The merged deterministic research foundation, v0.2 correctness hardening, and local read-only Dashboard page.
-- Output: Version `0.2.0`, current-status documentation, release handoff information, and focused metadata tests.
-- Completion standard: Active metadata and documentation describe the fixture-backed, read-only v0.2 Dashboard baseline; tests and demo remain local and pass without new product capability.
-- Current status: Completed and released as the active `v0.2.0` local read-only research Dashboard baseline.
+### v0.6A-v0.6D Stage 2
 
-## Planned Personal Research Workbench
+Completed reviewed slices:
 
-The following releases are controlled product stages. Each requires a separately authorized review issue before work starts. The v0.3 persistence foundation is complete; Issue #45 authorizes only the v0.4A selected-universe Market Cockpit foundation:
+- v0.6A company research and financial-transmission hypotheses;
+- v0.6B expectations and valuation observations;
+- v0.6C catalyst and risk assessments;
+- v0.6D independent industry/company quality judgments.
 
-- v0.2.1: local launcher completion.
-- v0.3: real-data persistence foundation (completed).
-- v0.4A: database-backed selected-universe Market Cockpit breadth and risk foundation (authorized in Issue #45; review pending).
-- v0.4B and broader Market Cockpit datasets: not authorized.
-- v0.5: Industry Alpha Stage 1 and evidence infrastructure.
-- v0.6: Industry Alpha Stage 2 and Stock Research.
-- v0.7: Watchlist and verification tasks.
-- v0.8: Paper Portfolio and simulated trades.
-- v0.9: portfolio analysis and Quant Core integration.
+All are append-only, cutoff-aware, evidence-bound and read-only. They do not produce target prices, expected returns, rankings, recommendations, Watchlist state, portfolio actions or trading behavior.
 
-Detailed objectives, exclusions, dependencies, acceptance criteria, and tests are in [implementation_plan.md](implementation_plan.md).
+## Superseded path
+
+v0.6E price-observation judgment planning in Issue #70 and PR #71 is superseded and closed without merge.
+
+The reset established that a price judgment cannot be implemented until the project separately resolves:
+
+- canonical market-price measurement, unit and currency ownership;
+- structured valuation comparison eligibility;
+- production-realistic fixture/provider parity;
+- Stage 2 shared-infrastructure consolidation.
+
+No v0.6E implementation or migration is authorized.
+
+## Current authorized stage
+
+The only active stage is the docs-only architecture baseline reset in Issue #72.
+
+Its purpose is to align project state, ownership, dependency direction, invariants, architecture debt and delivery gates. It does not authorize application behavior.
+
+## Required consolidation before new domains
+
+After the architecture baseline is accepted, the next candidate activity is a separately authorized Stage 2 consolidation characterization review. It must measure repeated validation, repository, query, fixture and test patterns before proposing any refactor.
+
+Stable schemas must not be generalized merely for aesthetic uniformity. A consolidation review may conclude that only shared Python-layer utilities are justified.
+
+## Prospective sequence
+
+The following sequence is prospective and requires separate Architecture Preflight and GitHub authorization at every step:
+
+1. accept the unified architecture baseline;
+2. characterize Stage 2 duplication and test-matrix growth;
+3. decide whether a standalone canonical market-price evidence contract has user value;
+4. decide whether valuation observations need structured comparison-eligibility semantics;
+5. re-evaluate whether a separate price-judgment aggregate is necessary;
+6. only then reconsider v0.7 Watchlist and verification tasks;
+7. later consider Paper Portfolio and portfolio analysis.
+
+A deterministic read model may be preferable to a new persisted judgment aggregate when it can reproduce the required relationship without duplicating state.
+
+## Not authorized
+
+Until explicitly approved in a future Issue:
+
+- v0.6E price judgment;
+- timing judgment;
+- v0.7 Watchlist or verification-task runtime behavior;
+- v0.8 Paper Portfolio or simulated trades;
+- v0.9 portfolio analysis and Quant Core workflow integration;
+- new migrations;
+- release/tag or version changes;
+- broker, order, automated trading, recommendation or production deployment behavior.
+
+## Delivery rule
+
+Development proceeds only through:
+
+```text
+Architecture Preflight
+  -> Definition of Ready
+  -> concise authoritative Issue
+  -> task synchronization/planning review
+  -> implementation review
+  -> merge authorization
+  -> architecture/status synchronization
+```
+
+Green CI is necessary but not sufficient. A stage must also prove domain ownership, production reachability, fixture parity, explicit semantics and bounded scope.
