@@ -7,9 +7,9 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 - Review date: 2026-07-19
 - Released software version: `0.2.0`
 - Merged capability stage: v0.6D
-- Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`
+- Accepted application/consolidation implementation baseline: `a2688b6e244743ef5e3bdcaedfc6c6717d7a7d8c`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Most recent architecture synchronization: Issue #94 and its linked synchronization PR
+- Most recent architecture synchronization: Issue #100 and its linked synchronization PR
 - Active application or consolidation implementation authorization: none
 - New migration authorization: none
 
@@ -23,23 +23,25 @@ Docs-only commits may advance `main` without changing release, capability or run
 - Issue #76 / PR #77 extracted the neutral frozen boundary.
 - Issues #80/#82 and PRs #81/#83 characterized and implemented ordered scalar row loading.
 - Issues #86/#88 and PRs #87/#89 characterized and implemented v0.6A-v0.6C pure query values.
+- Issue #92 / PR #93 kept evidence read serializers domain-local because no neutral claim projection reached Definition of Ready.
+- Issues #96/#98 and PRs #97/#99 characterized and implemented neutral command integrity translation.
 
-## Evidence read characterization acceptance
+## Command integrity implementation acceptance
 
-Issue #92 / PR #93 compared the v0.6B-v0.6D private evidence payload builders.
+PR #99 was accepted at fixed head `b0dc58b2adb27e9a6ec6f1a2dce3699bd2bab9ff` and squash-merged as `a2688b6e244743ef5e3bdcaedfc6c6717d7a7d8c`.
 
-Independent review confirmed that the serializers share evidence-item fields, contradiction projection, A-D grade counts and deterministic sorting, but also have material differences:
+Independent review confirmed:
 
-- v0.6B emits a reduced nested claim shape;
-- v0.6B uses domain-specific missing-evidence wording;
-- owner revision fields and source-link container names differ;
-- v0.6D retains a separate timestamp-null/error policy;
-- a whole serializer would require reflection, callbacks or adapter objects;
-- neutral projection DTOs would add conversion code without an accepted neutral claim contract.
+- the base-to-head diff contained exactly the seven Issue #98 files;
+- `stage2_integrity.translate_integrity(message)` catches only SQLAlchemy `IntegrityError`;
+- it raises `EvidenceLedgerConflictError` with the exact caller message and chains from the original exception;
+- non-integrity exceptions propagate as the same object;
+- all four command modules preserve outer-translator/inner-`session_factory.begin()` nesting;
+- conflict messages, transaction-owned rollback, process-local locks, database row locks, revision allocation and supersession are unchanged;
+- Actions `29687524781`, full tests and the fixture demo succeeded;
+- PostgreSQL-focused tests were honestly reported as skipped where the required database URL was unavailable.
 
-The accepted decision is to keep the serializers local. Evidence serializer implementation does not reach Definition of Ready, and no implementation Issue follows from PR #93.
-
-PR #93 was squash-merged as `e97762eba916e64299965a33b574870b1dad46e0`. Issue #92 closed completed. Actions tests, fixture demo and cleanup passed; no migration or runtime change occurred.
+No migration, API, schema, fixture, dependency, release, version, v0.6E, v0.7 or PR #38 change occurred.
 
 ## Current review conclusion
 
@@ -47,15 +49,16 @@ Neutral ownership exists for:
 
 - shared Stage 2 frozen-boundary mechanics;
 - ordered scalar repository row loading;
-- v0.6A-v0.6C pure query-value mechanics.
+- v0.6A-v0.6C pure query-value mechanics;
+- SQLAlchemy integrity-error translation.
 
-Evidence read serialization intentionally remains domain-local. Remaining consolidation risk is command conflict/integrity and rollback compatibility, revision allocation/locking, and ORM event complexity.
+Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text and transaction boundaries. Remaining consolidation risk is revision allocation/locking and ORM event complexity.
 
 ## Locked exclusions
 
 - no evidence serializer extraction or projection DTOs without a re-evaluation trigger and new preflight;
-- no command conflict/integrity implementation without accepted characterization;
-- no revision-lock, model-factory or append-only-listener refactor;
+- no revision-lock, row-lock, revision-allocation, supersession or retry refactor without accepted characterization;
+- no model-factory or append-only-listener refactor;
 - no application/provider behavior change or migration;
 - no v0.6E price or timing judgment;
 - no v0.7 Watchlist or verification-task behavior;
@@ -65,6 +68,6 @@ Evidence read serialization intentionally remains domain-local. Remaining consol
 
 ## Next development gate
 
-The next candidate is a separate characterization of command conflict/integrity behavior. It must inventory repeated `IntegrityError` handling, rollback ownership, domain exception translation, exact messages, revision/link atomicity and SQLite/PostgreSQL differences.
+The next candidate is a separate characterization of revision allocation and lock strategy. It must inventory process-local `RLock` registries, database `SELECT ... FOR UPDATE`, latest-revision reads, revision number and supersession allocation, concurrent PostgreSQL behavior, SQLite limitations, retry policy and lifecycle/cleanup risks.
 
-Characterization may conclude that conflict handling should remain local. It does not authorize implementation. No Codex application implementation command is active after this synchronization.
+Characterization may conclude that the current approach should remain local. It does not authorize implementation. No Codex application implementation command is active after this synchronization.
