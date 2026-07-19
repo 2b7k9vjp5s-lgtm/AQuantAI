@@ -6,91 +6,57 @@ This is the design record for accepted Stage 2 consolidation work.
 
 - Initial characterization: Issue #74 / PR #75.
 - Neutral frozen-boundary implementation: Issue #76 / PR #77.
-- Ordered repository row-loading characterization: Issue #80 / PR #81.
-- Neutral ordered row-loader implementation: Issue #82 / PR #83.
-- Accepted application/consolidation implementation baseline: `e424fa3a95e35b20f5fe8d8ada211821d9661efd`.
-- Migration decision for both implementations: no migration.
+- Ordered repository row-loading characterization and implementation: Issues #80/#82, PRs #81/#83.
+- Query-value characterization and implementation: Issues #86/#88, PRs #87/#89.
+- Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`.
+- Migration decision for all accepted consolidation implementations: no migration.
 
-The report records completed work and remaining candidates. It does not authorize another implementation.
+This report records completed work and remaining candidates. It does not authorize another implementation.
 
-## Completed dependency correction
+## Completed neutral boundaries
 
-Before PR #77, v0.6D quality-judgment commands imported shared private mechanics from the v0.6C catalyst/risk command module.
+### Frozen boundary
 
-The accepted direction is:
+`industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B base-boundary loading, UTC/cutoff visibility and company-research locking used by v0.6C and v0.6D. Catalyst/risk and judgment semantics, revision locks and conflict translation remain local.
 
-```text
-industry_alpha.stage2_boundary
-  <- v0.6C catalyst/risk commands
-  <- v0.6D quality-judgment commands
-```
+### Ordered repository rows
 
-`industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B base-boundary loading, UTC/cutoff visibility and company-research locking. Catalyst/risk and judgment semantics, revision locks and conflict translation remain local.
+`industry_alpha.stage2_repository_rows.load_ordered_rows` owns only explicit `IN` filtering and caller-owned ordering for scalar row loading. Repository wrappers retain optional-ID normalization, link-field selection, graph assembly, missing-parent policy, sessions, transactions and public methods.
 
-## Completed repository mechanic
+### Query values
 
-PR #83 added:
+`industry_alpha.stage2_query_values` owns only the accepted v0.6A-v0.6C pure mechanics:
 
-```text
-industry_alpha.stage2_repository_rows.load_ordered_rows
-```
+- required UTC normalization with the exact missing-timestamp visibility error;
+- naive/aware datetime conversion to UTC;
+- date-granular recorded and information-date visibility;
+- trailing-`Z` timestamp text;
+- optional date and UUID text.
 
-The neutral primitive owns only:
-
-```python
-select(model).where(field.in_(ids)).order_by(*order_fields)
-```
-
-It returns `()` for empty IDs and otherwise materializes the caller-owned ordered scalar query as a tuple.
-
-Repository-local responsibilities remain unchanged:
-
-- v0.6B filters optional `None` IDs before delegation;
-- v0.6C selects its caller-provided owning revision field;
-- v0.6D selects `judgment_revision_id`;
-- every repository owns graph assembly, required-parent and missing-row policy;
-- sessions, transactions, exceptions and public repository methods remain local.
-
-The extraction did not introduce a repository base class, generic graph loader, eager loading, joins, caching or input-order semantics.
+v0.6B/v0.6C revision collection wrappers remain local. v0.6D query values remain local because malformed-null behavior differs. Evidence payload construction, grade counts, conflicts, missing-evidence text, claim/link selection, ID sorting, notices, aggregate errors and public contracts remain local.
 
 ## Acceptance evidence
 
-### Frozen-boundary slice
+PR #77 established the neutral frozen boundary and removed the v0.6D dependency on v0.6C private command helpers.
 
-PR #77 established:
+PR #83 established the stateless ordered-row primitive while preserving SQL shape, graph behavior and transaction ownership.
 
-- one immutable `Stage2BaseBoundary` used by v0.6C and v0.6D;
-- removal of the v0.6D dependency on v0.6C private command helpers;
-- unchanged command behavior, validation, APIs, fixtures and Alembic metadata;
-- successful full Actions tests and local fixture demo.
+PR #89 established the v0.6A-v0.6C pure query-value module while preserving public query payloads and the v0.6D edge policy. Direct tests cover exact errors, UTC conversion, formatting and cutoff boundaries. GitHub Actions tests and the local fixture demo passed. PostgreSQL-focused cases were not claimed as executed where the required URL was unavailable.
 
-### Ordered-row slice
-
-PR #83 established:
-
-- one stateless `load_ordered_rows` helper;
-- existing private v0.6A-v0.6D wrappers retained;
-- unchanged SQL shape and ordering expressions;
-- direct tests for empty input, duplicate IDs, missing IDs, explicit ordering, transaction ownership and local `None` filtering;
-- unchanged graph assembly, public repository methods and read payloads;
-- successful full Actions tests, PostgreSQL regressions and local fixture demo.
-
-Both slices are source-only and require no database downgrade or data repair.
+All three slices are source-only and require no database downgrade or data repair.
 
 ## Current classification
 
 | Mechanism | Current decision |
 | --- | --- |
 | Shared v0.6A/v0.6B frozen boundary | Completed in PR #77 |
-| UTC and visibility helpers required by that boundary | Completed in PR #77 |
 | Ordered scalar repository row loading | Completed in PR #83 |
+| v0.6A-v0.6C pure query values | Completed in PR #89 |
+| v0.6D query-value null/error policy | Remains local |
 | Repository graph assembly and missing-parent semantics | Remain local |
-| v0.6B optional-ID normalization | Remains local |
-| v0.6C and v0.6D domain semantics | Remain local |
+| Evidence read serialization | Next characterization candidate; requires a neutral contract |
 | Generic evidence graph repository | Not justified |
-| Pure query visibility/date/UTC/UUID formatting | Next characterization candidate |
-| Evidence read serialization | Requires a neutral contract |
-| Integrity translation | Deferred |
+| Command conflict/integrity translation | Deferred |
 | Revision allocation and lock strategy | Deferred |
 | Dynamic model factories | Deferred, ORM-sensitive |
 | Append-only listener registration | Deferred, ORM-sensitive |
@@ -100,16 +66,15 @@ Both slices are source-only and require no database downgrade or data repair.
 
 Separate reviewed work may later consider:
 
-1. pure query cutoff/recorded visibility and date/UTC/UUID formatting;
-2. a neutral evidence read contract;
-3. conflict and integrity primitives;
-4. revision allocation and lock strategy;
-5. append-only listener registration and dynamic model construction.
+1. a neutral evidence read-serialization contract;
+2. command conflict and integrity primitives;
+3. revision allocation and lock strategy;
+4. append-only listener registration and dynamic model construction.
 
-A characterization may conclude that a candidate should remain duplicated. Completion of PR #77 or PR #83 is not blanket authorization for any remaining item.
+A characterization may conclude that a candidate should remain duplicated. Completed neutral boundaries are not blanket authorization for any remaining item.
 
 ## Next gate
 
-The next candidate begins with a separate characterization Issue for pure query visibility/date/UTC/UUID formatting. It must inventory exact existing functions and prove identical chronology, formatting, ordering, missing-data and cross-database behavior.
+The next candidate begins with a separate characterization Issue for evidence read serialization across v0.6B-v0.6D. It must inventory exact claim/evidence fields, lookup dependencies, ordering, conflict/missing projections, domain-specific text and collection types. It must define whether a neutral input/output contract can exist without weakening domain ownership, and it may conclude that no extraction is safe.
 
-No query implementation, v0.6E, v0.7 or new migration is authorized by this record.
+No evidence serializer implementation, v0.6E, v0.7 or new migration is authorized by this record.
