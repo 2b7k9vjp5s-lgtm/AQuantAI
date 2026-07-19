@@ -66,6 +66,10 @@ The first v0.5 slice is limited to a local, append-only research-case and eviden
 
 The second v0.5 slice is limited to append-only industry-map, node, directed-relationship, driver, bottleneck, and value-pool-shift observation revisions. Every assertion binds exact v0.5A claim revisions, map revisions freeze exact assertion revisions, and current/historical read-only views preserve A/B/C/D grades, conflicts, missing evidence, UTC chronology, and cutoff boundaries. It does not authorize scoring, weights, rankings, company beneficiaries, Stage 2 research, LLM/provider execution, scraping, recommendations, signals, portfolios, brokers, orders, or trading.
 
+### v0.5C Authorized Stage 1 Beneficiary Classifications
+
+The third v0.5 slice is limited to append-only direct, secondary, and potential company-beneficiary classifications. Every revision freezes one exact successful local `stock_basic` row, one exact v0.5B map revision, exact assertions contained in that map revision, and exact v0.5A claim revisions. Supported classifications require visible A/B/C-backed support without contradiction; D-only and disputed states remain explicit. Candidate-pool revisions freeze only exact supported classifications from one map boundary and have no score, weight, rank, target price, recommendation, or investment-priority semantics. Financial transmission, Stage 2 deep research, valuation, LLM/provider execution, scraping, recommendations, portfolios, brokers, orders, and trading remain unauthorized.
+
 ## v0.6 Stage 2 And Stock Research
 
 - **Objective:** assess beneficiaries, financial transmission, expectations, valuation, catalysts, and risks from Stage 1 inputs.

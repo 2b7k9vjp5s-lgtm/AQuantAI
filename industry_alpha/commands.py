@@ -312,6 +312,13 @@ class EvidenceLedgerCommandService:
                 validate_claim_evidence_append_after_map_freeze(
                     session, claim_revision_id, recorded
                 )
+                from industry_alpha.stage1_commands import (
+                    validate_claim_evidence_append_after_beneficiary_freeze,
+                )
+
+                validate_claim_evidence_append_after_beneficiary_freeze(
+                    session, claim_revision_id, recorded
+                )
                 existing = list(
                     session.scalars(
                         select(ClaimEvidenceLink).where(

@@ -276,6 +276,14 @@ python -m scripts.demo_industry_chain_map
 
 The map demo compares the current frozen map with the earlier `2026-07-03` cutoff. The current view includes supported A/B/C-backed assertions, a D-grade lead that remains draft, and one visible disputed conflict. It performs no network call and does not write the configured PostgreSQL database.
 
+Run the fully offline v0.5C Stage 1 beneficiary fixture demo:
+
+```bash
+python -m scripts.demo_stage1_beneficiaries
+```
+
+The demo freezes exact local `stock_basic`, map-assertion, and claim revisions for supported direct/secondary, D-only draft, and disputed classifications. Its candidate pool contains only supported revisions and has no score, weight, rank, or recommendation meaning. The isolated SQLite demo compares current and earlier-cutoff classification state and performs no network, provider, scraper, or LLM call.
+
 After applying Alembic migrations, the ledger exposes read-only database-backed routes:
 
 ```text
@@ -285,9 +293,13 @@ GET http://127.0.0.1:8000/industry-alpha/cases/{case_id}?as_of_cutoff=YYYY-MM-DD
 GET http://127.0.0.1:8000/industry-alpha/maps
 GET http://127.0.0.1:8000/industry-alpha/maps/{map_id}
 GET http://127.0.0.1:8000/industry-alpha/maps/{map_id}?as_of_cutoff=YYYY-MM-DD
+GET http://127.0.0.1:8000/industry-alpha/maps/{map_id}/beneficiaries
+GET http://127.0.0.1:8000/industry-alpha/beneficiaries/{beneficiary_id}
+GET http://127.0.0.1:8000/industry-alpha/maps/{map_id}/candidate-pools
+GET http://127.0.0.1:8000/industry-alpha/candidate-pools/{candidate_pool_id}
 ```
 
-There are no HTTP create, update, or delete routes. A missing or cutoff-invisible case or map returns 404, malformed dates return 422, and missing database configuration or schema returns 503. See [Industry Alpha evidence ledger](industry_alpha_evidence_ledger.md) and [evidence-backed industry chain maps](industry_chain_maps.md) for the append-only, evidence, conflict, and historical visibility rules.
+There are no HTTP create, update, or delete routes. A missing or cutoff-invisible case, map, beneficiary, or candidate pool returns 404, malformed dates return 422, and missing database configuration or schema returns 503. See [Industry Alpha evidence ledger](industry_alpha_evidence_ledger.md), [evidence-backed industry chain maps](industry_chain_maps.md), and [Stage 1 beneficiary classifications](stage1_beneficiaries.md) for the append-only, evidence, conflict, exact-binding, and historical visibility rules.
 
 See [market_cockpit.md](market_cockpit.md), [benchmark_context.md](benchmark_context.md), and [sector_context.md](sector_context.md) for exact formulas, minimum history, missing-data rules, provenance, alignment, and remaining exclusions.
 
@@ -317,6 +329,7 @@ If Windows reserves port 8000, `netsh interface ipv4 show excludedportrange prot
 - v0.4B benchmark context uses a separate explicit provider-attributed series. It is not an official exchange statement, full-market breadth, or a recommendation.
 - v0.4C sector context uses a separate exact Eastmoney `BK` code scope. It is descriptive market context, not company membership, Industry Alpha evidence, a signal, or a recommendation.
 - v0.5A records manually supplied or deterministic fixture research evidence only. It does not fetch sources, score industries, identify beneficiaries, or create investment conclusions or recommendations.
-- v0.5B records only evidence-bound, versioned industry-chain structure and observations. It adds no scoring, company beneficiaries, Stage 2 research, LLM execution, recommendations, or trading.
+- v0.5B records only evidence-bound, versioned industry-chain structure and observations.
+- v0.5C records exact evidence/map/company-bound Stage 1 classifications and an unranked candidate handoff. It adds no scores, financial-transmission assumptions, Stage 2 research, valuation, LLM execution, recommendations, or trading.
 - No real LLM calls, broker APIs, order placement, automatic trading, or production deployment.
 - No live-data Dashboard, authentication, account system, or payment system. PostgreSQL and AKShare ingestion are not connected to `/dashboard`.

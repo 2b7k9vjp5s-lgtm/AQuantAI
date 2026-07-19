@@ -16,6 +16,8 @@ from industry_alpha.chain_map_repository import IndustryChainMapRepository
 from industry_alpha.errors import EvidenceLedgerNotFound, EvidenceLedgerNotVisible
 from industry_alpha.query import EvidenceLedgerQueryService
 from industry_alpha.repository import EvidenceLedgerRepository
+from industry_alpha.stage1_query import Stage1BeneficiaryQueryService
+from industry_alpha.stage1_repository import Stage1BeneficiaryRepository
 
 router = APIRouter(prefix="/industry-alpha", tags=["industry-alpha"])
 
@@ -66,6 +68,94 @@ def get_industry_map(
             return IndustryChainMapQueryService(
                 IndustryChainMapRepository(session)
             ).get_map(map_id, as_of_cutoff=as_of_cutoff).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/maps/{map_id}/beneficiaries")
+def list_stage1_beneficiaries(
+    map_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage1BeneficiaryQueryService(
+                Stage1BeneficiaryRepository(session)
+            ).list_beneficiaries(
+                map_id, as_of_cutoff=as_of_cutoff
+            ).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/beneficiaries/{beneficiary_id}")
+def get_stage1_beneficiary(
+    beneficiary_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage1BeneficiaryQueryService(
+                Stage1BeneficiaryRepository(session)
+            ).get_beneficiary(
+                beneficiary_id, as_of_cutoff=as_of_cutoff
+            ).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/maps/{map_id}/candidate-pools")
+def list_stage1_candidate_pools(
+    map_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage1BeneficiaryQueryService(
+                Stage1BeneficiaryRepository(session)
+            ).list_candidate_pools(
+                map_id, as_of_cutoff=as_of_cutoff
+            ).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/candidate-pools/{candidate_pool_id}")
+def get_stage1_candidate_pool(
+    candidate_pool_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage1BeneficiaryQueryService(
+                Stage1BeneficiaryRepository(session)
+            ).get_candidate_pool(
+                candidate_pool_id, as_of_cutoff=as_of_cutoff
+            ).to_dict()
     except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
