@@ -83,6 +83,38 @@ def inputs(factory, research_id):
     return research_revision.id, hypothesis_revision_id, claim_revision_id
 
 
+def fixture_valuation_revision_semantics(factory, fixture):
+    with factory() as session:
+        initial = session.get(
+            Stage2ValuationSnapshotRevision, fixture.valuation_revision_id
+        )
+        later = session.get(
+            Stage2ValuationSnapshotRevision, fixture.later_valuation_revision_id
+        )
+    assert initial is not None
+    assert later is not None
+    return initial.revision_no, later.revision_no, initial.id != later.id
+
+
+def test_postgres_fixture_revision_ids_repeat_on_clean_database(
+    postgres_database_url: str,
+):
+    engine = build_engine(postgres_database_url)
+    factory = build_session_factory(engine)
+    results = []
+    try:
+        for _ in range(2):
+            with engine.begin() as connection:
+                connection.execute(
+                    text("TRUNCATE research_cases, ingestion_runs CASCADE")
+                )
+            fixture = build_stage2_expectation_valuation_fixture(factory)
+            results.append(fixture_valuation_revision_semantics(factory, fixture))
+    finally:
+        engine.dispose()
+    assert results == [(1, 2, True), (1, 2, True)]
+
+
 def test_postgres_v06b_migration_from_v06a_and_round_trip(postgres_database_url: str):
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", postgres_database_url)

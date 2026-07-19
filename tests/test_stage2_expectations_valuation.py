@@ -22,7 +22,10 @@ from industry_alpha.stage2_expectations_commands import Stage2ExpectationCommand
 from industry_alpha.stage2_expectations_fixtures import (
     build_stage2_expectation_valuation_fixture,
 )
-from industry_alpha.stage2_expectations_models import STAGE2_EXPECTATION_MODELS
+from industry_alpha.stage2_expectations_models import (
+    STAGE2_EXPECTATION_MODELS,
+    Stage2ValuationSnapshotRevision,
+)
 from industry_alpha.stage2_expectations_query import (
     Stage2ExpectationQueryService,
     Stage2ValuationQueryService,
@@ -102,6 +105,37 @@ def frozen_inputs(session_factory, research_id):
             )
         )
     return revision.id, hypothesis_revision_id, claim_revision_id
+
+
+def fixture_valuation_revision_semantics(session_factory, fixture):
+    with session_factory() as session:
+        initial = session.get(
+            Stage2ValuationSnapshotRevision, fixture.valuation_revision_id
+        )
+        later = session.get(
+            Stage2ValuationSnapshotRevision, fixture.later_valuation_revision_id
+        )
+    assert initial is not None
+    assert later is not None
+    return initial.revision_no, later.revision_no, initial.id != later.id
+
+
+def test_fixture_valuation_revision_ids_are_exact_and_repeatable_on_clean_sqlite():
+    results = []
+    for _ in range(2):
+        engine = create_engine(
+            "sqlite+pysqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(engine)
+        factory = build_session_factory(engine)
+        try:
+            fixture = build_stage2_expectation_valuation_fixture(factory)
+            results.append(fixture_valuation_revision_semantics(factory, fixture))
+        finally:
+            engine.dispose()
+    assert results == [(1, 2, True), (1, 2, True)]
 
 
 def test_fixture_outputs_are_strict_json_safe_and_bounded(session_factory, built):

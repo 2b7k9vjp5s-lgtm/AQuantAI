@@ -166,6 +166,13 @@ def build_stage2_expectation_valuation_fixture(
         daily_price_id=price_id,
         recorded_at_utc=_recorded(15, 13),
     )
+    with session_factory() as session:
+        valuation_revision = session.scalars(
+            select(Stage2ValuationSnapshotRevision).where(
+                Stage2ValuationSnapshotRevision.valuation_id == valuation.id,
+                Stage2ValuationSnapshotRevision.revision_no == 1,
+            )
+        ).one()
     later = commands.append_expectation_revision(
         expectation.id,
         company_research_revision_id=research_revision.id,
@@ -351,12 +358,6 @@ def build_stage2_expectation_valuation_fixture(
         daily_price_id=later_price_id,
         recorded_at_utc=_recorded(18, 12),
     )
-    with session_factory() as session:
-        valuation_revision = session.scalar(
-            select(Stage2ValuationSnapshotRevision).where(
-                Stage2ValuationSnapshotRevision.valuation_id == valuation.id
-            )
-        )
     return Stage2ExpectationFixtureIds(
         stage2=stage2,
         expectation_id=expectation.id,
