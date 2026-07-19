@@ -14,16 +14,22 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from industry_alpha.errors import EvidenceLedgerConflictError, EvidenceLedgerNotFound, EvidenceLedgerValidationError
-from industry_alpha.stage2_assessments_commands import (
-    _Boundary, _frozen_boundary, _load_unique, _locked_research, _required_text,
-    _stored_utc, _time_boundary, _visible_upstream,
-)
 from industry_alpha.stage2_assessments_models import (
     Stage2CatalystAssessment, Stage2CatalystAssessmentRevision, Stage2CatalystClaimLink,
     Stage2CatalystEvidenceLink, Stage2CatalystExpectationLink, Stage2CatalystHypothesisLink,
     Stage2CatalystValuationLink, Stage2RiskAssessment, Stage2RiskAssessmentRevision,
     Stage2RiskClaimLink, Stage2RiskEvidenceLink, Stage2RiskExpectationLink,
     Stage2RiskHypothesisLink, Stage2RiskValuationLink,
+)
+from industry_alpha.stage2_boundary import (
+    Stage2BaseBoundary as _Boundary,
+    build_stage2_base_boundary as _frozen_boundary,
+    load_unique as _load_unique,
+    lock_company_research as _locked_research,
+    required_text as _required_text,
+    stored_utc as _stored_utc,
+    time_boundary as _time_boundary,
+    visible_upstream as _visible_upstream,
 )
 from industry_alpha.stage2_judgments_models import (
     Stage2CompanyJudgment, Stage2CompanyJudgmentCatalystLink, Stage2CompanyJudgmentClaimLink,
