@@ -6,10 +6,11 @@ This document is the authoritative architecture and current-state baseline. `.co
 
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
-- Accepted application/consolidation implementation baseline: `4b6377169fabb8eef5f1b421e8f008a11582f8a9`.
+- Accepted application/consolidation implementation baseline: `e424fa3a95e35b20f5fe8d8ada211821d9661efd`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
+- Active application, consolidation implementation or migration authorization: none.
 
-Later docs-only commits may advance `main` without changing the released version, capability stage or runtime behavior. PR #73 established this baseline, PR #75 characterized Stage 2 consolidation, PR #77 implemented the first accepted extraction, and Issue #78 with PR #79 synchronized the record.
+Docs-only commits may advance `main` without changing the released version, capability stage or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #81 characterized ordered repository row loading; PR #83 implemented the neutral ordered row loader. Issue #84 and its linked synchronization PR record the resulting state.
 
 ## Product boundary
 
@@ -31,7 +32,12 @@ market-data evidence
 
 Downstream records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state or rewrite historical meaning.
 
-The shared v0.6A/v0.6B frozen-boundary mechanics used by v0.6C and v0.6D belong to `industry_alpha.stage2_boundary`. v0.6D no longer imports those private mechanics from the v0.6C command module. Catalyst/risk and quality-judgment semantics remain in their domain modules.
+Two neutral Stage 2 infrastructure boundaries are now accepted:
+
+- `industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B frozen-boundary mechanics used by v0.6C and v0.6D;
+- `industry_alpha.stage2_repository_rows` owns one stateless ordered scalar row-loading primitive used through repository-local private wrappers.
+
+Catalyst/risk and quality-judgment semantics remain in their domain modules. Repository graph assembly, v0.6B `None` normalization, link-field selection, missing-parent policy and session/transaction ownership remain local.
 
 The current implementable path does not include v0.6E price judgment, timing judgment, Watchlist tasks, Paper Portfolio, simulated trades, portfolio analysis or Quant Core workflow state. Issue #70 and PR #71 remain superseded and closed without merge.
 
@@ -44,14 +50,14 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | v0.5A-v0.5C | Evidence ledger, industry-chain maps, beneficiary classifications and candidate-pool handoff | Evidence qualification and exact frozen-link patterns remain repeated downstream |
 | v0.6A | Company research and financial-transmission hypotheses | Revision allocation, append-only and evidence checks remain repeated |
 | v0.6B | Expectations and valuation observations with optional local-price provenance | Generic `observed_value` is not automatically comparison eligible; no target/fair value or timing output |
-| v0.6C | Catalyst and risk assessments over exact frozen boundaries | Base-boundary ownership is consolidated; repository/query/concurrency/ORM repetition remains |
-| v0.6D | Independent industry/company quality judgments | Private dependency on v0.6C is removed; remaining read and lifecycle infrastructure needs separate review |
+| v0.6C | Catalyst and risk assessments over exact frozen boundaries | Base-boundary and ordered-row mechanics are consolidated; query/concurrency/ORM repetition remains |
+| v0.6D | Independent industry/company quality judgments | Incorrect private dependency and repeated ordered-row mechanics are removed; remaining query and lifecycle infrastructure needs separate review |
 | v0.6E | Superseded planning only | Not implemented or authorized |
 | v0.7+ | Prospective only | Not authorized; requires Architecture Preflight and Definition of Ready |
 
-## Field and domain ownership
+## Field and infrastructure ownership
 
-| Information | Authoritative owner | Rule |
+| Information or mechanism | Authoritative owner | Rule |
 | --- | --- | --- |
 | Provider rows, series identity, ingestion status and cutoff | Market-data persistence | Explicit series/run selection; no provider-only fallback or cross-run stitching |
 | Canonical market-price value, measurement kind, unit, currency and decimal normalization | Future separately reviewed market-data/evidence contract | Downstream judgment code must not invent it |
@@ -61,6 +67,7 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | Catalyst and risk state | v0.6C | Not monitors, alerts or task lifecycles |
 | Industry/company quality outcome and evidence state | v0.6D | Does not automatically generate price, timing or recommendation state |
 | Shared v0.6A/v0.6B frozen-boundary mechanics | Neutral Stage 2 infrastructure | `stage2_boundary.py` owns exact base-boundary loading and visibility; domain semantics remain local |
+| Ordered scalar repository row loading | Neutral Stage 2 infrastructure | `stage2_repository_rows.py` executes explicit `IN` filtering and caller-owned ordering; all normalization and graph semantics remain local |
 | “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities |
 
 A linked local `daily_price` row remains provenance/context. It is not a canonical comparison value merely because a valuation record also stores a numeric string and currency.
@@ -84,13 +91,15 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 
 ## Architecture debt register
 
-- **D1 Documentation drift — controlled:** PR #73 established the baseline; Issue #78 and PR #79 synchronized it after the first consolidation implementation.
-- **D2 Repeated Stage 2 structure — partially reduced:** PR #77 removed the highest-priority incorrect dependency. Ordered repository row loading is the next characterization candidate; a generic graph loader is not authorized.
-- **D3 Cross-cutting validation — partially reduced:** base-boundary loading and visibility have neutral ownership; revision allocation, integrity translation, append-only rejection and query serialization remain duplicated.
-- **D4 Test-matrix growth:** future slices must separate shared invariant tests from domain-specific semantic tests.
-- **D5 Fixture-versus-production reachability:** every success path needs production-realistic offline adapter parity.
-- **D6 Missing canonical market-price semantics:** `DailyPriceRecord` is not a complete arbitrary price-comparison evidence object.
-- **D7 Consolidation cadence:** review is mandatory after every two domain slices and earlier when duplication or ownership ambiguity appears.
+- **D1 Documentation drift — controlled:** architecture/status synchronization is required after accepted implementation changes.
+- **D2 Repeated Stage 2 structure — partially reduced:** PR #77 consolidated the neutral frozen boundary and PR #83 consolidated ordered scalar row loading. Generic graph loading remains unjustified.
+- **D3 Read and validation utilities — partially reduced:** pure query visibility/date/UTC/UUID formatting is the next characterization candidate; evidence serialization still requires a neutral contract.
+- **D4 Command lifecycle and concurrency — deferred:** revision allocation, lock strategy and integrity translation affect rollback and error compatibility.
+- **D5 ORM lifecycle — deferred:** dynamic link-model factories and append-only listeners are mapper/event sensitive and may remain duplicated.
+- **D6 Test-matrix growth:** future slices must separate shared invariant tests from domain-specific semantic tests.
+- **D7 Fixture-versus-production reachability:** every success path needs production-realistic offline adapter parity.
+- **D8 Missing canonical market-price semantics:** `DailyPriceRecord` is not a complete arbitrary price-comparison evidence object.
+- **D9 Consolidation cadence:** review is mandatory after every two domain slices and earlier when duplication or ownership ambiguity appears.
 
 ## Development gates
 
@@ -125,18 +134,20 @@ Completed:
 1. unified architecture baseline accepted in PR #73;
 2. Stage 2 consolidation characterized in PR #75;
 3. neutral Stage 2 frozen-boundary extraction accepted in PR #77;
-4. post-consolidation architecture status synchronized in Issue #78 and PR #79.
+4. ordered repository row loading characterized in PR #81;
+5. neutral ordered scalar row loader accepted in PR #83;
+6. Issue #84 and its linked PR synchronize those outcomes without changing application behavior.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
 Prospective and separately authorized:
 
-5. characterize shared ordered repository row-loading primitives;
-6. consider a minimal implementation only if SQL, ordering, duplicate and missing-row semantics are proven identical;
 7. characterize pure query visibility/date/UTC/UUID formatting;
-8. decide whether canonical market-price evidence has independent user value;
-9. only then consider structured valuation comparison eligibility;
-10. re-evaluate whether price judgment needs persisted state or a deterministic read model;
-11. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
+8. consider a minimal pure-helper implementation only if semantics and payload compatibility are proven identical;
+9. characterize evidence read serialization only after defining a neutral contract;
+10. decide whether canonical market-price evidence has independent user value;
+11. only then consider structured valuation comparison eligibility;
+12. re-evaluate whether price judgment needs persisted state or a deterministic read model;
+13. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
 
 No prospective item is authorized by this document alone.
