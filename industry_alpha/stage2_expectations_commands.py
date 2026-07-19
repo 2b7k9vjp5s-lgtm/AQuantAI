@@ -61,8 +61,6 @@ VALUATION_METHODS = frozenset(
         "missing_data",
     }
 )
-MISSING_EVIDENCE_REASON = "尚未获得可靠公开证据"
-
 _LOCKS_GUARD = Lock()
 _LOCKS: dict[tuple[str, UUID], RLock] = {}
 
@@ -197,6 +195,10 @@ class Stage2ExpectationCommandService:
         cutoff = _required_date(information_cutoff_date, "information_cutoff_date")
         validate_recorded_cutoff(cutoff, recorded)
         key = _required_text(valuation_key, "valuation_key", 96)
+        method = reviewed_value(valuation_method, "valuation_method", VALUATION_METHODS)
+        observed, missing = _valuation_value_state(
+            method, observed_value, missing_data_reason
+        )
         with self._translate_integrity("valuation key already exists"):
             with self._session_factory.begin() as session:
                 research = _locked_research(session, company_research_id)
@@ -214,10 +216,10 @@ class Stage2ExpectationCommandService:
                     company_research_revision_id=company_research_revision_id,
                     hypothesis_revision_ids=hypothesis_revision_ids,
                     claim_revision_ids=claim_revision_ids,
-                    valuation_method=valuation_method,
+                    valuation_method=method,
                     metric_context=metric_context,
-                    observed_value=observed_value,
-                    missing_data_reason=missing_data_reason,
+                    observed_value=observed,
+                    missing_data_reason=missing,
                     unit=unit,
                     currency=currency,
                     comparison_basis=comparison_basis,
@@ -254,6 +256,10 @@ class Stage2ExpectationCommandService:
         recorded = utc_timestamp(recorded_at_utc)
         cutoff = _required_date(information_cutoff_date, "information_cutoff_date")
         validate_recorded_cutoff(cutoff, recorded)
+        method = reviewed_value(valuation_method, "valuation_method", VALUATION_METHODS)
+        observed, missing = _valuation_value_state(
+            method, observed_value, missing_data_reason
+        )
         with _revision_lock("valuation", valuation_id):
             with self._translate_integrity("valuation revision conflicts with history"):
                 with self._session_factory.begin() as session:
@@ -266,10 +272,10 @@ class Stage2ExpectationCommandService:
                         company_research_revision_id=company_research_revision_id,
                         hypothesis_revision_ids=hypothesis_revision_ids,
                         claim_revision_ids=claim_revision_ids,
-                        valuation_method=valuation_method,
+                        valuation_method=method,
                         metric_context=metric_context,
-                        observed_value=observed_value,
-                        missing_data_reason=missing_data_reason,
+                        observed_value=observed,
+                        missing_data_reason=missing,
                         unit=unit,
                         currency=currency,
                         comparison_basis=comparison_basis,
@@ -339,17 +345,16 @@ class Stage2ExpectationCommandService:
         if prior is not None:
             chronology.append(("previous valuation revision timestamp", _stored_utc(prior.recorded_at_utc)))
         validate_utc_chronology(data["recorded_at_utc"], *chronology)
-        observed = _decimal_text(data["observed_value"])
-        missing = _optional_text(data["missing_data_reason"], "missing_data_reason", 500)
-        if observed is None and missing is None:
-            missing = MISSING_EVIDENCE_REASON
-        if observed is not None and missing is not None:
-            raise EvidenceLedgerValidationError("observed_value and missing_data_reason are mutually exclusive.")
+        method, observed, missing = _validated_valuation_values(
+            data["valuation_method"],
+            data["observed_value"],
+            data["missing_data_reason"],
+        )
         revision = Stage2ValuationSnapshotRevision(
             valuation_id=identity.id,
             company_research_revision_id=boundary.id,
             revision_no=1 if prior is None else prior.revision_no + 1,
-            valuation_method=reviewed_value(data["valuation_method"], "valuation_method", VALUATION_METHODS),
+            valuation_method=method,
             metric_context=_required_text(data["metric_context"], "metric_context", 1000),
             observed_value=observed,
             missing_data_reason=missing,
@@ -472,11 +477,21 @@ def _price(session: Session, research: Stage2CompanyResearch, price_id: int | No
     run = session.get(IngestionRun, row.ingestion_run_id)
     if run is None or run.status != "succeeded" or run.completed_at is None:
         raise EvidenceLedgerValidationError("price reference must belong to a successful ingestion run.")
+    imported_at = _stored_utc(run.imported_at)
+    completed_at = _stored_utc(run.completed_at)
+    if completed_at < imported_at:
+        raise EvidenceLedgerValidationError(
+            "price ingestion completion timestamp must not precede import timestamp."
+        )
     if row.source != research.source or row.stock_code != research.stock_code:
         raise EvidenceLedgerValidationError("price reference must match the frozen Stage 2 company identity.")
     if row.trade_date > cutoff or run.information_cutoff_date > cutoff:
         raise EvidenceLedgerValidationError("price reference is after the valuation cutoff.")
-    validate_utc_chronology(recorded, ("price import timestamp", _stored_utc(run.imported_at)), ("price completion timestamp", _stored_utc(run.completed_at)))
+    validate_utc_chronology(
+        recorded,
+        ("price import timestamp", imported_at),
+        ("price completion timestamp", completed_at),
+    )
     return row, run
 
 
@@ -511,12 +526,80 @@ def _decimal_text(value: str | Decimal | None) -> str | None:
     if not isinstance(value, (str, Decimal)):
         raise EvidenceLedgerValidationError("observed_value must be a decimal string or Decimal.")
     try:
-        parsed = Decimal(str(value))
+        parsed = Decimal(value)
     except InvalidOperation as exc:
         raise EvidenceLedgerValidationError("observed_value must be finite decimal text.") from exc
     if not parsed.is_finite():
         raise EvidenceLedgerValidationError("observed_value must be finite.")
-    return format(parsed.normalize(), "f")
+    if parsed.is_zero():
+        return "0"
+    sign, digit_values, exponent = parsed.as_tuple()
+    digits = "".join(str(item) for item in digit_values)
+    while digits.endswith("0"):
+        digits = digits[:-1]
+        exponent += 1
+    prefix = "-" if sign else ""
+    if exponent >= 0:
+        canonical_length = len(prefix) + len(digits) + exponent
+        if canonical_length > 64:
+            raise EvidenceLedgerValidationError(
+                "observed_value canonical decimal must not exceed 64 characters."
+            )
+        return prefix + digits + ("0" * exponent)
+    decimal_position = len(digits) + exponent
+    if decimal_position > 0:
+        canonical_length = len(prefix) + len(digits) + 1
+        if canonical_length > 64:
+            raise EvidenceLedgerValidationError(
+                "observed_value canonical decimal must not exceed 64 characters."
+            )
+        return prefix + digits[:decimal_position] + "." + digits[decimal_position:]
+    canonical_length = len(prefix) + 2 + (-decimal_position) + len(digits)
+    if canonical_length > 64:
+        raise EvidenceLedgerValidationError(
+            "observed_value canonical decimal must not exceed 64 characters."
+        )
+    return prefix + "0." + ("0" * (-decimal_position)) + digits
+
+
+def _valuation_value_state(
+    method: str,
+    observed_value: str | Decimal | None,
+    missing_data_reason: str | None,
+) -> tuple[str | None, str | None]:
+    observed = _decimal_text(observed_value)
+    missing = _optional_text(missing_data_reason, "missing_data_reason", 500)
+    if method == "missing_data":
+        if observed is not None:
+            raise EvidenceLedgerValidationError(
+                "missing_data valuation_method requires observed_value to be None."
+            )
+        if missing is None:
+            raise EvidenceLedgerValidationError(
+                "missing_data valuation_method requires a nonblank missing_data_reason."
+            )
+    else:
+        if observed is None:
+            raise EvidenceLedgerValidationError(
+                "non-missing valuation methods require an observed_value."
+            )
+        if missing is not None:
+            raise EvidenceLedgerValidationError(
+                "non-missing valuation methods must not include missing_data_reason."
+            )
+    return observed, missing
+
+
+def _validated_valuation_values(
+    valuation_method: str,
+    observed_value: str | Decimal | None,
+    missing_data_reason: str | None,
+) -> tuple[str, str | None, str | None]:
+    method = reviewed_value(valuation_method, "valuation_method", VALUATION_METHODS)
+    observed, missing = _valuation_value_state(
+        method, observed_value, missing_data_reason
+    )
+    return method, observed, missing
 
 
 def _required_text(value: str, field: str, maximum: int) -> str:

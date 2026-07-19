@@ -8,15 +8,18 @@ from datetime import date, datetime, timezone
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect, select, text
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.engine import make_url
 
 from backend.database.engine import build_engine, build_session_factory
+from backend.database.models import IngestionRun
+from industry_alpha.errors import EvidenceLedgerValidationError
 from industry_alpha.stage2_expectations_commands import Stage2ExpectationCommandService
 from industry_alpha.stage2_expectations_fixtures import (
     build_stage2_expectation_valuation_fixture,
 )
 from industry_alpha.stage2_expectations_models import (
+    STAGE2_EXPECTATION_MODELS,
     Stage2MarketExpectationRevision,
     Stage2ValuationSnapshotRevision,
 )
@@ -61,8 +64,10 @@ def inputs(factory, research_id):
     with factory() as session:
         research_revision = session.scalar(
             select(Stage2CompanyResearchRevision)
-            .where(Stage2CompanyResearchRevision.company_research_id == research_id)
-            .order_by(Stage2CompanyResearchRevision.revision_no.desc())
+            .where(
+                Stage2CompanyResearchRevision.company_research_id == research_id,
+                Stage2CompanyResearchRevision.revision_no == 3,
+            )
         )
         hypothesis_revision_id = session.scalar(
             select(Stage2ResearchHypothesisLink.hypothesis_revision_id).where(
@@ -163,14 +168,14 @@ def test_postgres_concurrent_valuation_revision_numbers(postgres_database_url: s
             assumptions="No fair value, target price, or expected return is derived.",
             status="supported",
             confidence="low",
-            information_cutoff_date=date(2026, 7, 17),
+            information_cutoff_date=date(2026, 7, 19),
             daily_price_id=fixture.daily_price_id,
-            recorded_at_utc=utc(17),
+            recorded_at_utc=utc(19),
         )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(append, (1, 2)))
-    assert sorted(item.revision_no for item in results) == [2, 3]
+    assert sorted(item.revision_no for item in results) == [3, 4]
     with factory() as session:
         rows = list(
             session.scalars(
@@ -179,5 +184,100 @@ def test_postgres_concurrent_valuation_revision_numbers(postgres_database_url: s
                 .order_by(Stage2ValuationSnapshotRevision.revision_no)
             )
         )
-    assert [item.revision_no for item in rows] == [1, 2, 3]
+    assert [item.revision_no for item in rows] == [1, 2, 3, 4]
+    engine.dispose()
+
+
+def test_postgres_invalid_decimal_and_missing_states_rollback(postgres_database_url: str):
+    engine = build_engine(postgres_database_url)
+    factory = build_session_factory(engine)
+    fixture = build_stage2_expectation_valuation_fixture(factory)
+    revision_id, hypothesis_revision_id, claim_revision_id = inputs(
+        factory, fixture.stage2.supported_research_id
+    )
+    with factory() as session:
+        before = tuple(
+            session.scalar(select(func.count()).select_from(model))
+            for model in STAGE2_EXPECTATION_MODELS
+        )
+    invalid = (
+        ("market_price_context", "1e64", None),
+        ("market_price_context", "NaN", None),
+        ("market_price_context", "Infinity", None),
+        ("market_price_context", "-Infinity", None),
+        ("missing_data", "1", "missing"),
+        ("missing_data", None, None),
+        ("market_price_context", None, None),
+        ("market_price_context", "1", "missing"),
+    )
+    for index, (method, observed, reason) in enumerate(invalid):
+        with pytest.raises(EvidenceLedgerValidationError):
+            Stage2ExpectationCommandService(factory).create_valuation_snapshot(
+                fixture.stage2.supported_research_id,
+                valuation_key=f"postgres-invalid-{index}",
+                company_research_revision_id=revision_id,
+                hypothesis_revision_ids=(hypothesis_revision_id,),
+                claim_revision_ids=(claim_revision_id,),
+                valuation_method=method,
+                metric_context="Invalid PostgreSQL valuation state",
+                observed_value=observed,
+                missing_data_reason=reason,
+                unit=None,
+                currency=None,
+                comparison_basis="Invalid input must rollback.",
+                assumptions="No invalid state is persisted.",
+                status="draft",
+                confidence="low",
+                information_cutoff_date=date(2026, 7, 16),
+                recorded_at_utc=utc(16),
+            )
+        with factory() as session:
+            assert tuple(
+                session.scalar(select(func.count()).select_from(model))
+                for model in STAGE2_EXPECTATION_MODELS
+            ) == before
+    engine.dispose()
+
+
+def test_postgres_impossible_price_chronology_rolls_back(postgres_database_url: str):
+    engine = build_engine(postgres_database_url)
+    factory = build_session_factory(engine)
+    fixture = build_stage2_expectation_valuation_fixture(factory)
+    revision_id, hypothesis_revision_id, claim_revision_id = inputs(
+        factory, fixture.stage2.supported_research_id
+    )
+    with factory.begin() as session:
+        run = session.get(IngestionRun, fixture.ingestion_run_id)
+        run.completed_at = utc(15, 9)
+    with factory() as session:
+        before = tuple(
+            session.scalar(select(func.count()).select_from(model))
+            for model in STAGE2_EXPECTATION_MODELS
+        )
+    with pytest.raises(EvidenceLedgerValidationError, match="must not precede"):
+        Stage2ExpectationCommandService(factory).create_valuation_snapshot(
+            fixture.stage2.supported_research_id,
+            valuation_key="postgres-impossible-price-chronology",
+            company_research_revision_id=revision_id,
+            hypothesis_revision_ids=(hypothesis_revision_id,),
+            claim_revision_ids=(claim_revision_id,),
+            valuation_method="market_price_context",
+            metric_context="Invalid PostgreSQL provenance chronology",
+            observed_value="10.2",
+            missing_data_reason=None,
+            unit="close",
+            currency="CNY",
+            comparison_basis="Invalid input must rollback.",
+            assumptions="No impossible provenance is persisted.",
+            status="draft",
+            confidence="low",
+            information_cutoff_date=date(2026, 7, 16),
+            daily_price_id=fixture.daily_price_id,
+            recorded_at_utc=utc(16),
+        )
+    with factory() as session:
+        assert tuple(
+            session.scalar(select(func.count()).select_from(model))
+            for model in STAGE2_EXPECTATION_MODELS
+        ) == before
     engine.dispose()

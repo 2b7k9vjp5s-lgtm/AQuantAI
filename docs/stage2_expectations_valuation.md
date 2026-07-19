@@ -8,6 +8,9 @@ v0.6B adds local, append-only records for market expectations and valuation-cont
 - Every revision freezes exact supported or disputed financial-transmission hypothesis revisions.
 - Every revision freezes exact claim revisions and visible evidence links from those hypothesis boundaries.
 - Valuation snapshots may optionally bind one exact local `daily_price` row from a successful ingestion run.
+- Price provenance rejects successful runs whose completion precedes import and exposes both `imported_at_utc` and `completed_at_utc`.
+- Observed decimal text is finite, canonical, and bounded to the persisted 64-character field before a transaction starts.
+- `missing_data` valuations require no observed value and a nonblank reason; every other method requires an observed value and forbids a missing-data reason.
 - Historical views require both `information_cutoff_date <= as_of_cutoff` and `recorded_at_utc` date `<= as_of_cutoff`.
 - Later evidence, links, price rows, or revisions do not leak into earlier views.
 

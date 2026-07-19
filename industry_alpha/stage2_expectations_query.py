@@ -351,6 +351,7 @@ def _price_reference(rows: Stage2ValuationRows, price_id: int | None) -> dict[st
         "source": price.source,
         "adjust_type": price.adjust_type,
         "close": price.close,
+        "imported_at_utc": _timestamp(run.imported_at),
         "completed_at_utc": _timestamp(run.completed_at),
     }
 
