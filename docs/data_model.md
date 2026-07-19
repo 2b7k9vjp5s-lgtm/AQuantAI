@@ -50,4 +50,4 @@ Research case -> thesis snapshot -> paper portfolio -> simulated trades / positi
 Quant Core records -> research-case validation inputs
 ```
 
-The implemented v0.5B boundary stops at the industry map. Stable map, node, relationship, and observation identities have immutable revisions. Every asserted revision references exact v0.5A claim revisions, and each map revision freezes exact assertion revisions. Beneficiary classification and the Stage 2 candidate pool remain unimplemented.
+The merged v0.5B boundary provides stable map, node, relationship, and observation identities with immutable revisions. The v0.5C boundary adds append-only Stage 1 beneficiary identities and revisions that freeze one exact local `stock_basic` row, one exact map revision, exact contained map assertions, and exact v0.5A claim revisions. Candidate-pool revisions freeze only exact supported beneficiary revisions from the same map boundary, without scores, weights, ranks, recommendations, or Stage 2 conclusions.
