@@ -62,6 +62,10 @@ The fifth v0.4 slice is limited to deterministic selected-universe price-behavio
 
 The first v0.5 slice is limited to a local, append-only research-case and evidence ledger. It separates workflow state from conclusion status; records immutable A/B/C/D evidence, versioned facts and inferences, explicit support and contradiction links, frozen case-revision claim membership, and mandatory follow-up verification metadata; and provides cutoff-aware read-only APIs plus an offline fixture demo. It does not authorize industry scoring, causal-chain conclusions, company-beneficiary mapping, Stage 2 stock research, LLM execution, scraping, recommendations, signals, portfolios, or trading.
 
+### v0.5B Authorized Evidence-Backed Chain Maps
+
+The second v0.5 slice is limited to append-only industry-map, node, directed-relationship, driver, bottleneck, and value-pool-shift observation revisions. Every assertion binds exact v0.5A claim revisions, map revisions freeze exact assertion revisions, and current/historical read-only views preserve A/B/C/D grades, conflicts, missing evidence, UTC chronology, and cutoff boundaries. It does not authorize scoring, weights, rankings, company beneficiaries, Stage 2 research, LLM/provider execution, scraping, recommendations, signals, portfolios, brokers, orders, or trading.
+
 ## v0.6 Stage 2 And Stock Research
 
 - **Objective:** assess beneficiaries, financial transmission, expectations, valuation, catalysts, and risks from Stage 1 inputs.

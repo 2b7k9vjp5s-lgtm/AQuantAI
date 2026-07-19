@@ -268,15 +268,26 @@ python -m scripts.demo_evidence_ledger
 
 The demo creates an isolated in-memory ledger and compares its complete current view with an earlier `2026-06-07` cutoff. It performs no provider, scraper, LLM, or other network call and does not write the configured PostgreSQL database.
 
+Run the fully offline v0.5B evidence-backed industry-chain-map fixture demo:
+
+```bash
+python -m scripts.demo_industry_chain_map
+```
+
+The map demo compares the current frozen map with the earlier `2026-07-03` cutoff. The current view includes supported A/B/C-backed assertions, a D-grade lead that remains draft, and one visible disputed conflict. It performs no network call and does not write the configured PostgreSQL database.
+
 After applying Alembic migrations, the ledger exposes read-only database-backed routes:
 
 ```text
 GET http://127.0.0.1:8000/industry-alpha/cases
 GET http://127.0.0.1:8000/industry-alpha/cases/{case_id}
 GET http://127.0.0.1:8000/industry-alpha/cases/{case_id}?as_of_cutoff=YYYY-MM-DD
+GET http://127.0.0.1:8000/industry-alpha/maps
+GET http://127.0.0.1:8000/industry-alpha/maps/{map_id}
+GET http://127.0.0.1:8000/industry-alpha/maps/{map_id}?as_of_cutoff=YYYY-MM-DD
 ```
 
-There are no HTTP create, update, or delete routes. A missing or cutoff-invisible case returns 404, malformed dates return 422, and missing database configuration or schema returns 503. See [Industry Alpha evidence ledger](industry_alpha_evidence_ledger.md) for the append-only, evidence, conflict, and historical visibility rules.
+There are no HTTP create, update, or delete routes. A missing or cutoff-invisible case or map returns 404, malformed dates return 422, and missing database configuration or schema returns 503. See [Industry Alpha evidence ledger](industry_alpha_evidence_ledger.md) and [evidence-backed industry chain maps](industry_chain_maps.md) for the append-only, evidence, conflict, and historical visibility rules.
 
 See [market_cockpit.md](market_cockpit.md), [benchmark_context.md](benchmark_context.md), and [sector_context.md](sector_context.md) for exact formulas, minimum history, missing-data rules, provenance, alignment, and remaining exclusions.
 
@@ -306,5 +317,6 @@ If Windows reserves port 8000, `netsh interface ipv4 show excludedportrange prot
 - v0.4B benchmark context uses a separate explicit provider-attributed series. It is not an official exchange statement, full-market breadth, or a recommendation.
 - v0.4C sector context uses a separate exact Eastmoney `BK` code scope. It is descriptive market context, not company membership, Industry Alpha evidence, a signal, or a recommendation.
 - v0.5A records manually supplied or deterministic fixture research evidence only. It does not fetch sources, score industries, identify beneficiaries, or create investment conclusions or recommendations.
+- v0.5B records only evidence-bound, versioned industry-chain structure and observations. It adds no scoring, company beneficiaries, Stage 2 research, LLM execution, recommendations, or trading.
 - No real LLM calls, broker APIs, order placement, automatic trading, or production deployment.
 - No live-data Dashboard, authentication, account system, or payment system. PostgreSQL and AKShare ingestion are not connected to `/dashboard`.

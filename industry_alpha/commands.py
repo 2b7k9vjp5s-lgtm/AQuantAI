@@ -305,6 +305,13 @@ class EvidenceLedgerCommandService:
                     ("claim revision timestamp", _stored_utc(revision.recorded_at_utc)),
                     ("evidence timestamp", _stored_utc(evidence.recorded_at_utc)),
                 )
+                from industry_alpha.chain_map_commands import (
+                    validate_claim_evidence_append_after_map_freeze,
+                )
+
+                validate_claim_evidence_append_after_map_freeze(
+                    session, claim_revision_id, recorded
+                )
                 existing = list(
                     session.scalars(
                         select(ClaimEvidenceLink).where(
@@ -688,7 +695,11 @@ class EvidenceLedgerCommandService:
     def _same_case_endpoints(
         session: Session, claim_revision_id: UUID, evidence_id: UUID
     ) -> tuple[ClaimRevision, EvidenceItem]:
-        revision = session.get(ClaimRevision, claim_revision_id)
+        revision = session.scalar(
+            select(ClaimRevision)
+            .where(ClaimRevision.id == claim_revision_id)
+            .with_for_update()
+        )
         evidence = session.get(EvidenceItem, evidence_id)
         if revision is None or evidence is None:
             raise EvidenceLedgerNotFound("claim revision or evidence was not found.")

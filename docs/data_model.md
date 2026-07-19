@@ -49,3 +49,5 @@ Research case -> watchlist entry -> revision history
 Research case -> thesis snapshot -> paper portfolio -> simulated trades / positions / NAV
 Quant Core records -> research-case validation inputs
 ```
+
+The implemented v0.5B boundary stops at the industry map. Stable map, node, relationship, and observation identities have immutable revisions. Every asserted revision references exact v0.5A claim revisions, and each map revision freezes exact assertion revisions. Beneficiary classification and the Stage 2 candidate pool remain unimplemented.
