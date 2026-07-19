@@ -6,11 +6,12 @@ This document is the authoritative architecture and current-state baseline. `.co
 
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
+- Current documentation head: `375a8d15b8a4f7ca80fe843fcfd93bccdeaa2d9a`.
 - Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
-Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 kept evidence read serializers domain-local; PRs #97/#99 characterized and implemented command integrity translation; PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry.
+Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 kept evidence read serializers domain-local; PRs #97/#99 characterized and implemented command integrity translation; PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry; PR #109 characterized Hithink as the preferred future A-share provider candidate.
 
 ## Product boundary
 
@@ -31,6 +32,14 @@ market-data evidence
 ```
 
 Downstream records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state or rewrite historical meaning.
+
+## Accepted future provider direction
+
+Issue #108 and PR #109 accept Hithink as the preferred future A-share provider candidate, not an active default or implemented provider. AKShare remains an explicit, separate provider-specific alternative, and all existing AKShare ingestion runs and canonical series remain immutable and readable.
+
+One ingestion run and one canonical series contain exactly one provider. Silent fallback, provider relabeling and row-level provider mixing are prohibited. A caller may explicitly choose a separate provider run and series; persistence must not hide that distinction.
+
+Canonical ingestion may use reviewed REST contracts or a separately reviewed market-dump importer. MCP or LLM-mediated calls are not canonical ingestion. Neither Hithink production path has reached Definition of Ready.
 
 Five neutral Stage 2 infrastructure boundaries are accepted:
 
@@ -62,7 +71,7 @@ The current implementable path does not include v0.6E price judgment, timing jud
 
 | Information or mechanism | Authoritative owner | Rule |
 | --- | --- | --- |
-| Provider rows, series identity, ingestion status and cutoff | Market-data persistence | Explicit series/run selection; no provider-only fallback or cross-run stitching |
+| Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit provider per run and series; no silent fallback, relabeling, row-level mixing or cross-run stitching |
 | Canonical market-price value, measurement kind, unit, currency and decimal normalization | Future separately reviewed market-data/evidence contract | Downstream judgment code must not invent it |
 | Evidence grades, claims, links and conflicts | v0.5 evidence ledger | Downstream slices freeze exact revisions and links |
 | Company-research workflow and hypotheses | v0.6A | Downstream records bind exact revisions |
@@ -103,9 +112,9 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 - **D2 Repeated Stage 2 structure — partially reduced:** frozen-boundary and ordered-row mechanics are consolidated; generic graph loading remains unjustified.
 - **D3 Read utilities — reviewed:** v0.6A-v0.6C pure query values are consolidated. Evidence serializers remain local because no neutral claim contract reaches Definition of Ready; v0.6D query-value policy remains local.
 - **D4 Command lifecycle and concurrency — partially reduced:** integrity translation and the process-local lock registry are consolidated; row locks, latest-revision reads, allocation, supersession, cleanup/eviction and retry remain command-local.
-- **D5 ORM lifecycle — next characterization gate:** dynamic link-model factories and append-only listeners are mapper/event sensitive; no implementation is authorized before characterization.
+- **D5 ORM lifecycle — deferred, not cancelled:** dynamic link-model factories and append-only listeners are mapper/event sensitive; characterization remains pending after the provider contract gate.
 - **D6 Test-matrix growth:** shared invariant tests and domain-semantic tests must remain distinct.
-- **D7 Fixture-versus-production reachability:** success paths need production-realistic offline adapter parity.
+- **D7 Fixture-versus-production reachability — next gate:** a credential-safe Hithink contract acceptance probe must establish reachable contracts before provider implementation planning.
 - **D8 Missing canonical market-price semantics:** `DailyPriceRecord` is not a complete arbitrary price-comparison evidence object.
 - **D9 Consolidation cadence:** review after every two domain slices and earlier when ownership ambiguity appears.
 
@@ -131,14 +140,17 @@ Completed:
 7. command integrity characterization and implementation — PRs #97 and #99;
 8. Issue #100 and its linked PR synchronize the completed integrity boundary without changing runtime behavior.
 9. revision-lock characterization and implementation — Issues #102/#104 and PRs #103/#105.
+10. Hithink provider characterization — Issue #108 and PR #109; preferred future candidate, no implementation authorization.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
 Prospective and separately authorized:
 
-10. characterize ORM lifecycle concerns without implementing dynamic model factories or append-only listeners;
-11. decide whether canonical market-price evidence has independent user value;
-12. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
-13. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
+11. run a separately authorized credential-safe Hithink contract acceptance probe with no database writes and a user-configured local secret only when executed;
+12. decide whether a reviewed REST adapter, a separately reviewed market-dump importer or neither reaches Definition of Ready;
+13. characterize ORM lifecycle concerns without implementing dynamic model factories or append-only listeners;
+14. decide whether canonical market-price evidence has independent user value;
+15. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
+16. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
 
 No prospective item is authorized by this document alone.

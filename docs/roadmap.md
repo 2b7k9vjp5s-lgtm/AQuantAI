@@ -6,6 +6,7 @@
 
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
+- Current documentation head: `375a8d15b8a4f7ca80fe843fcfd93bccdeaa2d9a`.
 - Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
@@ -37,6 +38,14 @@ The neutral integrity helper catches only `IntegrityError`, preserves the exact 
 
 No schema, migration, public API, fixture, domain-semantic or released-version change resulted from these consolidation reviews.
 
+## Accepted future provider direction
+
+Issue #108 / PR #109 records Hithink as the preferred future A-share provider candidate. It is not implemented and is not the active default. AKShare remains an explicit separate alternative, and existing AKShare ingestion history and canonical series remain preserved.
+
+Every ingestion run and canonical series contains exactly one provider. Silent fallback, provider relabeling and row-level provider mixing are prohibited. Explicit alternatives create separate provider-specific runs and series.
+
+Canonical ingestion may later use reviewed REST or a separately reviewed market-dump importer. MCP and LLM-mediated calls are excluded from canonical ingestion. No production Hithink implementation has reached Definition of Ready.
+
 ## Superseded path
 
 Issue #70 and PR #71 for v0.6E price judgment remain superseded and closed without merge. Canonical price measurement ownership, comparison eligibility, realistic provider parity and sufficient consolidation must be resolved separately before reconsideration.
@@ -47,18 +56,20 @@ No v0.6E implementation or migration is authorized.
 
 1. append-only listener registration and dynamic link-model construction.
 
-The next gate is only an independent ORM lifecycle characterization of item 1. Dynamic model factories and append-only listeners remain deferred until mapper/event registration, import-order behavior and test isolation are reviewed. No implementation is authorized by this status sync.
+The next Stage 2 consolidation candidate remains an independent ORM lifecycle characterization of item 1. It is deferred, not cancelled, while the more fundamental provider contract gate is resolved. Dynamic model factories and append-only listeners remain unimplemented.
 
 Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs. Integrity translation and the process-local lock registry are completed and do not authorize changes to row locks, allocation, supersession, cleanup/eviction or retry behavior.
 
 ## Prospective sequence
 
-1. characterize ORM lifecycle concerns;
-2. implement only if a smaller neutral contract preserves mapper/event behavior and reaches Definition of Ready;
-3. decide whether canonical market-price evidence has independent user value;
-4. decide whether valuation observations need comparison-eligibility semantics;
-5. re-evaluate whether price judgment needs persisted state or a deterministic read model;
-6. only then reconsider v0.7 Watchlist and later portfolio work.
+1. run a separately authorized credential-safe Hithink contract acceptance probe using a user-configured local secret only when executed and performing no database writes;
+2. decide whether a reviewed REST adapter, a separately reviewed market-dump importer or neither reaches Definition of Ready;
+3. characterize ORM lifecycle concerns;
+4. implement ORM changes only if a smaller neutral contract preserves mapper/event behavior and reaches Definition of Ready;
+5. decide whether canonical market-price evidence has independent user value;
+6. decide whether valuation observations need comparison-eligibility semantics;
+7. re-evaluate whether price judgment needs persisted state or a deterministic read model;
+8. only then reconsider v0.7 Watchlist and later portfolio work.
 
 Every item requires separate Architecture Preflight and GitHub authorization.
 
@@ -67,6 +78,8 @@ Every item requires separate Architecture Preflight and GitHub authorization.
 - evidence serializer extraction or projection DTOs;
 - row-lock, latest-revision, revision-allocation, supersession, cleanup/eviction or retry refactoring without accepted characterization;
 - append-only-listener or dynamic model-factory refactoring;
+- provider implementation, live request, secret, dependency, ingestion script, fixture or default-provider change;
+- silent provider fallback, relabeling, row-level mixing or MCP/LLM canonical ingestion;
 - v0.6D query-value policy changes;
 - v0.6E price or timing judgment;
 - v0.7 Watchlist or verification-task behavior;
