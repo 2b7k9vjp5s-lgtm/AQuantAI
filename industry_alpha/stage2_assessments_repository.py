@@ -17,6 +17,7 @@ from industry_alpha.stage2_assessments_models import (
     Stage2RiskClaimLink, Stage2RiskEvidenceLink, Stage2RiskExpectationLink,
     Stage2RiskHypothesisLink, Stage2RiskValuationLink,
 )
+from industry_alpha.stage2_repository_rows import load_ordered_rows
 
 
 @dataclass(frozen=True)
@@ -85,11 +86,15 @@ class Stage2AssessmentRepository:
         return Stage2AssessmentRows(row, revisions, hypothesis_links, expectation_links, valuation_links, claim_links, evidence_links, claims, claim_revisions, source_evidence_links, evidence)
 
     def _linked(self, model: type[Any], field: str, ids: list[UUID]) -> tuple[Any, ...]:
-        if not ids:
-            return ()
-        return tuple(self._session.scalars(select(model).where(getattr(model, field).in_(ids)).order_by(getattr(model, field), model.id)))
+        linked_field = getattr(model, field)
+        return load_ordered_rows(
+            self._session,
+            model,
+            linked_field,
+            ids,
+            linked_field,
+            model.id,
+        )
 
     def _rows(self, model: type[Any], field: Any, ids: list[Any], *order: Any) -> tuple[Any, ...]:
-        if not ids:
-            return ()
-        return tuple(self._session.scalars(select(model).where(field.in_(ids)).order_by(*order)))
+        return load_ordered_rows(self._session, model, field, ids, *order)
