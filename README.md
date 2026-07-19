@@ -1,131 +1,82 @@
 # AQuantAI
 
-AQuantAI is a personal A-share AI quantitative research platform built around market data, multi-factor research, backtesting, OpenBB-style research workflows, and future AI Agent orchestration.
+AQuantAI is a local-first personal A-share research workbench built around attributable market data, deterministic quantitative research, evidence-backed industry/company research, backtesting foundations and future guarded AI assistance.
 
-Current phase: v0.2 local read-only research Dashboard baseline.
+It is for research and learning only. It does not provide investment advice, recommendations, broker connectivity, real orders or automated trading, and it is not production-ready.
 
-Current version: `0.2.0`.
+## Current state
 
-This project is for quantitative research and learning only. It does not provide investment advice, does not make trading recommendations, is not production-ready, and is not intended for automated trading.
+AQuantAI uses three independent status axes:
 
-The v0.4A foundation adds a separate database-backed, read-only Market Cockpit for one explicit equity snapshot series. The authorized v0.4B slice adds an optional, separately selected provider-attributed benchmark-index series and close-based context. Neither domain claims full-market coverage or official exchange authorship. The released version, fixture Dashboard payloads, and Quant Core calculations remain unchanged.
+| Axis | Current state |
+| --- | --- |
+| Released software version | `0.2.0` |
+| Merged capability stage on `main` | v0.6D |
+| Runtime surfaces | Local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured |
 
-## Planned Personal Research Architecture
+Merged capability stages do not automatically publish a new release. The application version remains `0.2.0` until a separate release decision.
 
-The approved future direction is a local-first personal investment research workbench: Market Cockpit, Industry Alpha, Stock Research, Watchlist, Paper Portfolio, and Settings. The existing provider, factor, ranking, backtest, ML-boundary, report, and read-only Dashboard layers are preserved as Quant Core.
+The authoritative state, dependency direction, ownership rules, invariants, architecture debt and development gates are defined in [the architecture baseline](docs/architecture_baseline.md).
 
-This architecture is planning only. The active v0.2 application remains a fixture-backed, read-only research Dashboard. See [product architecture](docs/product_architecture.md), [research workflow](docs/research_workflow.md), [conceptual data model](docs/data_model.md), and [implementation plan](docs/implementation_plan.md).
+## Implemented capability summary
 
-## Positioning
+### Quant Core and Dashboard
 
-AQuantAI aims to become a sustainable research system for:
+- FastAPI application and health endpoint;
+- normalized provider contracts and guarded AKShare boundary;
+- deterministic factor values, percentile scores and composite utilities;
+- weekly equal-weight backtest foundations;
+- ML feature/label/prediction contracts and deterministic baseline path;
+- deterministic research-report contracts and lazy adapter boundaries;
+- fixture-backed read-only `/dashboard` page and JSON endpoints;
+- local fixture demo and no-network test discipline.
 
-- A-share market data collection
-- Multi-factor stock selection models
-- Weekly rebalancing backtests
-- Stock pool generation
-- AI-assisted research reports
-- Future integration with Qlib, VectorBT, OpenBB, LangGraph, and OpenAI APIs
+### Market-data persistence and Market Cockpit
 
-## Technology Stack
+- PostgreSQL market-data migrations and explicit session boundary;
+- immutable ingestion attempts and complete-snapshot reconciliation;
+- canonical snapshot-series identities isolating scopes, dates, adjustment and contract parameters;
+- controlled manual AKShare ingestion with explicit network opt-in and offline fixture mode;
+- cutoff-aware deterministic reads;
+- selected-universe breadth/risk, optional benchmark and sector context, liquidity distribution and descriptive price-behavior proxies;
+- read-only database-backed Market Cockpit API/page when configured.
 
-- Backend: Python 3.12, FastAPI, SQLAlchemy, Pydantic
-- Database: PostgreSQL
-- Data research: pandas, numpy
-- Data source foundation: AKShare provider boundary
-- Factor engine: deterministic pandas/numpy factor calculators and scoring utilities
-- Backtest engine: deterministic weekly Top-N equal-weight portfolio backtests
-- ML research layer: feature/label/prediction contracts and Qlib adapter boundary
-- AI Research Agent: deterministic research-only report assembly and adapter boundaries
-- Dashboard: read-only local browser page plus research presentation contracts and JSON endpoints
-- Future data source integrations: Tushare, OpenBB
-- Future full quant integrations beyond current adapter boundaries: VectorBT, Qlib
-- Future AI integrations beyond current adapter boundaries: LangGraph, OpenAI API
-- Deployment: Docker, docker-compose
-- Testing: pytest, httpx
+### Industry Alpha and Stage 2 research
 
-## Current Scope
+Merged reviewed foundations through v0.6D include:
 
-Phase 0 through Phase 6, the correctness hardening pass, and the local Dashboard delivery are implemented and review-accepted from an architecture perspective. The v0.2 baseline is local, deterministic, fixture-backed, and research-only:
+- v0.5A research cases, evidence, claims, conflicts and immutable revisions;
+- v0.5B industry maps, nodes, relationships, drivers, bottlenecks and value-pool observations;
+- v0.5C beneficiary classifications and exact candidate-pool handoff;
+- v0.6A company research and financial-transmission hypotheses;
+- v0.6B market expectations and valuation observations;
+- v0.6C catalyst and risk assessments;
+- v0.6D independent industry/company quality judgments.
 
-- Project structure
-- Documentation
-- Basic FastAPI app
-- Health check endpoint
-- Basic tests
-- Docker skeleton with FastAPI and PostgreSQL services
-- Data provider interface
-- AKShare provider skeleton
-- Normalized stock basic, daily price, and trade calendar contracts
-- Explicit SQLAlchemy engine/session boundary and Alembic market-data migration
-- Complete-snapshot PostgreSQL market-data versions with immutable ingestion attempts, cutoff-aware deterministic reads, exact stock-code scopes, transactional reconciliation, and concurrent-safe idempotent fixture imports
-- Canonical snapshot-series keys that isolate incompatible stock scopes, date ranges, adjustment policies, contracts, and compatibility parameters
-- Manual AKShare normalization and persistence CLI with explicit network opt-in, hard timeouts, finite retries, and dry-run support
-- Database-backed selected-universe Market Cockpit contracts, deterministic breadth/risk calculations, explicit series/cutoff selection, and a read-only local page
-- Separate benchmark-index daily persistence, bounded manual ingestion, explicit series selection, and deterministic close-based context
-- Mocked provider tests
-- Factor contracts for values and scores
-- Initial value, growth, quality, momentum, and risk factors
-- Percentile scoring and weighted composite score utilities
-- Date/universe-isolated factor and composite rankings with deterministic `stock_code` tie-breaking
-- Backtest contracts and result metrics
-- Top-N equal-weight portfolio selection from total scores
-- Weekly rebalance foundation using local price and score DataFrames
-- Post-close rebalance timing with no execution-date return leakage and total return calculated from initial cash
-- ML experiment contracts
-- Feature, label, and prediction output contracts
-- Deterministic baseline prediction path
-- Lazy Qlib adapter boundary
-- Research context and report contracts
-- Deterministic local report generation
-- Research-only disclaimer and safety wording checks
-- Optional lazy LLM adapter boundary
-- Dashboard data contracts
-- Read-only overview and report payload builders
-- Read-only dashboard FastAPI endpoints
-- Local read-only `/dashboard` HTML page using the existing fixture JSON endpoints only
-- End-to-end local fixture demo
-- Cross-module integration checks
-- Shared research-only safety validation
-- Duplicate, identifier, universe, and finite-value validation across ranking, backtest, and ML inputs
-- Release checklist and future work boundary documentation
+These records are append-only, cutoff-aware, evidence-bound and read-only. They do not produce target prices, fair values, expected returns, rankings, recommendations, Watchlist state, portfolio actions or trading behavior.
 
-## Not Supported Yet
+## Architecture freeze
 
-The current phase does not implement:
+The attempted v0.6E price-observation judgment path in Issue #70 and PR #71 is superseded and closed without merge.
 
-- Full historical A-share data ingestion
-- Tushare data fetching
-- OpenBB integration
-- Production stock-pool ranking
-- Strategy optimization or parameter grid search
-- Production model training
-- Hyperparameter search
-- Model registry
-- Scheduled retraining
-- Trading buttons
-- Broker APIs
-- Order placement
-- Automated trading
-- Production deployment pipeline
-- Login/auth/account system
+Before any new domain is authorized, the project must complete the architecture-baseline review and a separately authorized Stage 2 consolidation characterization. No v0.6E, v0.7 or new migration is currently authorized.
 
-## Quick Start
+A local `daily_price` row linked to a v0.6B valuation remains provenance/context. Generic valuation `observed_value` is not automatically eligible for price comparison. Canonical market-price measurement, unit and currency semantics require a separately reviewed upstream contract.
 
-For a complete local handoff covering Python, API, Docker, and Docker Compose usage, see [docs/local_usage.md](docs/local_usage.md).
+## Technology stack
 
-### One-Click Local Dashboard
+- Python 3.12
+- FastAPI
+- SQLAlchemy and Alembic
+- PostgreSQL
+- Pydantic
+- pandas and NumPy
+- pytest and httpx
+- Docker and Docker Compose for local use
 
-Prerequisites: a repository checkout and Docker Desktop. The launchers do not install Docker, Python, packages, or any other software.
+## Quick start
 
-- Windows: double-click `start-aquantai.bat`. Double-click `stop-aquantai.bat` to stop the local services safely.
-- macOS/Linux: run `chmod +x start-aquantai.sh stop-aquantai.sh`, then `./start-aquantai.sh`. Run `./stop-aquantai.sh` to stop the local services safely.
-
-The start launcher finds the repository root, checks Docker, Compose, the Docker daemon, and local Compose configuration, creates `.env` from `.env.example` only when needed, and starts the existing stack with `docker compose up --build -d`. It waits for the local health check, then opens `http://127.0.0.1:8000/dashboard`. It never overwrites an existing `.env`. If Docker cannot build dependencies, port 8000 is unavailable, or the health check times out, it prints focused diagnostics and a safe next action. Windows double-click results remain visible for 10 seconds; terminal and automation callers can pass `--no-wait` while retaining the launcher exit code.
-
-The Dashboard remains local, fixture/sample-data-only, and read-only. It is for research and learning only, not investment advice or a trading service.
-
-Install dependencies:
+Install runtime and development dependencies:
 
 ```bash
 pip install -e ".[dev]"
@@ -137,21 +88,15 @@ Run the API:
 uvicorn backend.main:app --reload
 ```
 
-Open:
+Available baseline endpoints include:
 
 - `GET /`
 - `GET /health`
-- `GET /dashboard` (local graphical, fixture-backed, read-only page)
+- `GET /dashboard`
 - `GET /dashboard/overview`
 - `GET /dashboard/report`
 
-`/dashboard` renders only the existing local fixture/sample Dashboard JSON payloads. It is read-only, uses no live market data, and keeps the raw JSON endpoints available for inspection.
-
-Inspect the Phase 1 data provider placeholder:
-
-```bash
-python -m scripts.update_data
-```
+The fixture Dashboard remains local, read-only and sample-data-only.
 
 Run the local research flow demo:
 
@@ -159,20 +104,35 @@ Run the local research flow demo:
 python -m scripts.demo_research_flow
 ```
 
-### Fixture Market-Data Persistence
+Run tests:
 
-Database migrations are explicit and never run when FastAPI imports or starts. After PostgreSQL is available, apply the schema and import the local deterministic fixture with:
+```bash
+python -m pytest
+```
+
+## Local Docker launch
+
+With Docker Desktop available:
+
+- Windows: `start-aquantai.bat`
+- macOS/Linux: `./start-aquantai.sh`
+
+The launcher checks Docker and Compose, preserves an existing `.env`, starts the local stack, waits for health and opens the local Dashboard. It does not install dependencies or enable production deployment.
+
+## Database-backed local use
+
+Migrations are explicit and never run during FastAPI import or startup.
 
 ```bash
 python -m alembic upgrade head
 python -m scripts.persist_fixture_market_data
 ```
 
-Run the fixture command a second time to verify the same ingestion ID is reused with `rows_written: 0` and `idempotent: true`. Set `DATABASE_URL` to a host-reachable PostgreSQL URL when running these commands outside Docker. See [docs/database.md](docs/database.md) for schema, provenance, cutoff, migration, and recovery details.
+Set `DATABASE_URL` to a host-reachable PostgreSQL URL when running outside Docker. See [database documentation](docs/database.md).
 
-### Controlled AKShare Ingestion
+### Controlled AKShare ingestion
 
-AKShare collection is manual and bounded. It requires explicit stock codes, dates, adjustment policy, cutoff, and `--allow-network`. The live cutoff must equal the UTC collection date and is rejected before any provider or database activity otherwise:
+Live collection is manual, bounded and requires explicit stock codes, dates, adjustment, cutoff and `--allow-network`.
 
 ```bash
 python -m scripts.ingest_akshare_market_data \
@@ -184,106 +144,33 @@ python -m scripts.ingest_akshare_market_data \
   --allow-network
 ```
 
-Inspect normalization and the canonical series key without database writes by adding `--dry-run`. For deterministic offline verification, replace `--allow-network` with `--offline-fixture`. The live stock-basic endpoint has no historical date selector, so it cannot reconstruct a historical stock universe; rows describe information available at collection time. No AKShare call occurs during imports, FastAPI startup, Dashboard use, tests, CI, or the fixture demo. See [controlled AKShare ingestion](docs/akshare_ingestion.md).
+Use `--dry-run` to inspect normalization and series identity without persistence. Use `--offline-fixture` for deterministic no-network verification. No AKShare call occurs during imports, startup, tests, CI, fixture demos or ordinary read use.
 
-Benchmark collection is a separate command and series. It uses only the reviewed `index_zh_a_hist` endpoint, accepts at most 20 explicit codes, and has the same explicit network/cutoff discipline:
+### Market Cockpit
 
-```bash
-python -m scripts.ingest_akshare_benchmark_data --index-code 000001 --start-date 20260105 --end-date 20260403 --cutoff 20260405 --offline-fixture --dry-run
-```
-
-See [benchmark index context](docs/benchmark_context.md) for endpoint mapping, series identity, formulas, and provider-attribution limits.
-
-### Database-Backed Market Cockpit
-
-After migrating PostgreSQL and persisting a compatible snapshot series, inspect the read-only JSON endpoint with an explicit series key:
+After persisting a compatible explicit snapshot series:
 
 ```text
-http://127.0.0.1:8000/market-cockpit/snapshot?series_key=<series-key>&as_of_cutoff=YYYYMMDD
+/market-cockpit/snapshot?series_key=<series-key>&as_of_cutoff=YYYYMMDD
+/market-cockpit?series_key=<series-key>&as_of_cutoff=YYYYMMDD
 ```
 
-Open the local page with the same selector:
+Equity, benchmark and sector series remain explicit and independent. The API never selects by provider alone and never stitches incompatible runs.
+
+## Development workflow
+
+GitHub is the source of truth for authorization and review. Every task must follow `.codex/WORKFLOW.md` and the active linked Issue.
+
+The required sequence is:
 
 ```text
-http://127.0.0.1:8000/market-cockpit?series_key=<series-key>&as_of_cutoff=YYYYMMDD
+Architecture Preflight
+  -> Definition of Ready
+  -> concise authoritative Issue
+  -> task synchronization/planning review
+  -> implementation review
+  -> explicit merge authorization
+  -> architecture/status synchronization
 ```
 
-Optionally add a separate explicit benchmark selector to either URL:
-
-```text
-&benchmark_series_key=<benchmark-series-key>
-```
-
-The API never performs provider-only selection and never falls back to fixture Dashboard data. Equity and benchmark runs are selected independently and never stitched. Without a benchmark key, the accepted equity-only response remains compatible and benchmark context is unavailable. Exact formulas and minimum windows are documented in [Market Cockpit v0.4A](docs/market_cockpit.md) and [benchmark index context](docs/benchmark_context.md).
-
-Run tests:
-
-```bash
-python -m pytest
-```
-
-Release readiness checklist:
-
-- `CHANGELOG.md`
-- `docs/release_checklist.md`
-- `docs/future_work.md`
-
-## Docker Start
-
-Copy the environment template:
-
-```bash
-cp .env.example .env
-```
-
-Start services:
-
-```bash
-docker compose up --build
-```
-
-## Development Workflow
-
-GitHub is the single source of truth for task synchronization and review follow-up.
-
-Every development sprint must start by reading:
-
-- Latest GitHub Review Issue
-- `docs/roadmap.md`
-- `docs/architecture.md`
-- `docs/factors.md`
-- `docs/backtesting.md`
-- `docs/ml.md`
-- `docs/agent.md`
-- `docs/dashboard.md`
-- `docs/development.md`
-- `docs/review.md`
-- `docs/release_checklist.md`
-- `docs/future_work.md`
-
-Every sprint should update:
-
-- `docs/roadmap.md`
-- `docs/review.md`
-- `README.md` when necessary
-
-Development must follow the planned phases and must not skip ahead.
-
-## GitHub Collaboration
-
-- `main`: stable branch
-- `dev`: development branch
-- `feature/*`: feature branches
-- `fix/*`: bug fix branches
-
-Codex implements changes, commits code, pushes branches, and opens pull requests when available. ChatGPT reviews the repository as an architecture and code reviewer. Review feedback is recorded in `docs/review.md` or GitHub Issues, then addressed in later sprints.
-
-After each sprint, Codex must:
-
-- Update relevant documentation
-- Commit code
-- Create a pull request
-- Include completed work, test results, and unfinished items in the pull request description
-- Wait for ChatGPT review before entering the next phase
-
-ChatGPT review feedback should be synchronized to GitHub first, preferably as an Issue titled `Sprint N Review & Next Tasks`, then as pull request review comments, and finally in `docs/review.md` when needed.
+Green CI is necessary but not sufficient. New work must also prove field ownership, production reachability, fixture/provider parity, explicit semantics and bounded scope.
