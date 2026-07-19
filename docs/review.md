@@ -7,9 +7,9 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 - Review date: 2026-07-19
 - Released software version: `0.2.0`
 - Merged capability stage: v0.6D
-- Accepted application/consolidation implementation baseline: `e424fa3a95e35b20f5fe8d8ada211821d9661efd`
+- Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Most recent architecture synchronization: Issue #84 and its linked synchronization PR
+- Most recent architecture synchronization: Issue #90 and its linked synchronization PR
 - Active application or consolidation implementation authorization: none
 - New migration authorization: none
 
@@ -17,57 +17,56 @@ Docs-only commits may advance `main` without changing release, capability or run
 
 ## Accepted architecture decisions
 
-- Issue #70 and PR #71 for v0.6E price judgment were closed without merge. No price-judgment model, migration, API or runtime behavior exists.
-- Issue #72 and PR #73 established the unified baseline, ownership, invariants, architecture debt and delivery gates.
-- Issue #74 and PR #75 characterized Stage 2 infrastructure.
-- Issue #76 and PR #77 moved shared exact v0.6A/v0.6B frozen-boundary mechanics to `industry_alpha.stage2_boundary` and removed the v0.6D dependency on v0.6C private helpers.
-- Issue #78 and PR #79 synchronized that first consolidation result.
+- Issue #70 / PR #71 for v0.6E price judgment were closed without merge.
+- Issue #72 / PR #73 established the unified baseline, ownership, invariants, debt register and delivery gates.
+- Issue #74 / PR #75 characterized Stage 2 infrastructure.
+- Issue #76 / PR #77 moved shared frozen-boundary mechanics to `industry_alpha.stage2_boundary` and removed the v0.6D dependency on v0.6C private helpers.
+- Issue #78 / PR #79 synchronized that first consolidation result.
+- Issue #80 / PR #81 characterized repeated ordered scalar row loading.
+- Issue #82 / PR #83 implemented `industry_alpha.stage2_repository_rows.load_ordered_rows`; Issue #84 and its linked PR synchronized the result.
 
-## Ordered repository row-loader acceptance
+## Query-value acceptance
 
-Issue #80 and PR #81 characterized repeated ordered scalar row loading across v0.6A-v0.6D repositories.
+Issue #86 / PR #87 characterized pure Stage 2 query-value mechanics.
 
-The accepted design shares only:
+The accepted design established that v0.6A-v0.6C share identical behavior for:
 
-```text
-select(model).where(field.in_(ids)).order_by(*order_fields)
-```
+- required UTC normalization, including the exact missing-timestamp visibility error;
+- naive and aware datetime conversion to UTC;
+- date-granular recorded and information-date visibility;
+- trailing-`Z` timestamp formatting;
+- optional date and UUID text formatting.
 
-Repository-local ownership remains for:
+v0.6D remains local because its required non-null helper has different malformed-input behavior.
 
-- v0.6B optional-ID `None` filtering;
-- v0.6C/v0.6D link-field selection;
-- graph assembly and required-parent behavior;
-- missing-row policy;
-- session and transaction lifecycle.
+Issue #88 / PR #89 implemented `industry_alpha.stage2_query_values` and delegated only those mechanics from v0.6A-v0.6C. Independent review confirmed:
 
-Issue #82 and PR #83 implemented `industry_alpha.stage2_repository_rows.load_ordered_rows`.
+- exact six-file inventory;
+- unchanged evidence payload construction, link selection, sorting, notices, aggregate errors and public contracts;
+- unchanged `stage2_judgments_query.py`;
+- direct tests for exact error text, UTC conversion, formatting and cutoff boundaries;
+- successful GitHub Actions tests, local fixture demo and cleanup;
+- PostgreSQL-focused cases were not falsely reported as executed when the required URL was unavailable;
+- no model, schema, migration, fixture, API, repository, command, dependency, CI, UI, release or version change.
 
-Independent review confirmed:
-
-- exact seven-file inventory;
-- unchanged public repository methods, graph results and ordering expressions;
-- direct coverage for empty input, duplicate IDs, missing IDs, explicit ordering, transaction ownership and local `None` filtering;
-- successful full Actions tests, PostgreSQL regressions and local fixture demo;
-- no model, schema, migration, fixture, API, query, command, dependency, CI, UI or release change.
-
-PR #83 was squash-merged as `e424fa3a95e35b20f5fe8d8ada211821d9661efd`. Issue #82 closed completed.
+PR #89 was squash-merged as `782b2362e1252aa87b21f7aa58f764837f5adb71`. Issue #88 closed completed.
 
 ## Current review conclusion
 
-The repository retains deterministic persistence, exact revision/provenance links, cutoff plus UTC chronology, read-only Stage 1/Stage 2 surfaces, SQLite/PostgreSQL validation and no-network fixture discipline.
+The repository retains deterministic persistence, exact revision/provenance links, cutoff plus UTC chronology, read-only Stage 1/Stage 2 surfaces and no-network fixture discipline.
 
 Neutral ownership now exists for:
 
 - shared Stage 2 frozen-boundary mechanics;
-- ordered scalar repository row loading.
+- ordered scalar repository row loading;
+- v0.6A-v0.6C pure query-value mechanics.
 
-Remaining risk is query/read serialization duplication, command lifecycle/concurrency repetition and ORM event complexity.
+Remaining risk is evidence read-serialization duplication, command lifecycle/concurrency repetition and ORM event complexity.
 
 ## Locked exclusions
 
-- no query utility implementation without accepted characterization;
-- no evidence serializer unification;
+- no evidence serializer implementation without accepted characterization;
+- no v0.6D query-value policy change;
 - no command integrity, revision-lock, model-factory or append-only-listener refactor;
 - no application/provider behavior change or migration;
 - no v0.6E price or timing judgment;
@@ -78,6 +77,6 @@ Remaining risk is query/read serialization duplication, command lifecycle/concur
 
 ## Next development gate
 
-The next candidate is a separate characterization of pure query visibility/date/UTC/UUID formatting. It must prove identical cutoff and recorded visibility, datetime normalization, output formatting, UUID/payload ordering, missing-data behavior and SQLite/PostgreSQL compatibility.
+The next candidate is a separate characterization of a neutral evidence read-serialization contract across the v0.6B-v0.6D query modules. It must identify truly invariant claim/evidence fields and ordering while preserving domain-specific boundaries, missing-evidence text, conflicts, collection types and public payloads.
 
-Characterization does not authorize implementation. No Codex application implementation command is active after this synchronization.
+Characterization may conclude that serializers should remain local. It does not authorize implementation. No Codex application implementation command is active after this synchronization.
