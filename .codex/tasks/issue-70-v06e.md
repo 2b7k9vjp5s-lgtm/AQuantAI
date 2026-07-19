@@ -126,18 +126,37 @@ v0.6E has no structured multi-value comparison capability. It must not define or
 
 ### Versioned daily-price unit and currency provenance
 
-`DailyPriceRecord` has no unit or currency column. Numeric comparison therefore uses one narrowly scoped, immutable, versioned mapping derived from a structured stock-basic record in the exact same successful complete snapshot:
+`DailyPriceRecord` has no unit or currency column. Numeric comparison therefore uses resolver `aquantai.a-share-price-unit-resolver/v2`, with two and only two ordered structured strategies. Both derive data from locked persisted rows; callers cannot select a strategy or submit/override resolver, exchange, series metadata, mapping result, unit, or currency.
 
-- mapping ID/version: `aquantai.a-share-price-unit/v1`;
+#### Strategy 1: trusted structured exchange
+
+- strategy ID: `trusted_exchange`;
 - source field: exact persisted `stock_basic.exchange` from the `StockBasicRecord` whose `ingestion_run_id`, `source`, and `stock_code` equal the frozen daily-price row and whose row belongs to the same selected series/snapshot;
-- allowed entries, matched case-sensitively with no additional normalization: `SH -> (unit=close, currency=CNY)` and `SZ -> (unit=close, currency=CNY)`; in this mapping version `close` means the normalized per-share closing price for the mapped exchange, not an aggregate or multiple;
-- blank, missing, malformed, differently cased, unknown, or any other exchange value has no mapping;
-- the command derives the mapping result from locked persisted rows only. Callers cannot submit or override exchange, mapping ID/version, unit, or currency;
-- no stock-code prefix/suffix inference, free-text parsing, provider-name inference, valuation-currency borrowing, fallback currency, FX conversion, or silent default is permitted.
+- allowed immutable entries, matched case-sensitively with no additional normalization: `exchange:SH -> (unit=close, currency=CNY)` and `exchange:SZ -> (unit=close, currency=CNY)`; here `close` means normalized per-share closing price, not an aggregate or multiple;
+- blank, missing, malformed, differently cased, unknown, or any other exchange token does not match this strategy and proceeds only to Strategy 2.
 
-The immutable price audit boundary freezes the stock-basic source integer ID and natural key, raw persisted exchange token, mapping ID/version, exact matched mapping entry, derived unit, and derived currency. Reads return those frozen fields and never recompute accepted provenance from a later-mutated stock-basic row or later mapping version.
+#### Strategy 2: exact canonical AKShare A-share snapshot contract
 
-A numeric `below_recorded_comparison`, `at_recorded_point`, or `above_recorded_comparison` requires this mapping to resolve and to match the designated valuation revision's explicit `close`/`CNY` dimension exactly. If the structured stock-basic row is absent, belongs to another snapshot, has no exact mapping, is malformed/unknown, or disagrees with the valuation unit/currency, numeric comparison fails closed. Only `qualitative_non_comparable` with `not_comparable` and an explicit provenance reason may be created; no `not_assessed` fallback may conceal the mismatch.
+- strategy ID: `canonical_akshare_a_share_snapshot`;
+- immutable matched entry: `akshare:a-share-complete-snapshot:v1 -> (unit=close, currency=CNY)`;
+- applicability requires raw persisted `stock_basic.exchange` to be exactly blank; the stock-basic and daily-price rows must have the same source and stock code and must both reference the exact selected `ingestion_run_id`, whose persisted series key identifies that one complete snapshot;
+- load the persisted `IngestionRun.series_identity` canonical JSON and `series_key`; validate the exact `aquantai.snapshot-series.v1` field set with no missing or extra fields;
+- independently rebuild the identity with `build_snapshot_series_identity` semantics from the persisted canonical values, require byte-equivalent canonical JSON, encode with `json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=True)`, recompute the lowercase SHA-256 series key, and require it to equal the persisted run key used by all source rows through their common `ingestion_run_id`;
+- require `status=succeeded`, `snapshot_mode=complete`, `provider=akshare`, `dataset=market_data_bundle`, and `contract_version=1.0`;
+- require canonical `datasets` to equal exactly sorted `daily_price`, `stock_basic`, and `trade_calendar`, with no missing or extra dataset;
+- require canonical `stock_codes` to equal the normalized `requested_scope.stock_codes`, require `requested_scope.stock_code_semantics=exact`, require the frozen stock code to be an exact member, and reject missing, duplicate, substituted, broader, or cross-run membership;
+- require canonical requested dates and adjustment policy to equal the ingestion run and frozen daily-price provenance;
+- require canonical `compatibility_parameters` to contain exactly `stock_basic_endpoint=stock_info_a_code_name`, `daily_price_endpoint=stock_zh_a_hist`, `trade_calendar_endpoint=tool_trade_date_hist_sina`, `frequency=daily`, and `adapter_compatibility_version=aquantai.akshare-adapter.v1`, with no missing, extra, or altered key;
+- require persisted `adapter_version=akshare-normalizer-v1` and freeze both adapter versions and the complete canonical compatibility object;
+- an exact match resolves `(unit=close, currency=CNY)` despite blank exchange. Provider name alone, a stored series key without payload validation, or a payload without key recomputation is never sufficient.
+
+If Strategy 1 matches, it wins and Strategy 2 is not used. Otherwise Strategy 2 must satisfy every condition. If neither strategy matches, numeric comparison fails closed and only `qualitative_non_comparable` with `not_comparable` and an explicit provenance reason may be created; no `not_assessed` fallback may conceal the mismatch.
+
+The resolver continues to prohibit stock-code prefix/suffix inference, security-name or free-text parsing, provider-name-only inference, caller metadata, valuation-currency borrowing, fallback/default currency, FX conversion, and silent normalization.
+
+The immutable price audit boundary freezes resolver ID/version, selected strategy, stock-basic source integer ID/natural key, raw exchange token including blank, persisted and recomputed series keys, complete canonical series payload, canonical payload hash input, contract and adapter versions, exact matched strategy entry, derived unit, and derived currency. Reads return those frozen values and never recompute accepted provenance from later-mutated metadata or a later resolver version.
+
+A numeric `below_recorded_comparison`, `at_recorded_point`, or `above_recorded_comparison` requires a resolver match and exact agreement with the designated valuation revision's explicit `close`/`CNY` dimension. Missing, forged, partial, extra, unknown, cross-run, later, or mismatched provenance permits no numeric context.
 
 ### Canonical close and comparison decimal
 
@@ -165,7 +184,7 @@ The implementation must apply the following matrix before creating any identity,
 | Selected v0.6B and v0.6D records otherwise satisfy the supported row, but no reproducible compatible point exists | `not_comparable` only | `insufficient_evidence` only | Preserve the qualitative incompatibility reason; lack of a point cannot become a supported comparison. |
 | Any selected v0.6B input is `disputed` | `not_comparable` only | `disputed` only | Preserve the disputed revision and conflicts; comparative below/at/above is rejected. |
 | Any required valuation input has method/state `missing_data`, or an observed numeric/unit/currency field is absent | `not_comparable` or `not_assessed` | `insufficient_evidence` only | No below/at/above context is allowed and missing fields remain explicit. |
-| Daily-price unit/currency structured provenance is absent, unknown, malformed, later, cross-snapshot, caller-supplied, or mismatched with the valuation | `not_comparable` only | `insufficient_evidence` or `disputed`, according to visible evidence | Preserve the exact failure reason and available provenance; no numeric context or silent fallback is allowed. |
+| Neither trusted exchange nor exact recomputed canonical AKShare snapshot contract resolves, or provenance is absent, forged, unknown, malformed, later, cross-run, caller-supplied, or valuation-mismatched | `not_comparable` only | `insufficient_evidence` or `disputed`, according to visible evidence | Preserve resolver attempts, raw exchange, and exact failure reason; no numeric context or silent fallback is allowed. |
 | v0.6D evidence is `disputed`, or its frozen claims contain a visible contradiction | `not_comparable` only | `disputed` only | Preserve v0.6D outcome, evidence state, and conflicts without upgrading them. |
 | v0.6D evidence is `insufficient_evidence`, or outcome is `uncertain`/`not_assessed` without a stronger compatible row above | `not_comparable` or `not_assessed` | `insufficient_evidence` only | Preserve v0.6D outcome and missing evidence; no comparison is supported. |
 | Any combination not listed, or multiple rows conflict | none | none | Fail closed and roll back. The most restrictive compatible row wins; states are never silently upgraded. |
@@ -196,8 +215,8 @@ The implementation must apply the following matrix before creating any identity,
 
 A `daily_price_id` or `ingestion_run_id` foreign key alone is insufficient because the referenced v0.3 rows are not protected by the Stage 2 append-only guards. The proposed implementation must therefore create one revision-owned immutable audit-boundary row whenever a price row is frozen. The boundary retains source foreign keys and canonical natural keys, and copies only the material audit scalars required to reproduce the accepted observation:
 
-- stock code, trade date, source Float close for audit only, authoritative canonical decimal-text close, and the exact frozen `aquantai.a-share-price-unit/v1` structured mapping provenance;
-- stock-basic source integer ID/natural key, raw persisted exchange token, mapping ID/version/entry, and derived `close`/`CNY` values;
+- stock code, trade date, source Float close for audit only, authoritative canonical decimal-text close, and exact frozen `aquantai.a-share-price-unit-resolver/v2` provenance;
+- resolver strategy, stock-basic source integer ID/natural key, raw persisted exchange token including blank, persisted/recomputed series keys, canonical series payload/hash input, contract/adapter versions, matched entry, and derived `close`/`CNY` values;
 - daily-price source integer ID and complete natural key;
 - ingestion-run source integer ID, batch identifier, status, provider, series key, contract/adapter versions, requested scope, adjustment mode, and information cutoff;
 - imported and completed UTC timestamps.
@@ -211,7 +230,7 @@ This is a narrow audit copy, not a second daily-price dataset: it stores one mat
 - ORM and direct repository attempts to update/delete the frozen audit-boundary row fail and roll back;
 - direct update/delete attempts against the referenced daily-price or successful-ingestion row either fail under existing database constraints or, where the source model permits mutation, cannot alter any current/historical observation payload because reads use frozen scalars;
 - source mutation followed by revision append cannot silently reuse stale/mismatched provenance;
-- stock-basic exchange or mapping changes after acceptance cannot alter frozen unit/currency provenance or existing current/historical payloads;
+- stock-basic exchange, series identity/key, request metadata, adapter/contract metadata, or resolver changes after acceptance cannot alter frozen unit/currency provenance or existing current/historical payloads;
 - SQLite and PostgreSQL preserve the accepted payload and unchanged observation row counts after every rejected mutation.
 
 ## Proposed persistence plan
@@ -242,7 +261,7 @@ If later authorized, add deterministic strict-JSON list/detail routes under `/in
 - `GET /industry-alpha/price-observation-judgments/{judgment_id}`;
 - optional `as_of_cutoff=YYYY-MM-DD` on both routes.
 
-The read model must expose the stable identity, selected revision, exact supersedes chain, observation/evidence states, the frozen v0.6A workflow/conclusion fields, rationale, uncertainty, bounded `后续验证清单`, exact upstream IDs, the optional single point valuation provenance, complete price/ingestion/stock-basic provenance, the exact unit/currency mapping ID/version/entry, claim fact/inference fields, evidence grades/relations, contradictions, missing-evidence diagnostics, information cutoff, and UTC timestamps.
+The read model must expose the stable identity, selected revision, exact supersedes chain, observation/evidence states, the frozen v0.6A workflow/conclusion fields, rationale, uncertainty, bounded `后续验证清单`, exact upstream IDs, the optional single point valuation provenance, complete price/ingestion/stock-basic provenance, resolver ID/version/strategy, raw exchange, canonical series payload and persisted/recomputed keys, contract/adapter versions, exact matched entry, unit/currency, claim fact/inference fields, evidence grades/relations, contradictions, missing-evidence diagnostics, information cutoff, and UTC timestamps.
 
 Ordering must be explicit and deterministic. Current and historical reads must fail closed when the selector or frozen boundary is absent, ambiguous, later, or inconsistent. The API must use the existing fixed generic 503 configuration-error message and must never reveal database URLs, credentials, paths, or raw exceptions.
 
@@ -253,7 +272,8 @@ No POST, PUT, PATCH, or DELETE route and no browser editing or presentation page
 If later authorized, add one completely offline fixture/demo that reuses the reviewed nested v0.5/v0.6A-v0.6D fixture boundary and contains:
 
 - one supported comparative observation with exact A/B/C evidence and a frozen successful daily-price row;
-- exact same-snapshot `stock_basic.exchange=SZ` provenance frozen through `aquantai.a-share-price-unit/v1` as `close`/`CNY`;
+- one exact same-snapshot `stock_basic.exchange=SZ` case resolved by `trusted_exchange` as `close`/`CNY`;
+- one no-network AKShare-compatible successful complete snapshot with blank exchange resolved by `canonical_akshare_a_share_snapshot` after exact canonical payload validation and series-key recomputation;
 - one `completed/disputed` v0.6A example that produces only `not_comparable/disputed` and preserves the original state;
 - one disputed observation that visibly retains contradictory evidence;
 - one `not_comparable` or `not_assessed` observation with explicit missing-data semantics;
@@ -281,8 +301,9 @@ Any later implementation authorization must require focused tests for:
 - point rejection for absent, multiple, unselected, non-supported, missing-data, altered, independently supplied, or wrong-field valuation values;
 - exact freezing and readback of valuation revision IDs/roles, `observed_value` field name, method, metric context, canonical strings, units, currencies, cutoffs, and UTC timestamps;
 - per-share price dimension enforcement and rejection of multiples, ratios, percentages, aggregates, absent/mixed units, absent/mixed currencies, FX conversion, and arbitrary normalization;
-- exact same-snapshot stock-basic exchange mapping and immutable readback, including mapping ID/version/entry and source row/natural key;
-- absent, unknown, blank, malformed, differently cased, caller-supplied, cross-snapshot, later-mutated, or valuation-mismatched daily-price unit/currency provenance, with only qualitative non-comparable output and no numeric fallback;
+- exact trusted SH/SZ exchange resolution and blank-exchange canonical AKShare contract resolution, with immutable resolver ID/version/strategy, raw exchange, canonical payload/keys, adapter/contract versions, matched entry, and source row/natural key readback;
+- forged or mismatched series key/payload, missing/extra/partial/wrong datasets, wrong provider/dataset/contract/snapshot mode/scope semantics/stock membership/date/adjustment, wrong endpoint/frequency/adapter version, duplicate or substituted scope, cross-run rows, unknown exchange plus nonmatching contract, caller overrides, and later metadata mutation;
+- every resolver rejection keeps identity/revision/audit/link counts unchanged and permits only explicit qualitative non-comparable output when otherwise valid;
 - the sole `Decimal(str(close)) -> _decimal_text` conversion, canonical string freeze, positive/finite/64-character/18-scale bounds, and rejection of `Decimal(float)`, direct float equality, epsilon matching, non-positive, non-finite, overlength, and overscale values;
 - supported, disputed, D-only, contradiction, missing-evidence, not-comparable, and not-assessed behavior;
 - chronology across information dates and UTC recorded/imported/completed timestamps;
@@ -292,7 +313,7 @@ Any later implementation authorization must require focused tests for:
 - direct frozen-boundary and source daily-price/ingestion update/delete mutation behavior, proving no indirect rewrite of current or historical payloads;
 - atomic rollback with unchanged row counts for every multi-row failure;
 - deterministic PostgreSQL concurrent revision allocation;
-- fixture-only UUIDv5 semantics, deterministic market-data integer IDs/natural keys, complete payload, all returned IDs, canonical close/basis strings, frozen stock-basic/mapping provenance, collection ordering, normal runtime ID behavior, two clean builds per database, and exact SQLite/PostgreSQL equality;
+- fixture-only UUIDv5 semantics, deterministic market-data integer IDs/natural keys, complete payload, all returned IDs, canonical close/basis strings, frozen resolver/stock-basic/canonical-series provenance, collection ordering, normal runtime ID behavior, two clean builds per database, and exact SQLite/PostgreSQL equality;
 - strict JSON, invalid cutoff handling, fixed generic 503 behavior, and read-only route inventory;
 - imports, FastAPI startup, tests, fixture demo, and API reads performing no network access;
 - all existing v0.3-v0.6D regressions and demos.
