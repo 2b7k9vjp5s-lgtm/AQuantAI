@@ -55,10 +55,13 @@ Exact revision coherence is mandatory rather than identity-level compatibility:
 - every selected v0.6B valuation revision's `company_research_revision_id` must equal that same exact v0.6A revision ID;
 - the selected v0.6D company-quality judgment revision's `company_research_revision_id` must equal that same exact v0.6A revision ID;
 - the price-specific v0.6B expectation and valuation revision IDs must each be a non-empty subset of the exact corresponding revision IDs already frozen by the selected v0.6D judgment revision;
+- every price-specific v0.6B subset member must have frozen status `supported` or `disputed`; these are the only statuses admitted by the v0.6D frozen boundary;
 - additional v0.6B revisions outside the v0.6D frozen sets are prohibited, even when they belong to the same stable company-research identity or were recorded earlier;
 - reads must return both the complete v0.6D frozen sets and the selected price-specific subsets so compatibility remains auditable.
 
 Same identity with a different v0.6A revision fails closed. Empty required subsets, mixed v0.6A revisions, or a price-specific v0.6B revision absent from the v0.6D frozen set fail closed in the same transaction. Every selected subset member must also satisfy the revision cutoff and UTC chronology rules independently.
+
+Membership and status validation occur before observation-state evaluation. Any attempted selected v0.6B revision with status `draft` or `rejected` fails as an invalid v0.6D frozen-set member before any identity, revision, audit row, or link is created. The implementation must not add dead draft/rejected observation-state branches or weaken exact-subset validation to make them reachable.
 
 The exact frozen v0.6A revision is executable only under this closed matrix:
 
@@ -117,9 +120,24 @@ The command derives the point by locked read of those exact fields and verifies 
 
 `below_recorded_comparison`, `at_recorded_point`, and `above_recorded_comparison` require exactly one valid point. `at_recorded_point` requires exact canonical-Decimal equality. `not_comparable` and `not_assessed` may use only `qualitative_non_comparable`.
 
-Observed close and the point value must represent the same per-share price dimension, unit, and currency. The numeric basis requires an explicit price-per-share unit and explicit matching currency on the designated valuation revision and frozen close convention. Multiples, ratios, percentages, aggregate enterprise/equity values, missing unit/currency, mixed dimensions, mixed currencies, or any requirement for FX/unit conversion fail closed; no conversion or arbitrary normalization is permitted. The validator may verify the direct point relation and provenance only. It must not calculate fair value, intrinsic value, expected return, discount/premium, upside/downside, recommendation, or timing.
+Observed close and the point value must represent the same per-share price dimension, unit, and currency. The numeric basis requires an explicit price-per-share unit and explicit matching currency on the designated valuation revision and the independently derived frozen daily-price provenance below. Multiples, ratios, percentages, aggregate enterprise/equity values, missing unit/currency, mixed dimensions, mixed currencies, or any requirement for FX/unit conversion fail closed; no conversion or arbitrary normalization is permitted. The validator may verify the direct point relation and provenance only. It must not calculate fair value, intrinsic value, expected return, discount/premium, upside/downside, recommendation, or timing.
 
 v0.6E has no structured multi-value comparison capability. It must not define or expose any two-value band, endpoint role, inclusive interval, or paired-valuation relationship. A future multi-value capability requires a separately reviewed upstream structured evidence boundary and is outside this slice.
+
+### Versioned daily-price unit and currency provenance
+
+`DailyPriceRecord` has no unit or currency column. Numeric comparison therefore uses one narrowly scoped, immutable, versioned mapping derived from a structured stock-basic record in the exact same successful complete snapshot:
+
+- mapping ID/version: `aquantai.a-share-price-unit/v1`;
+- source field: exact persisted `stock_basic.exchange` from the `StockBasicRecord` whose `ingestion_run_id`, `source`, and `stock_code` equal the frozen daily-price row and whose row belongs to the same selected series/snapshot;
+- allowed entries, matched case-sensitively with no additional normalization: `SH -> (unit=close, currency=CNY)` and `SZ -> (unit=close, currency=CNY)`; in this mapping version `close` means the normalized per-share closing price for the mapped exchange, not an aggregate or multiple;
+- blank, missing, malformed, differently cased, unknown, or any other exchange value has no mapping;
+- the command derives the mapping result from locked persisted rows only. Callers cannot submit or override exchange, mapping ID/version, unit, or currency;
+- no stock-code prefix/suffix inference, free-text parsing, provider-name inference, valuation-currency borrowing, fallback currency, FX conversion, or silent default is permitted.
+
+The immutable price audit boundary freezes the stock-basic source integer ID and natural key, raw persisted exchange token, mapping ID/version, exact matched mapping entry, derived unit, and derived currency. Reads return those frozen fields and never recompute accepted provenance from a later-mutated stock-basic row or later mapping version.
+
+A numeric `below_recorded_comparison`, `at_recorded_point`, or `above_recorded_comparison` requires this mapping to resolve and to match the designated valuation revision's explicit `close`/`CNY` dimension exactly. If the structured stock-basic row is absent, belongs to another snapshot, has no exact mapping, is malformed/unknown, or disagrees with the valuation unit/currency, numeric comparison fails closed. Only `qualitative_non_comparable` with `not_comparable` and an explicit provenance reason may be created; no `not_assessed` fallback may conceal the mismatch.
 
 ### Canonical close and comparison decimal
 
@@ -146,9 +164,8 @@ The implementation must apply the following matrix before creating any identity,
 | v0.6A has any other workflow/conclusion combination | none | none | Fail closed before any row is created; preserve the rejected source states in validation diagnostics without creating a research record. |
 | Selected v0.6B and v0.6D records otherwise satisfy the supported row, but no reproducible compatible point exists | `not_comparable` only | `insufficient_evidence` only | Preserve the qualitative incompatibility reason; lack of a point cannot become a supported comparison. |
 | Any selected v0.6B input is `disputed` | `not_comparable` only | `disputed` only | Preserve the disputed revision and conflicts; comparative below/at/above is rejected. |
-| Any selected v0.6B input is `draft` | `not_assessed` only | `insufficient_evidence` only | Preserve draft provenance; draft material cannot support a comparison. |
-| Any selected v0.6B input is `rejected` | `not_comparable` only | `insufficient_evidence` only | Preserve rejected provenance and reason; rejected material cannot support a comparison. |
 | Any required valuation input has method/state `missing_data`, or an observed numeric/unit/currency field is absent | `not_comparable` or `not_assessed` | `insufficient_evidence` only | No below/at/above context is allowed and missing fields remain explicit. |
+| Daily-price unit/currency structured provenance is absent, unknown, malformed, later, cross-snapshot, caller-supplied, or mismatched with the valuation | `not_comparable` only | `insufficient_evidence` or `disputed`, according to visible evidence | Preserve the exact failure reason and available provenance; no numeric context or silent fallback is allowed. |
 | v0.6D evidence is `disputed`, or its frozen claims contain a visible contradiction | `not_comparable` only | `disputed` only | Preserve v0.6D outcome, evidence state, and conflicts without upgrading them. |
 | v0.6D evidence is `insufficient_evidence`, or outcome is `uncertain`/`not_assessed` without a stronger compatible row above | `not_comparable` or `not_assessed` | `insufficient_evidence` only | Preserve v0.6D outcome and missing evidence; no comparison is supported. |
 | Any combination not listed, or multiple rows conflict | none | none | Fail closed and roll back. The most restrictive compatible row wins; states are never silently upgraded. |
@@ -179,12 +196,13 @@ The implementation must apply the following matrix before creating any identity,
 
 A `daily_price_id` or `ingestion_run_id` foreign key alone is insufficient because the referenced v0.3 rows are not protected by the Stage 2 append-only guards. The proposed implementation must therefore create one revision-owned immutable audit-boundary row whenever a price row is frozen. The boundary retains source foreign keys and canonical natural keys, and copies only the material audit scalars required to reproduce the accepted observation:
 
-- stock code, trade date, source Float close for audit only, authoritative canonical decimal-text close, and the normalized per-share price unit/currency convention;
+- stock code, trade date, source Float close for audit only, authoritative canonical decimal-text close, and the exact frozen `aquantai.a-share-price-unit/v1` structured mapping provenance;
+- stock-basic source integer ID/natural key, raw persisted exchange token, mapping ID/version/entry, and derived `close`/`CNY` values;
 - daily-price source integer ID and complete natural key;
 - ingestion-run source integer ID, batch identifier, status, provider, series key, contract/adapter versions, requested scope, adjustment mode, and information cutoff;
 - imported and completed UTC timestamps.
 
-Creation must lock/re-read the source rows, require a successful ingestion run, validate all scalar/provenance values, and write the immutable audit boundary in the same transaction as the observation revision. Query/API payloads use the frozen boundary values for historical meaning and expose source IDs/natural keys only as provenance; they must never rehydrate accepted values from a later-mutated source row.
+Creation must lock/re-read the daily-price, ingestion-run, and exact same-snapshot stock-basic source rows, require a successful ingestion run, validate all scalar/provenance/mapping values, and write the immutable audit boundary in the same transaction as the observation revision. Query/API payloads use the frozen boundary values for historical meaning and expose source IDs/natural keys only as provenance; they must never rehydrate accepted values from a later-mutated source row.
 
 The source Float is retained only to audit the one approved conversion. It is never used for equality, ordering, point classification, or JSON numeric output. Recomputing `Decimal(str(source_close)) -> _decimal_text` at creation must exactly equal the frozen canonical close string.
 
@@ -193,6 +211,7 @@ This is a narrow audit copy, not a second daily-price dataset: it stores one mat
 - ORM and direct repository attempts to update/delete the frozen audit-boundary row fail and roll back;
 - direct update/delete attempts against the referenced daily-price or successful-ingestion row either fail under existing database constraints or, where the source model permits mutation, cannot alter any current/historical observation payload because reads use frozen scalars;
 - source mutation followed by revision append cannot silently reuse stale/mismatched provenance;
+- stock-basic exchange or mapping changes after acceptance cannot alter frozen unit/currency provenance or existing current/historical payloads;
 - SQLite and PostgreSQL preserve the accepted payload and unchanged observation row counts after every rejected mutation.
 
 ## Proposed persistence plan
@@ -223,7 +242,7 @@ If later authorized, add deterministic strict-JSON list/detail routes under `/in
 - `GET /industry-alpha/price-observation-judgments/{judgment_id}`;
 - optional `as_of_cutoff=YYYY-MM-DD` on both routes.
 
-The read model must expose the stable identity, selected revision, exact supersedes chain, observation/evidence states, the frozen v0.6A workflow/conclusion fields, rationale, uncertainty, bounded `后续验证清单`, exact upstream IDs, the optional single point valuation provenance, complete price and ingestion provenance, claim fact/inference fields, evidence grades/relations, contradictions, missing-evidence diagnostics, information cutoff, and UTC timestamps.
+The read model must expose the stable identity, selected revision, exact supersedes chain, observation/evidence states, the frozen v0.6A workflow/conclusion fields, rationale, uncertainty, bounded `后续验证清单`, exact upstream IDs, the optional single point valuation provenance, complete price/ingestion/stock-basic provenance, the exact unit/currency mapping ID/version/entry, claim fact/inference fields, evidence grades/relations, contradictions, missing-evidence diagnostics, information cutoff, and UTC timestamps.
 
 Ordering must be explicit and deterministic. Current and historical reads must fail closed when the selector or frozen boundary is absent, ambiguous, later, or inconsistent. The API must use the existing fixed generic 503 configuration-error message and must never reveal database URLs, credentials, paths, or raw exceptions.
 
@@ -234,6 +253,7 @@ No POST, PUT, PATCH, or DELETE route and no browser editing or presentation page
 If later authorized, add one completely offline fixture/demo that reuses the reviewed nested v0.5/v0.6A-v0.6D fixture boundary and contains:
 
 - one supported comparative observation with exact A/B/C evidence and a frozen successful daily-price row;
+- exact same-snapshot `stock_basic.exchange=SZ` provenance frozen through `aquantai.a-share-price-unit/v1` as `close`/`CNY`;
 - one `completed/disputed` v0.6A example that produces only `not_comparable/disputed` and preserves the original state;
 - one disputed observation that visibly retains contradictory evidence;
 - one `not_comparable` or `not_assessed` observation with explicit missing-data semantics;
@@ -254,12 +274,15 @@ Any later implementation authorization must require focused tests for:
 - current/historical readback of the exact frozen v0.6A `workflow_state` and `conclusion_status` without upgrade or collapse;
 - same stable company-research identity but different exact v0.6A revision rejection;
 - price-specific v0.6B subset acceptance and out-of-v0.6D-set, empty-set, mixed-set, chronology, and provenance rejection;
+- membership-stage rejection of selected v0.6B `draft`/`rejected` revisions before observation-state evaluation, with unchanged identity/revision/audit/link counts;
 - same-company, same-case, same-series, exact stock, date, adjustment, and successful-ingestion enforcement;
 - stable identities, immutable sequential revisions, deterministic numbering, and supersedes chains;
 - all proposed observation/basis enums, single-point/qualitative field shapes, direct point relation checks, unit/currency compatibility, and every allowed/rejected status-matrix combination;
 - point rejection for absent, multiple, unselected, non-supported, missing-data, altered, independently supplied, or wrong-field valuation values;
 - exact freezing and readback of valuation revision IDs/roles, `observed_value` field name, method, metric context, canonical strings, units, currencies, cutoffs, and UTC timestamps;
 - per-share price dimension enforcement and rejection of multiples, ratios, percentages, aggregates, absent/mixed units, absent/mixed currencies, FX conversion, and arbitrary normalization;
+- exact same-snapshot stock-basic exchange mapping and immutable readback, including mapping ID/version/entry and source row/natural key;
+- absent, unknown, blank, malformed, differently cased, caller-supplied, cross-snapshot, later-mutated, or valuation-mismatched daily-price unit/currency provenance, with only qualitative non-comparable output and no numeric fallback;
 - the sole `Decimal(str(close)) -> _decimal_text` conversion, canonical string freeze, positive/finite/64-character/18-scale bounds, and rejection of `Decimal(float)`, direct float equality, epsilon matching, non-positive, non-finite, overlength, and overscale values;
 - supported, disputed, D-only, contradiction, missing-evidence, not-comparable, and not-assessed behavior;
 - chronology across information dates and UTC recorded/imported/completed timestamps;
@@ -269,7 +292,7 @@ Any later implementation authorization must require focused tests for:
 - direct frozen-boundary and source daily-price/ingestion update/delete mutation behavior, proving no indirect rewrite of current or historical payloads;
 - atomic rollback with unchanged row counts for every multi-row failure;
 - deterministic PostgreSQL concurrent revision allocation;
-- fixture-only UUIDv5 semantics, deterministic market-data integer IDs/natural keys, complete payload, all returned IDs, canonical close/basis strings, collection ordering, normal runtime ID behavior, two clean builds per database, and exact SQLite/PostgreSQL equality;
+- fixture-only UUIDv5 semantics, deterministic market-data integer IDs/natural keys, complete payload, all returned IDs, canonical close/basis strings, frozen stock-basic/mapping provenance, collection ordering, normal runtime ID behavior, two clean builds per database, and exact SQLite/PostgreSQL equality;
 - strict JSON, invalid cutoff handling, fixed generic 503 behavior, and read-only route inventory;
 - imports, FastAPI startup, tests, fixture demo, and API reads performing no network access;
 - all existing v0.3-v0.6D regressions and demos.
