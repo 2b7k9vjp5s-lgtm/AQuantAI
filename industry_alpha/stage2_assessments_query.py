@@ -160,8 +160,13 @@ def _evidence_payload(rows: Stage2AssessmentRows, revision_id: UUID, kind: str, 
         claims.append({
             "claim_id": str(identity.id), "claim_key": identity.claim_key,
             "claim_revision_id": str(revision.id), "revision_no": revision.revision_no,
-            "statement": revision.statement, "claim_status": revision.claim_status,
-            "information_cutoff_date": _date(revision.information_cutoff_date), "evidence": evidence_payload,
+            "statement": revision.statement, "claim_kind": revision.claim_kind,
+            "claim_status": revision.claim_status,
+            "inference_confidence": revision.inference_confidence,
+            "inference_basis": revision.inference_basis,
+            "information_cutoff_date": _date(revision.information_cutoff_date),
+            "recorded_at_utc": _timestamp(revision.recorded_at_utc),
+            "evidence": evidence_payload,
         })
     claims.sort(key=lambda item: (item["claim_key"], item["claim_revision_id"]))
     conflicts.sort(key=lambda item: (item["claim_key"], item["evidence_id"]))

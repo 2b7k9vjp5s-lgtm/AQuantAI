@@ -105,6 +105,45 @@ def test_fixture_freezes_exact_handoff_and_is_strict_json(session_factory, built
     json.dumps({"current": current, "historical": historical, "risk": risk}, allow_nan=False, sort_keys=True)
 
 
+def test_frozen_claim_provenance_is_exact_for_current_historical_and_api(session_factory, built):
+    current = catalyst_payload(session_factory, built.supported_catalyst_id)
+    historical = catalyst_payload(
+        session_factory, built.supported_catalyst_id, date(2026, 7, 16)
+    )
+    fact = historical["latest_revision"]["claims"][0]
+    inference = current["latest_revision"]["claims"][0]
+
+    assert fact["claim_kind"] == "fact"
+    assert fact["inference_confidence"] is None
+    assert fact["inference_basis"] is None
+    assert fact["recorded_at_utc"] == "2026-07-06T10:00:00Z"
+    assert inference["claim_kind"] == "inference"
+    assert inference["inference_confidence"] == "low"
+    assert inference["inference_basis"] == (
+        "The original supporting evidence and a later contradiction coexist."
+    )
+    assert inference["recorded_at_utc"] == "2026-07-17T11:00:00Z"
+    assert current["revision_history"][0]["claims"][0] == fact
+
+    app.dependency_overrides[get_industry_alpha_session_factory] = lambda: session_factory
+    try:
+        with TestClient(app) as client:
+            route = f"/industry-alpha/catalyst-assessments/{built.supported_catalyst_id}"
+            current_response = client.get(route)
+            historical_response = client.get(
+                route, params={"as_of_cutoff": "2026-07-16"}
+            )
+            assert current_response.status_code == 200
+            assert historical_response.status_code == 200
+            assert current_response.json()["latest_revision"]["claims"][0] == inference
+            assert historical_response.json()["latest_revision"]["claims"][0] == fact
+            assert current_response.json() == client.get(route).json()
+            json.dumps(current_response.json(), allow_nan=False, sort_keys=True)
+            json.dumps(historical_response.json(), allow_nan=False, sort_keys=True)
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_disputed_and_missing_evidence_are_explicit(session_factory, built):
     disputed = catalyst_payload(session_factory, built.disputed_catalyst_id)
     risk = risk_payload(session_factory, built.disputed_risk_id)
