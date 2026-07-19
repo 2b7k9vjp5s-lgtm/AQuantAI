@@ -6,7 +6,7 @@
 
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
-- Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`.
+- Accepted application/consolidation implementation baseline: `a2688b6e244743ef5e3bdcaedfc6c6717d7a7d8c`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
@@ -30,8 +30,9 @@ These capabilities remain research-only, cutoff-aware and non-advisory. They do 
 - PRs #81/#83 characterized and implemented ordered scalar row loading.
 - PRs #87/#89 characterized and implemented v0.6A-v0.6C pure query values.
 - PR #93 characterized v0.6B-v0.6D evidence read serialization and accepted the decision to keep the serializers local.
+- PRs #97/#99 characterized and implemented neutral Stage 2 SQLAlchemy integrity translation.
 
-The serializer decision is not unfinished implementation work. It records that no neutral claim projection reaches Definition of Ready, domain missing-evidence wording must remain visible, and v0.6D timestamp error behavior remains independent.
+The neutral integrity helper catches only `IntegrityError`, preserves the exact caller-owned message and original cause, and performs no transaction, rollback, retry or constraint-classification work. Command modules still own transaction boundaries, conflict wording, revision locks, row locks, revision allocation and supersession.
 
 No schema, migration, public API, fixture, domain-semantic or released-version change resulted from these consolidation reviews.
 
@@ -43,19 +44,18 @@ No v0.6E implementation or migration is authorized.
 
 ## Remaining Stage 2 consolidation candidates
 
-1. command conflict/integrity primitives and error compatibility;
-2. revision allocation and lock strategy;
-3. append-only listener registration and dynamic link-model construction.
+1. revision allocation and lock strategy;
+2. append-only listener registration and dynamic link-model construction.
 
-The next candidate is only an independent characterization of item 1. It must inventory repeated database conflict handling, rollback boundaries, exception classes/messages and cross-database behavior before any implementation decision.
+The next candidate is only an independent characterization of item 1. It must inventory process-local `RLock` use, database `SELECT ... FOR UPDATE`, latest-revision selection, revision-number/supersession allocation, SQLite behavior, PostgreSQL concurrency evidence, retry policy and lifecycle/cleanup implications before any implementation decision.
 
-Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs.
+Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs. Integrity translation is completed and is not authorization to alter concurrency behavior.
 
 ## Prospective sequence
 
-1. characterize command conflict/integrity handling;
-2. implement only a minimal primitive if exact rollback and error compatibility are proven;
-3. separately characterize revision allocation/locks and ORM lifecycle concerns;
+1. characterize revision allocation and lock strategy;
+2. implement only if a smaller neutral contract preserves SQLite/PostgreSQL behavior and reaches Definition of Ready;
+3. separately characterize ORM lifecycle concerns;
 4. decide whether canonical market-price evidence has independent user value;
 5. decide whether valuation observations need comparison-eligibility semantics;
 6. re-evaluate whether price judgment needs persisted state or a deterministic read model;
@@ -66,8 +66,8 @@ Every item requires separate Architecture Preflight and GitHub authorization.
 ## Not authorized
 
 - evidence serializer extraction or projection DTOs;
-- command conflict/integrity implementation without accepted characterization;
-- revision-lock or append-only-listener refactoring;
+- revision allocation, process-lock, row-lock or retry refactoring without accepted characterization;
+- append-only-listener or dynamic model-factory refactoring;
 - v0.6D query-value policy changes;
 - v0.6E price or timing judgment;
 - v0.7 Watchlist or verification-task behavior;
