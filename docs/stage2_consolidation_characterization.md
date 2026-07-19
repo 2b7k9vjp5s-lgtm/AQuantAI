@@ -8,8 +8,9 @@ This is the design record for accepted Stage 2 consolidation work.
 - Neutral frozen-boundary implementation: Issue #76 / PR #77.
 - Ordered repository row-loading characterization and implementation: Issues #80/#82, PRs #81/#83.
 - Query-value characterization and implementation: Issues #86/#88, PRs #87/#89.
+- Evidence read-serialization characterization: Issue #92 / PR #93.
 - Accepted application/consolidation implementation baseline: `782b2362e1252aa87b21f7aa58f764837f5adb71`.
-- Migration decision for all accepted consolidation implementations: no migration.
+- Migration decision for all accepted implementation slices: no migration.
 
 This report records completed work and remaining candidates. It does not authorize another implementation.
 
@@ -17,33 +18,38 @@ This report records completed work and remaining candidates. It does not authori
 
 ### Frozen boundary
 
-`industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B base-boundary loading, UTC/cutoff visibility and company-research locking used by v0.6C and v0.6D. Catalyst/risk and judgment semantics, revision locks and conflict translation remain local.
+`industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B base-boundary loading, UTC/cutoff visibility and company-research locking used by v0.6C and v0.6D. Domain semantics, revision locks and conflict translation remain local.
 
 ### Ordered repository rows
 
-`industry_alpha.stage2_repository_rows.load_ordered_rows` owns only explicit `IN` filtering and caller-owned ordering for scalar row loading. Repository wrappers retain optional-ID normalization, link-field selection, graph assembly, missing-parent policy, sessions, transactions and public methods.
+`industry_alpha.stage2_repository_rows.load_ordered_rows` owns only explicit `IN` filtering and caller-owned ordering for scalar row loading. Repository wrappers retain optional-ID normalization, link-field selection, graph assembly, missing-parent policy, sessions and transactions.
 
 ### Query values
 
-`industry_alpha.stage2_query_values` owns only the accepted v0.6A-v0.6C pure mechanics:
+`industry_alpha.stage2_query_values` owns only the accepted v0.6A-v0.6C required UTC, date-granular visibility and timestamp/date/UUID formatting mechanics. v0.6D query values remain local because malformed-null behavior differs.
 
-- required UTC normalization with the exact missing-timestamp visibility error;
-- naive/aware datetime conversion to UTC;
-- date-granular recorded and information-date visibility;
-- trailing-`Z` timestamp text;
-- optional date and UUID text.
+## Reviewed local boundary: evidence read serialization
 
-v0.6B/v0.6C revision collection wrappers remain local. v0.6D query values remain local because malformed-null behavior differs. Evidence payload construction, grade counts, conflicts, missing-evidence text, claim/link selection, ID sorting, notices, aggregate errors and public contracts remain local.
+PR #93 reviewed the v0.6B-v0.6D evidence payload builders.
+
+Shared mechanics include evidence-item fields, contradiction projections, A-D grade counts and deterministic sorting. The serializers remain local because:
+
+- v0.6B emits a reduced claim projection and domain-specific missing-evidence text;
+- v0.6C/v0.6D currently match more closely, but that equality is not an accepted neutral public contract;
+- owner-link fields and source-link container names differ;
+- v0.6D preserves independent timestamp-null/error behavior;
+- a shared helper would require reflection, callbacks or projection adapters without a demonstrated benefit.
+
+The accepted decision is not deferred implementation. Evidence serializer extraction does not reach Definition of Ready and no implementation Issue follows.
 
 ## Acceptance evidence
 
-PR #77 established the neutral frozen boundary and removed the v0.6D dependency on v0.6C private command helpers.
+- PR #77 removed the v0.6D dependency on v0.6C private command helpers.
+- PR #83 preserved repository SQL shape, graph behavior and transaction ownership while sharing ordered row loading.
+- PR #89 preserved public query payloads and v0.6D edge policy while sharing v0.6A-v0.6C pure query values.
+- PR #93 documented the evidence serializer no-extraction decision after comparing exact fields, wording, link ownership and error semantics.
 
-PR #83 established the stateless ordered-row primitive while preserving SQL shape, graph behavior and transaction ownership.
-
-PR #89 established the v0.6A-v0.6C pure query-value module while preserving public query payloads and the v0.6D edge policy. Direct tests cover exact errors, UTC conversion, formatting and cutoff boundaries. GitHub Actions tests and the local fixture demo passed. PostgreSQL-focused cases were not claimed as executed where the required URL was unavailable.
-
-All three slices are source-only and require no database downgrade or data repair.
+All accepted implementation slices are source-only and require no database downgrade or data repair. Characterization PR #93 was docs-only.
 
 ## Current classification
 
@@ -54,9 +60,9 @@ All three slices are source-only and require no database downgrade or data repai
 | v0.6A-v0.6C pure query values | Completed in PR #89 |
 | v0.6D query-value null/error policy | Remains local |
 | Repository graph assembly and missing-parent semantics | Remain local |
-| Evidence read serialization | Next characterization candidate; requires a neutral contract |
+| Evidence read serialization | Reviewed in PR #93; remains local; no implementation DoR |
 | Generic evidence graph repository | Not justified |
-| Command conflict/integrity translation | Deferred |
+| Command conflict/integrity translation | Next characterization candidate |
 | Revision allocation and lock strategy | Deferred |
 | Dynamic model factories | Deferred, ORM-sensitive |
 | Append-only listener registration | Deferred, ORM-sensitive |
@@ -66,15 +72,16 @@ All three slices are source-only and require no database downgrade or data repai
 
 Separate reviewed work may later consider:
 
-1. a neutral evidence read-serialization contract;
-2. command conflict and integrity primitives;
-3. revision allocation and lock strategy;
-4. append-only listener registration and dynamic model construction.
+1. command conflict and integrity behavior;
+2. revision allocation and lock strategy;
+3. append-only listener registration and dynamic model construction.
 
 A characterization may conclude that a candidate should remain duplicated. Completed neutral boundaries are not blanket authorization for any remaining item.
 
+Evidence read serialization may be reconsidered only under the triggers recorded in `docs/stage2_evidence_read_characterization.md`.
+
 ## Next gate
 
-The next candidate begins with a separate characterization Issue for evidence read serialization across v0.6B-v0.6D. It must inventory exact claim/evidence fields, lookup dependencies, ordering, conflict/missing projections, domain-specific text and collection types. It must define whether a neutral input/output contract can exist without weakening domain ownership, and it may conclude that no extraction is safe.
+The next candidate begins with a separate characterization Issue for command conflict/integrity behavior. It must inventory repeated database exception handling, rollback ownership, exact domain translation, atomicity and SQLite/PostgreSQL differences before proposing any neutral primitive.
 
-No evidence serializer implementation, v0.6E, v0.7 or new migration is authorized by this record.
+No command implementation, evidence serializer extraction, v0.6E, v0.7 or new migration is authorized by this record.
