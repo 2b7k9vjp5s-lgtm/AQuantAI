@@ -1,123 +1,215 @@
 # Personal Investment Research Implementation Plan
 
-This plan is prospective. Each stage requires a separate authorized review issue before implementation. The current v0.2 fixture-backed Dashboard remains the active baseline.
+This plan is prospective. It summarizes merged capability stages and the required gates for future work. It does not authorize implementation by itself.
 
-## v0.2.1 Local Launcher Completion
+`docs/architecture_baseline.md` is authoritative for current state, ownership, invariants, architecture debt and delivery gates.
 
-- **Objective:** finish a safe local launcher handoff for ordinary users.
-- **In scope:** reviewed launcher scripts, local usage documentation, Docker startup diagnostics, and focused tests.
-- **Exclusions:** product workflow, real data, persistence, new APIs, and frontend frameworks.
-- **Dependencies:** v0.2 baseline and Docker Compose configuration.
-- **Acceptance:** launcher behavior is documented, non-destructive, bounded, and verified on available platforms; review is complete.
-- **Tests:** local launcher checks, `python -m pytest -q`, and fixture demo.
+## Current state
 
-## v0.3 Real-Data Persistence Foundation
+- Released software version: `0.2.0`
+- Merged capability stage: v0.6D
+- Runtime surfaces: fixture-backed read-only Dashboard plus database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
+- Current authorized work: docs-only architecture baseline reset in Issue #72
+- Current application implementation authorization: none
 
-- **Objective:** introduce reviewed provider interfaces, local persistence foundations, provenance, and validation for research inputs.
-- **In scope:** data contracts, persistence design and migrations, local configuration, reconciliation, and local tests.
-- **Exclusions:** cockpit calculations, Industry Alpha execution, portfolio simulation, broker behavior, and production operations.
-- **Dependencies:** accepted product architecture, data-model decisions, and provider boundaries.
-- **Acceptance:** persisted inputs are attributable, validated, and recoverable with clear cutoff-date handling.
-- **Tests:** migration, provider-contract, provenance, validation, and fixture integration tests.
+Merged capability stages do not automatically publish a new release.
 
-## v0.4 Market Cockpit
+## Completed capability stages
 
-- **Objective:** provide local market-state monitoring for research timing and risk.
-- **In scope:** snapshot models, indices, breadth, style, liquidity, sector rotation, crowding, market risk, and read-only presentation.
-- **Exclusions:** trading signals, automatic recommendations, broker actions, and replacement of industry facts.
-- **Dependencies:** v0.3 persistence and reviewed data sources.
-- **Acceptance:** every snapshot has date, source, and missing-data behavior; outputs are local and auditable.
-- **Tests:** calculation fixtures, cutoff-date checks, read-only contract tests, and no-live-network unit tests.
+### v0.2 local read-only baseline
 
-### v0.4A Authorized Foundation
+Implemented released baseline:
 
-The first v0.4 slice is limited to deterministic selected-universe breadth, participation, realized-volatility, drawdown, provenance, and completeness from existing persisted stock-basic, daily-price, and trade-calendar snapshots. Official indices, sectors, style, valuation, crowding, derived-snapshot persistence, and automatic refresh require later separately reviewed data coverage and are explicitly unsupported in v0.4A.
+- deterministic Quant Core contracts;
+- local fixture-backed Dashboard and JSON APIs;
+- local demo, tests and safety wording;
+- no production data or execution claims.
 
-### v0.4B Authorized Benchmark Context
+### v0.3 market-data persistence
 
-The second v0.4 slice is limited to separate provider-attributed benchmark-index daily persistence, one reviewed bounded AKShare endpoint, explicit benchmark series selection, close-based context, provenance, cutoff/session alignment, and read-only presentation. It does not authorize sectors, style, valuation, crowding, relative-performance signals, recommendations, or automatic collection.
+Implemented:
 
-### v0.4C Authorized Sector Market Context
+- reviewed provider interfaces and normalized contracts;
+- PostgreSQL migrations and explicit session boundary;
+- immutable ingestion attempts and complete-snapshot reconciliation;
+- canonical snapshot-series identities;
+- controlled manual AKShare ingestion and offline fixtures;
+- provenance, validation and cutoff-aware reads.
 
-The third v0.4 slice is limited to a separate provider-attributed Eastmoney industry-board taxonomy and daily-history series, exact stable-code selection, deterministic exact-session descriptive metrics, provenance, cutoff/session alignment, and optional read-only Market Cockpit presentation. It does not authorize sector constituents, company beneficiaries, Industry Alpha evidence or conclusions, style, valuation, crowding, composite scores, recommendations, automatic collection, or trading behavior.
+### v0.4A-v0.4E Market Cockpit
 
-### v0.4D Authorized Liquidity Distribution Context
+Implemented selected-scope descriptive contexts:
 
-The fourth v0.4 slice is limited to deterministic liquidity-distribution statistics over the same selected-equity complete snapshot, effective session, and persisted open-session sequence already selected for v0.4A. It uses only eligible positive `daily_price.amount` observations and adds latest total/median amount, descriptive top-5/top-decile concentration, exact fixed-cohort 5/20-prior-session activity ratios, and above-prior-20-median participation. It adds no provider endpoint, ingestion, persistence, migration, independent series, calendar, style, valuation, crowding conclusion, signal, recommendation, or automatic collection.
+- breadth, participation, volatility and drawdown;
+- optional separate benchmark context;
+- provider-attributed sector context;
+- liquidity distribution and concentration;
+- descriptive price-behavior proxies.
 
-### v0.4E Authorized Price-Behavior Proxy Context
+Excluded: full-market claims, canonical style/valuation/regime/crowding, signals, recommendations, automatic collection and trading.
 
-The fifth v0.4 slice is limited to deterministic selected-universe price-behavior proxies over the same physical equity snapshot, accepted effective session, filtered close lookup, and persisted open-session sequence. It adds exact complete-window 20/60-session momentum, per-stock 20-return sample volatility annualized by `sqrt(252)`, independent cohort summaries, and one fixed matched-cohort four-bucket distribution. It does not claim canonical style factors, factor exposures, a market regime, risk appetite, valuation, crowding, signals, recommendations, or investment rankings, and adds no provider, ingestion, persistence, migration, selector, series, calendar, or automatic collection.
+### v0.5A-v0.5C Industry Alpha Stage 1
 
-## v0.5 Industry Alpha Stage 1 And Evidence Infrastructure
+Implemented:
 
-- **Objective:** model industry maps and evidence-backed causal research.
-- **In scope:** research cases, drivers, chain maps, bottlenecks, value-pool shifts, evidence, claims, conflicts, and revisions.
-- **Exclusions:** canonical scoring implementation, final investment screens, paper portfolios, LLM execution, and real trading.
-- **Dependencies:** v0.3 persistence and an accepted canonical Industry Alpha scoring reference.
-- **Acceptance:** facts, inferences, conflicts, missing evidence, and cutoff dates are explicit and versioned.
-- **Tests:** evidence provenance, claim-link, conflict, revision, and fixture workflow tests.
+- research cases, evidence, claims, conflicts and immutable revisions;
+- evidence-backed chain maps and assertions;
+- beneficiary classifications and exact candidate-pool handoff.
 
-### v0.5A Authorized Evidence Ledger Foundation
+Excluded: scoring, company deep-dive conclusions, recommendations, portfolio and trading behavior.
 
-The first v0.5 slice is limited to a local, append-only research-case and evidence ledger. It separates workflow state from conclusion status; records immutable A/B/C/D evidence, versioned facts and inferences, explicit support and contradiction links, frozen case-revision claim membership, and mandatory follow-up verification metadata; and provides cutoff-aware read-only APIs plus an offline fixture demo. It does not authorize industry scoring, causal-chain conclusions, company-beneficiary mapping, Stage 2 stock research, LLM execution, scraping, recommendations, signals, portfolios, or trading.
+### v0.6A-v0.6D Stage 2
 
-### v0.5B Authorized Evidence-Backed Chain Maps
+Implemented:
 
-The second v0.5 slice is limited to append-only industry-map, node, directed-relationship, driver, bottleneck, and value-pool-shift observation revisions. Every assertion binds exact v0.5A claim revisions, map revisions freeze exact assertion revisions, and current/historical read-only views preserve A/B/C/D grades, conflicts, missing evidence, UTC chronology, and cutoff boundaries. It does not authorize scoring, weights, rankings, company beneficiaries, Stage 2 research, LLM/provider execution, scraping, recommendations, signals, portfolios, brokers, orders, or trading.
+- v0.6A company-research revisions and financial-transmission hypotheses;
+- v0.6B expectation and valuation-observation revisions;
+- v0.6C catalyst and risk assessments;
+- v0.6D industry/company quality judgments.
 
-### v0.5C Authorized Stage 1 Beneficiary Classifications
+These stages bind exact accepted upstream revisions and evidence, preserve cutoff plus UTC chronology and expose read-only deterministic APIs/demos.
 
-The third v0.5 slice is limited to append-only direct, secondary, and potential company-beneficiary classifications. Every revision freezes one exact successful local `stock_basic` row, one exact v0.5B map revision, exact assertions contained in that map revision, and exact v0.5A claim revisions. Supported classifications require visible A/B/C-backed support without contradiction; D-only and disputed states remain explicit. Candidate-pool revisions freeze only exact supported classifications from one map boundary and have no score, weight, rank, target price, recommendation, or investment-priority semantics. Financial transmission, Stage 2 deep research, valuation, LLM/provider execution, scraping, recommendations, portfolios, brokers, orders, and trading remain unauthorized.
+Excluded: target/fair value, expected return, automatic conclusions, ranking, recommendations, price/timing judgment, Watchlist state, portfolio action and trading.
 
-## v0.6 Stage 2 And Stock Research
+## Superseded v0.6E plan
 
-- **Objective:** assess beneficiaries, financial transmission, expectations, valuation, catalysts, and risks from Stage 1 inputs.
-- **In scope:** Stage 2 screens, company deep dives, valuation snapshots, independent industry/company/price/timing judgments, and Quant Core validation links.
-- **Exclusions:** invented score weights, automatic final conclusions, real orders, and portfolio execution.
-- **Dependencies:** accepted v0.5 evidence model and canonical scoring reference.
-- **Acceptance:** Stage 2 cannot silently bypass Stage 1 evidence; assumptions and uncertainty remain visible.
-- **Tests:** Stage handoff, beneficiary relationship, claim provenance, valuation snapshot, and Quant Core reference tests.
+Issue #70 and PR #71 are closed without merge. No v0.6E application code or migration was implemented.
 
-### v0.6A Authorized Company-Research Foundation
+The plan was superseded because the repository must first settle:
 
-The first v0.6 slice is limited to append-only company-research files created from exact frozen v0.5C candidate-pool memberships and evidence-bound financial-transmission hypotheses. It freezes the exact beneficiary, map, company snapshot, claim and evidence boundaries; keeps UTC chronology and historical cutoffs fail-closed; and requires a `后续验证清单` for completed revisions. It does not authorize valuation, scores, weights, rankings, target prices, recommendations, Quant Core automatic scoring, LLM/provider execution, scraping, portfolios, brokers, orders or trading.
+- canonical market-price measurement, unit and currency ownership;
+- structured comparison eligibility for valuation observations;
+- production-realistic fixture/provider parity;
+- Stage 2 repeated-boundary and test-matrix consolidation.
 
-### v0.6B Authorized Expectation And Valuation Snapshots
+A v0.6B `daily_price` link remains provenance/context. Generic `observed_value` is not automatically a price-comparison reference.
 
-The second v0.6 slice is limited to append-only market-expectation and valuation-observation snapshots bound to exact v0.6A company-research revisions, exact supported/disputed hypothesis revisions, and exact claim/evidence boundaries. Valuation snapshots may optionally bind one exact local `daily_price` row from a successful ingestion run for provenance. They never compute target price, fair value, expected return, upside/downside, score, rank, recommendation, good-price/good-timing, catalyst/risk judgment, provider collection, LLM output, portfolio action, broker action, order, or trade.
+## Architecture reset — active Issue #72
 
-### v0.6C Authorized Catalyst And Risk Assessments
+The active docs-only stage must:
 
-The third v0.6 slice is limited to append-only catalyst and company-risk judgment snapshots. Every revision freezes one exact v0.6A company-research revision, its selected accepted hypotheses, at least one exact v0.6B expectation or valuation revision, and the exact claim/evidence links already frozen upstream. Supported/disputed status is evidence-gated, missing public evidence stays explicit, and dual cutoff/UTC chronology prevents later records from leaking into historical views. These records are not monitoring tasks, alerts, reminders, scores, ranks, final conclusions, good-price/good-timing outputs, recommendations, portfolios, broker actions, orders, or trades.
+- establish the three-axis state model;
+- align README, roadmap, review and architecture documents;
+- record the capability matrix through v0.6D;
+- define dependency and field/domain ownership;
+- centralize architecture invariants;
+- record architecture debt;
+- introduce Architecture Preflight, Definition of Ready, golden-path-first, reset and consolidation gates.
 
-### v0.6D Authorized Industry And Company Quality Judgments
+It must not change application behavior, migrations, tests, fixtures, provider behavior, version or release metadata.
 
-The fourth v0.6 slice adds append-only manual industry-quality and company-quality judgments. Every revision freezes one exact v0.6A research boundary, its accepted hypotheses, exact v0.6B expectation/valuation revisions, exact v0.6C catalyst/risk revisions, and exact claim/evidence links. Outcomes and evidence states are separate reviewed fields; facts, inferences, conflicts, missing evidence, uncertainty, and bounded `后续验证清单` notes remain visible. These judgments are not formal research conclusions, good-price/good-timing decisions, watchlist states, task lifecycles, Quant Core scores, rankings, recommendations, or trading actions. See [stage2_quality_judgments.md](stage2_quality_judgments.md).
+## Required future process
 
-## v0.7 Watchlist And Verification Tasks
+Every future capability follows:
 
-- **Objective:** manage personal research follow-up and historical status changes.
-- **In scope:** watchlists, statuses, catalysts, risks, verification tasks, reminders, and revision history.
-- **Exclusions:** multi-user collaboration, subscriptions, automated notifications to third parties, and trading actions.
-- **Dependencies:** v0.5/v0.6 research records.
-- **Acceptance:** status and task changes are attributable, reviewable, and never overwrite prior conclusions.
-- **Tests:** status transition, task completion, revision-history, and fixture reminder tests.
+```text
+Architecture Preflight
+  -> Definition of Ready
+  -> authoritative GitHub Issue
+  -> task synchronization and planning review
+  -> explicit implementation authorization
+  -> implementation review
+  -> explicit merge authorization
+  -> architecture/status synchronization
+```
 
-## v0.8 Paper Portfolio And Simulated Trades
+### Architecture Preflight
 
-- **Objective:** record multiple personal simulated portfolios and their thesis context.
-- **In scope:** manual simulated trades, positions, cash ledger, NAV, benchmarks, concentration, corporate actions, and thesis snapshots.
-- **Exclusions:** broker integration, real orders, automated trading, performance promises, and tax/accounting advice.
-- **Dependencies:** accepted watchlist/research records and persistence foundations.
-- **Acceptance:** all records are explicitly simulated, reconstructable, and linked to immutable thesis snapshots.
-- **Tests:** ledger, position, NAV, benchmark, concentration, corporate-action, and no-broker boundary tests.
+Before a feature Issue exists, establish:
 
-## v0.9 Portfolio Analysis And Quant Core Integration
+- user problem and missing capability;
+- field/domain ownership;
+- real provider or accepted upstream source for each input;
+- one production-realistic offline golden path;
+- important failure path;
+- migration/runtime impact;
+- conflicts with current architecture;
+- smallest viable slice and exclusions.
 
-- **Objective:** compare simulated portfolio outcomes with versioned research and Quant Core validation artifacts.
-- **In scope:** portfolio review, attribution-oriented analysis, benchmark comparison, research-thesis review, and controlled Quant Core references.
-- **Exclusions:** autonomous allocation, live execution, broker actions, mandatory Qlib/LLM production runs, and SaaS features.
-- **Dependencies:** v0.8 simulated records and stable Quant Core interfaces.
-- **Acceptance:** analysis remains traceable to simulated records, research revisions, and reproducible Quant Core outputs.
-- **Tests:** portfolio-review fixtures, traceability checks, Quant Core contract tests, and safety-boundary tests.
+### Definition of Ready
+
+Implementation requires:
+
+- accepted input/output contracts;
+- explicit ownership table;
+- production-reachable golden path;
+- fixture/provider parity evidence;
+- exact selectors and chronology;
+- explicit migration decision;
+- one main domain capability and at most one infrastructure change;
+- acceptance tests and stop conditions.
+
+### Reset rule
+
+Stop and create a new architecture decision rather than extending the task file when:
+
+- two rounds of foundational blockers occur;
+- production reachability fails;
+- a material field has no single owner;
+- semantics rely on free text, names, identifier patterns or defaults;
+- one slice requires multiple infrastructure foundations;
+- project documents materially disagree.
+
+### Consolidation cadence
+
+After every two domain slices, pause new features and review:
+
+- duplicated models, repositories, validators and serializers;
+- schema and frozen-link growth;
+- test count and cross-product growth;
+- API consistency;
+- next-stage input reachability;
+- status-document consistency.
+
+Green CI is necessary regression evidence but not architecture acceptance.
+
+## Candidate next stages — not authorized
+
+### Stage 2 consolidation characterization
+
+Potential objective: measure repeated v0.6A-v0.6D revision allocation, append-only enforcement, evidence qualification, cutoff validation, repository/query, fixture and database-test patterns.
+
+Default constraint: no migration and no schema rewrite. A later proposal may extract only justified shared Python-layer utilities.
+
+### Canonical market-price evidence
+
+Potential objective: define a standalone market-data/evidence object with canonical decimal text, measurement kind, unit, currency, trade date, adjustment, provider, series/run identity and chronology.
+
+This stage must have independent user value and a production-realistic offline AKShare path. It must not create below/at/above, good-price, recommendation or timing state.
+
+### Structured valuation comparison eligibility
+
+Potential objective: explicitly state whether a valuation observation is a compatible price-per-share reference and what role it serves.
+
+Generic `observed_value` remains ineligible by default. This stage must not create target price, fair value or expected return.
+
+### Re-evaluate price interpretation
+
+Only after accepted upstream contracts exist, decide whether a separate persisted price-judgment aggregate is necessary. Prefer a deterministic read model when the relationship can be reproduced without duplicating state.
+
+### v0.7 Watchlist and verification workflow
+
+Not authorized. It may be reconsidered only after the architecture baseline and required consolidation review are accepted. Follow-up verification text in current records is not yet a task lifecycle.
+
+### v0.8 Paper Portfolio
+
+Not authorized. Future records must be explicitly simulated and have no broker or real-order meaning.
+
+### v0.9 portfolio analysis and Quant Core integration
+
+Not authorized. Future analysis must remain traceable and must not create autonomous allocation or execution.
+
+## Locked exclusions
+
+Without a separate accepted Issue, do not add:
+
+- application behavior from this plan;
+- migrations;
+- v0.6E price or timing judgment;
+- v0.7+ workflow entities;
+- new mutation UI/API;
+- automatic provider collection;
+- production LLM execution;
+- recommendations, broker actions, orders or automated trading;
+- release/tag or version change;
+- modification of PR #38.

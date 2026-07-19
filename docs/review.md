@@ -1,80 +1,86 @@
 # Review Log
 
-GitHub is the preferred source for sprint review records. Use this file as a local mirror or fallback when GitHub Issues or pull request review comments are unavailable.
+GitHub Issues and pull-request reviews are the authoritative review record. This file is a concise local mirror of the current architecture status and major reset decisions.
 
-Preferred GitHub Issue title format:
+See `docs/architecture_baseline.md` for the authoritative capability matrix, dependency direction, field ownership, invariants, architecture debt and delivery gates.
 
-```text
-Sprint N Review & Next Tasks
-```
+## Current status
 
-Required review content:
+- Review date: 2026-07-19
+- Released software version: `0.2.0`
+- Merged capability stage: v0.6D
+- Accepted `main` commit: `9cc5a0e5dda97efa6b9c7b3a43eb3b5c4ead91ec`
+- Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
+- Active architecture work: Issue #72, docs-only unified architecture baseline reset
+- Application implementation authorization: none
 
-1. Current review scope
-2. Review conclusion
-3. Issues found
-4. Architecture risks
-5. Required fixes
-6. Next phase tasks
-7. Codex execution requirements
-8. Completion standards
+## Architecture reset decision
 
-## Current Status
+Issue #70 and Draft PR #71 attempted to plan a v0.6E price-observation judgment slice. The path was paused and withdrawn before application implementation.
 
-Version-alignment base commit: `ccede72b3fa56bd043a1781ca971844d71f91665`
+PR #71 was closed without merge and Issue #70 was closed as `not_planned`. Their branch, task and review history remain preserved.
 
-Active baseline: `0.2.0` local read-only research Dashboard baseline.
+The path was superseded because review exposed project-level problems rather than a single task defect:
 
-Release handoff tracked in [Issue #31](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/31).
+1. README, roadmap, review log and prospective architecture used incompatible descriptions of the current state.
+2. Canonical market-price measurement, unit and currency did not have a single accepted domain owner.
+3. Generic v0.6B valuation `observed_value` did not have structured price-comparison eligibility.
+4. Fixture-only data could make a success path appear reachable when the reviewed production adapter could not supply the same fields.
+5. v0.6A-v0.6D repeated identity, revision, frozen-link, repository, query, fixture and cross-database test patterns without an intervening consolidation review.
+6. The planning process exceeded the new reset threshold after repeated foundational blockers.
 
-The accepted v0.2 scope includes deterministic ranking and backtest correctness hardening plus the local `/dashboard` presentation page backed only by existing fixture JSON APIs. It remains fixture/sample-data-only, read-only, research-only, and not production-ready. Live ingestion, database persistence, production Qlib/VectorBT/LLM execution, authentication, deployment automation, broker integration, order placement, and automated trading remain out of scope.
+No v0.6E model, migration, command, API, fixture, test implementation or runtime behavior was merged.
 
-The version-alignment PR must update metadata and active status wording only, preserve historical v0.1 records, and wait for review before any release publication or new product scope.
+## Current review conclusion
 
-## Review Date
+The repository still has a reliable auditable foundation:
 
-2026-07-09
+- deterministic local market-data persistence and explicit snapshot-series selection;
+- read-only Market Cockpit context;
+- append-only v0.5 evidence ledger and Stage 1 handoff;
+- append-only v0.6A-v0.6D Stage 2 research records;
+- exact revision/provenance links;
+- cutoff plus UTC chronology;
+- SQLite/PostgreSQL validation;
+- no-network fixture and demo discipline.
 
-## Commit / Branch
+The immediate risk is architecture governance and duplication growth, not an uncontrolled code branch. The safe action is to align the architecture baseline before adding another domain.
 
-Branch: `codex/v0.1-release-readiness`
+## Active required changes — Issue #72
 
-Issue: [v0.1 Baseline Freeze & Release Readiness](https://github.com/2b7k9vjp5s-lgtm/AQuantAI/issues/18)
+The docs-only architecture reset must:
 
-## Review Scope
+- introduce the three-axis current-state model: release version, merged capability stage and runtime surface;
+- record the capability matrix through v0.6D;
+- mark v0.6E superseded and v0.7+ unauthorized;
+- define the implemented domain dependency direction;
+- establish field/domain ownership, especially market-price and valuation semantics;
+- centralize shared architecture invariants;
+- record architecture debt;
+- add Architecture Preflight, Definition of Ready, golden-path-first, reset and consolidation gates;
+- keep version `0.2.0` and avoid all application behavior.
 
-PR #17 merge confirmation and v0.1 baseline freeze/release readiness.
+## Locked exclusions
 
-## Summary
+Until a later explicit authorization is accepted:
 
-PR #17 was marked ready and merged so `main` contains the post-Phase-6 stabilization pass. The v0.1 release-readiness pass aligns version/status metadata, adds the changelog, adds the release checklist, documents future work boundaries, and adds a local-only CI workflow for pytest plus the fixture demo.
+- no application code or provider behavior change;
+- no migration;
+- no v0.6E price judgment;
+- no timing judgment;
+- no v0.7 Watchlist or verification-task behavior;
+- no portfolio, broker, order, recommendation or automated trading behavior;
+- no release/tag or version change;
+- no modification of PR #38.
 
-## Issues Found
+## Next review gate
 
-- v0.1 release preparation must not become a new feature phase.
-- Documentation must not claim production readiness.
-- CI must stay limited to local tests and fixture demo execution.
+Issue #72 and its Draft PR must remain Open/Draft/unmerged after documentation synchronization. Review will verify:
 
-## Architecture Concerns
+- only authorized documentation/task files changed;
+- project status is consistent across documents;
+- the architecture baseline has one unambiguous ownership model;
+- future work remains prospective and unauthorized;
+- unchanged regression tests, fixture demo and Actions are green.
 
-The release baseline consumes existing contracts only. Broker APIs, order placement, automatic trading, live data, production deployment, external paid services, and new feature phases remain out of scope.
-
-## Code Quality Suggestions
-
-Keep the baseline deterministic, local, and research-only. Add new product features only after a future GitHub review explicitly opens that scope.
-
-## Required Changes
-
-- Align version and status metadata on `0.1.0`.
-- Add `CHANGELOG.md`.
-- Add `docs/release_checklist.md`.
-- Add future work documentation.
-- Optionally add safe local-only CI for tests and demo.
-
-## Next Sprint Tasks
-
-Wait for the next GitHub review before any expansion beyond v0.1 release readiness.
-
-## Status
-
-v0.1 baseline freeze and release readiness implemented in PR. Waiting for next review.
+No Codex application implementation command is issued from this reset.
