@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from threading import Lock, RLock
 from typing import Any
 from uuid import UUID
 
@@ -30,19 +29,13 @@ from industry_alpha.stage2_boundary import (
 )
 from industry_alpha.stage2_integrity import translate_integrity as _integrity
 from industry_alpha.stage2_models import Stage2CompanyResearch
+from industry_alpha.stage2_revision_locks import revision_lock as _revision_lock
 from industry_alpha.validation import INFERENCE_CONFIDENCES, reviewed_value, validate_utc_chronology
 
 
 CATALYST_CATEGORIES = frozenset({"demand", "supply", "product", "customer", "certification", "capacity", "policy", "financial", "operational", "other"})
 RISK_CATEGORIES = frozenset({"demand", "supply", "execution", "competition", "customer", "policy", "financial", "governance", "operational", "other"})
 ASSESSMENT_STATUSES = frozenset({"draft", "supported", "disputed", "rejected"})
-_LOCKS_GUARD = Lock()
-_LOCKS: dict[tuple[str, UUID], RLock] = {}
-
-
-def _revision_lock(kind: str, identity: UUID) -> RLock:
-    with _LOCKS_GUARD:
-        return _LOCKS.setdefault((kind, identity), RLock())
 
 
 class Stage2AssessmentCommandService:
