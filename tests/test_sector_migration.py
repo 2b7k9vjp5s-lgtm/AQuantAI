@@ -71,7 +71,7 @@ def test_sector_migration_preserves_existing_runs_and_round_trips() -> None:
         with engine.connect() as connection:
             current_runs = Table("ingestion_runs", MetaData(), autoload_with=engine)
             assert connection.scalar(select(sa.func.count()).select_from(current_runs)) == 1
-            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260719_0008"
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "20260719_0009"
         engine.dispose()
 
         command.downgrade(config, "20260718_0003")

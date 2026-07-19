@@ -110,7 +110,7 @@ def test_migration_head_and_v05b_round_trip_preserve_prior_schema(
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version_num FROM alembic_version")
-            ) == "20260719_0008"
+            ) == "20260719_0009"
     finally:
         engine.dispose()
 

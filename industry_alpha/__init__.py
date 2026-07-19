@@ -7,6 +7,11 @@ from industry_alpha.query import EvidenceLedgerQueryService
 from industry_alpha.stage1_commands import Stage1BeneficiaryCommandService
 from industry_alpha.stage1_query import Stage1BeneficiaryQueryService
 from industry_alpha.stage2_commands import Stage2CompanyResearchCommandService
+from industry_alpha.stage2_expectations_commands import Stage2ExpectationCommandService
+from industry_alpha.stage2_expectations_query import (
+    Stage2ExpectationQueryService,
+    Stage2ValuationQueryService,
+)
 from industry_alpha.stage2_query import Stage2CompanyResearchQueryService
 
 __all__ = [
@@ -18,4 +23,7 @@ __all__ = [
     "Stage1BeneficiaryQueryService",
     "Stage2CompanyResearchCommandService",
     "Stage2CompanyResearchQueryService",
+    "Stage2ExpectationCommandService",
+    "Stage2ExpectationQueryService",
+    "Stage2ValuationQueryService",
 ]
