@@ -91,13 +91,39 @@ No confidence field may upgrade disputed or missing evidence. If inference confi
 
 ### `comparison_basis_kind`
 
-- `point`: one frozen finite decimal reference value, explicit unit, explicit currency when monetary, source revision/field provenance, and no range bounds;
-- `range`: one frozen finite inclusive lower/upper band with `lower <= upper`, explicit unit, explicit currency when monetary, and source revision/field provenance;
+- `point`: exactly one designated selected `supported` v0.6B valuation revision; the point is derived only from that revision's canonical `observed_value` and cannot be supplied independently;
+- `range`: exactly two distinct designated selected `supported` v0.6B valuation revisions with explicit `lower` and `upper` roles; each bound is derived only from its revision's canonical `observed_value`, and the canonical values must satisfy `lower < upper`;
 - `qualitative_non_comparable`: no numeric point or bounds, with a bounded non-empty incompatibility or missing-basis explanation and exact source provenance when available.
 
-`below_recorded_comparison` and `above_recorded_comparison` may use a compatible point or range. `at_recorded_point` may use only a point and requires exact normalized-decimal equality. `within_recorded_comparison` may use only an explicit range and requires `lower <= observed_close <= upper`; it is invalid for a point or qualitative basis. `not_comparable` and `not_assessed` may use only `qualitative_non_comparable`.
+No command field may accept an independently entered point, lower bound, or upper bound. Numeric values must never be parsed from `comparison_basis`, `metric_context`, assumptions, rationale, uncertainty, verification notes, or any other free text. A point command accepts exactly one designated valuation revision ID; a range command accepts exactly two distinct IDs with explicit lower/upper roles. Zero, one, three-or-more, duplicate, reversed, unselected, non-`supported`, or missing-data valuation revisions fail closed.
 
-Observed close and numeric comparison values must use the same unit and currency. Missing unit/currency, mixed currencies, mixed per-share/aggregate units, or any requirement for FX/unit conversion fails closed; no conversion or silent normalization is permitted. The validator may verify the direct point/range relation and provenance only. It must not calculate fair value, intrinsic value, expected return, discount/premium, upside/downside, recommendation, or timing.
+Each designated valuation revision must be in the selected price-specific valuation subset and therefore in the selected v0.6D frozen valuation set, bind the same exact v0.6A revision, be visible at the observation cutoff/UTC timestamp, have a non-`missing_data` method, and contain a canonical `observed_value`. The immutable observation boundary and read model freeze and expose for every designated revision:
+
+- exact valuation revision ID and role (`point`, `lower`, or `upper`);
+- exact source field name, fixed as `observed_value`;
+- valuation method and metric context;
+- the exact upstream canonical `observed_value` string without caller replacement;
+- unit, currency, information cutoff, and recorded UTC timestamp.
+
+The command derives the point/bounds by locked read of those exact fields and verifies byte-for-byte canonical string equality when writing the immutable boundary. It must reject any caller-supplied duplicate value field and any mismatch between the frozen value and the designated upstream revision.
+
+`below_recorded_comparison` and `above_recorded_comparison` may use a valid point or range. `at_recorded_point` may use only a point and requires exact canonical-Decimal equality. `within_recorded_comparison` may use only a valid two-revision range and requires `lower <= observed_close <= upper`; it is invalid for a point or qualitative basis. `not_comparable` and `not_assessed` may use only `qualitative_non_comparable`.
+
+Observed close and every numeric comparison value must represent the same per-share price dimension, unit, and currency. Allowed numeric bases require an explicit price-per-share unit and explicit matching currency on every designated valuation revision and the frozen close convention. Multiples, ratios, percentages, aggregate enterprise/equity values, missing unit/currency, mixed dimensions, mixed currencies, or any requirement for FX/unit conversion fail closed; no conversion or arbitrary normalization is permitted. The validator may verify the direct point/range relation and provenance only. It must not calculate fair value, intrinsic value, expected return, discount/premium, upside/downside, recommendation, or timing.
+
+### Canonical close and comparison decimal
+
+There is one permitted `daily_price.close` Float-to-canonical-Decimal conversion:
+
+1. reject booleans, non-numeric values, non-finite floats, and values `<= 0` before conversion;
+2. convert the source Float with `Decimal(str(source_close))`; direct `Decimal(source_close)` is prohibited;
+3. pass that Decimal through the existing v0.6B canonical decimal routine `_decimal_text` to produce plain canonical decimal text without exponent notation or insignificant trailing zeros;
+4. reject a canonical result that is non-finite, `<= 0`, longer than 64 characters, or has more than 18 fractional digits;
+5. freeze that canonical string in the immutable price audit boundary and expose it as the authoritative close value.
+
+The same positive, finite, maximum-64-character and maximum-18-fractional-digit restrictions apply to each designated valuation revision's already-canonical `observed_value` before it can serve as a point or bound. This additional comparison eligibility check does not rewrite the upstream v0.6B revision.
+
+All relation checks construct `Decimal` only from the frozen canonical close and frozen upstream canonical `observed_value` strings. Binary float comparison, direct float equality, float-derived range checks, tolerance/epsilon matching, and comparing a source Float with an upstream decimal are prohibited. Current, historical, fixture, demo, and API payloads return the canonical strings so SQLite and PostgreSQL cannot diverge through floating representation.
 
 ## Upstream status compatibility matrix
 
@@ -128,7 +154,7 @@ The implementation must apply the following matrix before creating any identity,
 - `not_assessed` requires `insufficient_evidence`, explicit `尚未获得可靠公开证据` wording, and no comparative conclusion.
 - Facts must retain null inference confidence/basis; inferences require the existing valid confidence vocabulary and a non-empty basis.
 - Comparison basis, rationale, uncertainty, and verification notes accept only strings (or explicitly allowed `None`), enforce reviewed length bounds, reject blank values where required, and never coerce non-strings with `str()`.
-- All dates, identifiers, enum values, prices, and provenance must be valid and finite. Strict JSON output must reject `NaN` and `Infinity`.
+- All dates, identifiers, enum values, prices, and provenance must be valid. Every numeric comparison value must satisfy the canonical positive finite Decimal, length, and scale rules above. Strict JSON output must reject `NaN` and `Infinity`.
 - The frozen price stock code must equal the company-research stock code and belong to the exact selected stock scope.
 - The price row must come from a successful ingestion run and the exact canonical series/adjustment boundary. Its trade date must be on or before the revision information cutoff. Its source and frozen audit scalars must match exactly at creation.
 - The ingestion run must satisfy `imported_at_utc <= completed_at_utc <= revision.recorded_at_utc`; every frozen upstream record/link must be visible by both information cutoff and recorded UTC time.
@@ -141,12 +167,14 @@ The implementation must apply the following matrix before creating any identity,
 
 A `daily_price_id` or `ingestion_run_id` foreign key alone is insufficient because the referenced v0.3 rows are not protected by the Stage 2 append-only guards. The proposed implementation must therefore create one revision-owned immutable audit-boundary row whenever a price row is frozen. The boundary retains source foreign keys and canonical natural keys, and copies only the material audit scalars required to reproduce the accepted observation:
 
-- stock code, trade date, close, and the normalized price unit/currency convention;
+- stock code, trade date, source Float close for audit only, authoritative canonical decimal-text close, and the normalized per-share price unit/currency convention;
 - daily-price source integer ID and complete natural key;
 - ingestion-run source integer ID, batch identifier, status, provider, series key, contract/adapter versions, requested scope, adjustment mode, and information cutoff;
 - imported and completed UTC timestamps.
 
 Creation must lock/re-read the source rows, require a successful ingestion run, validate all scalar/provenance values, and write the immutable audit boundary in the same transaction as the observation revision. Query/API payloads use the frozen boundary values for historical meaning and expose source IDs/natural keys only as provenance; they must never rehydrate accepted values from a later-mutated source row.
+
+The source Float is retained only to audit the one approved conversion. It is never used for equality, ordering, point/range classification, or JSON numeric output. Recomputing `Decimal(str(source_close)) -> _decimal_text` at creation must exactly equal the frozen canonical close string.
 
 This is a narrow audit copy, not a second daily-price dataset: it stores one material close/provenance boundary per observation revision, adds no OHLCV history or independent series, and cannot be queried as market data. The boundary and its links use the established append-only update/delete guards. Direct mutation tests must prove that:
 
@@ -212,6 +240,11 @@ Any later implementation authorization must require focused tests for:
 - same-company, same-case, same-series, exact stock, date, adjustment, and successful-ingestion enforcement;
 - stable identities, immutable sequential revisions, deterministic numbering, and supersedes chains;
 - all proposed observation/basis enums, point/range/qualitative field shapes, direct relation checks, unit/currency compatibility, and every allowed/rejected status-matrix combination;
+- point rejection for absent, multiple, unselected, non-supported, missing-data, altered, independently supplied, or wrong-field valuation values;
+- range rejection for free-text-derived, zero/one/three-bound, duplicate-revision, duplicate-value, reversed, unselected, non-supported, missing-data, altered, or independently supplied bounds;
+- exact freezing and readback of valuation revision IDs/roles, `observed_value` field name, method, metric context, canonical strings, units, currencies, cutoffs, and UTC timestamps;
+- per-share price dimension enforcement and rejection of multiples, ratios, percentages, aggregates, absent/mixed units, absent/mixed currencies, FX conversion, and arbitrary normalization;
+- the sole `Decimal(str(close)) -> _decimal_text` conversion, canonical string freeze, positive/finite/64-character/18-scale bounds, and rejection of `Decimal(float)`, direct float equality, epsilon matching, non-positive, non-finite, overlength, and overscale values;
 - supported, disputed, D-only, contradiction, missing-evidence, not-comparable, and not-assessed behavior;
 - chronology across information dates and UTC recorded/imported/completed timestamps;
 - current and historical cutoff reads with no later price, valuation, judgment, claim, evidence, or link leakage;
@@ -220,7 +253,7 @@ Any later implementation authorization must require focused tests for:
 - direct frozen-boundary and source daily-price/ingestion update/delete mutation behavior, proving no indirect rewrite of current or historical payloads;
 - atomic rollback with unchanged row counts for every multi-row failure;
 - deterministic PostgreSQL concurrent revision allocation;
-- fixture-only UUIDv5 semantics, deterministic market-data integer IDs/natural keys, complete payload, all returned IDs, collection ordering, normal runtime ID behavior, and SQLite/PostgreSQL equality;
+- fixture-only UUIDv5 semantics, deterministic market-data integer IDs/natural keys, complete payload, all returned IDs, canonical close/basis strings, collection ordering, normal runtime ID behavior, two clean builds per database, and exact SQLite/PostgreSQL equality;
 - strict JSON, invalid cutoff handling, fixed generic 503 behavior, and read-only route inventory;
 - imports, FastAPI startup, tests, fixture demo, and API reads performing no network access;
 - all existing v0.3-v0.6D regressions and demos.
