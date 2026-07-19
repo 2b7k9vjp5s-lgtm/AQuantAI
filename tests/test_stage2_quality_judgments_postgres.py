@@ -8,12 +8,18 @@ from datetime import date, datetime, timezone
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect, select, text
+from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.pool import StaticPool
 
 from backend.database.engine import build_engine, build_session_factory
+from backend.database.models import Base
 from industry_alpha.stage2_judgments_commands import Stage2JudgmentCommandService
-from industry_alpha.stage2_judgments_fixtures import _boundary, build_stage2_judgment_fixture
+from industry_alpha.stage2_judgments_fixtures import (
+    _boundary,
+    build_stage2_judgment_fixture,
+    build_stage2_judgment_fixture_payload,
+)
 from industry_alpha.stage2_judgments_models import Stage2CompanyJudgmentRevision, Stage2IndustryJudgmentRevision
 
 
@@ -106,15 +112,26 @@ def test_postgres_concurrent_revision_numbers(postgres_database_url: str, kind: 
 def test_postgres_fixture_semantics_repeat_on_clean_database(postgres_database_url: str):
     engine = build_engine(postgres_database_url)
     factory = build_session_factory(engine)
-    results = []
+    payloads = []
     try:
         for _ in range(2):
             with engine.begin() as connection:
                 connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
             fixture = build_stage2_judgment_fixture(factory)
-            with factory() as session:
-                rows = list(session.scalars(select(Stage2IndustryJudgmentRevision).where(Stage2IndustryJudgmentRevision.judgment_id == fixture.affirmed_industry_id).order_by(Stage2IndustryJudgmentRevision.revision_no)))
-            results.append(([item.revision_no for item in rows], rows[1].supersedes_revision_id == rows[0].id))
+            payloads.append(build_stage2_judgment_fixture_payload(factory, fixture))
     finally:
         engine.dispose()
-    assert results == [([1, 2], True), ([1, 2], True)]
+    sqlite_engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    try:
+        Base.metadata.create_all(sqlite_engine)
+        sqlite_factory = build_session_factory(sqlite_engine)
+        sqlite_fixture = build_stage2_judgment_fixture(sqlite_factory)
+        sqlite_payload = build_stage2_judgment_fixture_payload(sqlite_factory, sqlite_fixture)
+    finally:
+        sqlite_engine.dispose()
+    assert payloads[0] == payloads[1]
+    assert payloads[0] == sqlite_payload

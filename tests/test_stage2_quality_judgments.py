@@ -4,6 +4,7 @@ import json
 import socket
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,7 +18,10 @@ from backend.main import app
 from industry_alpha.errors import EvidenceLedgerImmutableError, EvidenceLedgerValidationError
 from industry_alpha.stage2_assessments_commands import _Boundary
 from industry_alpha.stage2_judgments_commands import Stage2JudgmentCommandService, _validate_outcome
-from industry_alpha.stage2_judgments_fixtures import build_stage2_judgment_fixture
+from industry_alpha.stage2_judgments_fixtures import (
+    build_stage2_judgment_fixture,
+    build_stage2_judgment_fixture_payload,
+)
 from industry_alpha.stage2_judgments_models import (
     STAGE2_JUDGMENT_MODELS, Stage2CompanyJudgmentRevision,
     Stage2IndustryJudgment, Stage2IndustryJudgmentRevision,
@@ -78,6 +82,22 @@ def _append(factory, built, **changes):
 def _counts(factory):
     with factory() as session:
         return tuple(session.scalar(select(func.count()).select_from(model)) for model in STAGE2_JUDGMENT_MODELS)
+
+
+def _returned_ids(value, key=""):
+    if isinstance(value, dict):
+        result = []
+        for item_key, item_value in value.items():
+            result.extend(_returned_ids(item_value, item_key))
+        return result
+    if isinstance(value, (list, tuple)):
+        if key.endswith("_ids"):
+            return [str(item) for item in value]
+        result = []
+        for item in value:
+            result.extend(_returned_ids(item, key))
+        return result
+    return [str(value)] if key.endswith("_id") and value is not None else []
 
 
 def test_fixture_current_historical_handoff_provenance_and_strict_json(session_factory, built):
@@ -163,6 +183,7 @@ def test_sequential_revision_supersedes_and_backdating_rolls_back(session_factor
     revision = Stage2JudgmentCommandService(session_factory).append_industry_judgment_revision(built.affirmed_industry_id, **_append(session_factory, built))
     assert revision.revision_no == 3
     assert revision.supersedes_revision_id == built.later_industry_revision_id
+    assert revision.id.version == 4
     before = _counts(session_factory)
     with pytest.raises(EvidenceLedgerValidationError, match="must not be before"):
         Stage2JudgmentCommandService(session_factory).append_industry_judgment_revision(
@@ -219,17 +240,22 @@ def test_api_is_read_only_deterministic_cutoff_aware_and_strict_json(session_fac
 
 
 def test_fixture_semantics_and_order_repeat_on_clean_databases():
-    results = []
+    payloads = []
+    returned_ids = []
     for _ in range(2):
         engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         Base.metadata.create_all(engine)
         factory = build_session_factory(engine)
         fixture = build_stage2_judgment_fixture(factory)
-        with factory() as session:
-            rows = Stage2IndustryJudgmentQueryService(Stage2JudgmentRepository(session)).list_judgments().to_dict()["judgments"]
-        results.append(([item["judgment_key"] for item in rows], _payload(factory, "industry", fixture.affirmed_industry_id)["latest_revision"]["revision_no"]))
+        payload = build_stage2_judgment_fixture_payload(factory, fixture)
+        json.dumps(payload, allow_nan=False, sort_keys=True, separators=(",", ":"))
+        payloads.append(payload)
+        returned_ids.append(_returned_ids(payload))
         engine.dispose()
-    assert results[0] == results[1]
+    assert payloads[0] == payloads[1]
+    assert returned_ids[0]
+    assert returned_ids[0] == returned_ids[1]
+    assert all(UUID(item).version == 5 for item in returned_ids[0])
 
 
 def test_import_startup_fixture_and_demo_do_not_use_network(monkeypatch, session_factory):

@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from collections import Counter
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from uuid import UUID
+from threading import RLock
+from typing import Iterator
+from uuid import UUID, UUID as UUIDValue, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.database.models import Base
 from industry_alpha.stage2_assessments_fixtures import Stage2AssessmentFixtureIds, build_stage2_assessment_fixture
 from industry_alpha.stage2_assessments_models import (
     Stage2CatalystAssessmentRevision, Stage2CatalystClaimLink,
@@ -17,6 +22,10 @@ from industry_alpha.stage2_assessments_models import (
 )
 from industry_alpha.stage2_judgments_commands import Stage2JudgmentCommandService
 from industry_alpha.stage2_judgments_models import Stage2CompanyJudgmentRevision, Stage2IndustryJudgmentRevision
+
+
+FIXTURE_ID_NAMESPACE = UUIDValue("52feff38-3d22-5a25-a44e-5d0a723a551c")
+_FIXTURE_ID_LOCK = RLock()
 
 
 @dataclass(frozen=True)
@@ -65,7 +74,36 @@ def _common(boundary: dict, *, outcome: str, evidence_state: str, confidence: st
     }
 
 
+@contextmanager
+def _deterministic_fixture_uuid_defaults() -> Iterator[None]:
+    """Assign deterministic UUID PKs while this fixture is being inserted."""
+    counters: Counter[str] = Counter()
+
+    def assign_uuid(mapper, _connection, target) -> None:
+        for column in mapper.primary_key:
+            if column.type.python_type is UUID and getattr(target, column.key) is None:
+                table_name = column.table.name
+                counters[table_name] += 1
+                setattr(
+                    target,
+                    column.key,
+                    uuid5(FIXTURE_ID_NAMESPACE, f"{table_name}:{counters[table_name]}"),
+                )
+
+    with _FIXTURE_ID_LOCK:
+        event.listen(Base, "before_insert", assign_uuid, propagate=True)
+        try:
+            yield
+        finally:
+            event.remove(Base, "before_insert", assign_uuid)
+
+
 def build_stage2_judgment_fixture(session_factory: sessionmaker[Session]) -> Stage2JudgmentFixtureIds:
+    with _deterministic_fixture_uuid_defaults():
+        return _build_stage2_judgment_fixture(session_factory)
+
+
+def _build_stage2_judgment_fixture(session_factory: sessionmaker[Session]) -> Stage2JudgmentFixtureIds:
     v06c = build_stage2_assessment_fixture(session_factory)
     with session_factory() as session:
         supported = _boundary(session, v06c.supported_catalyst_revision_id, v06c.supported_risk_revision_id)
@@ -118,3 +156,43 @@ def build_stage2_judgment_fixture(session_factory: sessionmaker[Session]) -> Sta
         industry_v1 = session.scalar(select(Stage2IndustryJudgmentRevision).where(Stage2IndustryJudgmentRevision.judgment_id == affirmed_industry.id, Stage2IndustryJudgmentRevision.revision_no == 1))
         company_v1 = session.scalar(select(Stage2CompanyJudgmentRevision).where(Stage2CompanyJudgmentRevision.judgment_id == affirmed_company.id, Stage2CompanyJudgmentRevision.revision_no == 1))
     return Stage2JudgmentFixtureIds(v06c, affirmed_industry.id, uncertain_industry.id, affirmed_company.id, uncertain_company.id, industry_v1.id, company_v1.id, later_industry.id, later_company.id)
+
+
+def build_stage2_judgment_fixture_payload(
+    session_factory: sessionmaker[Session], fixture: Stage2JudgmentFixtureIds
+) -> dict:
+    """Return the complete canonical list/detail payload for repeatability checks."""
+    from industry_alpha.stage2_judgments_query import (
+        Stage2CompanyJudgmentQueryService,
+        Stage2IndustryJudgmentQueryService,
+    )
+    from industry_alpha.stage2_judgments_repository import Stage2JudgmentRepository
+
+    with session_factory() as session:
+        repository = Stage2JudgmentRepository(session)
+        industry = Stage2IndustryJudgmentQueryService(repository)
+        company = Stage2CompanyJudgmentQueryService(repository)
+        return {
+            "industry_list": industry.list_judgments().to_dict(),
+            "company_list": company.list_judgments().to_dict(),
+            "industry_details": tuple(
+                industry.get_judgment(item).to_dict()
+                for item in sorted(
+                    (fixture.affirmed_industry_id, fixture.uncertain_industry_id), key=str
+                )
+            ),
+            "company_details": tuple(
+                company.get_judgment(item).to_dict()
+                for item in sorted(
+                    (fixture.affirmed_company_id, fixture.uncertain_company_id), key=str
+                )
+            ),
+            "historical": {
+                "industry": industry.get_judgment(
+                    fixture.affirmed_industry_id, as_of_cutoff=date(2026, 7, 16)
+                ).to_dict(),
+                "company": company.get_judgment(
+                    fixture.affirmed_company_id, as_of_cutoff=date(2026, 7, 16)
+                ).to_dict(),
+            },
+        }
