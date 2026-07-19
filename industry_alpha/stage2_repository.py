@@ -37,6 +37,7 @@ from industry_alpha.stage2_models import (
     Stage2ResearchHypothesisLink,
     Stage2VerificationItem,
 )
+from industry_alpha.stage2_repository_rows import load_ordered_rows
 
 
 @dataclass(frozen=True)
@@ -305,10 +306,4 @@ class Stage2CompanyResearchRepository:
         )
 
     def _rows(self, model, field, ids, *order) -> tuple:
-        if not ids:
-            return ()
-        return tuple(
-            self._session.scalars(
-                select(model).where(field.in_(ids)).order_by(*order)
-            )
-        )
+        return load_ordered_rows(self._session, model, field, ids, *order)
