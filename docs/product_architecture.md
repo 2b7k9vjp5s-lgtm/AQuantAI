@@ -25,8 +25,8 @@ Market observations can create research cases. Research produces evidence-backed
 | --- | --- | --- |
 | Home | Local market summary, recent research changes, and verification reminders. | Planned |
 | Market Cockpit | Selected-universe breadth, participation, liquidity distribution, price-behavior proxies, risk, provenance, completeness, and optional separately selected provider-attributed benchmark and sector context. | v0.4A-v0.4E merged; canonical style, valuation, regime, and crowding conclusions unsupported |
-| Industry Alpha | Stage 1 industry mapping and Stage 2 investment screening with evidence and cutoff dates. | v0.5A evidence ledger and v0.5B chain maps merged; bounded v0.5C evidence-backed beneficiary classifications and unranked candidate handoff in review; scoring, financial transmission, Stage 2, recommendations, and trading unsupported |
-| Stock Research | Company role, beneficiary relationship, financial transmission, expectations, valuation, catalysts, and risks. | Planned |
+| Industry Alpha | Stage 1 industry mapping and Stage 2 company research with evidence and cutoff dates. | v0.5A-v0.5C merged; v0.6A adds a bounded exact-membership company-research and financial-transmission foundation; scoring, valuation, recommendations, and trading unsupported |
+| Stock Research | Company role, beneficiary relationship, bounded financial-transmission hypotheses, expectations, valuation, catalysts, and risks. | v0.6A foundation implemented; valuation, scoring, recommendations, and later judgment workflows unsupported |
 | Watchlist | Research status, catalysts, risks, verification tasks, and status history. | Planned |
 | Paper Portfolio | Multiple simulated portfolios, manual simulated trades, positions, cash, NAV, benchmarks, concentration, and thesis snapshots. | Planned |
 | Settings | Local market-data and LLM-provider configuration. | Planned |
@@ -48,6 +48,7 @@ Quant Core -> product-domain validation and review inputs
 - Quant Core remains a supporting, deterministic research layer. It can validate a Stage 1 candidate pool, but does not independently create the final research conclusion.
 - Market state informs timing and risk. It must not overwrite established industry facts, claim evidence, or versioned conclusions.
 - Future persistence and user-facing modules are introduced only through separately reviewed stages.
+- Stage 2 may begin only from an exact frozen v0.5C candidate-pool membership. It preserves the Stage 1 beneficiary, map, company snapshot, claims and evidence boundary rather than selecting a newer compatible-looking record.
 
 ## Research Discipline And Safety
 

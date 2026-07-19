@@ -6,6 +6,8 @@ from industry_alpha.chain_map_query import IndustryChainMapQueryService
 from industry_alpha.query import EvidenceLedgerQueryService
 from industry_alpha.stage1_commands import Stage1BeneficiaryCommandService
 from industry_alpha.stage1_query import Stage1BeneficiaryQueryService
+from industry_alpha.stage2_commands import Stage2CompanyResearchCommandService
+from industry_alpha.stage2_query import Stage2CompanyResearchQueryService
 
 __all__ = [
     "EvidenceLedgerCommandService",
@@ -14,4 +16,6 @@ __all__ = [
     "IndustryChainMapQueryService",
     "Stage1BeneficiaryCommandService",
     "Stage1BeneficiaryQueryService",
+    "Stage2CompanyResearchCommandService",
+    "Stage2CompanyResearchQueryService",
 ]

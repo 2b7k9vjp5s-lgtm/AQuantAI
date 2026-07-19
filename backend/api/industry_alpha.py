@@ -18,6 +18,8 @@ from industry_alpha.query import EvidenceLedgerQueryService
 from industry_alpha.repository import EvidenceLedgerRepository
 from industry_alpha.stage1_query import Stage1BeneficiaryQueryService
 from industry_alpha.stage1_repository import Stage1BeneficiaryRepository
+from industry_alpha.stage2_query import Stage2CompanyResearchQueryService
+from industry_alpha.stage2_repository import Stage2CompanyResearchRepository
 
 router = APIRouter(prefix="/industry-alpha", tags=["industry-alpha"])
 
@@ -155,6 +157,51 @@ def get_stage1_candidate_pool(
                 Stage1BeneficiaryRepository(session)
             ).get_candidate_pool(
                 candidate_pool_id, as_of_cutoff=as_of_cutoff
+            ).to_dict()
+    except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/company-research")
+def list_stage2_company_research(
+    candidate_pool_revision_id: UUID | None = Query(default=None),
+    map_id: UUID | None = Query(default=None),
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage2CompanyResearchQueryService(
+                Stage2CompanyResearchRepository(session)
+            ).list_research(
+                candidate_pool_revision_id=candidate_pool_revision_id,
+                map_id=map_id,
+                as_of_cutoff=as_of_cutoff,
+            ).to_dict()
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Industry Alpha database query failed. Verify DATABASE_URL and run Alembic migrations.",
+        ) from exc
+
+
+@router.get("/company-research/{company_research_id}")
+def get_stage2_company_research(
+    company_research_id: UUID,
+    as_of_cutoff: date | None = Query(default=None),
+    session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
+) -> dict:
+    try:
+        with session_factory() as session:
+            return Stage2CompanyResearchQueryService(
+                Stage2CompanyResearchRepository(session)
+            ).get_research(
+                company_research_id, as_of_cutoff=as_of_cutoff
             ).to_dict()
     except (EvidenceLedgerNotFound, EvidenceLedgerNotVisible) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

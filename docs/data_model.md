@@ -21,6 +21,9 @@ This document defines conceptual entities and relationships for later reviewed p
 - **Research conclusion status:** a separate versioned conclusion using one of eight canonical values: `核心研究候选`, `估值合理，可持续跟踪`, `公司优秀但价格偏贵`, `等待业绩验证`, `认证期高赔率观察`, `周期拐点观察`, `产业相关但受益纯度低`, or `逻辑证伪或排除`.
 - **Verification task:** the task used to confirm, weaken, contradict, or leave unresolved a linked claim or thesis. Pending tasks form the mandatory `后续验证清单` at the end of each completed research output.
 - **Stage 1 beneficiary classification:** identifies a company as a direct, secondary, or potential beneficiary. Only companies with one of these Stage 1 classifications can enter a Stage 2 candidate pool.
+- **Stage 2 company-research identity:** a stable identity created only from one exact frozen candidate-pool membership. It retains the exact pool revision, membership, beneficiary revision, map revision, Stage 1 assertion links, successful `stock_basic` row and handoff claim/evidence boundary.
+- **Stage 2 research-file revision:** an immutable lifecycle/conclusion snapshot containing a research question, bounded summary, cutoff, UTC timestamp, exact accepted hypothesis revisions and a completed-state `后续验证清单`.
+- **Financial-transmission hypothesis revision:** an explicitly labeled inference from an exact Stage 1 assertion to an operating metric and financial-statement line. It freezes direction, lag/horizon, confidence, basis, exact claim revisions, exact evidence links, conflicts and missing evidence.
 
 ## Watchlists And History
 
@@ -44,6 +47,7 @@ Existing Quant Core concepts remain reusable records: normalized provider data, 
 ```text
 Market snapshot -> research case -> claims <-> evidence
 Research case -> industry map -> Stage 1 beneficiary classification -> Stage 2 candidate pool
+Stage 2 candidate-pool membership -> company research -> financial-transmission hypotheses / verification items
 Research case -> screens / valuation snapshots / catalysts / risks / verification tasks
 Research case -> watchlist entry -> revision history
 Research case -> thesis snapshot -> paper portfolio -> simulated trades / positions / NAV
@@ -51,3 +55,5 @@ Quant Core records -> research-case validation inputs
 ```
 
 The merged v0.5B boundary provides stable map, node, relationship, and observation identities with immutable revisions. The v0.5C boundary adds append-only Stage 1 beneficiary identities and revisions that freeze one exact local `stock_basic` row, one exact map revision, exact contained map assertions, and exact v0.5A claim revisions. Candidate-pool revisions freeze only exact supported beneficiary revisions from the same map boundary, without scores, weights, ranks, recommendations, or Stage 2 conclusions.
+
+The v0.6A boundary starts from one exact candidate-pool membership and adds append-only Stage 2 research-file and financial-transmission hypothesis revisions. It freezes exact Stage 1 and evidence boundaries, applies dual cutoff visibility, and adds no valuation, score, rank, target price, recommendation or trading semantics.
