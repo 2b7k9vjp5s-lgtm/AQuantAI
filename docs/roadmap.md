@@ -12,7 +12,7 @@ AQuantAI uses three independent status axes:
 
 Merged capability and consolidation slices do not automatically publish a new release.
 
-The accepted `main` commit after the first Stage 2 consolidation implementation is `4b6377169fabb8eef5f1b421e8f008a11582f8a9`.
+The accepted application/consolidation implementation baseline is `4b6377169fabb8eef5f1b421e8f008a11582f8a9`. Later docs-only commits may advance `main` without changing the released version, merged capability stage or runtime behavior.
 
 ## Completed foundations
 
@@ -73,6 +73,7 @@ All are append-only, cutoff-aware, evidence-bound and read-only. They do not pro
 - v0.6C and v0.6D now consume one neutral `Stage2BaseBoundary` contract.
 - v0.6D no longer imports shared private mechanics from the v0.6C command module.
 - No schema, migration, API, fixture or domain-semantic change was made by that extraction.
+- Issue #78 and PR #79 synchronized these outcomes into the architecture record without changing application behavior.
 
 ## Superseded path
 
@@ -87,11 +88,11 @@ The reset established that a price judgment cannot be implemented until the proj
 
 No v0.6E implementation or migration is authorized.
 
-## Current authorized stage
+## Current authorization state
 
-Issue #78 authorizes only a docs-only status synchronization after PRs #75 and #77.
+No application feature, consolidation implementation or migration is currently authorized.
 
-It records completed consolidation and remaining architecture debt. It does not authorize repository refactoring, application behavior, a migration, v0.6E or v0.7.
+The next candidate is a separate characterization of ordered repository row-loading primitives. Characterization must precede implementation and must prove identical SQL shape, ordering, duplicate and missing-row behavior, session behavior and SQLite/PostgreSQL compatibility.
 
 ## Remaining Stage 2 consolidation candidates
 
@@ -106,21 +107,18 @@ The neutral boundary extraction resolved the highest-priority incorrect dependen
 
 Stable schemas must not be generalized merely for aesthetic uniformity. A review may conclude that duplication should remain when sharing would weaken domain ownership or ORM stability.
 
-The next candidate is a separate characterization of ordered repository row-loading primitives. Characterization must precede implementation and must prove identical SQL shape, ordering, missing-row behavior and database compatibility.
-
 ## Prospective sequence
 
 The following sequence requires separate Architecture Preflight and GitHub authorization at every step:
 
-1. complete Issue #78 status synchronization;
-2. characterize ordered repository row-loading primitives;
-3. implement only a minimal helper if characterization is accepted;
-4. characterize safe query visibility and formatting utilities;
-5. decide whether a standalone canonical market-price evidence contract has user value;
-6. decide whether valuation observations need structured comparison-eligibility semantics;
-7. re-evaluate whether a separate price-judgment aggregate is necessary;
-8. only then reconsider v0.7 Watchlist and verification tasks;
-9. later consider Paper Portfolio and portfolio analysis.
+1. characterize ordered repository row-loading primitives;
+2. implement only a minimal helper if characterization is accepted;
+3. characterize safe query visibility and formatting utilities;
+4. decide whether a standalone canonical market-price evidence contract has user value;
+5. decide whether valuation observations need structured comparison-eligibility semantics;
+6. re-evaluate whether a separate price-judgment aggregate is necessary;
+7. only then reconsider v0.7 Watchlist and verification tasks;
+8. later consider Paper Portfolio and portfolio analysis.
 
 A deterministic read model may be preferable to a new persisted judgment aggregate when it can reproduce the required relationship without duplicating state.
 
