@@ -27,6 +27,7 @@ from industry_alpha.stage2_expectations_models import (
     Stage2ValuationSnapshot,
     Stage2ValuationSnapshotRevision,
 )
+from industry_alpha.stage2_repository_rows import load_ordered_rows
 
 
 @dataclass(frozen=True)
@@ -125,6 +126,4 @@ class Stage2ExpectationRepository:
 
     def _rows(self, model, field, ids, *order) -> tuple:
         ids = [item for item in ids if item is not None]
-        if not ids:
-            return ()
-        return tuple(self._session.scalars(select(model).where(field.in_(ids)).order_by(*order)))
+        return load_ordered_rows(self._session, model, field, ids, *order)
