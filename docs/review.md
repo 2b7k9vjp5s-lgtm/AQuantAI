@@ -7,7 +7,7 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 - Review date: 2026-07-19
 - Released software version: `0.2.0`
 - Merged capability stage: v0.6D
-- Current documentation head: `375a8d15b8a4f7ca80fe843fcfd93bccdeaa2d9a`
+- Provider-status synchronization base: `ca2a9fa0ca4daea6b7318a50851272b74c4dc115`
 - Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
 - Most recent accepted architecture characterization: Issue #108 / PR #109
@@ -76,7 +76,23 @@ The accepted direction is:
 - MCP and LLM-mediated calls are not canonical ingestion;
 - no production provider implementation has reached Definition of Ready.
 
-The next gate is a credential-safe Hithink contract acceptance probe. It may use a user-configured local secret only when explicitly executed, must not expose credentials, and performs no database writes or default-provider change.
+PR #109 remains the accepted future characterization; it is not rolled back. Hithink is deferred and is neither implemented nor the active default.
+
+## Hithink probe review and deferral
+
+Issue #112 and Draft PR #113 produced a seven-file credential-safe contract probe at reviewed fixed head `b09fcd8e68f4d280407b483a7d114aa0b0e8a015`.
+
+Independent technical review confirmed:
+
+- the base-to-head diff contained exactly the seven authorized files;
+- explicit offline/live gating, delayed local-environment key access, injected transport and sanitized deterministic JSON were implemented;
+- the probe performed no database writes or dump download and changed no provider default;
+- focused and full tests, the fixture demo and Actions `29691380530` succeeded;
+- no live probe ran, no API key was requested or used, and no live contract, permission or data-use acceptance exists.
+
+The account owner then deferred Hithink integration. Issue #112 closed as `not planned` and PR #113 closed without merge. Consequently no Hithink code, dependency, runtime/default-provider change, database/schema change or migration reached `main`.
+
+Hithink remains a future candidate only and requires new Architecture Preflight plus explicit authorization before reconsideration. AKShare remains the implemented controlled provider path, and provider-specific history remains immutable and readable.
 
 ## Current review conclusion
 
@@ -88,7 +104,7 @@ Neutral ownership exists for:
 - SQLAlchemy integrity-error translation;
 - the process-local keyed revision-lock registry.
 
-Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. ORM lifecycle characterization remains deferred but is not cancelled; the provider contract probe is the next project gate.
+Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. With Hithink deferred, ORM lifecycle characterization is restored as the next project gate.
 
 ## Locked exclusions
 
@@ -97,6 +113,7 @@ Evidence read serialization intentionally remains domain-local. Command modules 
 - no model-factory or append-only-listener refactor;
 - no application/provider behavior change or migration;
 - no provider implementation, live request, secret, dependency, ingestion script, fixture or default-provider change;
+- no reopening of Hithink integration without new Architecture Preflight and explicit authorization;
 - no v0.6E price or timing judgment;
 - no v0.7 Watchlist or verification-task behavior;
 - no portfolio, broker, order, recommendation or automated trading behavior;
@@ -105,6 +122,6 @@ Evidence read serialization intentionally remains domain-local. Command modules 
 
 ## Next development gate
 
-The next gate is a separately authorized, credential-safe Hithink contract acceptance probe with no database writes. It must inspect sanitized capability, schema and field evidence through a user-configured local secret only when explicitly executed; no credential may enter source, logs, fixtures, Issues, PRs or chat.
+The next gate is a separate ORM lifecycle characterization of dynamic link-model factories and append-only listener registration. It must inventory mapper/event registration, import-order behavior, duplicate-listener risk, metadata/model identity, test isolation and supported-database behavior before any implementation decision.
 
-The probe is not production ingestion and does not authorize a provider adapter or dump importer. Dynamic model factories and append-only listeners remain deferred pending the later ORM lifecycle characterization. No Codex provider or application implementation command is active after this synchronization.
+Characterization may conclude that the existing ORM-sensitive behavior should remain local. It does not authorize model, listener or runtime implementation. Canonical market-price evidence, v0.6E and v0.7 remain later and unauthorized. No Codex application implementation command is active after this synchronization.

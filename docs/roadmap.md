@@ -6,7 +6,7 @@
 
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
-- Current documentation head: `375a8d15b8a4f7ca80fe843fcfd93bccdeaa2d9a`.
+- Provider-status synchronization base: `ca2a9fa0ca4daea6b7318a50851272b74c4dc115`.
 - Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
@@ -46,6 +46,10 @@ Every ingestion run and canonical series contains exactly one provider. Silent f
 
 Canonical ingestion may later use reviewed REST or a separately reviewed market-dump importer. MCP and LLM-mediated calls are excluded from canonical ingestion. No production Hithink implementation has reached Definition of Ready.
 
+Issue #112 / Draft PR #113 produced a technically reviewed seven-file contract probe at fixed head `b09fcd8e68f4d280407b483a7d114aa0b0e8a015`; Actions `29691380530` succeeded. The account owner deferred integration, so Issue #112 closed as `not planned` and PR #113 closed without merge. No live probe ran, no API key was used, and no live contract, permission or data-use acceptance exists.
+
+No Hithink code, dependency, provider default, runtime behavior, database/schema change or migration reached `main`. Hithink remains a deferred future candidate that requires new Architecture Preflight and explicit authorization. AKShare remains the implemented controlled provider path.
+
 ## Superseded path
 
 Issue #70 and PR #71 for v0.6E price judgment remain superseded and closed without merge. Canonical price measurement ownership, comparison eligibility, realistic provider parity and sufficient consolidation must be resolved separately before reconsideration.
@@ -56,20 +60,19 @@ No v0.6E implementation or migration is authorized.
 
 1. append-only listener registration and dynamic link-model construction.
 
-The next Stage 2 consolidation candidate remains an independent ORM lifecycle characterization of item 1. It is deferred, not cancelled, while the more fundamental provider contract gate is resolved. Dynamic model factories and append-only listeners remain unimplemented.
+The next gate is an independent ORM lifecycle characterization of item 1. It must inventory dynamic link-model factories, append-only listener registration, mapper/event registration, import-order behavior, duplicate-listener risk, metadata/model identity, test isolation and supported-database behavior before any implementation decision. Dynamic model factories and listeners remain unimplemented.
 
 Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs. Integrity translation and the process-local lock registry are completed and do not authorize changes to row locks, allocation, supersession, cleanup/eviction or retry behavior.
 
 ## Prospective sequence
 
-1. run a separately authorized credential-safe Hithink contract acceptance probe using a user-configured local secret only when executed and performing no database writes;
-2. decide whether a reviewed REST adapter, a separately reviewed market-dump importer or neither reaches Definition of Ready;
-3. characterize ORM lifecycle concerns;
-4. implement ORM changes only if a smaller neutral contract preserves mapper/event behavior and reaches Definition of Ready;
-5. decide whether canonical market-price evidence has independent user value;
-6. decide whether valuation observations need comparison-eligibility semantics;
-7. re-evaluate whether price judgment needs persisted state or a deterministic read model;
-8. only then reconsider v0.7 Watchlist and later portfolio work.
+1. characterize ORM lifecycle concerns;
+2. implement ORM changes only if a smaller neutral contract preserves mapper/event behavior and reaches Definition of Ready;
+3. decide whether canonical market-price evidence has independent user value;
+4. decide whether valuation observations need comparison-eligibility semantics;
+5. re-evaluate whether price judgment needs persisted state or a deterministic read model;
+6. only then reconsider v0.7 Watchlist and later portfolio work;
+7. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
 
 Every item requires separate Architecture Preflight and GitHub authorization.
 
