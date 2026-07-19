@@ -9,11 +9,13 @@ See `docs/architecture_baseline.md` for the authoritative capability matrix, dep
 - Review date: 2026-07-19
 - Released software version: `0.2.0`
 - Merged capability stage: v0.6D
-- Accepted `main` commit: `4b6377169fabb8eef5f1b421e8f008a11582f8a9`
+- Accepted application/consolidation implementation baseline: `4b6377169fabb8eef5f1b421e8f008a11582f8a9`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Active architecture work: Issue #78, docs-only synchronization of completed Stage 2 consolidation
-- Application implementation authorization: none
+- Most recent architecture synchronization: Issue #78 and PR #79
+- Active application or consolidation implementation authorization: none
 - New migration authorization: none
+
+Docs-only commits after the implementation baseline may advance `main` without changing the released version, merged capability stage or runtime behavior.
 
 ## Architecture reset decision
 
@@ -67,6 +69,20 @@ Independent implementation review confirmed:
 
 PR #77 was squash-merged as `4b6377169fabb8eef5f1b421e8f008a11582f8a9`. Issue #76 closed as completed.
 
+## Status synchronization acceptance
+
+Issue #78 and PR #79 synchronized the architecture baseline, roadmap, review log and Stage 2 consolidation design record after PRs #75 and #77.
+
+The accepted synchronization:
+
+- records PRs #73, #75 and #77 as completed;
+- records `4b6377169fabb8eef5f1b421e8f008a11582f8a9` as the application/consolidation implementation baseline;
+- marks neutral boundary extraction complete;
+- distinguishes completed boundary consolidation from remaining repository, query, concurrency and ORM candidates;
+- identifies ordered repository row-loading primitives as the next separate characterization candidate;
+- preserves version `0.2.0` and all feature/migration exclusions;
+- changes no application behavior.
+
 ## Current review conclusion
 
 The repository has a reliable auditable foundation:
@@ -83,22 +99,11 @@ The repository has a reliable auditable foundation:
 
 The highest-priority incorrect dependency direction is resolved. Remaining risk is continued infrastructure duplication and test-matrix growth, not uncontrolled feature work.
 
-## Active required changes — Issue #78
-
-The docs-only status sync must:
-
-- record PRs #73, #75 and #77 as completed;
-- record accepted `main` commit `4b6377169fabb8eef5f1b421e8f008a11582f8a9`;
-- mark neutral boundary extraction complete;
-- distinguish completed boundary consolidation from remaining repository, query, concurrency and ORM candidates;
-- identify ordered repository row-loading primitives as the next separate characterization candidate;
-- preserve version `0.2.0` and all feature/migration exclusions.
-
 ## Locked exclusions
 
 Until a later explicit authorization is accepted:
 
-- no repository utility implementation from Issue #78;
+- no repository utility implementation without an accepted characterization Issue;
 - no application code or provider behavior change;
 - no migration;
 - no v0.6E price judgment;
@@ -108,14 +113,15 @@ Until a later explicit authorization is accepted:
 - no release/tag or version change;
 - no modification of PR #38.
 
-## Next review gate
+## Next development gate
 
-Issue #78 and its Draft PR must remain Open/Draft/unmerged after synchronization. Review will verify:
+The next candidate is a separate characterization Issue for ordered repository row-loading primitives. It must verify:
 
-- only the authorized task and four documentation files changed;
-- project status is consistent across documents;
-- completed consolidation is not described as prospective;
-- future repository/query work remains prospective and unauthorized;
-- unchanged regression tests, fixture demo and Actions are green.
+- exact repeated SQL shapes;
+- deterministic ordering and duplicate handling;
+- missing-row behavior;
+- session and loading semantics;
+- SQLite/PostgreSQL compatibility;
+- a no-migration decision and explicit implementation exclusions.
 
-No Codex application implementation command is issued from this status-sync task.
+Characterization does not authorize implementation. No Codex application implementation command is active after this status synchronization.
