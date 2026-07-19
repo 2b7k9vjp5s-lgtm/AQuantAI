@@ -1,180 +1,135 @@
-# Issue #62 — v0.6A Stage 2 Company Research Foundation
+# Issue #62 — v0.6A Blocking Review Revision
 
 ## State
 
 - Repository: `2b7k9vjp5s-lgtm/AQuantAI`
 - Issue: `#62`
 - Branch: `feat/v06a-company-research`
-- Draft PR: `[v0.6A] Add Stage 2 company research foundation`
+- Draft PR: `#63` — `[v0.6A] Add Stage 2 company research foundation`
 - Required base and ancestor: `df6d78299d0761a6911457ca4a3b6959b195eeb4`
+- Reviewed implementation Head: `51023297d14fdb90067182e1782eafd06f24a457`
+- Blocking COMMENT review: `4729717724`
+- Implementation CI: `29669976949` — success
 - Version remains `0.2.0`
 
-Read `.codex/WORKFLOW.md`, Issue #62, merged v0.5A-v0.5C models, migrations, docs, tests and current CI before editing.
+Read `.codex/WORKFLOW.md`, Issue #62, PR #63, review `4729717724`, the merged v0.5A-v0.5C boundaries and the current Stage 2 implementation before editing.
 
-Keep the PR Draft/Open/unmerged and Issue #62 Open. Do not modify PR #38, create a release/tag, change version, begin v0.6B, or add valuation/ranking/recommendation behavior.
+Keep PR #63 Draft/Open/unmerged and Issue #62 Open. Do not modify PR #38, create a release/tag, change version, begin v0.6B, or broaden the feature.
 
 ## Objective
 
-Implement one bounded, local, append-only and cutoff-aware Stage 2 company-research foundation. Stage 2 may start only from an exact frozen v0.5C candidate-pool membership. Persist company-research file revisions and evidence-backed financial-transmission hypotheses without valuation, scoring, ranking, recommendations or trading.
+Fix only the three blocking correctness defects identified in review `4729717724`. Preserve the accepted v0.6A architecture, schema, public routes and exclusions.
 
-## Required domain
+## Required correction 1 — supported hypothesis claim status
 
-Add stable identities and immutable revisions for:
+`Stage2CompanyResearchCommandService._insert_hypothesis_revision()` currently treats any visible A/B/C `supports` evidence as sufficient for `hypothesis_status="supported"`, regardless of the bound `ClaimRevision.claim_status`.
 
-1. A Stage 2 company-research identity belonging to one research case, industry map, candidate-pool identity and canonical company key.
-2. Research-file revisions with sequential revision number, workflow state, conclusion status, research question, bounded summary, information cutoff, UTC recorded timestamp and supersedes pointer.
-3. Financial-transmission hypothesis identities and revisions.
-4. Exact links from each hypothesis revision to exact v0.5A claim revisions.
-5. Exact membership/freeze references from the Stage 2 identity to one candidate-pool revision, one membership, one beneficiary identity/revision and one exact successful `stock_basic` record.
-6. Verification items forming the mandatory `后续验证清单` for completed research-file revisions.
+Change the rule to match the reviewed Stage 1 contract:
 
-Research-file workflow state and conclusion status must remain separate. Reuse reviewed values from existing research-case conventions where safe; do not invent ambiguous synonyms.
+- at least one bound claim revision must have `claim_status == "supported"`;
+- that same supported claim revision must have visible A/B/C evidence with relation `supports` at the hypothesis cutoff and recorded-time boundary;
+- no visible contradiction may exist across the bound claim/evidence boundary;
+- D-only evidence remains insufficient;
+- a draft, disputed or rejected claim revision must not independently support a `supported` hypothesis, even when it has an A/B/C supporting evidence link;
+- keep the existing `disputed` rule: a disputed claim revision or visible contradiction is required.
 
-Reviewed hypothesis directions:
+Add focused regressions for:
 
-- `positive`
-- `negative`
-- `mixed`
-- `uncertain`
+1. draft claim + A/B/C support rejected for a supported hypothesis;
+2. disputed claim + A/B/C support but no contradiction rejected for a supported hypothesis;
+3. rejected claim + A/B/C support rejected for a supported hypothesis;
+4. supported claim + visible A/B/C support accepted when no contradiction is visible;
+5. transaction rollback leaves no partial hypothesis identity, revision or links after rejection.
 
-Hypothesis revisions are inferences and must include:
+## Required correction 2 — exact Stage 1 evidence boundary
 
-- explicit mechanism;
-- operating metric;
-- financial-statement line;
-- expected lag/horizon;
-- confidence;
-- explicit basis;
-- information cutoff and recorded UTC timestamp;
-- exact claim-revision bindings.
+`_freeze_handoff_boundary()` currently freezes evidence using the later Stage 2 creation cutoff and timestamp. This can admit evidence or claim-evidence links appended after the frozen Stage 1 beneficiary revision.
 
-## Exact Stage 1 handoff
+Freeze the Stage 1 handoff exactly as the accepted beneficiary revision saw it:
 
-A Stage 2 identity can be created only from an exact visible `stage1_candidate_pool_membership` contained in an exact candidate-pool revision.
+- claim and assertion links must remain limited to links recorded no later than `beneficiary_revision.recorded_at_utc`;
+- evidence information dates must be no later than both the claim revision cutoff and `beneficiary_revision.information_cutoff_date`;
+- evidence rows and claim-evidence links must be recorded no later than `beneficiary_revision.recorded_at_utc`;
+- the later Stage 2 creation cutoff/timestamp may additionally restrict visibility, but must never expand the Stage 1 boundary;
+- frozen Stage 2 handoff reads must remain unchanged after later Stage 1 evidence/link additions.
 
-Freeze and expose these exact references:
+Prefer reusing or mirroring the already accepted Stage 1 evidence-boundary semantics rather than introducing a new interpretation.
 
-- candidate-pool identity and revision;
-- candidate-pool membership;
-- Stage 1 beneficiary identity and revision;
-- selected v0.5B map revision and exact assertion links frozen by that beneficiary revision;
-- exact successful `stock_basic` record and ingestion-run provenance;
-- exact Stage 1 claim revisions and evidence visible at the accepted handoff boundary.
+Add regressions that:
 
-All records must share one research case, industry map and company identity. Reject non-member companies, mismatched revisions, cross-case/map references, later snapshots and non-successful ingestion runs.
+1. create or identify a supported beneficiary revision;
+2. append a new evidence item and claim-evidence link after that beneficiary revision but before Stage 2 creation;
+3. create Stage 2 research later;
+4. prove the late evidence/link is absent from `stage2_handoff_evidence_links` and `frozen_stage1_handoff`;
+5. prove the original evidence boundary remains deterministic and sufficient;
+6. prove failed handoff validation rolls back all Stage 2 rows.
 
-No later Stage 1 beneficiary revision, membership, claim link, evidence link, assertion revision or company snapshot may rewrite an accepted Stage 2 historical view.
+## Required correction 3 — append-only verification-item visibility
 
-## Evidence rules
+`add_verification_item()` permits later checklist rows, but `_research_revision_payload()` currently requires each item timestamp to be no later than the parent research revision timestamp. A legitimately appended item is therefore permanently invisible.
 
-- Every hypothesis revision must bind at least one exact claim revision from the same research case.
-- The claim/evidence boundary must be visible at both the hypothesis cutoff and hypothesis recorded timestamp.
-- `supported` requires at least one visible supported A/B/C-backed claim revision and no visible contradiction.
-- D-only evidence cannot independently support a hypothesis or completed Stage 2 conclusion.
-- `disputed` requires a disputed claim or visible contradiction.
-- Missing evidence, contradictory evidence and unsupported assumptions remain explicit in read contracts.
-- Never fabricate customers, orders, capacity, market share, revenue exposure, margins, certification, operating metrics or financial impact.
+Correct the read semantics:
 
-A completed research-file revision must:
+- a verification item belongs to its exact company-research revision;
+- it becomes visible when its own `recorded_at_utc` is visible under `as_of_cutoff`;
+- do not require an appended item to have been recorded at or before the parent revision timestamp;
+- current reads must include later accepted items;
+- an earlier cutoff must exclude items recorded after that cutoff;
+- ordering remains deterministic by `item_no` and stable ID;
+- chronology validation in `add_verification_item()` must continue to prevent backdating before the research revision or prior checklist history.
 
-- contain at least one accepted hypothesis revision;
-- have no silent missing-evidence state;
-- include a non-empty `后续验证清单`;
-- keep unresolved conflicts explicit rather than silently claiming support.
+Add regressions for:
 
-## Append-only, chronology and transactions
+1. appending an item after the research revision;
+2. current detail includes the appended item;
+3. a cutoff before the item excludes it;
+4. a cutoff on/after the item's UTC date includes it;
+5. item numbering and strict JSON ordering are deterministic;
+6. invalid backdating remains atomic.
 
-- Corrections append revisions; accepted identities, revisions, links and verification items cannot be updated or deleted through ordinary ORM sessions.
-- Use exact timezone-aware UTC chronology.
-- Stage 2 identities/revisions cannot predate the case, map, pool identity/revision, membership, beneficiary identity/revision, company snapshot/import completion, selected map revision, assertions, claims, evidence or prior revision.
-- Hypothesis revisions cannot predate their identity, research-file revision boundary, linked claims/evidence or prior hypothesis revision.
-- Verification items cannot predate their research-file revision; later accepted items cannot be backdated before existing accepted checklist history.
-- Multi-row commands are single transactions and fully rollback on validation, uniqueness, chronology, cross-boundary or evidence failure.
-- Revision numbering must be concurrency-safe on PostgreSQL using repository conventions.
+## Allowed implementation scope
 
-## Persistence
+Expected files are limited to the smallest necessary subset of:
 
-Add exactly one focused Alembic migration after `20260719_0007`.
+- `industry_alpha/stage2_commands.py`
+- `industry_alpha/stage2_query.py`
+- `industry_alpha/stage2_fixtures.py` only if a deterministic fixture change is genuinely needed
+- `tests/test_stage2_company_research.py`
+- `tests/test_stage2_company_research_postgres.py` only if PostgreSQL-specific coverage is needed
+- focused Stage 2 documentation only when behavior text must be corrected
+- this task file
 
-Reuse the existing SQLAlchemy Base, engine and session conventions. Add only the tables, indexes and constraints needed for Stage 2 company-research identities/revisions, hypothesis identities/revisions, exact claim links, exact frozen Stage 1 handoff references and verification items.
+Do not add or alter migrations unless a demonstrated schema defect makes it unavoidable. The current schema migration `20260719_0008` should remain the only v0.6A migration.
 
-Downgrade must remove only v0.6A objects in dependency-safe order. Update migration imports/tests that enumerate domain models.
+Do not alter public route shapes, introduce HTTP mutation routes, change dependencies, Docker/Compose, CI, launchers, version, release/tag state, valuation, scoring, ranking, recommendations, Quant automatic scoring, LLM/provider execution, scraping, watchlists, portfolios, brokers, orders or trading.
 
-## Commands and repository boundaries
+## Validation
 
-Provide deterministic command services for tests and offline fixtures only. No HTTP mutation routes.
+Run and report exact results for:
 
-All command inputs must validate strict strings/enums, text bounds, duplicate IDs, exact ownership, cutoff visibility, UTC chronology and frozen Stage 1 boundaries. Optional text accepts only `str | None`; required text accepts only `str`.
-
-Translate persistence conflicts to existing domain errors and leave no partial rows after failure.
-
-Avoid circular imports. Reuse existing evidence/chronology helpers where safe without weakening v0.5 freeze protections.
-
-## Query and API
-
-Provide deterministic cutoff-aware reads for:
-
-- Stage 2 company-research list, preferably scoped by candidate-pool revision or industry map;
-- Stage 2 company-research detail with exact handoff, company snapshot, map assertions, Stage 1 claims/evidence, research-file history, hypotheses, conflicts, missing evidence and verification items.
-
-Expose read-only GET routes under `/industry-alpha`. Support optional `as_of_cutoff=YYYY-MM-DD` using both information-date and UTC recorded-date visibility.
-
-No POST, PUT, PATCH or DELETE routes. No browser editing UI.
-
-Notices must state that outputs are local research hypotheses, not scores, rankings, target prices, recommendations or investment advice.
-
-## Offline fixture/demo
-
-Add one deterministic no-network fixture/demo containing:
-
-- one exact frozen v0.5C candidate-pool revision with at least two exact memberships;
-- one supported Stage 2 research file with an A/B/C-backed `positive` or `mixed` financial-transmission hypothesis;
-- one draft or disputed research file with missing evidence or visible contradiction;
-- one completed research-file revision with a non-empty `后续验证清单`;
-- a later research/hypothesis/link/checklist revision excluded from an earlier cutoff view;
-- strict JSON output and deterministic ordering.
-
-Use an isolated local database. Do not call providers, the network or an LLM.
-
-## Tests and validation
-
-Cover at minimum:
-
-- clean base-to-head, `20260719_0007 -> head`, downgrade/upgrade and `python -m alembic check`;
-- stable identities, revision numbers and supersedes chains;
-- exact candidate-pool revision/membership/beneficiary/company handoff;
-- rejection of non-members, cross-case/map records and mismatched exact revisions;
-- strict workflow, conclusion, direction and hypothesis-field validation;
-- hypothesis inference confidence/basis enforcement;
-- exact claim/evidence binding and visible A/B/C, D-only, disputed, conflict and missing-evidence behavior;
-- completed research checklist enforcement;
-- exact chronology and historical cutoff non-leakage, including later Stage 1 links/evidence and later Stage 2 hypothesis/checklist records;
-- append-only update/delete rejection;
-- atomic rollback on every failed multi-row command;
-- PostgreSQL concurrent research-file and hypothesis revision numbering;
-- deterministic ordering and strict JSON;
-- read-only API and no mutation routes;
-- generic database-error responses without raw URLs, paths, credentials or exception text;
-- no-network startup/import/test/demo behavior;
-- all existing v0.2-v0.5C regressions and demos;
-- `python -m compileall` for changed Python packages;
+- focused Stage 2 SQLite/API tests;
+- focused PostgreSQL Stage 2 tests when `TEST_DATABASE_URL` is available;
+- full offline suite;
+- full PostgreSQL suite when available;
+- clean Alembic `base -> head`;
+- `20260719_0008 -> 20260719_0007 -> 20260719_0008` round trip;
+- `python -m alembic check`;
+- all offline demos, including `python -m scripts.demo_stage2_company_research`;
+- explicit no-network coverage;
+- `python -m compileall -q backend industry_alpha scripts tests`;
 - `git diff --check`.
 
-Run the full offline suite and PostgreSQL suite when `TEST_DATABASE_URL` is available. Record exact pass/skip/warning counts and environment limitations in the PR and Issue.
+Confirm:
 
-## Documentation
-
-Update the conceptual data model, implementation plan, product architecture and local usage docs to mark v0.5C merged and describe the exact v0.6A boundary. Add a focused Stage 2 company-research document covering frozen handoff, identities, hypothesis semantics, evidence/cutoff rules, verification checklist and exclusions.
-
-## Exclusions
-
-Do not add valuation models/snapshots, multiples, DCF, numeric scores, weights, ranks, target prices, investment-attractiveness conclusions, final recommendations, catalyst/risk judgment workflow, Quant Core automatic validation, watchlists, portfolios, LLM/provider execution, scraping, ingestion automation, brokers, orders or trading.
-
-Do not change dependencies, Docker/Compose, CI, launchers, project version, release/tag state or PR #38. Do not begin v0.6B.
+- no new migration;
+- no dependency/CI/launcher/version changes;
+- PR #38 remains unchanged at `a57f71d2677b35c678bc8477c9ce783c90294c66`;
+- PR #63 remains Draft/Open/unmerged;
+- Issue #62 remains Open.
 
 ## Delivery
 
-1. Implement only Issue #62 on `feat/v06a-company-research`.
-2. Keep the PR Draft throughout implementation.
-3. Update the Draft PR and Issue with base/head SHA, exact changed files, schema, handoff/evidence/cutoff semantics, demo and validation results.
-4. Stop for ChatGPT review. Do not merge, close Issue #62 or begin v0.6B without explicit owner authorization.
+1. Implement only these three corrections on `feat/v06a-company-research`.
+2. Update PR #63 and Issue #62 with the new Head, exact changed files, defect closures and exact validation counts.
+3. Keep PR #63 Draft and Issue #62 Open.
+4. Stop for ChatGPT re-review. Do not merge, close Issue #62, create a release/tag, change version, begin v0.6B or modify PR #38.
