@@ -4,7 +4,9 @@
 
 This document is the authoritative architecture and current-state baseline for future reviewed work.
 
-It does not publish a new release and does not authorize a feature. The released software version remains `0.2.0`. The merged capability stage on `main` is v0.6D at commit `9cc5a0e5dda97efa6b9c7b3a43eb3b5c4ead91ec`.
+It does not publish a new release and does not authorize a feature. The released software version remains `0.2.0`. The merged capability stage on `main` remains v0.6D. The accepted `main` commit after the first Stage 2 consolidation implementation is `4b6377169fabb8eef5f1b421e8f008a11582f8a9`.
+
+The unified baseline was accepted in PR #73. Stage 2 consolidation was characterized in PR #75, and the first behavior-preserving extraction was accepted in PR #77.
 
 When this document, a roadmap summary, a README sentence, an old review log, or a prospective plan disagree, this baseline and the active linked GitHub Issue control the architecture interpretation. `.codex/WORKFLOW.md` controls execution gates.
 
@@ -14,8 +16,8 @@ AQuantAI must not use one phrase such as “current phase” to represent three 
 
 | Axis | Current state | Meaning |
 | --- | --- | --- |
-| Released software version | `0.2.0` | Published package/application metadata remains unchanged. Merged capability slices do not automatically create a new release. |
-| Merged capability stage | v0.6D | `main` contains the reviewed persistence, Market Cockpit, Industry Alpha Stage 1, and Stage 2 foundations through independent industry/company quality judgments. |
+| Released software version | `0.2.0` | Published package/application metadata remains unchanged. Merged capability and consolidation slices do not automatically create a new release. |
+| Merged capability stage | v0.6D | `main` contains reviewed persistence, Market Cockpit, Industry Alpha Stage 1, and Stage 2 foundations through independent industry/company quality judgments. |
 | Runtime and user-visible surfaces | Mixed | The local fixture-backed read-only Dashboard remains available. Database-backed read-only Market Cockpit and Industry Alpha APIs and offline demos are also implemented when PostgreSQL and explicit local data are configured. No single unified end-user workbench UI exists. |
 
 A document may summarize one axis, but it must name the axis explicitly.
@@ -42,6 +44,8 @@ market-data evidence
 
 A downstream record may freeze exact accepted upstream revisions. It may not silently select newer compatible-looking records, infer missing upstream state, or rewrite historical upstream meaning.
 
+The shared v0.6A/v0.6B frozen-boundary mechanics used by v0.6C and v0.6D now belong to the neutral `industry_alpha.stage2_boundary` module. v0.6D no longer imports those private mechanics from the v0.6C command module. Catalyst/risk and quality-judgment semantics remain in their owning domain modules.
+
 The following are not part of the current implementable path:
 
 - v0.6E price judgment;
@@ -57,15 +61,15 @@ Issue #70 and PR #71 are superseded and closed without merge. No price-judgment 
 | Capability | Merged boundary | Runtime surface | Explicit boundary | Architecture debt |
 | --- | --- | --- | --- | --- |
 | v0.3 market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, cutoff-aware reads, canonical series identities, controlled AKShare command | CLI, persistence services, read paths | Manual bounded ingestion; no automatic collection; no production operations | Market-price measurement kind/unit/currency is not yet a standalone canonical evidence contract |
-| v0.4A-v0.4E Market Cockpit | Selected-equity breadth/risk, optional benchmark and sector context, liquidity distribution and price-behavior proxies | Read-only API and local page when configured | Descriptive selected-scope context; no official full-market, valuation, regime, signal or recommendation claims | Several documents still describe only the original Dashboard surface |
-| v0.5A evidence ledger | Research cases, evidence, claims, conflicts, immutable revisions and cutoff-aware reads | Read-only Industry Alpha APIs and offline fixture/demo | No scoring, beneficiary mapping, LLM execution or recommendations | Shared evidence qualification and chronology rules are repeated downstream |
+| v0.4A-v0.4E Market Cockpit | Selected-equity breadth/risk, optional benchmark and sector context, liquidity distribution and price-behavior proxies | Read-only API and local page when configured | Descriptive selected-scope context; no official full-market, valuation, regime, signal or recommendation claims | Some historical documents still emphasize only the original Dashboard surface |
+| v0.5A evidence ledger | Research cases, evidence, claims, conflicts, immutable revisions and cutoff-aware reads | Read-only Industry Alpha APIs and offline fixture/demo | No scoring, beneficiary mapping, LLM execution or recommendations | Shared evidence qualification and chronology rules remain repeated downstream |
 | v0.5B-v0.5C Stage 1 | Industry chain maps, assertions, beneficiary classifications and candidate-pool handoff | Read-only APIs and offline fixture/demo | No company deep dive, valuation, ranking or recommendation | Exact frozen-link patterns expand with each slice |
 | v0.6A company research | Company-research identities/revisions and financial-transmission hypotheses | Read-only APIs and offline fixture/demo | No valuation, score, recommendation or trading | Revision allocation, append-only and evidence checks are implemented repeatedly |
 | v0.6B expectations/valuation | Expectation and valuation-observation snapshots with optional local-price provenance | Read-only APIs and offline fixture/demo | `observed_value` is generic valuation context; no target/fair value, expected return, good-price or good-timing output | Comparison eligibility and canonical market-price measurement semantics are not defined |
-| v0.6C catalyst/risk | Append-only catalyst and risk assessments over exact v0.6A/v0.6B/evidence boundaries | Read-only APIs and offline fixture/demo | Not monitoring, alerts, tasks, signals or recommendations | Cross-product validation and frozen-link count continue to grow |
-| v0.6D quality judgments | Manual industry/company quality judgments with separate outcome and evidence state | Read-only APIs and offline fixture/demo | Not a formal conclusion, price/timing judgment, score, Watchlist state or recommendation | Stage 2 identity/revision/link/repository/query/fixture structure needs consolidation review |
-| v0.6E | Superseded planning only | None | Not implemented and not authorized | Requires upstream ownership and consolidation decisions before reconsideration |
-| v0.7+ | Prospective only | None | Not authorized | Must pass architecture preflight and Definition of Ready |
+| v0.6C catalyst/risk | Append-only catalyst and risk assessments over exact v0.6A/v0.6B/evidence boundaries | Read-only APIs and offline fixture/demo | Not monitoring, alerts, tasks, signals or recommendations | Base frozen-boundary ownership is consolidated; repository/query/concurrency/ORM repetition remains |
+| v0.6D quality judgments | Manual industry/company quality judgments with separate outcome and evidence state | Read-only APIs and offline fixture/demo | Not a formal conclusion, price/timing judgment, score, Watchlist state or recommendation | Private dependency on v0.6C was removed; remaining read and lifecycle infrastructure still needs separate review |
+| v0.6E | Superseded planning only | None | Not implemented and not authorized | Requires upstream ownership and further consolidation decisions before reconsideration |
+| v0.7+ | Prospective only | None | Not authorized | Must pass Architecture Preflight and Definition of Ready |
 
 ## Field and domain ownership
 
@@ -78,6 +82,7 @@ Issue #70 and PR #71 are superseded and closed without merge. No price-judgment 
 | Market expectations and valuation observations | v0.6B | `observed_value`, unit and currency retain their recorded context; generic values are not automatically price-comparison eligible |
 | Catalyst and risk assessment state | v0.6C | Assessment records are not monitors, alerts or task lifecycles |
 | Industry/company quality outcome and evidence state | v0.6D | Separate manual fields; neither automatically generates later price, timing or recommendation state |
+| Shared v0.6A/v0.6B frozen-boundary mechanics | Neutral Stage 2 infrastructure | `stage2_boundary.py` owns exact base-boundary loading and visibility mechanics; domain semantics remain local |
 | “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities and not authorized for implementation |
 
 A local `daily_price` row linked by v0.6B remains provenance/context. It does not become a canonical price-comparison value merely because a valuation record also stores a numeric string and currency.
@@ -99,23 +104,23 @@ Future tasks must reference these invariants and add only slice-specific rules.
 11. **Fixture/provider parity:** a fixture success path must use fields and contracts reachable through the reviewed production adapter boundary. Fixture-only enrichment cannot prove production reachability.
 12. **Read-only by default:** new mutation APIs, browser editing, notifications, tasks, portfolio state, broker or trading behavior require separate explicit authorization.
 13. **Secrets and diagnostics:** credentials and raw connection details never appear in source, fixtures, Issues, PRs, logs or user-facing errors.
-14. **Release independence:** merging a capability slice does not change the released version without a separate release decision.
+14. **Release independence:** merging a capability or consolidation slice does not change the released version without a separate release decision.
 
 ## Architecture debt register
 
-### D1. Current-state documentation drift
+### D1. Current-state documentation drift — controlled, monitored
 
-README, roadmap, review log and prospective planning have used incompatible descriptions of the current state. This reset introduces the three-axis model and this authoritative baseline.
+PR #73 introduced the three-axis model and authoritative baseline. Issue #78 synchronizes the record after the first consolidation implementation. Future merges must update status before another development slice begins.
 
-### D2. Repeated Stage 2 structural pattern
+### D2. Repeated Stage 2 structural pattern — partially reduced
 
 v0.6A-v0.6D repeatedly introduce identities, revisions, supersedes links, upstream membership links, claim/evidence links, repositories, query builders, contracts, fixtures and database-specific tests.
 
-A later consolidation review must characterize duplication before choosing shared validators, repository utilities or frozen-boundary application objects. Stable schemas must not be generalized merely for aesthetic uniformity.
+PR #77 removed the highest-priority incorrect dependency by extracting a neutral base boundary. It did not generalize schemas or domain semantics. Ordered repository row loading is the next characterization candidate; generic graph loading is not authorized.
 
-### D3. Repeated cross-cutting validation
+### D3. Repeated cross-cutting validation — partially reduced
 
-Revision allocation, exact membership, evidence qualification, append-only mutation rejection, cutoff chronology, strict serialization and fixture ID rules are implemented in multiple modules. These require a measured shared-infrastructure review.
+Exact v0.6A/v0.6B boundary loading, stored-UTC normalization, visibility checks and company-research locking used by v0.6C/v0.6D now have neutral ownership. Revision allocation, integrity translation, append-only mutation rejection, query serialization and fixture rules remain duplicated and require independent review.
 
 ### D4. Test-matrix growth
 
@@ -129,19 +134,19 @@ Artificial fixture fields can make an otherwise unreachable production path appe
 
 `DailyPriceRecord` does not independently expose a reviewed measurement-kind/unit/currency evidence object suitable for arbitrary downstream price comparisons. This must be solved upstream, if needed, before reconsidering price judgment.
 
-### D7. Missing consolidation cadence
+### D7. Consolidation cadence — active rule
 
-Feature slices were merged faster than architecture integration. A consolidation review is now mandatory after every two domain slices and may be required earlier when duplication or contract ambiguity appears.
+Feature slices were merged faster than architecture integration. A consolidation review is mandatory after every two domain slices and may be required earlier when duplication or contract ambiguity appears.
 
 ## Development gates
 
 ### Gate 1: Architecture Preflight
 
-Before creating a feature Issue, the architecture reviewer must document:
+Before creating a feature or consolidation implementation Issue, the architecture reviewer must document:
 
-- user problem and why current capability is insufficient;
-- domain owner for each material field;
-- real provider/persistence source for each input;
+- user or maintenance problem and why current capability is insufficient;
+- domain owner for each material field or mechanism;
+- real provider/persistence source for each input where applicable;
 - one production-realistic offline golden path;
 - important failure path;
 - dependency and migration impact;
@@ -158,7 +163,7 @@ Task synchronization or implementation requires:
 - accepted input/output contracts;
 - an ownership table;
 - a reachable golden path;
-- fixture/provider parity evidence;
+- fixture/provider parity evidence when applicable;
 - explicit selectors and chronology;
 - migration decision;
 - bounded scope with no more than one main domain capability and one infrastructure change;
@@ -198,11 +203,24 @@ Green CI is necessary regression evidence, but it is not architecture acceptance
 
 ## Near-term sequence
 
-1. Accept this docs-only architecture baseline.
-2. Perform a Stage 2 consolidation characterization review without automatically changing schema.
-3. Decide whether a canonical market-price evidence contract has independent user value.
-4. Only then consider structured valuation comparison eligibility.
-5. Re-evaluate whether a separate price-judgment aggregate is necessary; a deterministic read model may be sufficient.
-6. Do not start v0.7 until the baseline and required consolidation review are accepted.
+Completed:
 
-No item after step 1 is authorized by this document alone.
+1. unified architecture baseline accepted in PR #73;
+2. Stage 2 consolidation characterized in PR #75;
+3. neutral Stage 2 frozen-boundary extraction accepted in PR #77.
+
+Current synchronization:
+
+4. Issue #78 records those merged outcomes and the remaining debt without changing application behavior.
+
+Prospective and separately authorized:
+
+5. characterize shared ordered repository row-loading primitives;
+6. consider a minimal implementation only if characterization proves identical SQL, ordering and missing-row semantics;
+7. characterize pure query visibility/date/UTC/UUID formatting;
+8. decide whether a canonical market-price evidence contract has independent user value;
+9. only then consider structured valuation comparison eligibility;
+10. re-evaluate whether a separate price-judgment aggregate is necessary; a deterministic read model may be sufficient;
+11. do not start v0.7 until required upstream contracts and consolidation reviews are accepted.
+
+No prospective item is authorized by this document alone.
