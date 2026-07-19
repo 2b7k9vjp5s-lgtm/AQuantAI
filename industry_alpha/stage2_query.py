@@ -181,8 +181,6 @@ class Stage2CompanyResearchQueryService:
             for item in rows.verification_items
             if item.company_research_revision_id == revision.id
             and _recorded_visible(item.recorded_at_utc, cutoff)
-            and _stored_utc(item.recorded_at_utc)
-            <= _stored_utc(revision.recorded_at_utc)
         ]
         verification.sort(key=lambda item: (item["item_no"], item["verification_item_id"]))
         payload["后续验证清单"] = verification

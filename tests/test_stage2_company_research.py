@@ -18,8 +18,12 @@ from industry_alpha.errors import (
     EvidenceLedgerValidationError,
 )
 from industry_alpha.chain_map_models import IndustryMapRelationshipRevision
-from industry_alpha.models import Claim, ClaimRevision
+from industry_alpha.commands import EvidenceLedgerCommandService
+from industry_alpha.models import Claim, ClaimEvidenceLink, ClaimRevision, EvidenceItem
+from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import (
+    Stage1Beneficiary,
+    Stage1CandidatePool,
     Stage1BeneficiaryAssertionLink,
     Stage1BeneficiaryClaimLink,
     Stage1CandidatePoolMembership,
@@ -101,6 +105,60 @@ def hypothesis_inputs(session_factory, hypothesis_id, revision_no=1):
             )
         )
     return revision, claims
+
+
+def add_stage2_test_claim(
+    session_factory,
+    case_id,
+    *,
+    claim_key,
+    claim_status,
+    relation="supports",
+    evidence_grade="A",
+    information_date=date(2026, 7, 15),
+    recorded_at_utc=utc(15),
+):
+    with session_factory.begin() as session:
+        evidence = EvidenceItem(
+            case_id=case_id,
+            evidence_grade=evidence_grade,
+            source_kind="official",
+            source_title=f"Fixture evidence for {claim_key}",
+            information_date=information_date,
+            recorded_at_utc=recorded_at_utc,
+            summary=f"Bounded fixture evidence for {claim_key}.",
+            content_fingerprint=f"{claim_key}-evidence",
+        )
+        claim = Claim(
+            case_id=case_id,
+            claim_key=claim_key,
+            created_at_utc=recorded_at_utc,
+        )
+        session.add_all([evidence, claim])
+        session.flush()
+        revision = ClaimRevision(
+            claim_id=claim.id,
+            revision_no=1,
+            statement=f"Fixture claim {claim_key}.",
+            claim_kind="inference",
+            claim_status=claim_status,
+            inference_confidence="low",
+            inference_basis="Fixture basis.",
+            information_cutoff_date=information_date,
+            recorded_at_utc=recorded_at_utc,
+        )
+        session.add(revision)
+        session.flush()
+        session.add(
+            ClaimEvidenceLink(
+                claim_revision_id=revision.id,
+                evidence_id=evidence.id,
+                relation=relation,
+                recorded_at_utc=recorded_at_utc,
+            )
+        )
+        session.flush()
+        return revision.id
 
 
 def test_fixture_freezes_exact_handoff_and_cutoff_history(session_factory, built):
@@ -276,6 +334,37 @@ def test_completed_revision_rejects_missing_checklist(session_factory, built):
         )
 
 
+def test_later_verification_items_are_current_visible_without_cutoff_leakage(
+    session_factory, built
+):
+    with session_factory() as session:
+        latest_revision = session.scalar(
+            select(Stage2CompanyResearchRevision)
+            .where(
+                Stage2CompanyResearchRevision.company_research_id
+                == built.supported_research_id
+            )
+            .order_by(Stage2CompanyResearchRevision.revision_no.desc())
+        )
+    Stage2CompanyResearchCommandService(session_factory).add_verification_item(
+        latest_revision.id,
+        description="Later append-only checklist item visible only after its own timestamp.",
+        status="open",
+        recorded_at_utc=utc(16),
+    )
+    current = query(session_factory, built.supported_research_id)
+    historical = query(
+        session_factory, built.supported_research_id, date(2026, 7, 15)
+    )
+    current_items = current["latest_revision"]["后续验证清单"]
+    historical_items = historical["latest_revision"]["后续验证清单"]
+    assert [item["item_no"] for item in current_items] == [1, 2]
+    assert current_items[1]["description"].startswith("Later append-only")
+    assert [item["item_no"] for item in historical_items] == [1]
+    assert current_items[1]["recorded_at_utc"] > current_items[0]["recorded_at_utc"]
+    json.dumps(current, allow_nan=False, sort_keys=True)
+
+
 def test_d_only_claim_cannot_support_hypothesis(session_factory, built):
     with session_factory() as session:
         research = session.get(Stage2CompanyResearch, built.supported_research_id)
@@ -307,6 +396,92 @@ def test_d_only_claim_cannot_support_hypothesis(session_factory, built):
             claim_revision_ids=(d_claim.id,),
             recorded_at_utc=utc(16),
         )
+
+
+@pytest.mark.parametrize("claim_status", ["draft", "disputed", "rejected"])
+def test_supported_hypothesis_requires_supported_abc_claim_revision(
+    session_factory, built, claim_status
+):
+    before = stage2_counts(session_factory)
+    with session_factory() as session:
+        research = session.get(Stage2CompanyResearch, built.supported_research_id)
+        assertion = session.scalar(
+            select(Stage1BeneficiaryAssertionLink).where(
+                Stage1BeneficiaryAssertionLink.beneficiary_revision_id
+                == research.beneficiary_revision_id
+            )
+        )
+        case_id = research.case_id
+    claim_revision_id = add_stage2_test_claim(
+        session_factory,
+        case_id,
+        claim_key=f"stage2-{claim_status}-abc-support",
+        claim_status=claim_status,
+    )
+    with pytest.raises(
+        EvidenceLedgerValidationError, match="supported A/B/C-backed claim"
+    ):
+        Stage2CompanyResearchCommandService(session_factory).create_hypothesis(
+            research.id,
+            hypothesis_key=f"{claim_status}-abc-invalid",
+            stage1_assertion_link_id=assertion.id,
+            hypothesis_status="supported",
+            mechanism="A claim without supported status must not support Stage 2.",
+            direction="positive",
+            operating_metric="units",
+            financial_statement_line="revenue",
+            expected_lag_horizon="unknown",
+            confidence="low",
+            basis="The evidence is A-grade but the claim revision is not supported.",
+            information_cutoff_date=date(2026, 7, 16),
+            claim_revision_ids=(claim_revision_id,),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_counts(session_factory) == before
+
+
+def test_supported_hypothesis_accepts_supported_abc_claim_revision(
+    session_factory, built
+):
+    with session_factory() as session:
+        research = session.get(Stage2CompanyResearch, built.supported_research_id)
+        assertion = session.scalar(
+            select(Stage1BeneficiaryAssertionLink).where(
+                Stage1BeneficiaryAssertionLink.beneficiary_revision_id
+                == research.beneficiary_revision_id
+            )
+        )
+        case_id = research.case_id
+    claim_revision_id = add_stage2_test_claim(
+        session_factory,
+        case_id,
+        claim_key="stage2-supported-abc-support",
+        claim_status="supported",
+    )
+    hypothesis = Stage2CompanyResearchCommandService(session_factory).create_hypothesis(
+        research.id,
+        hypothesis_key="supported-abc-valid",
+        stage1_assertion_link_id=assertion.id,
+        hypothesis_status="supported",
+        mechanism="A supported A-backed claim may support a bounded hypothesis.",
+        direction="positive",
+        operating_metric="units",
+        financial_statement_line="revenue",
+        expected_lag_horizon="unknown",
+        confidence="low",
+        basis="The bound claim revision is supported and has A-grade support.",
+        information_cutoff_date=date(2026, 7, 16),
+        claim_revision_ids=(claim_revision_id,),
+        recorded_at_utc=utc(16),
+    )
+    payload = query(session_factory, research.id)
+    matched = [
+        item
+        for item in payload["hypotheses"]
+        if item["hypothesis_id"] == str(hypothesis.id)
+    ]
+    assert matched[0]["latest_revision"]["hypothesis_status"] == "supported"
+    json.dumps(payload, allow_nan=False, sort_keys=True)
 
 
 def test_disputed_requires_conflict_or_disputed_claim(session_factory, built):
@@ -418,6 +593,76 @@ def test_frozen_handoff_claim_set_does_not_follow_later_stage1_links(
         )
     after = query(session_factory, built.supported_research_id)
     assert after["frozen_stage1_handoff"] == before["frozen_stage1_handoff"]
+
+
+def test_handoff_evidence_freezes_at_beneficiary_revision_boundary(session_factory):
+    stage1 = build_stage1_beneficiary_fixture(session_factory)
+    with session_factory() as session:
+        pool_revision = session.scalar(
+            select(Stage1CandidatePoolRevision).where(
+                Stage1CandidatePoolRevision.candidate_pool_id
+                == stage1.candidate_pool_id
+            )
+        )
+        membership = session.scalar(
+            select(Stage1CandidatePoolMembership)
+            .join(
+                Stage1Beneficiary,
+                Stage1Beneficiary.id
+                == Stage1CandidatePoolMembership.beneficiary_id,
+            )
+            .where(
+                Stage1CandidatePoolMembership.candidate_pool_revision_id
+                == pool_revision.id,
+                Stage1Beneficiary.stock_code == "000002",
+            )
+            .order_by(Stage1CandidatePoolMembership.recorded_at_utc)
+        )
+        claim_revision_id = session.scalar(
+            select(Stage1BeneficiaryClaimLink.claim_revision_id).where(
+                Stage1BeneficiaryClaimLink.beneficiary_revision_id
+                == membership.beneficiary_revision_id
+            )
+        )
+        case_id = session.get(Stage1CandidatePool, stage1.candidate_pool_id).case_id
+
+    ledger = EvidenceLedgerCommandService(session_factory)
+    late_evidence = ledger.add_evidence(
+        case_id,
+        evidence_grade="A",
+        source_kind="official",
+        source_title="Late Stage 1 evidence after beneficiary freeze",
+        information_date=date(2026, 7, 6),
+        summary="This evidence is visible by Stage 2 creation but not by the beneficiary revision.",
+        content_fingerprint="stage2-late-handoff-evidence",
+        recorded_at_utc=utc(9),
+    )
+    ledger.link_evidence(
+        claim_revision_id,
+        late_evidence.id,
+        relation="supports",
+        recorded_at_utc=utc(9, 11),
+    )
+    research = Stage2CompanyResearchCommandService(
+        session_factory
+    ).create_company_research(
+        pool_revision.id,
+        membership.id,
+        workflow_state="open",
+        conclusion_status="unassessed",
+        research_question="Does a later Stage 1 evidence link leak into the handoff?",
+        summary=None,
+        information_cutoff_date=date(2026, 7, 10),
+        recorded_at_utc=utc(10),
+    )
+    handoff = query(session_factory, research.id)["frozen_stage1_handoff"]
+    titles = [
+        evidence["source_title"]
+        for claim in handoff["frozen_claims"]
+        for evidence in claim["evidence"]
+    ]
+    assert "Late Stage 1 evidence after beneficiary freeze" not in titles
+    json.dumps(handoff, allow_nan=False, sort_keys=True)
 
 
 def test_frozen_handoff_assertion_set_does_not_follow_later_stage1_links(

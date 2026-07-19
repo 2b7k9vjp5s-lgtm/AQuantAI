@@ -470,14 +470,16 @@ class Stage2CompanyResearchCommandService:
         normalized_confidence = reviewed_value(confidence, "confidence", INFERENCE_CONFIDENCES)
         claims = self._claims(session, research.case_id, claim_revision_ids, information_cutoff_date, recorded_at_utc)
         boundaries = self._evidence_boundaries(session, claims, information_cutoff_date, recorded_at_utc)
-        has_abc_support = any(
-            link.relation == "supports" and evidence.evidence_grade in {"A", "B", "C"}
-            for _claim, link, evidence in boundaries
+        has_supported_abc_claim = any(
+            claim.claim_status == "supported"
+            and link.relation == "supports"
+            and evidence.evidence_grade in {"A", "B", "C"}
+            for claim, link, evidence in boundaries
         )
         has_conflict = any(link.relation == "contradicts" for _claim, link, _evidence in boundaries)
-        if status == "supported" and (not has_abc_support or has_conflict):
+        if status == "supported" and (not has_supported_abc_claim or has_conflict):
             raise EvidenceLedgerValidationError(
-                "supported hypotheses require visible A/B/C support and no contradiction."
+                "supported hypotheses require a visible supported A/B/C-backed claim revision and no contradiction."
             )
         if status == "disputed" and not (
             has_conflict or any(claim.claim_status == "disputed" for claim in claims)
@@ -611,18 +613,25 @@ class Stage2CompanyResearchCommandService:
                 )
             )
         claim_ids = [item.claim_revision_id for item in stage1_links]
+        boundary_cutoff = beneficiary_revision.information_cutoff_date
+        boundary_recorded = _stored_utc(beneficiary_revision.recorded_at_utc)
         claims = (
             Stage2CompanyResearchCommandService._claims(
                 session,
                 research.case_id,
                 tuple(claim_ids),
-                cutoff,
-                recorded,
+                boundary_cutoff,
+                boundary_recorded,
             )
             if claim_ids
             else []
         )
-        for claim, link, evidence in Stage2CompanyResearchCommandService._evidence_boundaries(session, claims, cutoff, recorded):
+        for claim, link, evidence in Stage2CompanyResearchCommandService._evidence_boundaries(
+            session,
+            claims,
+            boundary_cutoff,
+            boundary_recorded,
+        ):
             session.add(Stage2HandoffEvidenceLink(company_research_id=research.id, claim_revision_id=claim.id, claim_evidence_link_id=link.id, evidence_id=evidence.id, recorded_at_utc=recorded))
         session.flush()
 
