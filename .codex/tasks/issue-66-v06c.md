@@ -1,4 +1,4 @@
-# Issue #66 — v0.6C Blocking Review Cycle
+# Issue #66 — v0.6C Acceptance Handoff
 
 ## State
 
@@ -7,74 +7,50 @@
 - Draft PR: `#67`
 - Branch: `feat/v06c-catalyst-risk-assessments`
 - Required base and ancestor: `571fa9396a9318f2e6c409e1d8b7a25ec2120b2f`
-- Reviewed implementation Head: `7c78826016bbbaed19e5649da0d20f67acca4643`
-- Blocking COMMENT review: `4730246609`
-- Implementation CI: `29675419647` — success
-- Version must remain `0.2.0`
+- Accepted implementation Head: `eb5de10406742c42116b2bf2f6d10812e2c94bb2`
+- Acceptance COMMENT review: `4730272416`
+- Accepted CI: `29676694275` — success
+- Version remains `0.2.0`
 
-Read `.codex/WORKFLOW.md`, Issue #66, PR #67, review `4730246609`, and this task before editing. The Issue and review are authoritative.
+Read `.codex/WORKFLOW.md`, Issue #66, PR #67, acceptance review `4730272416`, and this handoff before acting.
 
-## Review result
+## Acceptance result
 
-The v0.6C persistence, migration, command, chronology, cutoff, append-only, API-route and PostgreSQL concurrency foundations are retained. Do not redesign them.
+v0.6C is accepted at implementation Head `eb5de10406742c42116b2bf2f6d10812e2c94bb2`.
 
-One blocker remains: the read model drops the canonical frozen claim fact/inference provenance.
+The accepted slice includes:
 
-`ClaimRevision` already stores:
+- append-only catalyst and company-risk identities and sequential revisions;
+- exact frozen v0.6A research/hypothesis and v0.6B expectation/valuation boundaries;
+- exact claim/evidence provenance with visible fact/inference fields;
+- supported/disputed/D-only/missing-evidence rules;
+- UTC chronology, atomic rollback and PostgreSQL revision serialization;
+- migration `20260719_0010`;
+- deterministic cutoff-aware read-only catalyst/risk APIs;
+- no-network fixtures, demos and focused/full validation.
 
-- `claim_kind` (`fact` or `inference`);
-- `inference_confidence`;
-- `inference_basis`;
-- `recorded_at_utc`.
+The blocking review is resolved. No further v0.6C code change is requested.
 
-The catalyst/risk claim payload currently returns statement, status, cutoff and evidence but omits these fields. Consumers therefore cannot distinguish a frozen fact from a frozen inference or inspect its explicit basis/confidence.
+## Next authorized action
 
-## Authorized fix
+Perform handoff and status verification only:
 
-Make the smallest focused change:
-
-1. In the v0.6C query/read payload, expose the exact frozen claim revision fields:
-   - `claim_kind`;
-   - `inference_confidence`;
-   - `inference_basis`;
-   - `recorded_at_utc`.
-2. Preserve `None` for fact-only inference fields; do not synthesize values.
-3. Add focused query/API regressions proving:
-   - a frozen fact is returned with `claim_kind == "fact"` and null inference fields;
-   - a frozen inference is returned with its exact confidence and basis;
-   - current and historical cutoff payloads preserve the same frozen provenance;
-   - payloads remain deterministic and strict-JSON safe.
-4. Update directly relevant documentation only if the response contract is documented there.
+1. Confirm the branch contains accepted implementation Head `eb5de10406742c42116b2bf2f6d10812e2c94bb2` plus this task-only handoff commit.
+2. Confirm the post-handoff diff from the accepted implementation changes only `.codex/tasks/issue-66-v06c.md`.
+3. Confirm GitHub Actions for the handoff Head succeeds.
+4. Keep PR #67 Draft/Open/Mergeable/unmerged and Issue #66 Open.
+5. Update PR #67 and Issue #66 with the acceptance review ID, accepted implementation Head, handoff Head, CI result and exact task-only diff.
+6. Stop for explicit owner merge authorization.
 
 ## Locked boundaries
 
-Do not change:
+Do not:
 
-- models, migrations, tables or persisted domain fields;
-- create/append command semantics or evidence/status rules;
-- routes or HTTP methods;
-- fixture domain scope except the minimal test data needed to expose both a fact and inference;
-- dependencies, CI, Docker, launchers, authentication or version metadata;
-- v0.6D/v0.7 scope;
-- PR #38.
+- change any application code, tests, docs, models, commands, migrations, routes or fixtures;
+- mark the PR ready, merge, close Issue #66 or rewrite history;
+- begin v0.6D/v0.7 or create a new issue/branch/PR;
+- change dependencies, CI, Docker, launchers, authentication or version metadata;
+- create a release or tag;
+- modify PR #38.
 
-Do not rebase or force-push reviewed history. Keep PR #67 Draft/Open/unmerged and Issue #66 Open.
-
-## Validation
-
-Run and record exact results for:
-
-- focused SQLite v0.6C tests;
-- focused PostgreSQL v0.6C tests when available;
-- full offline suite;
-- full PostgreSQL persistence/Industry Alpha suite when available;
-- all offline demos;
-- explicit no-network coverage;
-- `python -m compileall -q backend industry_alpha scripts tests`;
-- `git diff --check`.
-
-No migration change is authorized; confirm `python -m alembic check` still reports no new upgrade operations.
-
-## Delivery
-
-Update PR #67 and Issue #66 with the new Head, exact changed files and exact validation counts. Keep the PR Draft and stop for ChatGPT re-review. Do not merge, close Issue #66, create a release/tag, change version, begin another slice, or modify PR #38.
+If any non-task file changes after the accepted implementation Head, stop and report them instead of proceeding.
