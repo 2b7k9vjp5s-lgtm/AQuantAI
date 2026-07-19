@@ -21,6 +21,7 @@ from industry_alpha.stage2_judgments_models import (
     Stage2IndustryJudgmentRevision, Stage2IndustryJudgmentRiskLink,
     Stage2IndustryJudgmentValuationLink,
 )
+from industry_alpha.stage2_repository_rows import load_ordered_rows
 
 
 @dataclass(frozen=True)
@@ -80,11 +81,14 @@ class Stage2JudgmentRepository:
         return Stage2JudgmentRows(row, revisions, links["hypothesis"], links["expectation"], links["valuation"], links["catalyst"], links["risk"], links["claim"], links["evidence"], claims, claim_revisions, source_links, evidence)
 
     def _linked(self, model: type[Any], ids: list[UUID]) -> tuple[Any, ...]:
-        if not ids:
-            return ()
-        return tuple(self._session.scalars(select(model).where(model.judgment_revision_id.in_(ids)).order_by(model.judgment_revision_id, model.id)))
+        return load_ordered_rows(
+            self._session,
+            model,
+            model.judgment_revision_id,
+            ids,
+            model.judgment_revision_id,
+            model.id,
+        )
 
     def _rows(self, model: type[Any], ids: list[UUID], *order: Any) -> tuple[Any, ...]:
-        if not ids:
-            return ()
-        return tuple(self._session.scalars(select(model).where(model.id.in_(ids)).order_by(*order)))
+        return load_ordered_rows(self._session, model, model.id, ids, *order)
