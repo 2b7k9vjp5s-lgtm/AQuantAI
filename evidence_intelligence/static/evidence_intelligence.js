@@ -8,41 +8,42 @@ const EVENT_LABELS = Object.freeze({
   company_research_revision: "公司研究修订",
 });
 
-const form = document.querySelector("#feed-filters");
-const resetButton = document.querySelector("#reset-filters");
-const loadMoreButton = document.querySelector("#load-more");
-const feedList = document.querySelector("#feed-list");
-const emptyState = document.querySelector("#empty-state");
-const statusBadge = document.querySelector("#status-badge");
-const loadStatus = document.querySelector("#load-status");
-const loadError = document.querySelector("#load-error");
-const queryMetadata = document.querySelector("#query-metadata");
+const $ = (selector) => document.querySelector(selector);
+const form = $("#feed-filters");
+const resetButton = $("#reset-filters");
+const loadMoreButton = $("#load-more");
+const feedList = $("#feed-list");
+const emptyState = $("#empty-state");
+const statusBadge = $("#status-badge");
+const loadStatus = $("#load-status");
+const loadError = $("#load-error");
+const queryMetadata = $("#query-metadata");
 
 let nextCursor = null;
 let activeRequestId = 0;
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  void loadFeed({ append: false });
+  void loadFeed(false);
 });
 
 resetButton.addEventListener("click", () => {
   form.reset();
-  document.querySelector("#limit").value = "50";
-  void loadFeed({ append: false });
+  $("#limit").value = "50";
+  void loadFeed(false);
 });
 
 loadMoreButton.addEventListener("click", () => {
   if (nextCursor) {
-    void loadFeed({ append: true });
+    void loadFeed(true);
   }
 });
 
-void loadFeed({ append: false });
+void loadFeed(false);
 
-async function loadFeed({ append }) {
+async function loadFeed(append) {
   const requestId = ++activeRequestId;
-  setLoading(true, append ? "正在加载更多研究变化。" : "正在读取本地研究变化。");
+  setBusy(true, append ? "正在加载更多研究变化。" : "正在读取本地研究变化。");
   clearError();
   if (!append) {
     nextCursor = null;
@@ -52,8 +53,7 @@ async function loadFeed({ append }) {
   }
 
   try {
-    const url = buildRequestUrl(append ? nextCursor : null);
-    const response = await fetch(url, {
+    const response = await fetch(buildRequestUrl(append ? nextCursor : null), {
       method: "GET",
       headers: { Accept: "application/json" },
       credentials: "same-origin",
@@ -65,50 +65,51 @@ async function loadFeed({ append }) {
     if (requestId !== activeRequestId) {
       return;
     }
+
     renderMetadata(payload);
-    renderEvents(payload.events || [], { append });
-    nextCursor = payload.next_cursor || null;
+    renderEvents(Array.isArray(payload.events) ? payload.events : [], append);
+    nextCursor = typeof payload.next_cursor === "string" ? payload.next_cursor : null;
     loadMoreButton.hidden = !nextCursor;
-    loadMoreButton.disabled = false;
     statusBadge.dataset.state = "ready";
     statusBadge.textContent = "已就绪";
-    const pageCount = Array.isArray(payload.events) ? payload.events.length : 0;
+    const count = Array.isArray(payload.events) ? payload.events.length : 0;
     loadStatus.textContent = append
-      ? `已追加 ${pageCount} 条记录。`
-      : `当前页读取 ${pageCount} 条记录。变化记录仅表示研究时间线。`;
+      ? `已追加 ${count} 条记录。`
+      : `当前页读取 ${count} 条记录。变化记录仅表示研究时间线。`;
   } catch (error) {
-    if (requestId !== activeRequestId) {
-      return;
+    if (requestId === activeRequestId) {
+      showError(error instanceof Error ? error.message : "无法读取研究变化。");
     }
-    showError(error instanceof Error ? error.message : "无法读取研究变化。");
   } finally {
     if (requestId === activeRequestId) {
-      setLoading(false);
+      setBusy(false);
     }
   }
 }
 
 function buildRequestUrl(cursor) {
   const params = new URLSearchParams();
-  const eventType = document.querySelector("#event-type").value;
-  const recordedFrom = document.querySelector("#recorded-from").value;
-  const recordedTo = document.querySelector("#recorded-to").value;
-  const cutoff = document.querySelector("#as-of-cutoff").value;
-  const limit = document.querySelector("#limit").value;
+  const values = {
+    event_type: $("#event-type").value,
+    recorded_from: $("#recorded-from").value,
+    recorded_to: $("#recorded-to").value,
+    as_of_cutoff: $("#as-of-cutoff").value,
+    limit: $("#limit").value || "50",
+  };
 
-  if (eventType) {
-    params.set("event_type", eventType);
+  if (values.event_type) {
+    params.set("event_type", values.event_type);
   }
-  if (recordedFrom) {
-    params.set("recorded_from", localInputToIso(recordedFrom, "记录起点"));
+  if (values.recorded_from) {
+    params.set("recorded_from", localInputToIso(values.recorded_from, "记录起点"));
   }
-  if (recordedTo) {
-    params.set("recorded_to", localInputToIso(recordedTo, "记录终点"));
+  if (values.recorded_to) {
+    params.set("recorded_to", localInputToIso(values.recorded_to, "记录终点"));
   }
-  if (cutoff) {
-    params.set("as_of_cutoff", cutoff);
+  if (values.as_of_cutoff) {
+    params.set("as_of_cutoff", values.as_of_cutoff);
   }
-  params.set("limit", limit || "50");
+  params.set("limit", values.limit);
   if (cursor) {
     params.set("cursor", cursor);
   }
@@ -125,17 +126,15 @@ function localInputToIso(value, label) {
 
 async function readPayload(response) {
   const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    return response.json();
-  }
-  return { detail: await response.text() };
+  return contentType.includes("application/json")
+    ? response.json()
+    : { detail: await response.text() };
 }
 
 function errorMessage(payload, status) {
-  if (payload && typeof payload.detail === "string" && payload.detail.trim()) {
-    return payload.detail;
-  }
-  return `读取失败（HTTP ${status}）。`;
+  return payload && typeof payload.detail === "string" && payload.detail.trim()
+    ? payload.detail
+    : `读取失败（HTTP ${status}）。`;
 }
 
 function renderMetadata(payload) {
@@ -145,29 +144,17 @@ function renderMetadata(payload) {
     ["记录窗口终点（不含）", formatDateTime(payload.recorded_to)],
     ["研究截止日期", payload.as_of_cutoff || "未限定"],
   ];
-  queryMetadata.replaceChildren(
-    ...entries.map(([term, description]) => {
-      const wrapper = document.createElement("div");
-      const dt = document.createElement("dt");
-      const dd = document.createElement("dd");
-      dt.textContent = term;
-      dd.textContent = description;
-      wrapper.append(dt, dd);
-      return wrapper;
-    })
-  );
+  queryMetadata.replaceChildren(...entries.map(([term, value]) => metadataPair(term, value)));
 }
 
-function renderEvents(events, { append }) {
+function renderEvents(events, append) {
   if (!append && events.length === 0) {
     emptyState.hidden = false;
     return;
   }
   emptyState.hidden = true;
   const fragment = document.createDocumentFragment();
-  for (const event of events) {
-    fragment.append(createEventItem(event));
-  }
+  events.forEach((event) => fragment.append(createEventItem(event)));
   feedList.append(fragment);
 }
 
@@ -178,7 +165,7 @@ function createEventItem(event) {
   const body = document.createElement("article");
   const topLine = document.createElement("div");
   topLine.className = "feed-topline";
-  topLine.append(createBadge(EVENT_LABELS[event.event_type] || event.event_type, "event-type-badge"));
+  topLine.append(createBadge(EVENT_LABELS[event.event_type] || event.event_type || "未知变化", "event-type-badge"));
   if (Number.isInteger(event.revision_no)) {
     topLine.append(createBadge(`修订 ${event.revision_no}`, "data-badge"));
   }
@@ -208,7 +195,7 @@ function createEventItem(event) {
     sourceLink.rel = "noopener noreferrer";
     actions.append(sourceLink);
   }
-  if (actions.childElementCount > 0) {
+  if (actions.childElementCount) {
     body.append(actions);
   }
 
@@ -224,6 +211,9 @@ function createEventItem(event) {
   );
   if (event.source_kind) {
     addMetadata(metadata, "来源类型", event.source_kind);
+  }
+  if (typeof event.source_locator === "string" && event.source_locator.trim()) {
+    addMetadata(metadata, "来源定位", event.source_locator.trim());
   }
   addMetadata(metadata, "对象 ID", event.object_id || "不可用");
   addMetadata(metadata, "展示字段", event.primary_text_source_field || "不可用");
@@ -247,26 +237,31 @@ function createLink(href, text) {
   return link;
 }
 
-function addMetadata(list, term, description) {
+function metadataPair(term, value) {
   const wrapper = document.createElement("div");
   const dt = document.createElement("dt");
   const dd = document.createElement("dd");
   dt.textContent = term;
-  dd.textContent = description;
+  dd.textContent = value;
   wrapper.append(dt, dd);
-  list.append(wrapper);
+  return wrapper;
+}
+
+function addMetadata(list, term, value) {
+  list.append(metadataPair(term, value));
 }
 
 function safeHttpUrl(value) {
-  if (typeof value !== "string" || !value.trim()) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  if (!/^https?:\/\//i.test(normalized)) {
     return null;
   }
   try {
-    const url = new URL(value, window.location.origin);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return null;
-    }
-    return url.href;
+    const url = new URL(normalized);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
   } catch {
     return null;
   }
@@ -296,19 +291,16 @@ function formatDateTime(value) {
   }).format(parsed);
 }
 
-function setLoading(isLoading, message) {
-  const controls = form.querySelectorAll("input, select, button");
-  controls.forEach((control) => {
-    control.disabled = isLoading;
+function setBusy(isBusy, message) {
+  form.querySelectorAll("input, select, button").forEach((control) => {
+    control.disabled = isBusy;
   });
-  resetButton.disabled = isLoading;
-  loadMoreButton.disabled = isLoading;
-  if (isLoading) {
+  resetButton.disabled = isBusy;
+  loadMoreButton.disabled = isBusy;
+  if (isBusy) {
     statusBadge.dataset.state = "loading";
     statusBadge.textContent = "读取中";
-    if (message) {
-      loadStatus.textContent = message;
-    }
+    loadStatus.textContent = message;
   }
 }
 
