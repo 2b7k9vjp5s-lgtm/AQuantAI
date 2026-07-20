@@ -342,7 +342,9 @@ class Stage2ResearchHypothesisLink(Base):
     hypothesis_id: Mapped[UUID] = mapped_column(
         ForeignKey("stage2_financial_hypotheses.id", ondelete="RESTRICT"), nullable=False
     )
-    hypothesis_revision_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    hypothesis_revision_id: Mapped[UUID] = mapped_column(
+        Uuid, nullable=False
+    )
     recorded_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
