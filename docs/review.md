@@ -10,7 +10,7 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 - Provider-status synchronization base: `ca2a9fa0ca4daea6b7318a50851272b74c4dc115`
 - Accepted application/consolidation implementation baseline: `7705b7caf210d606473db6f24c5fadfad4918646`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Most recent accepted architecture characterization: Issue #118 / PR #119
+- Most recent accepted architecture characterization: Issue #124 / PR #125
 - Active application or consolidation implementation authorization: none
 - New migration authorization: none
 
@@ -31,6 +31,25 @@ Docs-only commits may advance `main` without changing release, capability or run
 - Issue #116 / PR #117 characterized Stage 2 ORM lifecycle behavior.
 - Issue #118 / PR #119 committed and accepted the ORM lifecycle compatibility matrix.
 - Issue #120 / PR #121 implemented the one accepted neutral append-only mutation-scan helper.
+- Issue #124 / PR #125 characterized canonical market-price evidence, accepted its independent value and preferred future ownership, and found no production implementation ready.
+
+## Canonical market-price characterization acceptance
+
+PR #125 was accepted at fixed head `969815964fc150c224cf862ad47556569606332c` and merged as `8955e419c79f592ee9edcccdb446ebbe249de1dd`.
+
+Independent review confirmed:
+
+- the base-to-head diff contained exactly the two Issue #124 documentation files;
+- provider-normalized rows, persisted `DailyPriceRecord` rows, latest-series reads, canonical evidence, v0.6B valuation observations, comparison eligibility and later judgment state remain distinct boundaries;
+- a standalone canonical market-price evidence contract has independent value for point-in-time inspection, audit and downstream provenance;
+- a separately reviewed market-data/evidence layer is the preferred future owner, not Stage 2 valuation or a future price-judgment domain;
+- a linked daily-price row, generic `observed_value` or optional `daily_price_id` is context only and is not automatically canonical or comparison eligible;
+- comparison eligibility remains a later separate deterministic contract;
+- provider price semantics, unit/currency source, historical freezing, price-specific decimal limits, exact selector, information/UTC visibility, missing-state vocabulary, migration and rollback remain unresolved;
+- no module, table, migration, API or production implementation reaches Definition of Ready;
+- Actions `29728198982`, job `88306125767`, completed PostgreSQL setup, the full test step, fixture demo and cleanup successfully. Exact counts were not exposed and are not guessed.
+
+No code, test, fixture, dependency, provider behavior, schema/migration, API/runtime, release/version, v0.6E, v0.7 or PR #38 change occurred.
 
 ## ORM lifecycle compatibility acceptance
 
@@ -135,13 +154,16 @@ Neutral ownership exists for:
 - the process-local keyed revision-lock registry;
 - the Stage 2 append-only ORM mutation scan.
 
-Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. ORM event decorators, listener identities, model tuples, dynamic factories and generated globals remain domain-local. The accepted lifecycle matrix and pure scan extraction complete the bounded ORM work; canonical market-price evidence characterization is the next independent gate.
+Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. ORM event decorators, listener identities, model tuples, dynamic factories and generated globals remain domain-local.
+
+Canonical market-price evidence now has an accepted independent-value and preferred-ownership direction, but no implementation DoR. Existing provider rows, persisted daily-price rows, selected DataFrame reads and v0.6B valuation observations remain source/context boundaries. The next independent gate is credential-free provider measurement-semantics and deterministic-fixture characterization.
 
 ## Locked exclusions
 
 - no evidence serializer extraction or projection DTOs without a re-evaluation trigger and new preflight;
 - no row-lock, latest-revision, revision-allocation, supersession, cleanup/eviction or retry refactor without accepted characterization;
 - no listener/decorator/tuple relocation, dynamic model-factory consolidation, explicit reload support, database trigger or Core-DML interception;
+- no canonical market-price record, resolver, repository, API or comparison implementation without a later accepted DoR;
 - no application/provider behavior change or migration;
 - no provider implementation, live request, secret, dependency, ingestion script, fixture or default-provider change;
 - no reopening of Hithink integration without new Architecture Preflight and explicit authorization;
@@ -153,6 +175,6 @@ Evidence read serialization intentionally remains domain-local. Command modules 
 
 ## Next development gate
 
-The next gate is a separately authorized, documentation-only characterization of canonical market-price evidence. It must decide whether a standalone canonical measurement has independent user value and inventory value/decimal normalization, measurement kind, unit/currency, provider/series/exact source-row provenance, observation date/time, information cutoff and point-in-time visibility, adjustment meaning, the relationship to `DailyPriceRecord` and v0.6B valuation observations, comparison eligibility and missing-data semantics.
+The next gate is a separately authorized credential-free characterization of provider price semantics and a deterministic offline fixture matrix. It may determine whether implemented provider contracts can prove exact instrument market identity, `daily_close` meaning, unit/currency, unadjusted-versus-adjusted eligibility, exact provider/series/run/row selection, information-cutoff plus imported/completed UTC visibility, price-specific decimal limits and the minimum provenance required for historical stability.
 
-This synchronization does not authorize that characterization or any price model, migration, v0.6E or v0.7 implementation. No Codex application implementation command is active after this synchronization.
+That characterization must not change provider code, make a live request, create a schema or migration, implement canonical evidence or comparison eligibility, or start v0.6E or v0.7. No application implementation command is active after this synchronization.
