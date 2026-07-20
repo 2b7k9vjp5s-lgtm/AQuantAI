@@ -99,7 +99,7 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | Process-local revision-lock registry | `stage2_revision_locks.py` | Guarded exact `(kind, UUID)` keys and reentrant lock identity only; eight kinds and call placement remain caller-owned |
 | Stage 2 append-only ORM mutation scan | `orm_append_only.py` | Delete-before-dirty scan, tuple membership, material-dirty check and exact immutable messages only; decorators, listeners and tuples remain domain-local |
 | Revision allocation and database lock strategy | Stage 2 command modules | Row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry remain command-local |
-| “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities |
+| "Good price" and "good timing" | Conceptual future workflow | Not current runtime entities |
 
 A linked local `daily_price` row remains provenance/context. It is not a canonical comparison value merely because a valuation record also stores a numeric string and currency.
 
@@ -119,6 +119,203 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 12. Mutations, notifications, tasks and portfolio state require separate authorization.
 13. Credentials and raw connection details never enter source, fixtures, Issues, PRs, logs or user errors.
 14. Capability/consolidation merges do not change the released version without a separate release decision.
+
+## Semantic Level
+
+Data in AQuantAI is classified into four semantic tiers. Semantic Level defines consumption eligibility, not a quality label. A level cannot be upgraded through inference, non-null fields, UI display or guesswork.
+
+### L0 — Raw Provider Data
+
+Directly from a provider's original output. No internal normalization has been applied.
+
+**Allowed:**
+- Raw auditing
+- Source data inspection
+- Provider adapter diagnostics
+
+**Not automatically assumed:**
+- Field meaning is standardized
+- Unit is verified
+- Currency is verified
+- Comparable with other series
+
+### L1 — Provider Normalized
+
+Has passed through the current Provider adapter into project-internal fields, but retains provider-specific semantic constraints.
+
+**Allowed:**
+- Read-only display with explicit source annotation
+- Basic observation within a single series
+- Deterministic local statistics
+
+**Not automatically allowed:**
+- Cross-provider comparison
+- Cross-asset comparison
+- Canonical comparison
+- Valuation judgment
+- Investment signals
+
+### L2 — Standardized
+
+Measurement kind, format, unit or other required fields are standardized through an explicit contract.
+
+**Allowed:**
+- Deterministic analysis within contract scope
+- Aggregation or comparison within explicitly defined scope
+
+**Not automatically equivalent to:**
+- Full canonical evidence
+- Comparability across all historical periods
+- Compatibility across all providers
+
+### L3 — Canonical
+
+Satisfies the accepted canonical contract, including:
+
+- Measurement identity
+- Unit
+- Currency
+- Market identity
+- Adjustment semantics
+- Provider / series / run / row provenance
+- Cutoff and UTC visibility
+- Historical freeze method
+- Decimal contract
+- Missing-state contract
+
+Only L3 data meeting the corresponding contract may enter authorized canonical comparison or subsequent comparison eligibility.
+
+Semantic Level is a consumption qualification, not a quality label. A level cannot be upgraded through inference, non-null fields, UI display or guesswork. Each new product feature must declare its minimum required input level. This document establishes the classification contract; no Enum, model, database field, API field or migration is created here.
+
+## Evidence Qualification / Derivation Level
+
+Every piece of evidence or derived value in AQuantAI is classified into one of four derivation levels. The level determines how the information may be consumed, displayed and combined. AI may assist in generating draft content or suggesting classification candidates, but must not self-promote its output to D0 fact or automatically become D2 without explicit rules and review.
+
+### D0 — Direct Fact
+
+A fact directly supported by an explicit source.
+
+Examples:
+- A company published an announcement
+- Evidence was imported at a specific time
+- A provider-normalized close has a specific value
+
+### D1 — Deterministic Aggregation
+
+Produced from a fully recorded input set, scope, time window and deterministic algorithm.
+
+Examples:
+- Count of new evidence items in the past 7 days
+- Number of rising records within a specified range
+- Unresolved conflict count for a research case
+
+D1 must disclose:
+- Input set
+- Time window
+- Deduplication rules
+- Missing-value rules
+- Aggregation algorithm
+- Sorting rules
+
+### D2 — Rule Classification
+
+Depends on explicit, versioned classification rules.
+
+Examples:
+- Industry chain membership
+- Company-to-industry-node relationship type
+- Evidence type classification
+
+D2 must not be disguised as a direct fact. The following must be traceable:
+- Rule version
+- Classification source
+- Human or system responsibility boundary
+
+### D3 — Analytical Judgment
+
+Contains analysis, interpretation or research judgment.
+
+Examples:
+- Industry outlook improving
+- An event constitutes a positive catalyst
+- A company may benefit
+- Risk may be increasing
+
+D3 must be displayed separately from facts and deterministic aggregations. D3 must not automatically enter:
+- Buy recommendations
+- Sell suggestions
+- Target prices
+- Return promises
+- Trading signals
+
+## Development Task Classification
+
+Work in AQuantAI is divided into two task types. Correct classification is essential for process integrity; uncertain tasks default to Architecture Task.
+
+### Architecture Task
+
+An Architecture Task must complete full Architecture Preflight, Definition of Ready and fixed-head review if it meets any of the following triggers:
+
+- Adding or changing a schema
+- Adding or changing a migration
+- Adding or changing a Provider
+- Changing data or field meaning
+- Changing Semantic Level qualification
+- Changing revision / append-only rules
+- Changing cutoff / UTC visibility
+- Changing provenance
+- Changing fallback, identity or join rules
+- Adding persistent state
+- Changing a computation contract
+- Adding a rule-classification contract
+- Changing security or secret management
+
+An Architecture Task must not be disguised as "UI display" to bypass review.
+
+### Product Task
+
+A Product Task may use a lighter process only when ALL of the following conditions are met:
+
+- Reads only from already accepted data contracts
+- Does not add persistent state
+- Does not change fields or data meaning
+- Does not change system invariants
+- Does not change computation contracts
+- Does not change Provider behavior
+- Does not change cutoff, revision or provenance
+- Does not upgrade Semantic Level
+- Does not disguise D2/D3 as D0/D1
+
+Typical Product Tasks include:
+- Page layout for already-available data
+- Read-only display of an existing API
+- Query composition under explicit contracts
+- Reading experience optimization
+- Accessibility optimization
+- Serialization display that does not change semantics
+
+### Boundaries and fact display
+
+Not all seemingly objective Dashboard metrics are D0 facts. For example, "industry rising/falling" may depend on:
+
+- Industry member definitions
+- Member validity periods
+- Weighting methodology
+- ST / suspension / missing-data treatment
+- Price semantic level
+- Time boundaries
+
+Therefore, any aggregated display must declare:
+
+- Required Semantic Level
+- Derivation Level
+- Input scope
+- Classification or membership source
+- Calculation method
+- Time window
+- Missing-data and conflict handling
+
+Only display tasks that do not alter existing data semantics, system invariants or domain state may proceed as Product Tasks under the light process.
 
 ## Architecture debt register
 
@@ -141,6 +338,8 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 5. **Consolidation cadence:** review documentation, duplicated infrastructure, schema/link growth, tests, APIs and next-stage reachability.
 6. **Review evidence:** green CI is necessary but not sufficient; ownership, reachability, semantics and scope must also pass.
 
+Documentation-only architecture synchronization commits that add Semantic Level, Derivation Level or task-classification contracts do not alter runtime behavior, schema, Provider behavior or product authorization state. They are Architecture Tasks only in the documentation sense and do not require the full implementation Preflight cycle.
+
 ## Near-term sequence
 
 Completed:
@@ -159,16 +358,106 @@ Completed:
 12. ORM lifecycle characterization and committed compatibility matrix — PRs #117/#119.
 13. neutral append-only mutation-scan implementation — PR #121, merged as `7705b7caf210d606473db6f24c5fadfad4918646`.
 14. canonical market-price evidence characterization — PR #125; independent value and preferred ownership accepted, no production DoR.
+15. architecture rebalance documentation synchronization — Issue #132 / this PR; Semantic Level, Derivation Level, dual-track classification, Evidence Intelligence MVP as next product gate, canonical price as parallel infrastructure track.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
+### Recommended forward sequence
+
+This ordering is not an authorization of v0.6E or v0.7. Each item requires separate Architecture Preflight and GitHub authorization.
+
+1. Complete architecture rebalance documentation sync (this task).
+2. Evidence Intelligence MVP Architecture Preflight.
+3. Research Feed / Evidence Timeline minimum read-only slice.
+4. Industry → Company Mapping read-only display.
+5. In parallel: Price Semantic Level and explicit market/exchange source characterization.
+6. Canonical Price MVP.
+7. Comparison Eligibility.
+8. Watchlist.
+9. Advanced analysis and AI research assistant.
+
+### Evidence Intelligence MVP as next product-facing gate
+
+The previous linear blocking path (canonical price → comparison → v0.6E → Watchlist) is no longer the sole product mainline. The product value mainline shifts to:
+
+**Evidence Intelligence MVP**
+
+Priority goal: let a user determine within approximately 5 minutes what research objects, industries, companies and evidence have changed recently.
+
+Phase 1 is limited to read-only capabilities based on existing accepted contracts. Candidate content includes:
+
+- Research Feed
+- Evidence Timeline
+- Industry → Company Mapping
+- Evidence addition counts
+- Unresolved conflict counts
+- Research record last-updated timestamps
+- Existing beneficiary relationships and evidence links
+
+Industry → Company Mapping displays existing relationships; it is not automatic stock recommendation.
+
+Phase 1 must not output:
+- Buy or sell signals
+- Target prices
+- Opportunity rankings
+- Return predictions
+- Automated investment advice
+- Unsupervised positive or negative judgments
+
+### Canonical price as parallel infrastructure track
+
+Canonical price continues as a separately governed infrastructure track but no longer blocks all product-facing capability. It remains a required gate for:
+
+- Canonical comparison
+- Price judgment
+- Comparison eligibility
+
+Provider isolation, provenance, cutoff, append-only, no-silent-fallback and no-inference requirements are not relaxed. No temporary price assumptions (exchange inference via security-code prefix, default currency without source recording, silent provider fallback, provider-name-based unit/currency inference) are authorized. Any future provisional assumptions require a separate Architecture Task with explicit scope, versioning, traceability and fail-closed rules.
+
+### Architecture Preflight requirements for Evidence Intelligence MVP
+
+The next-stage Architecture Preflight must answer:
+
+1. What does the user see first on opening the system?
+2. Which existing tables and queries does Research Feed use?
+3. Which Derivation Level (D0-D3) does each metric belong to?
+4. Which Semantic Level does each price-related field require?
+5. What are the time-window, deduplication, sort and missing-value rules?
+6. Are all Industry → Company relationships from existing persisted links?
+7. Is any new state or schema required?
+8. If using only read models, how is domain contract invariance proved?
+9. How is "attention" prevented from masquerading as "investment opportunity"?
+10. How is AI limited to expression assistance rather than fact-level promotion?
+
+This PR does not create an Evidence Intelligence code Issue or implementation PR.
+
+### Preserved canonical price no-DoR conclusion
+
+This rebalance must not be interpreted as canonical price being complete or no longer needed.
+
+- Canonical market-price evidence retains independent value.
+- Preferred ownership remains in the market-data / evidence layer.
+- Current Provider semantics remain insufficient for production DoR.
+- The change is only about priority and blocking relationships: canonical price no longer blocks all read-only product capabilities, but remains required for any functionality needing canonical comparison, price judgment or comparison eligibility.
+
+The following remain unauthorized:
+- Exchange inference via security-code prefix
+- Interpreting null exchange as Shanghai/Shenzhen market
+- Defaulting currency to CNY without recording the source
+- Inferring unit or currency from Provider name
+- Silent fallback to another Provider
+
 Prospective and separately authorized:
 
-15. characterize credential-free provider price semantics and a deterministic fixture matrix;
-16. re-evaluate whether one bounded canonical market-price evidence implementation reaches DoR;
-17. only then consider valuation comparison eligibility;
-18. only after those gates reconsider whether price judgment needs persisted state or a deterministic read model;
-19. do not start v0.7 until required upstream contracts and consolidation reviews are accepted;
-20. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
+16. Evidence Intelligence MVP Architecture Preflight;
+17. Research Feed / Evidence Timeline read-only slice;
+18. Industry → Company Mapping read-only display;
+19. credential-free provider price semantics and a deterministic fixture matrix (parallel infrastructure track);
+20. canonical market-price evidence implementation re-evaluation (parallel infrastructure track);
+21. comparison eligibility consideration;
+22. Watchlist reconsideration;
+23. only then evaluate whether price judgment needs persisted state or a deterministic read model;
+24. do not start v0.7 until required upstream contracts and consolidation reviews are accepted;
+25. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
 
 No prospective item is authorized by this document alone.
