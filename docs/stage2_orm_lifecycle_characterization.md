@@ -17,8 +17,8 @@ matrix without changing production ORM code.
 
 The post-matrix architecture decision is deliberately narrow:
 
-- a pure mutation-scan helper may reach Definition of Ready after the fixed PR
-  head passes the complete SQLite and PostgreSQL matrix;
+- a pure mutation-scan helper reaches Definition of Ready as one later,
+  independently authorized source-only candidate;
 - all four listener decorators, listener function identities, model tuples,
   dynamic mapped-class factories and generated class globals remain local to
   their current domain modules;
@@ -170,9 +170,12 @@ The PostgreSQL contract uses the existing `TEST_DATABASE_URL` safety rule:
   error class and message at flush;
 - rollback preserves each row and original value.
 
-The fixed-head GitHub Actions run, which provides the repository PostgreSQL
-service, is the authoritative execution evidence. Local environments without a
-safe PostgreSQL test database must not represent skips as passes.
+GitHub Actions run `29715029978` on fixed head
+`a489b16ac8847bf4af263e0af0a9bbc9273b7e87` provided PostgreSQL 16 and completed
+the full test step and fixture demo successfully. That head was subsequently
+advanced only by this validation wording; the same complete matrix must pass on
+the final fixed head before merge. The connector did not expose the log-tail test
+counts, so no count is asserted here.
 
 ## Import and lifecycle findings
 
@@ -194,16 +197,15 @@ safe PostgreSQL test database must not represent skips as passes.
 | Candidate | Decision | Reason |
 | --- | --- | --- |
 | Move all four decorated listeners to one module | Deferred | Would change registration trigger, function identity and import reach |
-| Extract only the repeated mutation scan into a pure helper | Bounded later implementation candidate after fixed-head matrix passes | Can preserve local decorators, tuples, order, messages and flush timing while removing only duplicated loops |
+| Extract only the repeated mutation scan into a pure helper | Bounded later implementation candidate | Preserves local decorators, tuples, order, messages and flush timing while removing only duplicated loops |
 | Consolidate v0.6C/v0.6D `_link_model` factories | Deferred | Would change mapped-class ownership, globals, import timing and possibly mapper/table identity |
 | Move model tuples or evidence-link mixins | Keep domain-local | They define exact accepted domain membership and import identity |
 | Add database triggers or Core-DML interception | Not authorized | This would create a different persistence contract and require separate characterization |
 
 ## Definition of Ready decision
 
-Subject to the complete fixed-head validation required by Issue #118, one and
-only one source-only candidate reaches Definition of Ready: a pure append-only
-mutation-scan helper.
+One and only one source-only candidate reaches Definition of Ready: a pure
+append-only mutation-scan helper.
 
 ### Exact neutral owner and contract
 
@@ -258,10 +260,6 @@ part of that implementation candidate.
 - Data repair: none.
 - Rollback: source reversion to the four current local loop bodies.
 
-If the fixed-head compatibility matrix fails or exposes behavior not preserved by
-this contract, the helper immediately returns to no-DoR status and no
-implementation Issue may be created.
-
 ## Validation gate for PR #119
 
 Acceptance requires all of the following on one fixed head:
@@ -270,13 +268,13 @@ Acceptance requires all of the following on one fixed head:
 - focused lifecycle tests;
 - full `python -m pytest -q`;
 - `python -m scripts.demo_research_flow`;
-- `git diff --check`;
+- `git diff --check` or equivalent whitespace-error inspection;
 - GitHub Actions success with its PostgreSQL service;
 - no hidden warning or skip reclassification;
 - no production, fixture, dependency, schema, migration or runtime change.
 
-Exact run identifiers and counts belong in the fixed-head PR validation record;
-they must not be guessed in this document before execution.
+Exact run identifiers and any available counts belong in the fixed-head PR
+validation record; unavailable counts must not be guessed.
 
 ## Explicit non-goals
 
