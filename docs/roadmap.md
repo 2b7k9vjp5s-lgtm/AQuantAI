@@ -36,10 +36,19 @@ These capabilities remain research-only, cutoff-aware and non-advisory. They do 
 - PR #117 characterized Stage 2 ORM lifecycle behavior.
 - PR #119 committed and accepted the SQLite/subprocess/PostgreSQL lifecycle compatibility matrix.
 - PR #121 implemented the neutral Stage 2 append-only mutation scan and merged as `7705b7caf210d606473db6f24c5fadfad4918646`.
+- PR #125 characterized canonical market-price evidence, accepted its independent value and preferred future ownership, and found no production implementation ready.
 
 The neutral integrity helper catches only `IntegrityError`, preserves the exact caller-owned message and original cause, and performs no transaction, rollback, retry or constraint-classification work. The neutral revision-lock helper owns only the guarded process-local `(kind, UUID) -> RLock` registry. The neutral append-only helper owns only delete-before-dirty scanning, tuple membership, material-dirty detection and exact immutable messages. All four decorators, listeners, tuples, dynamic factories and generated globals remain domain-local. Command modules still own transaction boundaries, conflict wording, row locks, latest-revision reads, revision-number allocation, supersession and retry.
 
-No schema, migration, public API, fixture, domain-semantic or released-version change resulted from these consolidation reviews.
+No schema, migration, public API, fixture, domain-semantic or released-version change resulted from these consolidation and characterization reviews.
+
+## Accepted canonical market-price direction
+
+Issue #124 / PR #125 confirms that canonical market-price evidence has independent value for point-in-time inspection, audit and downstream provenance. The preferred future owner is a separately reviewed market-data/evidence layer rather than Stage 2 valuation or a future price-judgment domain.
+
+Provider-normalized rows, persisted `DailyPriceRecord` rows, latest-series/cutoff-aware reads, canonical evidence, v0.6B valuation observations, comparison eligibility and later judgment state remain distinct. A linked daily-price row or generic valuation `observed_value` is context only and is not automatically canonical or comparison eligible.
+
+No production implementation reaches Definition of Ready. Provider measurement semantics, unit/currency, historical freezing, price-specific decimal limits, exact selection, information/UTC visibility, missing-state vocabulary, migration and rollback remain unresolved. Comparison eligibility is a later separate deterministic contract.
 
 ## Accepted future provider direction
 
@@ -55,7 +64,7 @@ No Hithink code, dependency, provider default, runtime behavior, database/schema
 
 ## Superseded path
 
-Issue #70 and PR #71 for v0.6E price judgment remain superseded and closed without merge. Canonical price measurement ownership, comparison eligibility, realistic provider parity and sufficient consolidation must be resolved separately before reconsideration.
+Issue #70 and PR #71 for v0.6E price judgment remain superseded and closed without merge. Canonical price measurement ownership, provider semantics, comparison eligibility and sufficient upstream evidence contracts must be resolved separately before reconsideration.
 
 No v0.6E implementation or migration is authorized.
 
@@ -67,11 +76,12 @@ Evidence read serializer implementation is not a remaining candidate unless a do
 
 ## Prospective sequence
 
-1. characterize whether canonical market-price evidence has independent user value and define value normalization, measurement, provenance, chronology, adjustment, comparison and missing-data semantics;
-2. decide whether valuation observations need comparison-eligibility semantics;
-3. re-evaluate whether price judgment needs persisted state or a deterministic read model;
-4. only then reconsider v0.7 Watchlist and later portfolio work;
-5. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
+1. characterize credential-free provider price semantics and a deterministic offline fixture matrix;
+2. re-evaluate whether one bounded canonical market-price evidence implementation reaches Definition of Ready;
+3. only then decide whether valuation observations need comparison-eligibility semantics;
+4. only after those gates re-evaluate whether price judgment needs persisted state or a deterministic read model;
+5. only then reconsider v0.7 Watchlist and later portfolio work;
+6. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
 
 Every item requires separate Architecture Preflight and GitHub authorization.
 
@@ -80,6 +90,7 @@ Every item requires separate Architecture Preflight and GitHub authorization.
 - evidence serializer extraction or projection DTOs;
 - row-lock, latest-revision, revision-allocation, supersession, cleanup/eviction or retry refactoring without accepted characterization;
 - listener/decorator/tuple relocation, dynamic model-factory consolidation, explicit reload support, database triggers or Core-DML interception;
+- canonical market-price record, resolver, repository, API or comparison implementation without a later accepted DoR;
 - provider implementation, live request, secret, dependency, ingestion script, fixture or default-provider change;
 - silent provider fallback, relabeling, row-level mixing or MCP/LLM canonical ingestion;
 - v0.6D query-value policy changes;
