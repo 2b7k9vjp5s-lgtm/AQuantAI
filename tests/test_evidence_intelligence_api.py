@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -68,6 +69,19 @@ def test_evidence_intelligence_page_is_served() -> None:
     assert response.status_code == 200
     assert "研究变化" in response.text
     assert "不是投资吸引力排序" in response.text
+
+
+def test_page_script_does_not_infer_relative_source_locator_links() -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "evidence_intelligence"
+        / "static"
+        / "evidence_intelligence.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'new URL(value, window.location.origin)' not in script
+    assert 'new URL(normalized)' in script
+    assert 'addMetadata(metadata, "来源定位"' in script
 
 
 def test_feed_api_returns_neutral_read_only_contract(monkeypatch) -> None:
