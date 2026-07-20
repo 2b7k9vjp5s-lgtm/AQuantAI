@@ -170,10 +170,10 @@ The PostgreSQL contract uses the existing `TEST_DATABASE_URL` safety rule:
   error class and message at flush;
 - rollback preserves each row and original value.
 
-GitHub Actions run `29715274119` on fixed head
-`af250f0a2f1c8930922b6379e05b81aaaa241062` provided PostgreSQL 16 and completed
-the full test step, fixture demo and cleanup successfully. The connector did not
-expose the log-tail test counts, so no count is asserted here.
+The fixed-head GitHub Actions validation record is maintained on PR #119. It
+uses PostgreSQL 16 and must complete the full test step, fixture demo and cleanup
+successfully. Exact run identifiers and any available counts belong in that PR
+record; unavailable counts must not be guessed in this architecture document.
 
 ## Import and lifecycle findings
 
@@ -270,9 +270,6 @@ Acceptance requires all of the following on one fixed head:
 - GitHub Actions success with its PostgreSQL service;
 - no hidden warning or skip reclassification;
 - no production, fixture, dependency, schema, migration or runtime change.
-
-Exact run identifiers and any available counts belong in the fixed-head PR
-validation record; unavailable counts must not be guessed.
 
 ## Explicit non-goals
 
