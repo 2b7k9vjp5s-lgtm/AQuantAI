@@ -37,6 +37,7 @@ These capabilities remain research-only, cutoff-aware and non-advisory. They do 
 - PR #119 committed and accepted the SQLite/subprocess/PostgreSQL lifecycle compatibility matrix.
 - PR #121 implemented the neutral Stage 2 append-only mutation scan and merged as `7705b7caf210d606473db6f24c5fadfad4918646`.
 - PR #125 characterized canonical market-price evidence, accepted its independent value and preferred future ownership, and found no production implementation ready.
+- Issue #132 / this PR synchronizes the architecture rebalance: Semantic Level (L0-L3), Derivation Level (D0-D3), dual-track classification (Architecture Task / Product Task), Evidence Intelligence MVP as next product gate, canonical price as parallel infrastructure track.
 
 The neutral integrity helper catches only `IntegrityError`, preserves the exact caller-owned message and original cause, and performs no transaction, rollback, retry or constraint-classification work. The neutral revision-lock helper owns only the guarded process-local `(kind, UUID) -> RLock` registry. The neutral append-only helper owns only delete-before-dirty scanning, tuple membership, material-dirty detection and exact immutable messages. All four decorators, listeners, tuples, dynamic factories and generated globals remain domain-local. Command modules still own transaction boundaries, conflict wording, row locks, latest-revision reads, revision-number allocation, supersession and retry.
 
@@ -74,16 +75,77 @@ Listener/decorator/tuple relocation and v0.6C/v0.6D dynamic link-model factory c
 
 Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs. Integrity translation, the process-local lock registry and the pure append-only scan are completed and do not authorize changes to row locks, allocation, supersession, cleanup/eviction, retry, event registration or mapped-class ownership.
 
-## Prospective sequence
+## Recommended forward sequence
 
-1. characterize credential-free provider price semantics and a deterministic offline fixture matrix;
-2. re-evaluate whether one bounded canonical market-price evidence implementation reaches Definition of Ready;
-3. only then decide whether valuation observations need comparison-eligibility semantics;
-4. only after those gates re-evaluate whether price judgment needs persisted state or a deterministic read model;
-5. only then reconsider v0.7 Watchlist and later portfolio work;
-6. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
+This ordering is not an authorization of v0.6E or v0.7. Each item requires separate Architecture Preflight and GitHub authorization.
 
-Every item requires separate Architecture Preflight and GitHub authorization.
+1. Complete architecture rebalance documentation synchronization.
+2. Evidence Intelligence MVP Architecture Preflight.
+3. Research Feed / Evidence Timeline minimum read-only slice.
+4. Industry → Company Mapping read-only display.
+5. In parallel: Price Semantic Level and explicit market/exchange source characterization (infrastructure track).
+6. Canonical Price MVP (infrastructure track).
+7. Comparison Eligibility.
+8. Watchlist.
+9. Advanced analysis and AI research assistant.
+
+### Phase 1: Evidence Intelligence MVP
+
+Phase 1 has exactly one main delivery direction: **Evidence Intelligence MVP**.
+
+The previous linear blocking path (canonical price → comparison → v0.6E → Watchlist) is restructured into two governed tracks:
+
+**Product value mainline**
+The next product gate is Evidence Intelligence MVP.
+
+Priority goal: let a user determine within approximately 5 minutes what research objects, industries, companies and evidence have changed recently.
+
+Phase 1 is limited to read-only capabilities based on existing accepted contracts. Candidate content includes:
+- Research Feed
+- Evidence Timeline
+- Industry → Company Mapping
+- Evidence addition counts
+- Unresolved conflict counts
+- Research record last-updated timestamps
+- Existing beneficiary relationships and evidence links
+
+Industry → Company Mapping displays existing relationships; it is not automatic stock recommendation.
+
+Phase 1 must not output:
+- Buy or sell signals
+- Target prices
+- Opportunity rankings
+- Return predictions
+- Automated investment advice
+- Unsupervised positive or negative judgments
+
+**Infrastructure parallel track**
+The following continue as separately governed infrastructure work:
+- Price Semantic Level characterization
+- Credential-free market/exchange identity source
+- Canonical Price MVP
+- Comparison Eligibility
+
+This track remains subject to the full architecture process. Parallel status does not relax:
+- Provider isolation
+- Provenance
+- Cutoff
+- Append-only
+- No silent fallback
+- No inference
+
+The next-stage Architecture Preflight for Evidence Intelligence MVP must answer the ten questions documented in `docs/architecture_baseline.md`.
+
+### Preserved canonical price no-DoR status
+
+This rebalance does not authorize canonical price as complete or reduce its requirements. Canonical market-price evidence retains independent value. Preferred ownership remains in the market-data/evidence layer. Current Provider semantics remain insufficient for production DoR.
+
+The priority change is that canonical price no longer blocks all read-only product capabilities, but it remains required for any functionality needing canonical comparison, price judgment or comparison eligibility. The following remain unauthorized:
+- Exchange inference via security-code prefix
+- Interpreting null exchange as Shanghai/Shenzhen market
+- Defaulting currency to CNY without recording the source
+- Inferring unit or currency from Provider name
+- Silent fallback to another Provider
 
 ## Not authorized
 

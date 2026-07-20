@@ -10,7 +10,7 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 - Provider-status synchronization base: `ca2a9fa0ca4daea6b7318a50851272b74c4dc115`
 - Accepted application/consolidation implementation baseline: `7705b7caf210d606473db6f24c5fadfad4918646`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Most recent accepted architecture characterization: Issue #124 / PR #125
+- Most recent accepted architecture characterization: Issue #132 / this PR (architecture rebalance documentation sync)
 - Active application or consolidation implementation authorization: none
 - New migration authorization: none
 
@@ -32,6 +32,7 @@ Docs-only commits may advance `main` without changing release, capability or run
 - Issue #118 / PR #119 committed and accepted the ORM lifecycle compatibility matrix.
 - Issue #120 / PR #121 implemented the one accepted neutral append-only mutation-scan helper.
 - Issue #124 / PR #125 characterized canonical market-price evidence, accepted its independent value and preferred future ownership, and found no production implementation ready.
+- Issue #132 / this PR synchronizes the architecture rebalance: Semantic Level (L0-L3), Derivation Level (D0-D3), dual-track task classification (Architecture Task / Product Task), Evidence Intelligence MVP as the next product-facing gate, and canonical price as a parallel infrastructure track.
 
 ## Canonical market-price characterization acceptance
 
@@ -143,6 +144,34 @@ The account owner then deferred Hithink integration. Issue #112 closed as `not p
 
 Hithink remains a future candidate only and requires new Architecture Preflight plus explicit authorization before reconsideration. AKShare remains the implemented controlled provider path, and provider-specific history remains immutable and readable.
 
+## Architecture rebalance documentation synchronization
+
+Issue #132 / this PR synchronizes the architecture rebalance as a docs-only change. The synchronization introduces the following contracts to the authoritative documents without altering any code, schema, migration, Provider, test, fixture or runtime behavior:
+
+1. **Semantic Level (L0-L3):** L0 Raw Provider Data, L1 Provider Normalized, L2 Standardized, L3 Canonical. Semantic Level is a consumption qualification, not a quality label.
+2. **Derivation Level (D0-D3):** D0 Direct Fact, D1 Deterministic Aggregation, D2 Rule Classification, D3 Analytical Judgment. AI may assist but must not self-promote output to higher levels without explicit rules.
+3. **Dual-track classification (Architecture Task / Product Task):** Architecture Tasks require full Preflight and DoR; Product Tasks may use a light process only when reading existing contracts without semantic changes. Uncertain tasks default to Architecture Task.
+4. **Evidence Intelligence MVP** as the next product-facing gate, replacing the old linear blocking path.
+5. **Canonical price** as a parallel infrastructure track that does not block all product-facing capabilities.
+6. **Preserved provider semantics no-DoR** conclusion and all existing no-inference rules.
+
+### Risk assessment update
+
+The project's largest risk is no longer solely missing data semantics. It now also includes the gap between architecture evolution speed and user-perceivable value.
+
+The decision to halt or prevent the premature v0.6E direction remains correct. The new adjustment is not an abandonment of architecture discipline; rather, it concentrates strict governance on tasks that genuinely change semantics and system invariants.
+
+Current product risk: research infrastructure is relatively mature, but the user lacks an obvious daily entry point and change summary.
+
+Current process risk: an agent's text report does not constitute completion evidence. GitHub fixed heads, file diffs, CI, review threads and merge status are the authoritative sources of fact.
+
+### Preserved invariants
+
+- Version 0.2.0, v0.6D and implementation baseline `7705b7caf210d606473db6f24c5fadfad4918646` are unchanged.
+- Hithink remains deferred; AKShare remains the implemented provider path.
+- No silent provider fallback, cross-provider natural-key stitching, exchange inference, default-currency inference, or provider-name-based inference is authorized.
+- No code, test, fixture, schema, migration, Provider or runtime behavior change occurred.
+
 ## Current review conclusion
 
 Neutral ownership exists for:
@@ -157,6 +186,8 @@ Neutral ownership exists for:
 Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. ORM event decorators, listener identities, model tuples, dynamic factories and generated globals remain domain-local.
 
 Canonical market-price evidence now has an accepted independent-value and preferred-ownership direction, but no implementation DoR. Existing provider rows, persisted daily-price rows, selected DataFrame reads and v0.6B valuation observations remain source/context boundaries. The next independent gate is credential-free provider measurement-semantics and deterministic-fixture characterization.
+
+Architecture task classification, Semantic Level and Derivation Level are now documented. These documentation contracts do not alter runtime behavior, Provider semantics or authorization state.
 
 ## Locked exclusions
 
@@ -175,6 +206,6 @@ Canonical market-price evidence now has an accepted independent-value and prefer
 
 ## Next development gate
 
-The next gate is a separately authorized credential-free characterization of provider price semantics and a deterministic offline fixture matrix. It may determine whether implemented provider contracts can prove exact instrument market identity, `daily_close` meaning, unit/currency, unadjusted-versus-adjusted eligibility, exact provider/series/run/row selection, information-cutoff plus imported/completed UTC visibility, price-specific decimal limits and the minimum provenance required for historical stability.
+The next gate is a separately authorized Evidence Intelligence MVP Architecture Preflight. Its 10 required questions are documented in `docs/architecture_baseline.md`. In parallel, credential-free characterization of provider price semantics and a deterministic offline fixture matrix may proceed as a separately authorized infrastructure task.
 
-That characterization must not change provider code, make a live request, create a schema or migration, implement canonical evidence or comparison eligibility, or start v0.6E or v0.7. No application implementation command is active after this synchronization.
+Neither Evidence Intelligence MVP implementation nor canonical price implementation is authorized by this synchronization.
