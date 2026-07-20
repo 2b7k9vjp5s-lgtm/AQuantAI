@@ -11,7 +11,7 @@ This document is the authoritative architecture and current-state baseline. `.co
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
-Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 kept evidence read serializers domain-local; PRs #97/#99 characterized and implemented command integrity translation; PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry; PR #109 characterized Hithink as the preferred future A-share provider candidate; PRs #117/#119 characterized and fixed the ORM lifecycle compatibility matrix; PR #121 implemented the neutral append-only mutation scan.
+Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 kept evidence read serializers domain-local; PRs #97/#99 characterized and implemented command integrity translation; PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry; PR #109 characterized Hithink as the preferred future A-share provider candidate; PRs #117/#119 characterized and fixed the ORM lifecycle compatibility matrix; PR #121 implemented the neutral append-only mutation scan; PR #125 characterized canonical market-price evidence and found no production implementation ready.
 
 ## Product boundary
 
@@ -45,6 +45,14 @@ Issue #112 and Draft PR #113 explored only a credential-safe contract probe. The
 
 No Hithink code, dependency, runtime/default-provider change, database/schema change or migration reached `main`. AKShare remains the implemented controlled provider path. Hithink is a deferred future candidate and may be reconsidered only through a new Architecture Preflight and explicit authorization.
 
+## Accepted canonical market-price direction
+
+Issue #124 and PR #125 accept that a standalone canonical market-price evidence contract has independent value for point-in-time inspection, audit and later downstream provenance. The preferred future owner is a separately reviewed market-data/evidence layer, not Stage 2 valuation or a future price-judgment domain.
+
+Provider-normalized rows, persisted `DailyPriceRecord` rows, latest-series/cutoff-aware reads, canonical evidence, v0.6B valuation observations, comparison eligibility and later judgment state remain separate boundaries. A linked daily-price row or generic valuation `observed_value` is context only and is not automatically a canonical or comparison-eligible market price.
+
+No production implementation reaches Definition of Ready. Provider measurement semantics, explicit unit/currency, historical freezing, price-specific decimal limits, exact provider/series/run/row selection, information-cutoff plus imported/completed UTC visibility, missing-state vocabulary, migration and rollback remain unresolved. Comparison eligibility remains a later separate deterministic contract.
+
 Six neutral Stage 2 infrastructure boundaries are accepted:
 
 - `industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B frozen-boundary mechanics used by v0.6C and v0.6D;
@@ -62,7 +70,7 @@ The current implementable path does not include v0.6E price judgment, timing jud
 
 | Capability | Merged boundary | Remaining boundary |
 | --- | --- | --- |
-| v0.3 market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Canonical arbitrary market-price measurement semantics are not a standalone evidence contract |
+| v0.3 market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Canonical market-price evidence has independent value but provider semantics and a durable evidence contract have no DoR |
 | v0.4A-v0.4E Market Cockpit | Read-only selected-scope breadth/risk, context, liquidity and descriptive price behavior | No official full-market, valuation, regime, signal or recommendation claims |
 | v0.5A-v0.5C | Evidence ledger, industry maps, beneficiary classifications and candidate-pool handoff | Evidence qualification and frozen-link patterns remain repeated downstream |
 | v0.6A | Company research and hypotheses | Integrity translation and the process-local lock registry are consolidated; row locks and revision allocation remain local |
@@ -77,7 +85,7 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | Information or mechanism | Authoritative owner | Rule |
 | --- | --- | --- |
 | Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit provider per run and series; no silent fallback, relabeling, row-level mixing or cross-run stitching |
-| Canonical market-price value, measurement kind, unit, currency and decimal normalization | Future separately reviewed market-data/evidence contract | Downstream judgment code must not invent it |
+| Canonical market-price value, measurement kind, unit, currency and decimal normalization | Future separately reviewed market-data/evidence contract | Independent value and preferred ownership are accepted; no implementation DoR exists and downstream judgment code must not invent it |
 | Evidence grades, claims, links and conflicts | v0.5 evidence ledger | Downstream slices freeze exact revisions and links |
 | Company-research workflow and hypotheses | v0.6A | Downstream records bind exact revisions |
 | Expectations and valuation observations | v0.6B | Recorded context remains generic without later comparison eligibility |
@@ -121,7 +129,7 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 - **D5 ORM lifecycle — bounded work complete:** PR #119 fixes the accepted listener/import/mapper/metadata/SQLite/PostgreSQL matrix, and PR #121 extracts only the neutral mutation scan. Event decorators, listener identities, model tuples, dynamic factories and generated globals remain domain-local; relocation, reload support, database triggers and Core-DML interception remain deferred.
 - **D6 Test-matrix growth:** shared invariant tests and domain-semantic tests must remain distinct.
 - **D7 Fixture-versus-production reachability — deferred:** the reviewed offline Hithink probe did not establish live contract, permission or data-use acceptance; a future provider attempt requires new preflight.
-- **D8 Missing canonical market-price semantics:** `DailyPriceRecord` is not a complete arbitrary price-comparison evidence object.
+- **D8 Canonical market-price semantics — characterized, unresolved:** PR #125 confirms independent value and a preferred market-data/evidence owner, but no provider price-semantics, unit/currency, historical-freezing, decimal, selector, visibility, missing-state or migration contract reaches DoR.
 - **D9 Consolidation cadence:** review after every two domain slices and earlier when ownership ambiguity appears.
 
 ## Development gates
@@ -150,14 +158,17 @@ Completed:
 11. Hithink probe technical review — Issue #112 / PR #113; closed without merge after integration was deferred.
 12. ORM lifecycle characterization and committed compatibility matrix — PRs #117/#119.
 13. neutral append-only mutation-scan implementation — PR #121, merged as `7705b7caf210d606473db6f24c5fadfad4918646`.
+14. canonical market-price evidence characterization — PR #125; independent value and preferred ownership accepted, no production DoR.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
 Prospective and separately authorized:
 
-14. characterize whether canonical market-price evidence has independent user value and define its ownership and point-in-time semantics;
-15. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
-16. do not start v0.7 until required upstream contracts and consolidation reviews are accepted;
-17. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
+15. characterize credential-free provider price semantics and a deterministic fixture matrix;
+16. re-evaluate whether one bounded canonical market-price evidence implementation reaches DoR;
+17. only then consider valuation comparison eligibility;
+18. only after those gates reconsider whether price judgment needs persisted state or a deterministic read model;
+19. do not start v0.7 until required upstream contracts and consolidation reviews are accepted;
+20. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
 
 No prospective item is authorized by this document alone.
