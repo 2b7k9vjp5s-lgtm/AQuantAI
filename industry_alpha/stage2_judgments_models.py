@@ -9,7 +9,7 @@ from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integ
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from backend.database.models import Base
-from industry_alpha.errors import EvidenceLedgerImmutableError
+from industry_alpha.orm_append_only import reject_append_only_mutation
 
 
 OUTCOME_CHECK = "outcome IN ('affirmed','not_affirmed','uncertain','not_assessed')"
@@ -167,9 +167,4 @@ STAGE2_JUDGMENT_MODELS = tuple(
 
 @event.listens_for(Session, "before_flush")
 def reject_stage2_judgment_mutation(session: Session, _flush_context: object, _instances: object) -> None:
-    for row in session.deleted:
-        if isinstance(row, STAGE2_JUDGMENT_MODELS):
-            raise EvidenceLedgerImmutableError(f"{type(row).__name__} rows are append-only and cannot be deleted.")
-    for row in session.dirty:
-        if isinstance(row, STAGE2_JUDGMENT_MODELS) and session.is_modified(row, include_collections=False):
-            raise EvidenceLedgerImmutableError(f"{type(row).__name__} rows are append-only and cannot be updated.")
+    reject_append_only_mutation(session, STAGE2_JUDGMENT_MODELS)

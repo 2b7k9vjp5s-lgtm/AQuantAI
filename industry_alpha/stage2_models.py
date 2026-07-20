@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from backend.database.models import Base, IDENTITY_TYPE
-from industry_alpha.errors import EvidenceLedgerImmutableError
+from industry_alpha.orm_append_only import reject_append_only_mutation
 
 
 class Stage2CompanyResearch(Base):
@@ -398,15 +398,4 @@ def reject_stage2_mutation(
     session: Session, _flush_context: object, _instances: object
 ) -> None:
     """Reject ordinary ORM updates and deletes for accepted Stage 2 rows."""
-    for row in session.deleted:
-        if isinstance(row, STAGE2_MODELS):
-            raise EvidenceLedgerImmutableError(
-                f"{type(row).__name__} rows are append-only and cannot be deleted."
-            )
-    for row in session.dirty:
-        if isinstance(row, STAGE2_MODELS) and session.is_modified(
-            row, include_collections=False
-        ):
-            raise EvidenceLedgerImmutableError(
-                f"{type(row).__name__} rows are append-only and cannot be updated."
-            )
+    reject_append_only_mutation(session, STAGE2_MODELS)

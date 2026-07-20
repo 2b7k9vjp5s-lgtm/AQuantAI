@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect as pyinspect
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,8 @@ from sqlalchemy.pool import StaticPool
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
 from industry_alpha.errors import EvidenceLedgerImmutableError
+import industry_alpha.orm_append_only as orm_append_only
+from industry_alpha.orm_append_only import reject_append_only_mutation
 import industry_alpha.stage2_assessments_models as v06c
 import industry_alpha.stage2_expectations_models as v06b
 from industry_alpha.stage2_judgments_fixtures import build_stage2_judgment_fixture
@@ -345,3 +348,72 @@ def test_global_listener_applies_to_custom_session_subclass(lifecycle_store):
             "Stage2CompanyResearch rows are append-only and cannot be updated."
         )
         session.rollback()
+
+
+class _HelperModel:
+    pass
+
+
+class _OtherModel:
+    pass
+
+
+class _FakeSession:
+    def __init__(self, *, deleted=(), dirty=(), modified=()):
+        self.deleted = tuple(deleted)
+        self.dirty = tuple(dirty)
+        self.new = (object(),)
+        self._modified = set(modified)
+        self.modified_calls = []
+
+    def is_modified(self, row, *, include_collections):
+        self.modified_calls.append((row, include_collections))
+        return row in self._modified
+
+
+def test_neutral_helper_checks_delete_before_dirty_and_preserves_exact_error():
+    deleted = _HelperModel()
+    dirty = _HelperModel()
+    session = _FakeSession(deleted=(deleted,), dirty=(dirty,), modified=(dirty,))
+
+    with pytest.raises(EvidenceLedgerImmutableError) as captured:
+        reject_append_only_mutation(session, (_HelperModel,))
+
+    assert type(captured.value) is EvidenceLedgerImmutableError
+    assert str(captured.value) == (
+        "_HelperModel rows are append-only and cannot be deleted."
+    )
+    assert session.modified_calls == []
+
+
+def test_neutral_helper_preserves_exact_update_error():
+    dirty = _HelperModel()
+    session = _FakeSession(dirty=(dirty,), modified=(dirty,))
+
+    with pytest.raises(EvidenceLedgerImmutableError) as captured:
+        reject_append_only_mutation(session, (_HelperModel,))
+
+    assert type(captured.value) is EvidenceLedgerImmutableError
+    assert str(captured.value) == (
+        "_HelperModel rows are append-only and cannot be updated."
+    )
+    assert session.modified_calls == [(dirty, False)]
+
+
+def test_neutral_helper_returns_none_for_noop_pending_and_unmodified_state():
+    dirty = _HelperModel()
+    other = _OtherModel()
+    session = _FakeSession(deleted=(other,), dirty=(dirty, other), modified=(other,))
+
+    assert reject_append_only_mutation(session, (_HelperModel,)) is None
+    assert session.modified_calls == [(dirty, False)]
+    assert session.new
+
+
+def test_neutral_helper_module_has_no_event_or_stage2_ownership():
+    source = pyinspect.getsource(orm_append_only)
+    assert "event.listens_for" not in source
+    assert "industry_alpha.stage2" not in source
+    assert not any(name.startswith("STAGE2_") for name in vars(orm_append_only))
+    assert "Session" in vars(orm_append_only)
+    assert "reject_append_only_mutation" in vars(orm_append_only)
