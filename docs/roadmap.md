@@ -7,7 +7,7 @@
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
 - Provider-status synchronization base: `ca2a9fa0ca4daea6b7318a50851272b74c4dc115`.
-- Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
+- Accepted application/consolidation implementation baseline: `7705b7caf210d606473db6f24c5fadfad4918646`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
@@ -33,8 +33,11 @@ These capabilities remain research-only, cutoff-aware and non-advisory. They do 
 - PR #93 characterized v0.6B-v0.6D evidence read serialization and accepted the decision to keep the serializers local.
 - PRs #97/#99 characterized and implemented neutral Stage 2 SQLAlchemy integrity translation.
 - PRs #103/#105 characterized and implemented the neutral process-local Stage 2 revision-lock registry.
+- PR #117 characterized Stage 2 ORM lifecycle behavior.
+- PR #119 committed and accepted the SQLite/subprocess/PostgreSQL lifecycle compatibility matrix.
+- PR #121 implemented the neutral Stage 2 append-only mutation scan and merged as `7705b7caf210d606473db6f24c5fadfad4918646`.
 
-The neutral integrity helper catches only `IntegrityError`, preserves the exact caller-owned message and original cause, and performs no transaction, rollback, retry or constraint-classification work. The neutral revision-lock helper owns only the guarded process-local `(kind, UUID) -> RLock` registry. It preserves all eight kind labels and lock -> integrity translator -> transaction nesting, adds no cross-process or cross-host guarantee, and has no cleanup or eviction policy. Command modules still own transaction boundaries, conflict wording, row locks, latest-revision reads, revision-number allocation, supersession and retry.
+The neutral integrity helper catches only `IntegrityError`, preserves the exact caller-owned message and original cause, and performs no transaction, rollback, retry or constraint-classification work. The neutral revision-lock helper owns only the guarded process-local `(kind, UUID) -> RLock` registry. The neutral append-only helper owns only delete-before-dirty scanning, tuple membership, material-dirty detection and exact immutable messages. All four decorators, listeners, tuples, dynamic factories and generated globals remain domain-local. Command modules still own transaction boundaries, conflict wording, row locks, latest-revision reads, revision-number allocation, supersession and retry.
 
 No schema, migration, public API, fixture, domain-semantic or released-version change resulted from these consolidation reviews.
 
@@ -56,23 +59,19 @@ Issue #70 and PR #71 for v0.6E price judgment remain superseded and closed witho
 
 No v0.6E implementation or migration is authorized.
 
-## Remaining Stage 2 consolidation candidates
+## Deferred Stage 2 ORM work
 
-1. append-only listener registration and dynamic link-model construction.
+Listener/decorator/tuple relocation and v0.6C/v0.6D dynamic link-model factory consolidation have no current Definition of Ready. Explicit reload support, database triggers and Core-DML interception also remain unauthorized. The accepted helper does not change event registration, mapper identity or domain ownership.
 
-The next gate is an independent ORM lifecycle characterization of item 1. It must inventory dynamic link-model factories, append-only listener registration, mapper/event registration, import-order behavior, duplicate-listener risk, metadata/model identity, test isolation and supported-database behavior before any implementation decision. Dynamic model factories and listeners remain unimplemented.
-
-Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs. Integrity translation and the process-local lock registry are completed and do not authorize changes to row locks, allocation, supersession, cleanup/eviction or retry behavior.
+Evidence read serializer implementation is not a remaining candidate unless a documented re-evaluation trigger from PR #93 occurs. Integrity translation, the process-local lock registry and the pure append-only scan are completed and do not authorize changes to row locks, allocation, supersession, cleanup/eviction, retry, event registration or mapped-class ownership.
 
 ## Prospective sequence
 
-1. characterize ORM lifecycle concerns;
-2. implement ORM changes only if a smaller neutral contract preserves mapper/event behavior and reaches Definition of Ready;
-3. decide whether canonical market-price evidence has independent user value;
-4. decide whether valuation observations need comparison-eligibility semantics;
-5. re-evaluate whether price judgment needs persisted state or a deterministic read model;
-6. only then reconsider v0.7 Watchlist and later portfolio work;
-7. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
+1. characterize whether canonical market-price evidence has independent user value and define value normalization, measurement, provenance, chronology, adjustment, comparison and missing-data semantics;
+2. decide whether valuation observations need comparison-eligibility semantics;
+3. re-evaluate whether price judgment needs persisted state or a deterministic read model;
+4. only then reconsider v0.7 Watchlist and later portfolio work;
+5. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
 
 Every item requires separate Architecture Preflight and GitHub authorization.
 
@@ -80,7 +79,7 @@ Every item requires separate Architecture Preflight and GitHub authorization.
 
 - evidence serializer extraction or projection DTOs;
 - row-lock, latest-revision, revision-allocation, supersession, cleanup/eviction or retry refactoring without accepted characterization;
-- append-only-listener or dynamic model-factory refactoring;
+- listener/decorator/tuple relocation, dynamic model-factory consolidation, explicit reload support, database triggers or Core-DML interception;
 - provider implementation, live request, secret, dependency, ingestion script, fixture or default-provider change;
 - silent provider fallback, relabeling, row-level mixing or MCP/LLM canonical ingestion;
 - v0.6D query-value policy changes;
