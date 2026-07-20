@@ -7,11 +7,11 @@ This document is the authoritative architecture and current-state baseline. `.co
 - Released software version: `0.2.0`.
 - Merged capability stage: v0.6D.
 - Provider-status synchronization base: `ca2a9fa0ca4daea6b7318a50851272b74c4dc115`.
-- Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
+- Accepted application/consolidation implementation baseline: `7705b7caf210d606473db6f24c5fadfad4918646`.
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured.
 - Active application, consolidation implementation or migration authorization: none.
 
-Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 kept evidence read serializers domain-local; PRs #97/#99 characterized and implemented command integrity translation; PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry; PR #109 characterized Hithink as the preferred future A-share provider candidate.
+Docs-only commits may advance `main` without changing release, capability or runtime behavior. PR #73 established the unified baseline; PR #75 characterized Stage 2 consolidation; PR #77 extracted the neutral frozen boundary; PR #83 implemented the neutral ordered-row primitive; PR #89 implemented the accepted v0.6A-v0.6C query-value boundary; PR #93 kept evidence read serializers domain-local; PRs #97/#99 characterized and implemented command integrity translation; PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry; PR #109 characterized Hithink as the preferred future A-share provider candidate; PRs #117/#119 characterized and fixed the ORM lifecycle compatibility matrix; PR #121 implemented the neutral append-only mutation scan.
 
 ## Product boundary
 
@@ -45,15 +45,16 @@ Issue #112 and Draft PR #113 explored only a credential-safe contract probe. The
 
 No Hithink code, dependency, runtime/default-provider change, database/schema change or migration reached `main`. AKShare remains the implemented controlled provider path. Hithink is a deferred future candidate and may be reconsidered only through a new Architecture Preflight and explicit authorization.
 
-Five neutral Stage 2 infrastructure boundaries are accepted:
+Six neutral Stage 2 infrastructure boundaries are accepted:
 
 - `industry_alpha.stage2_boundary` owns exact shared v0.6A/v0.6B frozen-boundary mechanics used by v0.6C and v0.6D;
 - `industry_alpha.stage2_repository_rows` owns stateless ordered scalar row loading used through repository-local wrappers;
 - `industry_alpha.stage2_query_values` owns required UTC normalization, date-granular visibility and timestamp/date/UUID formatting used by v0.6A-v0.6C query modules;
 - `industry_alpha.stage2_integrity` owns stateless SQLAlchemy `IntegrityError` translation to `EvidenceLedgerConflictError` while preserving the caller-provided message and original cause.
 - `industry_alpha.stage2_revision_locks` owns only the guarded process-local `(kind, UUID) -> RLock` registry shared by v0.6A-v0.6D commands.
+- `industry_alpha.orm_append_only` owns only delete-before-dirty scanning, `isinstance` tuple membership, material-dirty detection with `include_collections=False`, and the existing exact `EvidenceLedgerImmutableError` messages.
 
-Domain semantics remain local. Repository graph assembly, optional-ID normalization, link-field selection, missing-parent policy, sessions and transactions remain repository-local. Evidence read serialization, claim projection, missing-evidence wording, link selection, payload sorting, notices, aggregate errors and v0.6D timestamp-null policy remain query-module-local by the accepted PR #93 decision. Command modules retain the eight exact lock-kind strings and lock -> integrity translator -> transaction placement, conflict-message policy, transaction boundaries, rollback ownership, database row locks, latest-revision reads, revision-number allocation, supersession and retry policy. The shared registry has no cleanup or eviction and provides no cross-process or cross-host guarantee.
+Domain semantics remain local. Repository graph assembly, optional-ID normalization, link-field selection, missing-parent policy, sessions and transactions remain repository-local. Evidence read serialization, claim projection, missing-evidence wording, link selection, payload sorting, notices, aggregate errors and v0.6D timestamp-null policy remain query-module-local by the accepted PR #93 decision. Command modules retain the eight exact lock-kind strings and lock -> integrity translator -> transaction placement, conflict-message policy, transaction boundaries, rollback ownership, database row locks, latest-revision reads, revision-number allocation, supersession and retry policy. The shared registry has no cleanup or eviction and provides no cross-process or cross-host guarantee. The four `Session.before_flush` decorators, listener identities/signatures, registration modules and model tuples remain domain-local and delegate only their duplicated scan to `reject_append_only_mutation`. The v0.6C/v0.6D dynamic factories and generated globals also remain domain-local.
 
 The current implementable path does not include v0.6E price judgment, timing judgment, Watchlist tasks, Paper Portfolio, simulated trades, portfolio analysis or Quant Core workflow state. Issue #70 and PR #71 remain superseded and closed without merge.
 
@@ -88,6 +89,7 @@ The current implementable path does not include v0.6E price judgment, timing jud
 | Evidence read serialization | v0.6B-v0.6D domain query modules | Reviewed in PR #93 and intentionally remains local |
 | SQLAlchemy integrity translation | `stage2_integrity.py` | Translate only `IntegrityError`; exact messages and transaction ownership remain command-local |
 | Process-local revision-lock registry | `stage2_revision_locks.py` | Guarded exact `(kind, UUID)` keys and reentrant lock identity only; eight kinds and call placement remain caller-owned |
+| Stage 2 append-only ORM mutation scan | `orm_append_only.py` | Delete-before-dirty scan, tuple membership, material-dirty check and exact immutable messages only; decorators, listeners and tuples remain domain-local |
 | Revision allocation and database lock strategy | Stage 2 command modules | Row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry remain command-local |
 | “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities |
 
@@ -116,7 +118,7 @@ A linked local `daily_price` row remains provenance/context. It is not a canonic
 - **D2 Repeated Stage 2 structure — partially reduced:** frozen-boundary and ordered-row mechanics are consolidated; generic graph loading remains unjustified.
 - **D3 Read utilities — reviewed:** v0.6A-v0.6C pure query values are consolidated. Evidence serializers remain local because no neutral claim contract reaches Definition of Ready; v0.6D query-value policy remains local.
 - **D4 Command lifecycle and concurrency — partially reduced:** integrity translation and the process-local lock registry are consolidated; row locks, latest-revision reads, allocation, supersession, cleanup/eviction and retry remain command-local.
-- **D5 ORM lifecycle — next characterization gate:** dynamic link-model factories and append-only listeners are mapper/event sensitive; no implementation is authorized before characterization.
+- **D5 ORM lifecycle — bounded work complete:** PR #119 fixes the accepted listener/import/mapper/metadata/SQLite/PostgreSQL matrix, and PR #121 extracts only the neutral mutation scan. Event decorators, listener identities, model tuples, dynamic factories and generated globals remain domain-local; relocation, reload support, database triggers and Core-DML interception remain deferred.
 - **D6 Test-matrix growth:** shared invariant tests and domain-semantic tests must remain distinct.
 - **D7 Fixture-versus-production reachability — deferred:** the reviewed offline Hithink probe did not establish live contract, permission or data-use acceptance; a future provider attempt requires new preflight.
 - **D8 Missing canonical market-price semantics:** `DailyPriceRecord` is not a complete arbitrary price-comparison evidence object.
@@ -146,15 +148,16 @@ Completed:
 9. revision-lock characterization and implementation — Issues #102/#104 and PRs #103/#105.
 10. Hithink provider characterization — Issue #108 and PR #109; preferred future candidate, no implementation authorization.
 11. Hithink probe technical review — Issue #112 / PR #113; closed without merge after integration was deferred.
+12. ORM lifecycle characterization and committed compatibility matrix — PRs #117/#119.
+13. neutral append-only mutation-scan implementation — PR #121, merged as `7705b7caf210d606473db6f24c5fadfad4918646`.
 
 Current authorization state: no application feature, consolidation implementation or migration is authorized.
 
 Prospective and separately authorized:
 
-12. characterize ORM lifecycle concerns without implementing dynamic model factories or append-only listeners;
-13. decide whether canonical market-price evidence has independent user value;
-14. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
-15. do not start v0.7 until required upstream contracts and consolidation reviews are accepted;
-16. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
+14. characterize whether canonical market-price evidence has independent user value and define its ownership and point-in-time semantics;
+15. only then consider valuation comparison eligibility and whether price judgment needs persisted state or a deterministic read model;
+16. do not start v0.7 until required upstream contracts and consolidation reviews are accepted;
+17. reconsider Hithink only through a new Architecture Preflight and explicit authorization.
 
 No prospective item is authorized by this document alone.

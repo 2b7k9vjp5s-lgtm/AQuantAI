@@ -5,24 +5,28 @@
 - Original characterization: Issue #116 / PR #117.
 - Accepted characterization merge: `2fb24eadf7285000fdb0c2ef7ebc1d84f87c8908`.
 - Compatibility-matrix follow-up: Issue #118 / PR #119.
-- Work type: test-only consolidation prerequisite plus documentation decision.
+- Accepted compatibility-matrix merge: `e0644de3ea7c3afaeba8da483fef800c2c90f197`.
+- Accepted helper implementation: Issue #120 / PR #121, fixed head `3d41a3f238a994aba172bd824d704d0fc11091cc`, merge `7705b7caf210d606473db6f24c5fadfad4918646`.
+- Work type: accepted characterization, compatibility matrix and bounded source-only consolidation implementation.
 - Released version remains `0.2.0`; merged capability remains v0.6D.
-- Accepted application/consolidation implementation baseline remains
-  `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`.
+- Accepted application/consolidation implementation baseline is
+  `7705b7caf210d606473db6f24c5fadfad4918646`.
 - Migration, dependency, schema, API and runtime decisions: no change.
 
 Issue #116 established that current behavior is stable on supported cached-import
-paths but had no committed lifecycle compatibility matrix. Issue #118 adds that
-matrix without changing production ORM code.
+paths but had no committed lifecycle compatibility matrix. Issue #118 added and
+accepted that matrix without changing production ORM code. Issue #120 then
+implemented its one bounded candidate without changing event or mapper ownership.
 
 The post-matrix architecture decision is deliberately narrow:
 
-- a pure mutation-scan helper reaches Definition of Ready as one later,
-  independently authorized source-only candidate;
+- `industry_alpha.orm_append_only.reject_append_only_mutation(session, model_types)`
+  is the accepted neutral mutation-scan boundary;
 - all four listener decorators, listener function identities, model tuples,
   dynamic mapped-class factories and generated class globals remain local to
   their current domain modules;
-- no implementation is authorized by this report or by PR #119.
+- listener relocation, tuple relocation, dynamic factory consolidation, explicit
+  reload support, database triggers and Core-DML interception remain unauthorized.
 
 ## Current module and registration matrix
 
@@ -49,8 +53,9 @@ The four tuples and the Alembic model set contain exactly 53 `stage2_` tables.
 
 ## Append-only behavior contract
 
-Each current listener has the same ordered behavior while retaining a distinct
-module-local function object and tuple:
+Each current listener retains its distinct module-local decorator, function
+object, signature and tuple, and delegates the following ordered behavior to
+`reject_append_only_mutation(session, model_types)`:
 
 1. inspect `session.deleted` first;
 2. when a deleted row belongs to the local tuple, raise the exact
@@ -190,32 +195,30 @@ record; unavailable counts must not be guessed in this architecture document.
 7. The append-only guard remains an ORM unit-of-work boundary, not a database
    trigger or general Core-DML interceptor.
 
-## Candidate classification after the matrix
+## Candidate status after PR #121
 
 | Candidate | Decision | Reason |
 | --- | --- | --- |
 | Move all four decorated listeners to one module | Deferred | Would change registration trigger, function identity and import reach |
-| Extract only the repeated mutation scan into a pure helper | Bounded later implementation candidate | Preserves local decorators, tuples, order, messages and flush timing while removing only duplicated loops |
+| Extract only the repeated mutation scan into a pure helper | Implemented and accepted | PR #121 preserves local decorators, tuples, order, messages and flush timing while removing only duplicated loops |
 | Consolidate v0.6C/v0.6D `_link_model` factories | Deferred | Would change mapped-class ownership, globals, import timing and possibly mapper/table identity |
 | Move model tuples or evidence-link mixins | Keep domain-local | They define exact accepted domain membership and import identity |
 | Add database triggers or Core-DML interception | Not authorized | This would create a different persistence contract and require separate characterization |
 
-## Definition of Ready decision
+## Accepted helper implementation
 
-One and only one source-only candidate reaches Definition of Ready: a pure
-append-only mutation-scan helper.
+The one source-only candidate accepted by PR #119 was implemented by PR #121.
+No additional ORM lifecycle implementation reaches Definition of Ready.
 
 ### Exact neutral owner and contract
 
-A later independently authorized implementation may introduce one neutral module,
-provisionally `industry_alpha/orm_append_only.py`, containing a function with the
-following bounded responsibility:
+The neutral owner is `industry_alpha/orm_append_only.py`, containing:
 
 ```python
 reject_append_only_mutation(session, model_types)
 ```
 
-Its contract must be limited to the current repeated algorithm:
+Its accepted contract is limited to the extracted algorithm:
 
 - accept the active SQLAlchemy `Session` and an explicit domain-owned tuple of
   mapped classes;
@@ -235,20 +238,13 @@ The helper must not:
 - inspect or intercept Core DML;
 - catch, translate or wrap the immutable error.
 
-### Required later file family
+### Preserved domain-local ownership
 
-A later implementation Issue may authorize only a bounded source-and-test family:
-
-1. one new neutral helper module;
-2. the four current Stage 2 model modules, changing only each listener body to
-   delegate with its existing local tuple;
-3. the committed non-PostgreSQL lifecycle contract test;
-4. the committed PostgreSQL lifecycle contract test;
-5. this characterization document if a status update is required.
-
-The four decorated listener function names, decorator locations and tuples must
-remain in their current modules. Dynamic factories and generated globals are not
-part of that implementation candidate.
+PR #121 changed only each listener's duplicated loop body to delegate to the
+helper. The four decorated listener function names/signatures, decorator
+locations, registration modules and tuples remain in their current modules.
+Dynamic factories and generated globals remain domain-local and were not part of
+the implementation.
 
 ### Rollback and migration
 
@@ -256,20 +252,20 @@ part of that implementation candidate.
 - Persisted schema: unchanged.
 - Dependency: unchanged.
 - Data repair: none.
-- Rollback: source reversion to the four current local loop bodies.
+- Rollback: source reversion to the four pre-PR #121 local loop bodies; no data
+  repair is required.
 
-## Validation gate for PR #119
+## Accepted validation records
 
-Acceptance requires all of the following on one fixed head:
+PR #119 was accepted at fixed head `905fce200a6d3d47519a0512ef52fb59b6de813b`.
+Actions `29715627495` completed its PostgreSQL 16 service, full test step,
+fixture demo and cleanup successfully. Exact counts were unavailable and are not
+guessed.
 
-- exactly the four Issue #118 authorized files;
-- focused lifecycle tests;
-- full `python -m pytest -q`;
-- `python -m scripts.demo_research_flow`;
-- `git diff --check` or equivalent whitespace-error inspection;
-- GitHub Actions success with its PostgreSQL service;
-- no hidden warning or skip reclassification;
-- no production, fixture, dependency, schema, migration or runtime change.
+PR #121 was accepted at fixed head `3d41a3f238a994aba172bd824d704d0fc11091cc`.
+Actions `29716094740`, job `88269576578`, completed its PostgreSQL 16 service,
+full test step, fixture demo and cleanup successfully. Exact counts were
+unavailable and are not guessed.
 
 ## Explicit non-goals
 

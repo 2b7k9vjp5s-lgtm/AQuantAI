@@ -4,13 +4,13 @@ GitHub Issues and pull-request reviews are authoritative. `docs/architecture_bas
 
 ## Current status
 
-- Review date: 2026-07-19
+- Review date: 2026-07-20
 - Released software version: `0.2.0`
 - Merged capability stage: v0.6D
 - Provider-status synchronization base: `ca2a9fa0ca4daea6b7318a50851272b74c4dc115`
-- Accepted application/consolidation implementation baseline: `cf3ad09c9f9fb39dbaada7342435a8c7b2853b1a`
+- Accepted application/consolidation implementation baseline: `7705b7caf210d606473db6f24c5fadfad4918646`
 - Runtime surfaces: local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured
-- Most recent accepted architecture characterization: Issue #108 / PR #109
+- Most recent accepted architecture characterization: Issue #118 / PR #119
 - Active application or consolidation implementation authorization: none
 - New migration authorization: none
 
@@ -28,6 +28,36 @@ Docs-only commits may advance `main` without changing release, capability or run
 - Issues #96/#98 and PRs #97/#99 characterized and implemented neutral command integrity translation.
 - Issues #102/#104 and PRs #103/#105 characterized and implemented the neutral process-local revision-lock registry.
 - Issue #108 / PR #109 characterized Hithink as the preferred future A-share provider candidate while retaining AKShare as an explicit separate alternative.
+- Issue #116 / PR #117 characterized Stage 2 ORM lifecycle behavior.
+- Issue #118 / PR #119 committed and accepted the ORM lifecycle compatibility matrix.
+- Issue #120 / PR #121 implemented the one accepted neutral append-only mutation-scan helper.
+
+## ORM lifecycle compatibility acceptance
+
+PR #119 was accepted at fixed head `905fce200a6d3d47519a0512ef52fb59b6de813b` and merged as `e0644de3ea7c3afaeba8da483fef800c2c90f197`.
+
+Independent review confirmed:
+
+- the matrix fixes four global `Session.before_flush` listeners, tuple sizes 11/10/14/18 and exactly 53 Stage 2 tables;
+- ordinary imports preserve listener, tuple, mapped-class, table and shared metadata identity;
+- one dirty-but-unmodified flush invokes each Stage 2 listener exactly once after repeated ordinary imports;
+- SQLite and custom-`Session` tests preserve pending/no-op, exact update/delete errors and rollback behavior;
+- PostgreSQL 16 verifies representative v0.6A-v0.6D update/delete rollback behavior;
+- dynamic v0.6C/v0.6D factories and generated globals remain domain-local;
+- Actions `29715627495` completed the full test step, PostgreSQL service, fixture demo and cleanup successfully. Exact counts are not guessed.
+
+## Append-only helper implementation acceptance
+
+PR #121 was accepted at fixed head `3d41a3f238a994aba172bd824d704d0fc11091cc` and merged as `7705b7caf210d606473db6f24c5fadfad4918646`.
+
+Independent review confirmed:
+
+- `industry_alpha.orm_append_only.reject_append_only_mutation(session, model_types)` owns only delete-before-dirty scanning, `isinstance`, material-dirty detection with `include_collections=False` and the exact existing immutable error messages;
+- all four event decorators, listener names/signatures and identities, registration modules and model tuples remain domain-local;
+- all mapped classes, dynamic factories and generated globals remain unchanged and domain-local;
+- explicit reload support, listener or tuple relocation, database triggers and Core-DML interception were not added;
+- Actions `29716094740`, job `88269576578`, completed PostgreSQL 16, the full test step, fixture demo and cleanup successfully. Exact counts are not guessed;
+- no migration, schema, dependency, API/runtime, provider, release/version, v0.6E, v0.7 or PR #38 change occurred.
 
 ## Command integrity implementation acceptance
 
@@ -102,15 +132,16 @@ Neutral ownership exists for:
 - ordered scalar repository row loading;
 - v0.6A-v0.6C pure query-value mechanics;
 - SQLAlchemy integrity-error translation;
-- the process-local keyed revision-lock registry.
+- the process-local keyed revision-lock registry;
+- the Stage 2 append-only ORM mutation scan.
 
-Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. With Hithink deferred, ORM lifecycle characterization is restored as the next project gate.
+Evidence read serialization intentionally remains domain-local. Command modules continue to own exact conflict text, transaction boundaries, row locks, latest-revision reads, revision-number allocation, supersession, cleanup/eviction and retry. ORM event decorators, listener identities, model tuples, dynamic factories and generated globals remain domain-local. The accepted lifecycle matrix and pure scan extraction complete the bounded ORM work; canonical market-price evidence characterization is the next independent gate.
 
 ## Locked exclusions
 
 - no evidence serializer extraction or projection DTOs without a re-evaluation trigger and new preflight;
 - no row-lock, latest-revision, revision-allocation, supersession, cleanup/eviction or retry refactor without accepted characterization;
-- no model-factory or append-only-listener refactor;
+- no listener/decorator/tuple relocation, dynamic model-factory consolidation, explicit reload support, database trigger or Core-DML interception;
 - no application/provider behavior change or migration;
 - no provider implementation, live request, secret, dependency, ingestion script, fixture or default-provider change;
 - no reopening of Hithink integration without new Architecture Preflight and explicit authorization;
@@ -122,6 +153,6 @@ Evidence read serialization intentionally remains domain-local. Command modules 
 
 ## Next development gate
 
-The next gate is a separate ORM lifecycle characterization of dynamic link-model factories and append-only listener registration. It must inventory mapper/event registration, import-order behavior, duplicate-listener risk, metadata/model identity, test isolation and supported-database behavior before any implementation decision.
+The next gate is a separately authorized, documentation-only characterization of canonical market-price evidence. It must decide whether a standalone canonical measurement has independent user value and inventory value/decimal normalization, measurement kind, unit/currency, provider/series/exact source-row provenance, observation date/time, information cutoff and point-in-time visibility, adjustment meaning, the relationship to `DailyPriceRecord` and v0.6B valuation observations, comparison eligibility and missing-data semantics.
 
-Characterization may conclude that the existing ORM-sensitive behavior should remain local. It does not authorize model, listener or runtime implementation. Canonical market-price evidence, v0.6E and v0.7 remain later and unauthorized. No Codex application implementation command is active after this synchronization.
+This synchronization does not authorize that characterization or any price model, migration, v0.6E or v0.7 implementation. No Codex application implementation command is active after this synchronization.
