@@ -170,8 +170,8 @@ The PostgreSQL contract uses the existing `TEST_DATABASE_URL` safety rule:
   error class and message at flush;
 - rollback preserves each row and original value.
 
-GitHub Actions run `29715168299` on fixed head
-`62a55448ac8ffcfb7e0468c68b1d45a1f8849878` provided PostgreSQL 16 and completed
+GitHub Actions run `29715274119` on fixed head
+`af250f0a2f1c8930922b6379e05b81aaaa241062` provided PostgreSQL 16 and completed
 the full test step, fixture demo and cleanup successfully. The connector did not
 expose the log-tail test counts, so no count is asserted here.
 
