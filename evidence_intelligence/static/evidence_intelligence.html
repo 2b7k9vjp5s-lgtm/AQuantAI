@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AQuantAI 研究变化</title>
+    <link rel="stylesheet" href="/evidence-intelligence/static/evidence_intelligence.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#research-feed">跳到研究变化列表</a>
+    <header class="site-header">
+      <div class="page-width header-grid">
+        <div>
+          <p class="eyebrow">Evidence Intelligence · 只读研究工作台</p>
+          <h1>研究变化</h1>
+          <p class="lede">集中查看最近录入的证据、研究案例修订、产业地图修订和公司研究修订，并区分信息日期与系统记录时间。</p>
+        </div>
+        <nav aria-label="AQuantAI 页面导航">
+          <a href="/dashboard">量化看板</a>
+          <a href="/market-cockpit">市场驾驶舱</a>
+          <a href="/docs">API 文档</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-width">
+      <section class="boundary-panel" aria-labelledby="boundary-title">
+        <div>
+          <p class="section-kicker">研究边界</p>
+          <h2 id="boundary-title">变化记录不是投资吸引力排序</h2>
+        </div>
+        <p>本页仅展示已经接受的证据与研究对象的时间线。更新更近、修订更多或证据等级更高，不代表股票更值得投资，也不构成买卖建议。</p>
+      </section>
+
+      <section class="filter-panel" aria-labelledby="filter-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">限定查询范围</p>
+            <h2 id="filter-title">筛选研究变化</h2>
+          </div>
+          <button id="reset-filters" class="button button-secondary" type="button">恢复默认</button>
+        </div>
+        <form id="feed-filters">
+          <div class="filter-grid">
+            <label>
+              <span>变化类型</span>
+              <select id="event-type" name="event_type">
+                <option value="">全部类型</option>
+                <option value="evidence">新增证据</option>
+                <option value="case_revision">研究案例修订</option>
+                <option value="industry_map_revision">产业地图修订</option>
+                <option value="company_research_revision">公司研究修订</option>
+              </select>
+            </label>
+            <label>
+              <span>记录起点</span>
+              <input id="recorded-from" name="recorded_from" type="datetime-local">
+            </label>
+            <label>
+              <span>记录终点</span>
+              <input id="recorded-to" name="recorded_to" type="datetime-local">
+            </label>
+            <label>
+              <span>研究截止日期</span>
+              <input id="as-of-cutoff" name="as_of_cutoff" type="date">
+            </label>
+            <label>
+              <span>每页数量</span>
+              <select id="limit" name="limit">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="button button-primary" type="submit">应用筛选</button>
+            <p class="form-note">默认读取最近 7 天，单次窗口最多 30 天。终点采用不包含边界。</p>
+          </div>
+        </form>
+      </section>
+
+      <section class="status-panel" aria-labelledby="status-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">当前查询</p>
+            <h2 id="status-title">时间范围与状态</h2>
+          </div>
+          <span id="status-badge" class="status-badge" data-state="loading">读取中</span>
+        </div>
+        <p id="load-status" role="status" aria-live="polite">正在读取本地研究变化。</p>
+        <p id="load-error" class="error-message" role="alert" hidden></p>
+        <dl id="query-metadata" class="metadata-grid"></dl>
+      </section>
+
+      <section id="research-feed" class="feed-panel" aria-labelledby="feed-title" tabindex="-1">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">按系统记录时间倒序</p>
+            <h2 id="feed-title">研究变化时间线</h2>
+          </div>
+        </div>
+        <div id="empty-state" class="empty-state" hidden>
+          <h3>当前范围内没有记录</h3>
+          <p>系统不会自动回退到更早的数据。可调整时间范围后重新查询。</p>
+        </div>
+        <ol id="feed-list" class="feed-list" aria-live="polite"></ol>
+        <div class="pagination-bar">
+          <button id="load-more" class="button button-secondary" type="button" hidden>加载更多</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="page-width">
+        <h2>本地、只读、可追溯</h2>
+        <p>页面不会连接券商、执行交易、生成目标价或隐藏调用外部数据源。所有展示内容应回到对应的证据、修订和截止时间核验。</p>
+      </div>
+    </footer>
+
+    <script src="/evidence-intelligence/static/evidence_intelligence.js" defer></script>
+  </body>
+</html>
