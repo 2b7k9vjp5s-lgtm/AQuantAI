@@ -8,6 +8,7 @@
 - Architecture: Issue #164 / PR #165 fixed head `67fbf8dbe8577d0c33078ae6bff562a72b4277aa`
 - Owner authorized implementation start on 2026-07-21.
 - Issue #168 comments authorize the lower-risk API split at `backend/api/beneficiary_semantics.py` plus minimal registration in `backend/main.py`.
+- Issue #168 comments authorize assertion-only Alembic head compatibility updates in five existing migration round-trip tests.
 
 Implementation may proceed before PR #165 merges, but this implementation may not merge until the architecture fixed head is independently approved and the implementation fixed head is independently reviewed.
 
@@ -23,7 +24,8 @@ Add one append-only semantic profile layer for an explicit existing Stage 1 bene
 - `backend/api/beneficiary_semantics.py` and the minimal router registration in `backend/main.py`;
 - `scripts/record_beneficiary_semantics.py` and command documentation;
 - minimal `industry_research/static/industry_research.html` and `.js` integration;
-- `tests/test_beneficiary_semantics*.py`.
+- `tests/test_beneficiary_semantics*.py`;
+- assertion-only head-version updates in `tests/test_benchmark_migration.py`, `tests/test_sector_migration.py`, `tests/test_stage1_beneficiaries_postgres.py`, `tests/test_stage2_company_research_postgres.py`, and `tests/test_stage2_expectations_valuation_postgres.py`.
 
 ## Required invariants
 
