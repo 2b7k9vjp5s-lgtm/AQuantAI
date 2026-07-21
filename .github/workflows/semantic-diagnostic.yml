@@ -1,0 +1,24 @@
+name: Semantic Diagnostic
+
+on:
+  pull_request:
+
+jobs:
+  focused-semantic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies quietly
+        run: python -m pip install -q -e ".[dev]"
+      - name: Run focused semantic tests
+        run: >-
+          python -m pytest -q
+          tests/test_beneficiary_semantics.py
+          tests/test_beneficiary_semantics_api.py
+          tests/test_beneficiary_semantics_migration.py
+          --tb=short
