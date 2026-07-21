@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
+from backend.api.industry_research import router as industry_research_router
 from backend.api.market_cockpit import router as market_cockpit_router
 from dashboard import build_dashboard_overview, build_dashboard_report
 
@@ -20,6 +21,9 @@ MARKET_COCKPIT_STATIC_DIR = Path(__file__).resolve().parents[1] / "market_cockpi
 EVIDENCE_INTELLIGENCE_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "evidence_intelligence" / "static"
 )
+INDUSTRY_RESEARCH_STATIC_DIR = (
+    Path(__file__).resolve().parents[1] / "industry_research" / "static"
+)
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
 app.mount(
     "/market-cockpit/static",
@@ -31,9 +35,15 @@ app.mount(
     StaticFiles(directory=EVIDENCE_INTELLIGENCE_STATIC_DIR),
     name="evidence-intelligence-static",
 )
+app.mount(
+    "/industry-research/static",
+    StaticFiles(directory=INDUSTRY_RESEARCH_STATIC_DIR),
+    name="industry-research-static",
+)
 app.include_router(market_cockpit_router)
 app.include_router(industry_alpha_router)
 app.include_router(evidence_intelligence_router)
+app.include_router(industry_research_router)
 
 
 @app.get("/")
@@ -81,5 +91,14 @@ def evidence_intelligence_page() -> FileResponse:
     """Serve the read-only Evidence Intelligence research-change page."""
     return FileResponse(
         EVIDENCE_INTELLIGENCE_STATIC_DIR / "evidence_intelligence.html",
+        media_type="text/html",
+    )
+
+
+@app.get("/industry-research", include_in_schema=False)
+def industry_research_page() -> FileResponse:
+    """Serve the read-only Industry Beneficiary Workspace page."""
+    return FileResponse(
+        INDUSTRY_RESEARCH_STATIC_DIR / "industry_research.html",
         media_type="text/html",
     )

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AQuantAI 产业研究</title>
+    <link rel="stylesheet" href="/industry-research/static/industry_research.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#beneficiary-table">跳到已录入受益公司全量</a>
+    <header class="site-header">
+      <div class="page-width header-grid">
+        <div>
+          <p class="eyebrow">Industry Research · 只读研究工作台</p>
+          <h1>产业受益公司研究</h1>
+          <p class="lede">选择一张已持久化产业地图，查看截止日期可见的产业观察、Stage 1 受益公司和已有 Stage 2 财务传导研究。</p>
+        </div>
+        <nav aria-label="AQuantAI 页面导航">
+          <a href="/evidence-intelligence">研究变化</a>
+          <a href="/dashboard">量化看板</a>
+          <a href="/docs">API 文档</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-width">
+      <section class="boundary-panel" aria-labelledby="boundary-title">
+        <div>
+          <p class="section-kicker">研究边界</p>
+          <h2 id="boundary-title">已录入受益公司全量，不是全市场排名</h2>
+        </div>
+        <p>本页只展示所选产业地图下、研究截止日期可见且已经持久化的 Stage 1 公司。原始 <code>direct / secondary / potential</code> 是分析性研究状态，不是推荐、评分或最终四级分类。</p>
+      </section>
+
+      <section class="panel" aria-labelledby="selector-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">明确选择</p>
+            <h2 id="selector-title">产业地图与研究截止</h2>
+          </div>
+          <span id="status-badge" class="status-badge" data-state="idle">等待选择</span>
+        </div>
+        <form id="workspace-form" class="selector-form">
+          <label>
+            <span>产业地图</span>
+            <select id="map-select" name="map_id" required>
+              <option value="">请选择产业地图</option>
+            </select>
+          </label>
+          <label>
+            <span>研究截止日期</span>
+            <input id="cutoff-input" name="as_of_cutoff" type="date">
+          </label>
+          <button class="button button-primary" type="submit">读取工作台</button>
+        </form>
+        <p id="load-status" role="status" aria-live="polite">正在读取可选产业地图。</p>
+        <p id="load-error" class="error-message" role="alert" hidden></p>
+      </section>
+
+      <section id="map-summary-panel" class="panel" aria-labelledby="map-summary-title" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">系统持久化事实</p>
+            <h2 id="map-summary-title">产业地图摘要</h2>
+          </div>
+        </div>
+        <dl id="map-summary" class="metadata-grid"></dl>
+      </section>
+
+      <section id="observations-panel" class="panel" aria-labelledby="observations-title" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">冻结产业观察</p>
+            <h2 id="observations-title">驱动、瓶颈与利润池迁移</h2>
+          </div>
+        </div>
+        <div id="observations" class="card-grid"></div>
+        <div class="evidence-summary">
+          <h3>地图证据状态</h3>
+          <dl id="map-evidence-summary" class="metadata-grid"></dl>
+        </div>
+      </section>
+
+      <section id="beneficiaries-panel" class="panel" aria-labelledby="beneficiaries-title" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">中性排序：分类、来源、代码、UUID</p>
+            <h2 id="beneficiaries-title">已录入受益公司全量</h2>
+          </div>
+          <span id="beneficiary-count" class="count-badge">0 家</span>
+        </div>
+        <div id="empty-state" class="empty-state" hidden>
+          <h3>当前截止日期没有已录入受益公司</h3>
+          <p>系统不会回退到候选池、全股票列表或其他产业地图。</p>
+        </div>
+        <div class="table-wrap">
+          <table id="beneficiary-table">
+            <thead>
+              <tr>
+                <th scope="col">公司</th>
+                <th scope="col">现有 Stage 1 分类</th>
+                <th scope="col">研究状态</th>
+                <th scope="col">分类依据</th>
+                <th scope="col">研究截止 / 记录时间</th>
+                <th scope="col">财务传导研究</th>
+                <th scope="col">详情</th>
+              </tr>
+            </thead>
+            <tbody id="beneficiary-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="detail-panel" class="panel detail-panel" aria-labelledby="detail-title" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">按需加载精确图</p>
+            <h2 id="detail-title">公司研究详情</h2>
+          </div>
+          <button id="close-detail" class="button button-secondary" type="button">关闭详情</button>
+        </div>
+        <p id="detail-status" role="status" aria-live="polite"></p>
+        <div class="detail-grid">
+          <article>
+            <h3>Stage 1 分类、证据、冲突与缺失证据</h3>
+            <pre id="beneficiary-detail" tabindex="0"></pre>
+          </article>
+          <article>
+            <h3>Stage 2 财务传导研究</h3>
+            <pre id="company-detail" tabindex="0"></pre>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel boundary-list" aria-labelledby="unsupported-title">
+        <p class="section-kicker">未建模 / 不可用</p>
+        <h2 id="unsupported-title">当前切片不生成的新语义</h2>
+        <ul>
+          <li>不把 <code>direct / secondary / potential</code> 映射为最终四级分类。</li>
+          <li>不从文本推断客户、认证、产能、投产或订单阶段。</li>
+          <li>不计算估值、机会分、强度分、目标价、收益预测或交易信号。</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="page-width">
+        <h2>本地、只读、精确修订绑定</h2>
+        <p>Stage 2 只通过持久化的受益公司身份与冻结修订关联。历史修订差异会明确展示，不会自动重绑到最新结论。</p>
+      </div>
+    </footer>
+
+    <script src="/industry-research/static/industry_research.js" defer></script>
+  </body>
+</html>
