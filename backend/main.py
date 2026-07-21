@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend.api.beneficiary_semantics import router as beneficiary_semantics_router
 from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
@@ -51,6 +52,7 @@ app.mount(
 )
 app.include_router(market_cockpit_router)
 app.include_router(industry_alpha_router)
+app.include_router(beneficiary_semantics_router)
 app.include_router(evidence_intelligence_router)
 app.include_router(industry_research_router)
 app.include_router(company_research_router)
