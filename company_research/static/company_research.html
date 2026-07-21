@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>公司研究工作台 · AQuantAI</title>
+  <link rel="stylesheet" href="/company-research/static/company_research.css">
+  <script src="/company-research/static/company_research.js" defer></script>
+</head>
+<body>
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">AQuantAI · Company Research Workspace v1</p>
+      <h1>公司研究工作台</h1>
+      <p class="lead">明确选择一条已持久化的公司研究身份，阅读其冻结的产业背景、财务传导假设、市场预期、估值观察、催化剂、风险与质量判断。</p>
+    </div>
+    <aside class="boundary" aria-label="研究边界">
+      <strong>只读研究边界</strong>
+      <span>不是全市场排名，不生成评分、目标价、预期收益、买卖建议或好价格/好时机判断。</span>
+    </aside>
+  </header>
+
+  <main>
+    <section class="panel controls" aria-labelledby="selector-title">
+      <div>
+        <h2 id="selector-title">选择公司研究</h2>
+        <p>唯一身份为 <code>company_research_id</code>。页面不会根据股票代码、名称或相似文本自动推断。</p>
+      </div>
+      <div class="control-grid">
+        <label>
+          公司研究
+          <select id="researchSelect">
+            <option value="">请选择公司研究</option>
+          </select>
+        </label>
+        <label>
+          信息截止日（可选）
+          <input id="cutoffInput" type="date">
+        </label>
+        <button id="loadButton" type="button">加载工作台</button>
+      </div>
+      <p id="selectorStatus" class="status" role="status" aria-live="polite">正在加载可选研究身份……</p>
+    </section>
+
+    <section id="workspaceState" class="panel state-panel" aria-live="polite">
+      <h2>尚未选择公司研究</h2>
+      <p>请先明确选择一条记录，再加载对应工作台。不会默认选择第一条。</p>
+    </section>
+
+    <section id="workspace" class="workspace" hidden>
+      <section class="panel" aria-labelledby="identity-title">
+        <div class="section-heading">
+          <div><p class="level">D0 · 持久化事实</p><h2 id="identity-title">身份与来源</h2></div>
+          <button id="researchDetailButton" class="secondary" type="button">查看完整公司研究图</button>
+        </div>
+        <div id="identityGrid" class="data-grid"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="stage1-title">
+        <div class="section-heading"><div><p class="level">D0 / D2 · 冻结来源与分析分类</p><h2 id="stage1-title">冻结 Stage 1 背景</h2></div></div>
+        <div id="stage1Content"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="research-title">
+        <div class="section-heading"><div><p class="level">D3 · 公司研究判断</p><h2 id="research-title">公司研究与修订历史</h2></div></div>
+        <div id="researchContent"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="summary-title">
+        <div class="section-heading"><div><p class="level">D1 · 确定性统计</p><h2 id="summary-title">证据、冲突与缺失摘要</h2></div></div>
+        <div id="evidenceSummary"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="hypothesis-title"><div class="section-heading"><div><p class="level">D3</p><h2 id="hypothesis-title">财务传导假设</h2></div></div><div id="hypotheses"></div></section>
+      <section class="panel" aria-labelledby="expectation-title"><div class="section-heading"><div><p class="level">D3</p><h2 id="expectation-title">市场预期</h2></div></div><div id="expectations"></div></section>
+      <section class="panel" aria-labelledby="valuation-title"><div class="section-heading"><div><p class="level">D3；价格仅为 L1 来源上下文</p><h2 id="valuation-title">估值观察</h2></div></div><div id="valuations"></div></section>
+      <section class="panel two-column"><div><div class="section-heading"><div><p class="level">D3</p><h2>催化剂</h2></div></div><div id="catalysts"></div></div><div><div class="section-heading"><div><p class="level">D3</p><h2>风险</h2></div></div><div id="risks"></div></div></section>
+      <section class="panel two-column"><div><div class="section-heading"><div><p class="level">D3</p><h2>产业质量判断</h2></div></div><div id="industryJudgments"></div></div><div><div class="section-heading"><div><p class="level">D3</p><h2>公司质量判断</h2></div></div><div id="companyJudgments"></div></div></section>
+
+      <section class="panel" aria-labelledby="detail-title">
+        <div class="section-heading"><div><p class="level">按需读取</p><h2 id="detail-title">完整详情</h2></div></div>
+        <p>完整 claim / evidence 图仅在点击某个研究项目后加载。</p>
+        <pre id="detailOutput" tabindex="0">尚未加载完整详情。</pre>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
