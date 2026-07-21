@@ -117,7 +117,9 @@ def test_semantic_route_has_no_mutation_method() -> None:
     route_methods = {
         method
         for route in semantics_api.router.routes
-        if getattr(route, "path", "").startswith("/beneficiary-semantics")
+        if getattr(route, "path", "").startswith(
+            "/industry-alpha/beneficiary-semantics"
+        )
         for method in getattr(route, "methods", set())
     }
     assert route_methods == {"GET"}
