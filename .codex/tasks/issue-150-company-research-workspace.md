@@ -1,39 +1,69 @@
 # Issue #150 — Company Research Workspace v1
 
 ## Authority
-- Product Task: Issue #150.
-- Approved preflight: Issue #148 / PR #149.
+
+- Product Task Issue: #150.
+- Approved Architecture Preflight: Issue #148 / PR #149.
 - Required base: `b2554e24de3166475c016f8d09826989e8535e51`.
-- Branch: `feat/company-research-workspace-v1`.
-- Version remains `0.2.0`.
+- Implementation branch: `feat/company-research-workspace-v1`.
+- Release remains `0.2.0`.
 
 ## Objective
-Create a Chinese-first, read-only workspace for one explicitly selected persisted `company_research_id`. Read exact frozen Stage 1 provenance and cutoff-visible v0.6A-v0.6D research without ranking, scoring or recommendations.
 
-## Routes and identity
-- `GET /company-research`
-- `GET /company-research/research?as_of_cutoff=YYYY-MM-DD`
-- `GET /company-research/research/{company_research_id}/workspace?as_of_cutoff=YYYY-MM-DD`
+Implement a Chinese-first, read-only workspace for one explicitly selected persisted `company_research_id`. The workspace reads the exact frozen Stage 1 provenance and cutoff-visible v0.6A-v0.6D research record without ranking, scoring, price-attractiveness or recommendation semantics.
+
+## Identity and routes
+
+- Primary identity: persisted `company_research_id` only.
 - No silent first-row selection.
-- No inference from stock code, name, industry text, free text, similarity or LLM output.
+- No identity inference from stock code, company name, Provider industry, free text, title similarity or LLM output.
+- Page: `GET /company-research`.
+- Selector: `GET /company-research/research?as_of_cutoff=YYYY-MM-DD`.
+- Workspace: `GET /company-research/research/{company_research_id}/workspace?as_of_cutoff=YYYY-MM-DD`.
 
 ## Query contract
+
 - New stateless domain-specific repository/query boundary.
-- Selector: exactly 2 SQL statements, below the approved maximum of 3.
-- Workspace: exactly 14 SQL statements, below the approved maximum of 24.
-- Counts remain constant as identities, revisions, claims and evidence increase.
-- No composition of existing Stage 2 list services and no per-row detail calls.
+- Selector: 3 SQL statements; accepted maximum is 3.
+- Selected workspace: 14 SQL statements; accepted maximum is 24.
+- Query counts are independent of identity, revision, claim and evidence row counts.
+- No composition of existing Stage 2 list services.
+- No per-row owning-domain detail calls.
+- Full claim/evidence graphs remain explicit on-demand reads through existing owning-domain APIs.
 
 ## Cutoff and integrity
-- Identity visibility uses recorded UTC.
-- Revision visibility requires information cutoff and recorded UTC.
-- Required frozen Stage 1, stock and ingestion rows fail closed when absent or incompatible.
+
+- Identity creation is visible by recorded UTC.
+- Revisions require information-cutoff and recorded-UTC visibility.
+- Latest means the deterministic latest visible persisted revision.
+- Required frozen Stage 1, stock and ingestion provenance is fail-closed.
 - Downstream frozen company-research revisions must be cutoff-visible.
 - Hypothesis revisions must be frozen by a visible company-research revision.
-- Historical mismatch remains visible and is not relinked.
-- Optional modules use explicit empty states.
+- Historical revision mismatch remains visible and is never automatically repaired.
+- Exact claim/evidence and Stage 1 handoff boundaries are validated.
+- Optional modules return valid empty states without fallback or generation.
+
+## Presentation
+
+Separate:
+
+- D0 persisted identity/provenance;
+- D1 deterministic counts;
+- D2 Stage 1/evidence classifications;
+- D3 research judgments.
+
+Use “估值观察”, never “估值结论”. Optional local daily-price rows are L1 source context only, not Canonical Price or Comparison Eligibility.
+
+## Error contract
+
+- malformed UUID/date: 422;
+- missing/cutoff-invisible identity: 404;
+- database/configuration/integrity failure: credential-safe 503;
+- no raw DB URL, credentials or exception text;
+- no external network during import, startup, tests or ordinary reads.
 
 ## Authorized files
+
 1. `.codex/tasks/issue-150-company-research-workspace.md`
 2. `industry_alpha/company_research_workspace_contracts.py`
 3. `industry_alpha/company_research_workspace_repository.py`
@@ -45,23 +75,27 @@ Create a Chinese-first, read-only workspace for one explicitly selected persiste
 9. `tests/test_company_research_workspace_repository.py`
 10. `tests/test_company_research_workspace_query.py`
 11. `tests/test_company_research_api.py`
-12. `backend/main.py` only for registration.
+12. `backend/main.py` only for router/static/page registration.
 
 No other file is authorized.
 
-## Boundaries
-Use D0/D1/D2/D3 separation. “估值观察” may show optional L1 local price provenance but is not Canonical Price, Comparison Eligibility, fair value, target price, expected return, upside/downside, ranking, score, buy/sell/hold, good price or good timing.
+## Locked exclusions
 
-No schema, migration, Provider, dependency, release/version, generic framework, monitoring, alerts, portfolio, trading, automatic discovery, identity inference or automatic relinking.
+No schema, migration, Provider, dependency, release/version, generic workspace framework, Canonical Price, Comparison Eligibility, computed expectation gap, fair value, target price, expected return, upside/downside, cross-company comparison/ranking, research-priority ranking, attractiveness score, buy/sell/hold, good-price/good-timing, Watchlist, monitoring, alerts, reminders, portfolio, paper trading, execution state, automatic company discovery, identity inference or automatic relinking.
 
 ## Verification
-- SQL counts and row-growth invariance.
-- Exact identity, cutoff, UTC, provenance and historical mismatch.
-- Explicit empty modules.
-- Deterministic sorting.
-- Safe DOM with `textContent` and `replaceChildren`.
-- 422/404/503 boundaries and redacted internal failures.
-- Full pytest and local PostgreSQL fixture demo.
+
+- selector count remains exactly 3 under row growth;
+- workspace count remains exactly 14 under row growth;
+- exact identity and provenance checks;
+- cutoff/UTC and frozen mismatch checks;
+- optional empty modules;
+- deterministic sorting;
+- safe DOM (`textContent`, `replaceChildren`, no untrusted `innerHTML`);
+- 422/404/503 and credential-safe errors;
+- strict JSON serialization;
+- full pytest and local PostgreSQL fixture demo.
 
 ## Completion gate
-Keep the implementation PR Draft/Open/unmerged until independent fixed-head implementation approval and explicit owner authorization.
+
+Keep the implementation PR Draft/Open/unmerged. Independent fixed-head implementation approval and explicit owner authorization are required before merge or Issue closure.

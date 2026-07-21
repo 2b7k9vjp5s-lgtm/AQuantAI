@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
 from backend.api.industry_research import router as industry_research_router
@@ -24,6 +25,9 @@ EVIDENCE_INTELLIGENCE_STATIC_DIR = (
 INDUSTRY_RESEARCH_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "industry_research" / "static"
 )
+COMPANY_RESEARCH_STATIC_DIR = (
+    Path(__file__).resolve().parents[1] / "company_research" / "static"
+)
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
 app.mount(
     "/market-cockpit/static",
@@ -40,10 +44,16 @@ app.mount(
     StaticFiles(directory=INDUSTRY_RESEARCH_STATIC_DIR),
     name="industry-research-static",
 )
+app.mount(
+    "/company-research/static",
+    StaticFiles(directory=COMPANY_RESEARCH_STATIC_DIR),
+    name="company-research-static",
+)
 app.include_router(market_cockpit_router)
 app.include_router(industry_alpha_router)
 app.include_router(evidence_intelligence_router)
 app.include_router(industry_research_router)
+app.include_router(company_research_router)
 
 
 @app.get("/")
@@ -100,5 +110,14 @@ def industry_research_page() -> FileResponse:
     """Serve the read-only Industry Beneficiary Workspace page."""
     return FileResponse(
         INDUSTRY_RESEARCH_STATIC_DIR / "industry_research.html",
+        media_type="text/html",
+    )
+
+
+@app.get("/company-research", include_in_schema=False)
+def company_research_page() -> FileResponse:
+    """Serve the read-only Company Research Workspace page."""
+    return FileResponse(
+        COMPANY_RESEARCH_STATIC_DIR / "company_research.html",
         media_type="text/html",
     )
