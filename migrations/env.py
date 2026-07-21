@@ -16,6 +16,7 @@ import industry_alpha.stage2_models  # noqa: F401 - register v0.6A metadata
 import industry_alpha.stage2_expectations_models  # noqa: F401 - register v0.6B metadata
 import industry_alpha.stage2_assessments_models  # noqa: F401 - register v0.6C metadata
 import industry_alpha.stage2_judgments_models  # noqa: F401 - register v0.6D metadata
+import industry_alpha.beneficiary_semantics_models  # noqa: F401 - register typed semantics
 
 config = context.config
 
