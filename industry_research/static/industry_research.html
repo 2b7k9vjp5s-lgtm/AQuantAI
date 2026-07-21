@@ -13,7 +13,7 @@
         <div>
           <p class="eyebrow">Industry Research · 只读研究工作台</p>
           <h1>产业受益公司研究</h1>
-          <p class="lede">选择一张已持久化产业地图，查看截止日期可见的产业观察、Stage 1 受益公司和已有 Stage 2 财务传导研究。</p>
+          <p class="lede">选择一张已持久化产业地图，查看截止日期可见的产业观察、Stage 1 受益公司、类型化证据语义和已有 Stage 2 财务传导研究。</p>
         </div>
         <nav aria-label="AQuantAI 页面导航">
           <a href="/evidence-intelligence">研究变化</a>
@@ -29,7 +29,7 @@
           <p class="section-kicker">研究边界</p>
           <h2 id="boundary-title">已录入受益公司全量，不是全市场排名</h2>
         </div>
-        <p>本页只展示所选产业地图下、研究截止日期可见且已经持久化的 Stage 1 公司。原始 <code>direct / secondary / potential</code> 是分析性研究状态，不是推荐、评分或最终四级分类。</p>
+        <p>本页只展示所选产业地图下、研究截止日期可见且已经持久化的 Stage 1 公司。原始 <code>direct / secondary / potential</code> 与新类型化 <code>direct / conditional / indirect / conceptual</code> 是彼此独立的分析人员研究判断，不会自动映射，也不是推荐或评分。</p>
       </section>
 
       <section class="panel" aria-labelledby="selector-title">
@@ -103,7 +103,8 @@
                 <th scope="col">分类依据</th>
                 <th scope="col">研究截止 / 记录时间</th>
                 <th scope="col">财务传导研究</th>
-                <th scope="col">详情</th>
+                <th scope="col">精确详情</th>
+                <th scope="col">类型化证据语义</th>
               </tr>
             </thead>
             <tbody id="beneficiary-body"></tbody>
@@ -126,6 +127,10 @@
             <pre id="beneficiary-detail" tabindex="0"></pre>
           </article>
           <article>
+            <h3>类型化受益证据语义</h3>
+            <pre id="semantic-detail" tabindex="0"></pre>
+          </article>
+          <article>
             <h3>Stage 2 财务传导研究</h3>
             <pre id="company-detail" tabindex="0"></pre>
           </article>
@@ -133,11 +138,11 @@
       </section>
 
       <section class="panel boundary-list" aria-labelledby="unsupported-title">
-        <p class="section-kicker">未建模 / 不可用</p>
-        <h2 id="unsupported-title">当前切片不生成的新语义</h2>
+        <p class="section-kicker">明确边界</p>
+        <h2 id="unsupported-title">类型化语义仍然不做的事情</h2>
         <ul>
-          <li>不把 <code>direct / secondary / potential</code> 映射为最终四级分类。</li>
-          <li>不从文本推断客户、认证、产能、投产或订单阶段。</li>
+          <li>不把旧 <code>direct / secondary / potential</code> 自动映射为新四级分类。</li>
+          <li>不从文本、公司名称、股票代码、Provider 行业或 AI 输出推断客户、认证、产能、投产或订单阶段。</li>
           <li>不计算估值、机会分、强度分、目标价、收益预测或交易信号。</li>
         </ul>
       </section>
@@ -146,7 +151,7 @@
     <footer class="site-footer">
       <div class="page-width">
         <h2>本地、只读、精确修订绑定</h2>
-        <p>Stage 2 只通过持久化的受益公司身份与冻结修订关联。历史修订差异会明确展示，不会自动重绑到最新结论。</p>
+        <p>类型化语义通过本地 CLI 明确写入，并冻结精确 Stage 1、地图、driver 和 claim 修订。网页只读，历史差异不会自动重绑。</p>
       </div>
     </footer>
 
