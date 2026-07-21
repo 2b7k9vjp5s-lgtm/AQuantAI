@@ -9,16 +9,31 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          show-progress: false
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install dependencies quietly
         run: python -m pip install -q -e ".[dev]"
-      - name: Run focused semantic tests
-        run: >-
-          python -m pytest -q
-          tests/test_beneficiary_semantics.py
-          tests/test_beneficiary_semantics_api.py
-          tests/test_beneficiary_semantics_migration.py
-          --tb=short
+      - name: Vocabulary contract
+        run: python -m pytest -q tests/test_beneficiary_semantics.py::test_closed_vocabulary_has_no_ranking_semantics --tb=short
+      - name: Record query cutoff
+        if: always()
+        run: python -m pytest -q tests/test_beneficiary_semantics.py::test_record_query_and_historical_cutoff --tb=short
+      - name: Atomic stale revision
+        if: always()
+        run: python -m pytest -q tests/test_beneficiary_semantics.py::test_stale_expected_revision_is_atomic --tb=short
+      - name: Missing and frozen claim validation
+        if: always()
+        run: python -m pytest -q tests/test_beneficiary_semantics.py::test_missing_requires_verification_and_frozen_claim --tb=short
+      - name: CLI local dry run
+        if: always()
+        run: python -m pytest -q tests/test_beneficiary_semantics.py::test_cli_dry_run_is_local_and_redacts_input_path --tb=short
+      - name: Read-only API
+        if: always()
+        run: python -m pytest -q tests/test_beneficiary_semantics_api.py --tb=short
+      - name: Migration guard
+        if: always()
+        run: python -m pytest -q tests/test_beneficiary_semantics_migration.py --tb=short
