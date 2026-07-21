@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import date, datetime, timezone
+import json
+import socket
 from uuid import uuid4
 
 import pytest
@@ -40,6 +42,7 @@ from industry_alpha.stage1_commands import (
 )
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import Stage1BeneficiaryRevision
+import scripts.record_beneficiary_semantics as semantics_cli
 
 
 def _recorded(day: int) -> datetime:
@@ -117,6 +120,7 @@ def semantic_context():
         recorded_at_utc=_recorded(10),
     )
     context = {
+        "engine": engine,
         "factory": factory,
         "beneficiary_id": fixture.direct_beneficiary_id,
         "beneficiary_revision_id": beneficiary_revision.id,
@@ -288,3 +292,26 @@ def test_missing_requires_verification_and_frozen_claim(semantic_context):
     payload["assertions"][0]["claim_links"][0]["claim_revision_id"] = str(uuid4())
     with pytest.raises(EvidenceLedgerValidationError, match="already be frozen"):
         BeneficiarySemanticCommandService(semantic_context["factory"]).validate(payload)
+
+
+def test_cli_dry_run_is_local_and_redacts_input_path(
+    semantic_context, tmp_path, monkeypatch, capsys
+):
+    input_path = tmp_path / "semantic-input.json"
+    input_path.write_text(
+        json.dumps(_payload(semantic_context), ensure_ascii=False), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        semantics_cli, "build_engine", lambda: semantic_context["engine"]
+    )
+
+    def reject_network(_socket, _address):
+        raise AssertionError("network access is forbidden")
+
+    monkeypatch.setattr(socket.socket, "connect", reject_network)
+    assert semantics_cli.main(["--input", str(input_path), "--dry-run"]) == 0
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+    assert payload["status"] == "ok"
+    assert payload["result"]["dry_run"] is True
+    assert str(input_path) not in output
