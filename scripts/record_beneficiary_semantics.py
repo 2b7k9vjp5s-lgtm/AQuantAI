@@ -42,10 +42,11 @@ def _load(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def _emit(payload: dict[str, Any], *, stream: Any = sys.stdout) -> None:
+def _emit(payload: dict[str, Any], *, stream: Any | None = None) -> None:
+    target = sys.stdout if stream is None else stream
     print(
         json.dumps(payload, ensure_ascii=True, sort_keys=True, allow_nan=False),
-        file=stream,
+        file=target,
     )
 
 
