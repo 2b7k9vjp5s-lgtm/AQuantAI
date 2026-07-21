@@ -20,3 +20,30 @@ The command uses a temporary SQLite database, the existing fixture persistence p
 - `python -m scripts.demo_stage2_company_research`: build an isolated deterministic v0.6A fixture from exact candidate-pool memberships, freeze company/map/claim/evidence boundaries, and compare current/historical financial-transmission hypotheses and verification checklists. It never accesses the network or configured PostgreSQL database.
 - `python -m scripts.demo_stage2_expectations_valuation`: build an isolated deterministic v0.6B fixture with append-only expectation and valuation-context observations bound to exact Stage 2 research, hypothesis, claim, evidence, and optional local price provenance. It never outputs target prices, fair values, expected returns, scores, rankings, recommendations, or trading actions.
 - `python -m scripts.demo_stage2_catalyst_risk_assessments`: build an isolated deterministic v0.6C fixture with append-only catalyst and company-risk judgments bound to exact v0.6A/v0.6B and claim/evidence boundaries. It is not a monitor, alert, score, recommendation, timing model, or trading system.
+
+## Record typed beneficiary evidence semantics
+
+After configuring `DATABASE_URL` and running `alembic upgrade head`, validate one explicit local JSON file without writing:
+
+```bash
+python -m scripts.record_beneficiary_semantics --input path/to/semantic-input.json --dry-run
+```
+
+Record the validated append-only revision:
+
+```bash
+python -m scripts.record_beneficiary_semantics --input path/to/semantic-input.json
+```
+
+The JSON object must explicitly provide:
+
+- one existing `beneficiary_id`, its exact `beneficiary_revision_id`, and the same frozen `selected_map_revision_id`;
+- `taxonomy_version` equal to `aquantai.typed-beneficiary-evidence-semantics.v1`;
+- `expected_latest_revision_id` (`null` for the first revision);
+- `overall_status`, summary, local responsibility label `recorded_by`, information cutoff, and recorded UTC;
+- exactly one exposure, customer, certification, capacity, production, and order assertion;
+- at least one driver and offering assertion;
+- exact driver observation revisions and claim revisions already frozen by the selected Stage 1 beneficiary revision;
+- one linked verification item for every assertion whose evidence state is `missing`.
+
+The command is local-only: it performs no browsing, Provider access, model call, automatic extraction, ranking, valuation, recommendation, monitoring, portfolio action, or trading action. The browser and API remain read-only; all accepted writes pass through this explicit CLI transaction.
