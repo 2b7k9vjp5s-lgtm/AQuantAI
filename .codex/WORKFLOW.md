@@ -4,67 +4,114 @@ This file defines the standing execution rules for Codex work in AQuantAI.
 
 ## Authority order
 
-1. The linked GitHub Issue is authoritative for product scope, acceptance criteria, exclusions and status.
+1. The linked GitHub Issue is authoritative for product scope, acceptance criteria, exclusions and status when an Issue is required.
 2. `docs/architecture_baseline.md` is authoritative for project state, domain ownership, dependency direction and shared architecture invariants.
-3. The matching file under `.codex/tasks/` is the executable snapshot for the current planning, implementation or review cycle.
-4. The active Draft PR contains the change and validation record.
-5. A chat message starts an already authorized action; it does not silently override GitHub scope or architecture ownership.
+3. A matching `.codex/tasks/` file is required only for Strict work or when an Issue explicitly requests one.
+4. The active PR contains the change and validation record.
+5. Explicit project-owner chat authorization may start work, approve a governance transition or authorize merge, but must be summarized in the Issue or PR before completion.
 
-If the Issue, architecture baseline, task file, branch state or PR instructions conflict, stop without changing code and report the conflict in the Issue and PR.
+If Issue scope, architecture ownership, branch state or PR instructions materially conflict, stop the affected change and report the conflict. Do not use process formality to block unrelated safe work.
 
-## Work types
+## Risk tiers
 
-Every Issue must identify exactly one work type:
+Every change must be classified before editing.
 
-- architecture decision or documentation reset;
-- task synchronization/planning;
-- application implementation;
-- consolidation/refactoring characterization;
-- release or operational handoff.
+### Light
 
-A planning Issue does not authorize application implementation. A documentation Issue does not authorize models, migrations, APIs, fixtures, tests or behavior changes.
+Use Light for:
 
-## Architecture Preflight
+- documentation, copy, styles and static layout;
+- tests that do not change product contracts;
+- internal refactors with unchanged public behavior;
+- small bug fixes with no schema, external-data, AI-write, identity or destructive-history impact.
 
-Before a new feature Issue is created, the architecture reviewer must establish:
+Process:
 
-1. the user problem and why existing capability is insufficient;
-2. the authoritative domain owner for every material field;
-3. the real provider, persisted record or accepted upstream revision supplying every input;
-4. one production-realistic offline golden path;
-5. the most important failure path;
-6. dependency, migration and runtime-surface impact;
-7. conflicts with existing architecture or roadmap documents;
-8. the smallest viable slice and explicit exclusions.
+- Issue and task snapshot are optional;
+- use one branch and one PR;
+- run targeted validation appropriate to the changed files;
+- author-side review plus passing checks is sufficient;
+- merge still requires explicit owner authorization.
 
-Do not use a Codex task file to discover fundamental field ownership, provider reachability or product meaning.
+### Standard
+
+Use Standard for:
+
+- new read-only APIs over accepted models;
+- local CLI or ordinary domain logic using existing schemas;
+- bounded front-end and back-end features with no Strict trigger;
+- additive behavior confined to one main domain capability.
+
+Process:
+
+- one implementation Issue and one PR;
+- record objective, ownership, contracts, cutoff rules, migration decision, tests and exclusions in the Issue or PR;
+- no separate Architecture Preflight PR is required;
+- use one focused review and targeted plus regression validation;
+- exact individual filenames are not mandatory when an authorized directory or file family is clear;
+- merge requires explicit owner authorization.
+
+### Strict
+
+Use Strict only when a change includes any of:
+
+- database schema or migration;
+- external network, Provider, ingestion, crawling, browsing or data acquisition;
+- AI data transmission, AI-owned acceptance or automated persistence;
+- authentication, authorization or identity controls;
+- destructive operations, backfill, history rewrite or downgrade risk;
+- ranking, scoring, recommendations, valuation, target price, expected return, portfolio or trading semantics;
+- modification of a core cross-domain contract or frozen-history boundary.
+
+Process:
+
+- one architecture note or Architecture Preflight and one implementation PR;
+- a `.codex/tasks/` snapshot is required;
+- one independent fixed-head architecture review before production merge;
+- one independent fixed-head implementation review before production merge;
+- implementation may begin in parallel after the architecture note exists and the owner explicitly authorizes it, but the implementation PR must not merge before architecture approval;
+- avoid extra synchronization, reset or consolidation PRs unless a concrete blocker requires them.
+
+Do not escalate a task merely because it is large. Escalate only because its risk matches a Strict trigger.
 
 ## Definition of Ready
 
-Task synchronization or implementation may begin only when the linked Issue contains:
+### Light
 
-- one unambiguous objective;
-- accepted input and output contracts;
-- an explicit field/domain ownership table;
-- a reachable production-realistic golden path;
-- fixture/provider contract-parity evidence;
-- exact selectors, cutoff and chronology rules;
-- an explicit migration decision;
-- bounded scope with no more than one main domain capability and one infrastructure change;
-- acceptance tests, exclusions and stop conditions.
+A clear requested result and bounded changed area are sufficient.
 
-Green CI from prior work does not satisfy these requirements by itself.
+### Standard
+
+The Issue or PR must state:
+
+- one objective;
+- accepted inputs and outputs;
+- authoritative owner for material fields;
+- selectors, cutoff and missing-data behavior;
+- migration decision;
+- acceptance tests and exclusions.
+
+### Strict
+
+The architecture note must additionally establish:
+
+- exact revision and provenance boundaries;
+- one production-realistic offline golden path;
+- the most important failure path;
+- migration, rollback and downgrade behavior;
+- explicit stop conditions and locked exclusions.
+
+Green CI alone does not establish domain ownership or product meaning.
 
 ## Start protocol
 
 Before editing:
 
-1. Fetch `origin` and inspect the Issue, `docs/architecture_baseline.md`, task file, Draft PR, latest review and latest CI result.
-2. Confirm repository, branch, base commit and required ancestor SHA.
-3. Confirm the Issue work type and that its authorization matches the requested files and behavior.
-4. Confirm there are no unexpected commits after the reviewed head. Task-synchronization commits that only change `.codex/` are allowed only when the task explicitly identifies them.
-5. Keep the existing branch and Draft PR unless the task requires a new one.
-6. Do not modify unrelated branches or pull requests, including PR #38.
+1. Inspect the current base, relevant Issue or request, architecture baseline, active PR and latest CI relevant to the change.
+2. Confirm the risk tier and summarize it in the Issue or PR.
+3. Confirm the branch base and avoid unrelated branches and PRs, including PR #38.
+4. Reuse the existing branch and PR when scope is unchanged.
+5. For Standard and Strict work, authorize a directory or file family where practical instead of predicting every helper filename.
 
 ## Implementation rules
 
@@ -74,73 +121,80 @@ Before editing:
 - Do not access external networks during imports, FastAPI startup, tests, CI, fixture demos or ordinary read use.
 - Never put credentials, tokens, connection strings or secrets in source, logs, fixtures, Issues, PRs or task files.
 - Use explicit selectors, cutoff dates, provenance, missing-data behavior and fail-closed semantics.
-- Bind exact accepted revisions when the architecture requires frozen research history; do not select newer compatible-looking records.
-- A fixture success path must use fields and contracts reachable through the reviewed production adapter boundary.
-- Do not silently broaden scope, create a later-phase entity or begin a later roadmap stage.
+- Bind exact accepted revisions when frozen research history is required; do not select newer compatible-looking records.
+- A fixture success path must use fields and contracts reachable through the reviewed production boundary.
+- Do not infer product meaning from provider name, free text, security code, company name or an unreviewed default.
+- Do not silently broaden scope into a later roadmap stage.
 
 ## Golden-path-first rule
 
 Before expanding a rejection matrix, prove one complete success path using production-realistic offline inputs. The path must demonstrate:
 
-- the actual adapter or persistence contract can produce every required field;
-- canonical values have one authoritative owner;
-- fixture data does not add information unavailable to the production path;
-- the output has the intended domain meaning without free-text, provider-name, security-code or fallback inference.
-
-A large negative-test plan cannot compensate for an unreachable success path.
+- every required field has an authoritative source;
+- fixture data does not add information unavailable to production;
+- canonical values have one owner;
+- output meaning does not depend on hidden inference.
 
 ## Reset threshold
 
-Stop the current plan and return to architecture preflight when any of the following occurs:
+Return to architecture work only when:
 
-- two rounds of foundational planning blockers;
-- a reviewed production adapter cannot reach the planned success path;
-- a material field has no single authoritative owner;
-- core meaning depends on provider name, free text, security-code inference or an unreviewed default;
-- one slice requires multiple new infrastructure boundaries;
-- project-level documents materially disagree about the feature.
+- a material field has no authoritative owner;
+- the reviewed production boundary cannot reach the success path;
+- core meaning depends on free-text, provider-name, security-code or AI inference;
+- the task unexpectedly introduces more than one new infrastructure boundary;
+- project-level documents materially disagree.
 
-Provider reachability or ownership failure can trigger immediate reset without waiting for two rounds. Preserve the branch and review history; close superseded work without merge and create a new architecture Issue rather than endlessly extending the task file.
+Do not require two failed planning rounds when the ownership or reachability failure is already clear.
 
 ## Consolidation cadence
 
-After every two domain slices, pause feature expansion for a consolidation review covering:
+Consolidation is not mandatory after every two slices.
 
-- current-state documentation;
-- repeated models, repositories, validators and serializers;
-- schema and frozen-link growth;
-- test count, duration and cross-product growth;
-- API consistency;
-- next-stage input reachability and field ownership.
+Trigger it when either:
 
-A consolidation review may decide to keep stable schemas unchanged. Do not generalize merely for aesthetic uniformity.
+- 5–6 implemented domain slices have accumulated since the last review; or
+- there is concrete evidence of duplicated models, validators or serializers, schema/frozen-link complexity, inconsistent APIs, material test-duration growth, or conflicting ownership.
+
+A consolidation review may decide no refactor is needed. Never generalize only for aesthetic uniformity.
 
 ## Validation and reporting
 
-1. Run every command listed in the task file.
-2. Record exact pass, skip and warning counts plus environment limitations.
-3. Update the Draft PR and linked Issue with:
-   - base and head SHA;
-   - work type and authorization state;
-   - architecture and data-contract decisions;
-   - changed files;
-   - exact validation results;
-   - demonstration output where authorized;
-   - known limitations, debt and exclusions.
-4. Verify the complete base-to-head changed-file inventory matches the authorized list.
-5. Keep the PR Draft unless the task explicitly authorizes Ready status.
-6. Stop after synchronization and wait for ChatGPT review.
+- Match validation effort to risk and changed surfaces.
+- Documentation-only changes use Markdown, links and repository checks; full database regression is required only when executable contracts or runtime configuration are affected.
+- Standard implementation uses focused tests plus relevant regression coverage.
+- Strict implementation uses focused tests, full relevant regression and the offline golden path.
+- Record base/head, risk tier, changed file families, validation results, limitations and exclusions in the PR.
+- Verify the complete base-to-head inventory stays within authorized directories or file families.
+- Keep Strict architecture and implementation PRs Draft until their required reviews; Light and Standard PRs may become Ready after author verification and passing checks.
 
-Green CI is necessary regression evidence, but architecture acceptance also requires domain ownership, production reachability, fixture parity, explicit semantics and scope coherence.
+## Independent review
 
-## Prohibited completion actions
+Independent fixed-head review is mandatory only for Strict architecture and Strict implementation work, or when the owner explicitly requests it.
 
-Unless the project owner explicitly authorizes them in chat and the authorization is synchronized to GitHub:
+Review should focus on:
 
-- do not merge a PR;
-- do not close the implementation Issue as completed;
-- do not create a release or tag;
-- do not change the project version;
-- do not start the next roadmap phase;
-- do not create a migration outside the exact authorized implementation task;
-- do not rebase or force-push reviewed history.
+- scope and ownership;
+- frozen revision/provenance integrity;
+- migration and rollback safety;
+- hidden network or inference paths;
+- test sufficiency;
+- prohibited recommendation, price or trading semantics.
+
+Do not generate exhaustive ceremonial checklists when a concise risk-focused review is sufficient.
+
+## Transition rule for PR #165
+
+PR #165 remains a Strict architecture artifact. Its implementation may begin after explicit owner authorization, but neither PR #165 nor the related production implementation may merge without the required independent fixed-head architecture approval. Avoid additional planning layers between the approved architecture and implementation.
+
+## Completion actions
+
+Explicit project-owner authorization is always required before:
+
+- merging a PR;
+- closing an implementation Issue as completed;
+- starting the next roadmap phase;
+- creating a release or tag;
+- changing the project version.
+
+Never rebase or force-push reviewed fixed-head history. Never create a migration outside an authorized Strict implementation Issue.
