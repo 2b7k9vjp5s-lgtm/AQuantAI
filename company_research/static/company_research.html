@@ -71,6 +71,28 @@
         <div id="evidenceSummary"></div>
       </section>
 
+      <section class="panel" aria-labelledby="guarded-ai-title">
+        <div class="section-heading">
+          <div>
+            <p class="level">D3 · 临时草稿</p>
+            <h2 id="guarded-ai-title">Guarded AI 研究辅助</h2>
+          </div>
+        </div>
+        <p>先在本地生成并检查确定性输入清单。只有明确勾选确认后，才会向当前配置的单一模型服务发送一次请求。</p>
+        <p><strong>AI 研究草稿（D3，需人工核验，不构成投资建议）</strong></p>
+        <div class="control-grid">
+          <button id="aiPreviewButton" type="button">本地预览 AI 输入</button>
+          <label>
+            <input id="aiConfirmCheckbox" type="checkbox" disabled>
+            我已检查输入、模型与数据使用说明，并确认本次远程传输
+          </label>
+          <button id="aiGenerateButton" type="button" disabled>生成 AI 研究草稿</button>
+        </div>
+        <p id="aiStatus" class="status" role="status" aria-live="polite">尚未生成本地输入预览。页面加载和普通读取不会调用模型。</p>
+        <div id="aiPreviewContent"></div>
+        <div id="aiDraftOutput"></div>
+      </section>
+
       <section class="panel" aria-labelledby="hypothesis-title"><div class="section-heading"><div><p class="level">D3</p><h2 id="hypothesis-title">财务传导假设</h2></div></div><div id="hypotheses"></div></section>
       <section class="panel" aria-labelledby="expectation-title"><div class="section-heading"><div><p class="level">D3</p><h2 id="expectation-title">市场预期</h2></div></div><div id="expectations"></div></section>
       <section class="panel" aria-labelledby="valuation-title"><div class="section-heading"><div><p class="level">D3；价格仅为 L1 来源上下文</p><h2 id="valuation-title">估值观察</h2></div></div><div id="valuations"></div></section>
