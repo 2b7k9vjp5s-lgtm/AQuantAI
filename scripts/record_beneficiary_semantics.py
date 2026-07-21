@@ -59,18 +59,18 @@ def main(argv: list[str] | None = None) -> int:
             result = service.validate(payload) if args.dry_run else service.record(payload)
         finally:
             engine.dispose()
-    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
-        _emit(
-            {"status": "error", "error": "invalid_input", "detail": str(exc)},
-            stream=sys.stderr,
-        )
-        return 2
     except EvidenceLedgerError as exc:
         _emit(
             {"status": "error", "error": "semantic_validation_failed", "detail": str(exc)},
             stream=sys.stderr,
         )
         return 3
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        _emit(
+            {"status": "error", "error": "invalid_input", "detail": str(exc)},
+            stream=sys.stderr,
+        )
+        return 2
     except (RuntimeError, SQLAlchemyError):
         _emit(
             {
