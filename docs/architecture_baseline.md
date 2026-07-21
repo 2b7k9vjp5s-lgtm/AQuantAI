@@ -2,58 +2,60 @@
 
 ## Status and authority
 
-This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and an accepted linked GitHub Issue controls a specific task.
+This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls the scope of Standard or Strict work.
 
 - Released software version: `0.2.0`.
-- Merged capability stage: v0.6D plus reviewed read-only product surfaces and bounded Guarded AI Research Assistance v1.
-- Accepted application/product baseline: `2e3722fdf224a58df0c870e2fa167b4f8e742b49`.
-- Active application implementation, migration, release or Provider authorization: none.
-- Evidence Ingestion status: deferred by owner decision after Issue #154 / closed-unmerged PR #155; no ingestion runtime capability reached `main`.
-- Guarded AI status: Architecture Preflight merged through PR #159 and bounded implementation merged through PR #161.
-- Current required gate: mandatory consolidation review under Issue #162 after Company Research Workspace v1 and Guarded AI Research Assistance v1.
-- No later product/domain implementation or Architecture Preflight is authorized until Issue #162 is independently approved, merged and explicitly advanced by the owner.
+- Accepted application/product baseline: `e59e40ce9b45d9a0d2a22a897edcbc9dcd10704e`.
+- Latest merged capability: Typed Beneficiary Evidence Semantics v1 through architecture PR #165 and implementation PR #169.
+- Active application implementation, migration, Provider, release or version authorization: none.
+- Evidence Ingestion remains deferred after Issue #154 / closed-unmerged PR #155; no ingestion runtime capability reached `main`.
+- Canonical Price and Comparison Eligibility remain separate infrastructure tracks without implementation Definition of Ready.
+- Owner authorization on 2026-07-21 advances the roadmap to the next Strict architecture gate only: Company Research Priority Comparison v1.
+- No comparison, score, ranking, recommendation, price judgment or next-phase implementation is authorized until that architecture gate is independently approved.
 
-Documentation synchronization may advance `main` without changing release, capability or runtime behavior. This document records accepted current state; it does not itself authorize implementation.
+Documentation may advance `main` without changing release or runtime behavior. This document records accepted current state; it does not itself authorize production implementation.
 
 ## Product boundary
 
 AQuantAI is a local-first, personal-use, research-only and non-advisory workbench. It is not a broker, order-management system, automated-trading system, investment-advice service, multi-user SaaS product or production deployment platform.
 
-Deterministic calculations, canonicalization, selectors and workflow state belong to reviewed application code. An LLM may assist only behind an explicit bounded adapter and may not own evidence qualification, deterministic state, execution or trading behavior.
+Deterministic calculations, canonicalization, selectors and workflow state belong to reviewed application code. An LLM may assist only behind an explicit bounded adapter and may not own evidence qualification, deterministic state, accepted research state, execution or trading behavior.
 
 ## Implemented dependency direction
 
 ```text
 market-data evidence
-  -> v0.5 evidence ledger
-  -> Stage 1 industry map and beneficiary boundary
-  -> v0.6A company research and financial-transmission hypotheses
+  -> v0.5 Evidence Ledger
+  -> v0.5B Industry Map
+  -> v0.5C Stage 1 beneficiary identity and revisions
+       -> Typed Beneficiary Evidence Semantics v1
+       -> v0.6A Company Research and financial-transmission hypotheses
   -> v0.6B expectations and valuation observations
   -> v0.6C catalyst and risk assessments
   -> v0.6D industry and company quality judgments
-  -> read-only product surfaces over exact persisted boundaries
+  -> read-only product workspaces
   -> optional company-scoped Guarded AI D3 draft assistance
 ```
 
-Downstream accepted records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state or rewrite historical meaning.
+Typed Beneficiary Evidence Semantics extends one exact Stage 1 beneficiary through a separate append-only profile. It does not rewrite the Stage 1 beneficiary contract and does not automatically relink frozen Stage 2 records.
 
-Guarded AI consumes only an explicit deterministic Manifest projected from one accepted Company Research workspace. It cannot choose records, query the database, browse, search, retrieve missing evidence or mutate accepted state.
+Downstream accepted records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state or rewrite historical meaning.
 
 ## Current runtime and product surfaces
 
 When the configured database and local assets are available, the reviewed runtime contains:
 
-1. the existing local fixture-backed Dashboard;
+1. local fixture-backed Dashboard;
 2. database-backed read-only Market Cockpit and Industry Alpha APIs/demos;
-3. Evidence Intelligence / Research Change Feed from PR #139;
-4. Industry Beneficiary Workspace v1 from PR #143;
-5. Company Research Workspace v1 from PR #151;
-6. Guarded AI Research Assistance v1 from PR #161, disabled by default.
+3. Evidence Intelligence / Research Change Feed;
+4. Industry Beneficiary Workspace v1;
+5. Company Research Workspace v1;
+6. Guarded AI Research Assistance v1, disabled by default;
+7. Typed Beneficiary Evidence Semantics v1 detail inside Industry Research.
 
 ### Evidence Intelligence / Research Change Feed
 
-- Chinese-first read-only product surface for recent evidence and research changes;
-- bounded event-source scalar query plan;
+- Chinese-first read-only surface for recent evidence and research changes;
 - explicit time window, cutoff, provenance and deterministic ordering;
 - no opportunity ranking, score, recommendation or trading state;
 - detail navigation reuses accepted owning-domain contracts.
@@ -61,21 +63,34 @@ When the configured database and local assets are available, the reviewed runtim
 ### Industry Beneficiary Workspace v1
 
 - Chinese-first read-only `/industry-research` workspace;
-- requires an explicit persisted industry-map selection;
-- shows the complete cutoff-visible persisted Stage 1 beneficiary set for that selected map;
-- preserves exact stored beneficiary and assessment values;
-- uses a fixed-count scalar overview path and one explicit map-detail load;
-- loads full beneficiary or Stage 2 detail only after explicit user action;
+- requires explicit persisted Industry Map selection;
+- shows the complete cutoff-visible persisted Stage 1 beneficiary set for the selected map;
+- preserves exact stored legacy beneficiary and assessment values;
+- loads full beneficiary, typed-semantic or Stage 2 detail only after explicit user action;
 - does not claim full-market exhaustive coverage and does not rank beneficiaries.
+
+### Typed Beneficiary Evidence Semantics v1
+
+- separate append-only profile identity for one exact existing Stage 1 beneficiary;
+- immutable revisions freeze exact beneficiary revision, selected map revision, driver observation revision and accepted claim revisions;
+- taxonomy version is `aquantai.typed-beneficiary-evidence-semantics.v1`;
+- exposure taxonomy is exactly `direct / conditional / indirect / conceptual`;
+- legacy Stage 1 `direct / secondary / potential` is preserved and never automatically mapped;
+- driver, offering, customer, certification, capacity, production and order vocabularies are closed;
+- positive assertions require already-frozen claim revisions and attributable A/B/C evidence paths;
+- `missing`, `disputed` and `not_applicable` remain distinct;
+- all accepted semantic values are explicit analyst-owned D3 judgments;
+- deterministic code validates identity, chronology, vocabulary and evidence sufficiency but does not infer values from text, Provider metadata, company name, security code or AI output;
+- local CLI is the only write path; API and page are read-only;
+- writes are atomic and append-only with expected-latest conflict protection;
+- migration `20260721_0012` performs no backfill and refuses populated downgrade before any drop;
+- no network, LLM, ranking, score, valuation, recommendation, alert, portfolio or trading behavior.
 
 ### Company Research Workspace v1
 
 - Chinese-first read-only `/company-research` workspace;
 - requires one explicit persisted `company_research_id` and never silently selects the first row;
-- does not infer identity from stock code, company name, Provider industry, free text, title similarity or LLM output;
-- selector uses exactly 3 SQL statements;
-- selected workspace uses exactly 14 SQL statements;
-- query count is independent of hypothesis, expectation, valuation, catalyst, risk, judgment, claim and evidence row growth;
+- selector uses exactly 3 SQL statements and selected workspace uses exactly 14 SQL statements;
 - shows exact frozen Stage 1, stock, ingestion and v0.6A-v0.6D revision provenance;
 - keeps latest cutoff-visible revisions separate from exact frozen historical revisions;
 - displays historical revision mismatch and never automatically relinks it;
@@ -87,142 +102,57 @@ When the configured database and local assets are available, the reviewed runtim
 ### Guarded AI Research Assistance v1
 
 - available only inside one explicitly selected Company Research workspace;
-- local preview route projects an immutable deterministic Manifest and exact SHA-256 fingerprint;
-- Manifest projection performs zero SQL, filesystem or network I/O beyond the already completed workspace read;
-- request-time generation metadata is excluded from the fingerprint;
-- generation requires explicit remote-transmission confirmation and the exact expected fingerprint;
-- the server reloads the one Company Research workspace and rebuilds the Manifest before adapter invocation;
-- fingerprint mismatch returns `409` before network access;
+- local preview projects an immutable deterministic Manifest and exact SHA-256 fingerprint;
+- Manifest projection performs zero SQL, filesystem or network I/O beyond the completed workspace read;
+- generation requires explicit remote-transmission confirmation and exact expected fingerprint;
 - disabled by default with one explicit HTTPS OpenAI-compatible profile;
 - no default provider, endpoint or model;
-- no retry, provider/model fallback, streaming, tools, browsing, search, retrieval, embeddings or background execution;
-- strict application-owned response schema, section, fingerprint and Manifest-item citation validation;
+- no retry, fallback, streaming, tools, browsing, search, retrieval, embeddings or background execution;
+- strict application-owned response, section, fingerprint and Manifest-item citation validation;
 - prohibited recommendation and price-judgment language fails closed;
 - output is ephemeral D3 draft assistance only;
 - no prompt, model response, draft identity, revision, review state or accepted-domain mutation is persisted.
 
-### Product reading-surface consolidation decision
+## Consolidation decisions
 
-Issue #144 / PR #145 completed the first required review after Evidence Intelligence and Industry Beneficiary Workspace v1.
+The accepted consolidation reviews remain binding:
 
-Accepted decisions remain:
-
-- no production consolidation refactor was required before Company Research;
-- do not create a generic workspace framework merely for router, static-page or DOM similarity;
-- Evidence, Stage 1 and Stage 2 domain serializers, notices, cutoff rules and failure semantics remain domain-local;
-- each reading surface retains its bounded product-specific overview repository/query boundary;
-- existing Stage 2 list services remain valid owning-domain reads but are not composed into multi-domain overview pages;
-- stable schemas remain unchanged.
-
-### Company Research and Guarded AI consolidation gate
-
-Company Research Workspace v1 and Guarded AI Research Assistance v1 are the next two implemented product/domain slices after PR #145. Mandatory consolidation review is active under Issue #162.
-
-The candidate consolidation finding is:
-
-- no production refactor;
-- keep the Company Research workspace projection product-local;
-- keep deterministic Manifest construction separate from provider transport and response validation;
-- do not create a generic AI-agent, provider, prompt, RAG or product-page framework;
-- preserve the one company-scoped, explicit-confirmation, ephemeral D3 job;
-- consider Typed Beneficiary Evidence Semantics only as a later Architecture Preflight candidate.
-
-These findings are not accepted until the Issue #162 Draft PR receives independent fixed-head review and owner authorization.
-
-## Accepted future Provider direction
-
-Issue #108 and PR #109 accept Hithink as a preferred future A-share Provider candidate, not an active default or implemented Provider. AKShare remains an explicit, separate implemented Provider path, and existing runs and series remain immutable and readable.
-
-One ingestion run and one canonical series contain exactly one Provider. Silent fallback, Provider relabeling and row-level Provider mixing are prohibited. A caller may explicitly choose another reviewed run or series; persistence must not hide the distinction.
-
-Issue #112 / PR #113 did not establish a live Hithink contract, permission or data-use acceptance. No Hithink code, dependency, runtime/default-Provider change, schema change or migration reached `main`. Hithink may be reconsidered only through a new Architecture Preflight and explicit authorization.
-
-The Guarded AI provider profile is a separate optional model-transport configuration. It does not become a market-data Provider and may not relabel, mix or supply market evidence.
-
-## Accepted canonical market-price direction
-
-Issue #124 / PR #125 accept that standalone canonical market-price evidence has independent value for point-in-time inspection, audit and later downstream provenance. The preferred future owner is a separately reviewed market-data/evidence contract, not Stage 2 valuation or a future price-judgment domain.
-
-Provider-normalized rows, persisted `DailyPriceRecord` rows, latest-series/cutoff-aware reads, canonical evidence, v0.6B valuation observations, Comparison Eligibility and later judgment state remain separate boundaries.
-
-A linked `daily_price` row, a generic valuation `observed_value` or AI-generated text is context only. It is not automatically:
-
-- canonical current price;
-- comparison eligible;
-- a normalized valuation multiple;
-- fair value;
-- target price;
-- expected return;
-- upside or downside.
-
-No canonical-price implementation has Definition of Ready. Provider measurement semantics, explicit unit/currency, historical freezing, decimal limits, exact Provider/series/run/row selection, chronology, missing-state vocabulary, migration and rollback remain unresolved. Comparison Eligibility remains a later, separate deterministic contract.
-
-## Accepted neutral Stage 2 infrastructure boundaries
-
-The following neutral boundaries are accepted:
-
-- `industry_alpha.stage2_boundary`: exact shared frozen-boundary mechanics;
-- `industry_alpha.stage2_repository_rows`: stateless ordered scalar row loading;
-- `industry_alpha.stage2_query_values`: required UTC normalization, date-granular visibility and text formatting for reviewed domains;
-- `industry_alpha.stage2_integrity`: SQLAlchemy `IntegrityError` translation only;
-- `industry_alpha.stage2_revision_locks`: guarded process-local `(kind, UUID) -> RLock` registry only;
-- `industry_alpha.orm_append_only`: neutral append-only ORM mutation scan only.
-
-Domain semantics remain local. Repository graph assembly, optional-ID normalization, missing-parent policy, link selection, evidence serialization, claim projection, notices, aggregate errors, command transactions, row locks, revision-number allocation, supersession and retry policy remain with their owning domains unless a later characterization proves a neutral shared contract.
-
-The current implementable path does not include v0.6E price judgment, timing judgment, Watchlist tasks, Paper Portfolio, simulated trades, portfolio analysis or Quant Core workflow state.
-
-## Capability matrix
-
-| Capability | Merged boundary | Remaining boundary |
-| --- | --- | --- |
-| v0.3 market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Canonical market-price evidence still has no implementation DoR |
-| v0.4A-v0.4E Market Cockpit | Read-only selected-scope breadth/risk, context, liquidity and descriptive price behavior | No official full-market, valuation, regime, signal or recommendation claims |
-| v0.5A-v0.5C | Evidence ledger, industry maps, beneficiary classifications and candidate-pool handoff | No full-market beneficiary discovery; typed beneficiary semantics remain separate |
-| v0.6A | Company research and financial-transmission hypotheses | No automatic research acceptance or evidence promotion |
-| v0.6B | Expectations and valuation observations with optional local price provenance | `observed_value` is not automatically comparison eligible |
-| v0.6C | Catalyst and risk assessments | Not monitoring, alerts, tasks, timing or recommendation state |
-| v0.6D | Industry and company quality judgments | No price, timing, ranking or formal recommendation state |
-| Evidence Intelligence | Merged read-only Research Change Feed | No automated attention-to-opportunity promotion |
-| Industry Research | Merged Industry Beneficiary Workspace v1 | No new taxonomy, inferred discovery or valuation filtering |
-| Company Research | Merged Company Research Workspace v1 | No cross-company ranking, computed expectation gap or price-attractiveness judgment |
-| Guarded AI assistance | Merged company-scoped preview and explicit ephemeral D3 generation | No second AI job, persisted draft, tools, retrieval, accepted-state mutation or fallback |
-| Evidence Ingestion | Not implemented; Issue #154 / PR #155 deferred unmerged | Requires a new explicit restart Architecture Preflight; manual PDF import is not a current product prerequisite |
-| Typed Beneficiary Evidence Semantics | Prospective architecture candidate only | Field ownership, taxonomy, evidence requirements, revision, migration and UI remain unresolved |
-| v0.6E / v0.7+ | Superseded or prospective planning only | Not implemented or authorized |
+- no generic product-workspace framework merely for router, page or DOM similarity;
+- no generic AI-agent, provider registry, prompt, RAG, vector database or tool framework;
+- domain serializers, notices, cutoff rules and failure semantics remain domain-local;
+- Company Research projection, deterministic AI Manifest, provider transport and response validation remain separate bounded responsibilities;
+- Typed Beneficiary semantics remains a separate Stage 1 extension rather than modifying the accepted Stage 1 contract;
+- no new consolidation review is required until 5–6 implemented slices accumulate or concrete duplication/ownership/test-growth evidence appears.
 
 ## Field and infrastructure ownership
 
 | Information or mechanism | Authoritative owner | Rule |
 | --- | --- | --- |
-| Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit Provider per run and series; no silent fallback, relabeling, row-level mixing or cross-run stitching |
-| Canonical market-price value, measurement kind, unit, currency and decimal normalization | Future separately reviewed market-data/evidence contract | No implementation DoR; downstream code must not invent it |
-| Evidence grades, claims, links and conflicts | v0.5 evidence ledger | Downstream records freeze exact revisions and links |
+| Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit Provider per run and series; no silent fallback, relabeling or row-level mixing |
+| Canonical market-price value, unit, currency and comparison eligibility | Future separately reviewed market-data/evidence contract | No implementation DoR; downstream code must not invent it |
+| Evidence grades, claims, links and conflicts | v0.5 Evidence Ledger | Downstream records freeze exact revisions and links |
 | Industry map, nodes, relationships and observations | v0.5B | Exact persisted identities and cutoff-visible revisions only |
-| Stage 1 beneficiary classification and rationale | v0.5C | Preserve exact stored taxonomy and revision history; no inferred remapping |
-| Future typed beneficiary/customer/certification/capacity/production/order semantics | Unassigned pending Architecture Preflight | Must not be inferred from free text, Provider industry, security code or model output |
+| Legacy beneficiary identity/classification and rationale | v0.5C Stage 1 | Preserve exact `direct / secondary / potential` values and revision history |
+| Typed beneficiary exposure and execution-evidence profile | `industry_alpha.beneficiary_semantics_*` | Separate append-only D3 profile; no automatic legacy mapping or hidden inference |
+| Typed semantic write transaction | `beneficiary_semantics_commands.py` | CLI-only, atomic, expected-latest and append-only |
+| Typed semantic read projection | `beneficiary_semantics_query.py` and read-only API | Explicit beneficiary selector and exact revision/evidence provenance |
 | Company-research workflow and financial hypotheses | v0.6A | Downstream records bind exact revisions |
-| Expectations and valuation observations | v0.6B | Stored research context only without later Comparison Eligibility |
+| Expectations and valuation observations | v0.6B | Stored research context only without Comparison Eligibility |
 | Catalyst and risk assessments | v0.6C | Not monitors, alerts, tasks or timing models |
 | Industry/company quality outcome and evidence state | v0.6D | Does not generate price, timing or recommendation state |
 | Product overview aggregation | Product-specific read repository/query | Explicit selectors, bounded query counts and no domain-meaning change |
 | Company Research AI input projection | `guarded_ai_manifest.py` | Deterministic zero-I/O Manifest, stable item IDs and SHA-256 fingerprint |
-| Guarded AI profile and HTTPS request | `guarded_ai_adapter.py` | One explicit disabled-by-default profile, one request, no retry or fallback |
-| Guarded AI confirmation and output validation | `guarded_ai_service.py` | Exact fingerprint comparison, strict schema/citations and D3-only result |
-| Guarded AI UI state | Company Research page script | Explicit preview and confirmation; safe DOM; no credential or endpoint display |
-| Shared frozen-boundary mechanics | `stage2_boundary.py` | Exact accepted boundary mechanics; semantics remain local |
-| Ordered scalar repository loading | `stage2_repository_rows.py` | Explicit filtering and caller-owned ordering only |
-| Evidence read serialization | Owning Evidence/Stage 1/Stage 2 query module | Remains domain-local under PR #93 and PR #145 decisions |
-| Revision allocation and database lock strategy | Owning command module | Remains domain-local |
-| Future ingestion raw capture, normalization, deduplication and review state | Deferred / not assigned | Issue #154 / PR #155 remain design history only; restart requires a new explicit source decision and Architecture Preflight |
-| “Good price” and “good timing” | Conceptual future workflow | Not current runtime entities |
+| Guarded AI profile and HTTPS request | `guarded_ai_adapter.py` | One disabled-by-default explicit profile, one request, no retry or fallback |
+| Guarded AI confirmation and output validation | `guarded_ai_service.py` | Exact fingerprint, strict schema/citations and D3-only result |
+| Future ingestion raw capture and review state | Deferred / not assigned | Restart requires a new explicit source decision and Architecture Preflight |
+| Research-priority comparison, score or ordering | Unassigned pending next Strict Architecture Preflight | Must not be inferred from recency, evidence count, price context or AI output |
 
 ## Shared architecture invariants
 
 1. Local and non-advisory: no advice, performance promise, broker, real order or automated trading.
-2. Deterministic calculations and state stay outside LLM ownership.
+2. Deterministic calculations and accepted state stay outside LLM ownership.
 3. Imports, startup, tests, CI, fixture demos and ordinary reads perform no hidden external network access.
-4. Exact IDs, series keys, scopes, dates and revisions are explicit.
+4. Exact IDs, series keys, scopes, dates, revisions and selectors are explicit.
 5. Downstream accepted records freeze exact revisions and links.
 6. Corrections append revisions; accepted history is not mutated through ordinary paths.
 7. Information cutoff and recorded UTC chronology both prevent later-information leakage.
@@ -234,192 +164,155 @@ The current implementable path does not include v0.6E price judgment, timing jud
 13. Credentials and raw connection details never enter source, fixtures, Issues, PRs, logs or user errors.
 14. Capability, product-surface and consolidation merges do not change released version without a separate release decision.
 15. A product reading surface cannot upgrade Semantic Level or Derivation Level through display, non-null fields or inference.
-16. Initial overview query count remains bounded independently of displayed row count unless a reviewed task explicitly authorizes otherwise.
+16. Initial overview query count remains bounded independently of displayed row count unless explicitly reviewed.
 17. External-source ingestion requires explicit source authorization and may not appear as hidden runtime or test network access.
-18. Candidate entity matching is not accepted identity; human review is required before accepted EvidenceItem or claim linkage unless a later reviewed deterministic contract explicitly says otherwise.
-19. Model-generated text is D3 draft assistance unless an independently reviewed deterministic contract says otherwise; it cannot self-promote to D0, D1, accepted D2 or accepted domain state.
-20. Guarded AI may consume only an explicit Manifest of accepted persisted inputs and may not browse, crawl, search, infer hidden identity, fetch missing evidence or mutate accepted records as a fallback.
-21. A remote Guarded AI request requires local preview, explicit confirmation, an exact expected fingerprint and one explicit provider/model profile.
-22. Unknown model citations, malformed output, fingerprint mismatch and prohibited recommendation/price language fail closed with no usable partial draft.
-23. No generic AI-agent, provider registry, prompt framework, RAG layer or tool system may be introduced without a separate Architecture Preflight.
+18. Candidate entity matching is not accepted identity; human review is required before accepted evidence linkage unless a reviewed deterministic contract says otherwise.
+19. Model-generated text is D3 draft assistance and cannot self-promote to accepted D0, D1, D2 or domain state.
+20. Guarded AI may consume only an explicit Manifest of accepted persisted inputs and may not fetch missing evidence or mutate accepted records.
+21. A remote Guarded AI request requires local preview, explicit confirmation, exact expected fingerprint and one explicit provider/model profile.
+22. Unknown model citations, malformed output, fingerprint mismatch and prohibited recommendation/price language fail closed.
+23. No generic AI-agent, provider registry, prompt framework, RAG layer or tool system without a separate Architecture Preflight.
+24. Typed beneficiary values remain analyst-owned D3 judgments; closed vocabularies and evidence checks do not convert them into D2 rules.
+25. Legacy and typed beneficiary classifications may disagree; disagreement is visible history, not an automatic correction or mapping.
+26. No research-priority comparison may collapse industry benefit, company execution, evidence quality, valuation context and risk into an unexplained total.
 
-## Semantic Level
+## Semantic and derivation levels
 
-Semantic Level defines consumption eligibility, not quality. A level cannot be upgraded through inference, non-null fields, UI display, AI output or guesswork.
+### Semantic Level
 
-### L0 — Raw Provider Data
+- **L0 — Raw Provider Data:** source output before internal normalization; audit only.
+- **L1 — Provider Normalized:** project fields with Provider-specific constraints; not automatically comparable.
+- **L2 — Standardized:** standardized through an explicit accepted contract; usable only within that contract.
+- **L3 — Canonical:** identity, measurement, unit, currency, market, adjustment, provenance, cutoff, chronology, decimal and missing-state contract. No current price implementation has reached L3.
 
-Direct Provider output before internal normalization. Allowed for raw auditing, source inspection and adapter diagnostics. It is not automatically standardized, unit-verified, currency-verified or cross-series comparable.
+A level cannot be upgraded through inference, non-null fields, UI display, AI output or guesswork.
 
-### L1 — Provider Normalized
+### Evidence Qualification / Derivation Level
 
-Data normalized into project fields while retaining Provider-specific constraints. Allowed for source-attributed read-only display and deterministic local statistics within one explicit series. It is not automatically canonical, comparison eligible or suitable for investment signals.
+- **D0 — Direct Fact:** directly supported by an explicit source.
+- **D1 — Deterministic Aggregation:** fully recorded inputs, scope, algorithm and missing treatment.
+- **D2 — Rule Classification:** explicit versioned rules and responsibility boundary.
+- **D3 — Analytical Judgment:** analysis or interpretation, including typed beneficiary semantics and AI drafts.
 
-### L2 — Standardized
+D3 does not automatically enter buy/sell guidance, target prices, return promises, trading signals or cross-company rankings.
 
-Measurement kind, format, unit or another required field is standardized through an explicit accepted contract. Deterministic analysis is allowed only within that contract. L2 is not automatically full canonical evidence or universally comparable.
+## Capability matrix
 
-### L3 — Canonical
-
-Satisfies an accepted canonical contract including identity, unit, currency, market, adjustment semantics, Provider/series/run/row provenance, cutoff and UTC visibility, historical freeze method, decimal policy and missing-state behavior. No current price implementation has reached this level.
-
-## Evidence Qualification / Derivation Level
-
-### D0 — Direct Fact
-
-A fact directly supported by an explicit source, such as an announcement, import timestamp or exact Provider-normalized value.
-
-### D1 — Deterministic Aggregation
-
-Produced from a fully recorded input set, scope, time window and deterministic algorithm. D1 discloses inputs, time window, deduplication, missing-value handling, algorithm and sorting.
-
-### D2 — Rule Classification
-
-Depends on explicit versioned rules. D2 exposes rule version, classification source and human/system responsibility boundary.
-
-### D3 — Analytical Judgment
-
-Contains analysis, interpretation or research judgment. D3 remains separate from D0/D1 and does not automatically enter buy/sell suggestions, target prices, return promises, trading signals or cross-company rankings.
-
-Model-generated summaries, contradiction prompts, missing-evidence prompts, research questions and review checklists are D3 drafts. Their source Manifest, cutoff and model/adapter provenance remain visible, and they do not become accepted Evidence Ledger or Stage 1/Stage 2 state through display, citation or user convenience.
-
-## Development task classification
-
-### Architecture Task
-
-Full Architecture Preflight, Definition of Ready and fixed-head review are required when work changes schema, migration, Provider, data meaning, Semantic Level, revision rules, cutoff, provenance, fallback/identity/join rules, persistent state, computation contracts, rule classifications, external-network boundaries or security.
-
-An Architecture Task must not be disguised as UI display.
-
-### Product Task
-
-A Product Task may use the lighter process only when it reads accepted contracts, adds no persistent state, changes no field meaning/invariant/computation/Provider/cutoff/revision/provenance, upgrades no Semantic Level and does not disguise D2/D3 as D0/D1.
-
-Typical Product Tasks are bounded read-only pages, query composition, reading-experience optimization, accessibility and serialization display without semantic change.
+| Capability | Merged boundary | Remaining boundary |
+| --- | --- | --- |
+| Market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Canonical market-price evidence still has no implementation DoR |
+| Market Cockpit | Read-only selected-scope breadth/risk, context, liquidity and descriptive price behavior | No official full-market, valuation, signal or recommendation claims |
+| Evidence Ledger / Industry Map | Evidence, claims, conflicts, map identities and exact revisions | No external automated evidence acquisition |
+| Stage 1 beneficiary | Legacy beneficiary identity/classification and candidate-pool handoff | No automatic full-market beneficiary discovery |
+| Typed Beneficiary Semantics | Merged append-only exposure and execution-evidence profiles | No automatic mapping, extraction, ranking or recommendation |
+| Company Research v0.6A-v0.6D | Financial hypotheses, expectations, valuation observations, catalysts, risks and quality judgments | No automatic acceptance, price judgment or recommendation |
+| Evidence Intelligence | Merged read-only Research Change Feed | No attention-to-opportunity promotion |
+| Industry Research | Merged beneficiary workspace plus explicit typed-semantic detail | No cross-company research-priority comparison |
+| Company Research | Merged exact company workspace | No cross-company ranking, computed expectation gap or price-attractiveness judgment |
+| Guarded AI | Merged company-scoped preview and explicit ephemeral D3 generation | No second AI job, persisted draft, tools, retrieval or accepted-state mutation |
+| Evidence Ingestion | Not implemented and deferred | Requires explicit source authorization and restart Architecture Preflight |
+| Research Priority Comparison | Not implemented | Requires next Strict Architecture Preflight |
+| Canonical Price / Comparison Eligibility | Not implemented | Separate Architecture Preflight required |
 
 ## Architecture debt register
 
-- **D1 Documentation drift — active synchronization:** Issue #162 synchronizes the merged Guarded AI capability and current consolidation gate.
-- **D2 Repeated Stage 2 structure — bounded:** neutral frozen-boundary and ordered-row mechanics are shared; generic graph loading remains unjustified.
+- **D1 Documentation drift — resolved by this sync:** baseline now records PR #165 and PR #169.
+- **D2 Repeated Stage 2 structure — bounded:** neutral mechanics are shared; generic graph loading remains unjustified.
 - **D3 Read utilities — reviewed:** evidence serializers and domain notices remain local.
-- **D4 Command lifecycle and concurrency — partially reduced:** integrity translation and process-local locks are shared; allocation and transaction semantics remain local.
+- **D4 Command lifecycle and concurrency — partially reduced:** integrity translation and process-local locks are shared; allocation and transactions remain local.
 - **D5 ORM lifecycle — bounded:** accepted listener/import/mapper/metadata compatibility remains in place.
-- **D6 Test-matrix growth — bounded:** shared-invariant tests and domain-semantic tests remain distinct; a second AI job would trigger renewed review.
+- **D6 Test-matrix growth — bounded:** shared-invariant and domain-semantic tests remain distinct.
 - **D7 Fixture-versus-production Provider reachability — deferred:** Hithink live contract and permission are not established.
 - **D8 Canonical market-price semantics — unresolved:** no canonical-price implementation DoR.
-- **D9 Product overview query architecture — resolved for current surfaces:** Company Research uses a bounded 3/14 query boundary and does not compose Stage 2 N+1 list services.
-- **D10 Consolidation cadence — active:** Issue #162 is required after Company Research Workspace v1 and Guarded AI v1.
-- **D11 Evidence-ingestion source and review ownership — deferred:** Issue #154 / PR #155 remain unmerged design history; no current product path depends on manual PDF import.
-- **D12 Guarded AI ownership — resolved for v1:** Company Research projection, deterministic Manifest, adapter transport, response validation and ephemeral D3 rendering have explicit owners.
-- **D13 Typed beneficiary evidence semantics — unresolved:** final taxonomy, typed execution evidence, ownership, revision and migration require a separate Architecture Preflight.
-
-## Development gates
-
-1. **Architecture Preflight:** problem, ownership, inputs, golden/failure paths, migration/dependency/network impact, conflicts, smallest slice and exclusions.
-2. **Definition of Ready:** one objective, accepted contracts, ownership, reachable paths, selectors/chronology, migration decision, bounded tests and stop conditions.
-3. **Planning before implementation:** architecture decisions precede implementation Issue and task snapshot.
-4. **Reset threshold:** reset when ownership is ambiguous, semantics depend on inference/defaults, production cannot reach the path, or authoritative documents disagree.
-5. **Consolidation cadence:** review documentation, duplicated infrastructure, schema/link growth, tests, APIs and next-stage reachability after every two implemented domain/product slices.
-6. **Review evidence:** green CI is necessary but not sufficient; ownership, reachability, semantics and scope must also pass.
-7. **Fixed-head gate:** independent approval must name the exact reviewed HEAD before an architecture, consolidation or implementation PR is merged.
+- **D9 Product overview query architecture — resolved for current surfaces:** bounded query boundaries remain product-local.
+- **D10 Consolidation cadence — reset:** new risk-tiered cadence is 5–6 slices or concrete duplication/ownership evidence.
+- **D11 Evidence-ingestion source and review ownership — deferred.**
+- **D12 Guarded AI ownership — resolved for v1.**
+- **D13 Typed beneficiary evidence semantics — resolved for v1:** ownership, taxonomy, evidence, revision, migration and UI boundaries are implemented.
+- **D14 Research-priority comparison semantics — unresolved:** component ownership, comparison eligibility, missing treatment and non-advisory presentation require a Strict Architecture Preflight.
 
 ## Accepted product sequence
 
 Completed:
 
-1. architecture rebalance and Evidence Intelligence roadmap;
-2. Evidence Intelligence Architecture Preflight;
-3. Research Change Feed implementation — PR #139;
-4. Industry Beneficiary Workspace v1 Architecture Preflight — PR #141;
-5. Industry Beneficiary Workspace v1 implementation — PR #143;
-6. first product reading-surface consolidation review — PR #145;
-7. product-surface baseline synchronization — PR #147;
-8. Company Research Workspace v1 Architecture Preflight — PR #149;
-9. Company Research Workspace v1 implementation — PR #151;
-10. Company Research baseline synchronization — PR #153;
-11. owner-approved Evidence Ingestion deferral and route synchronization — PR #157;
-12. Guarded AI Research Assistance v1 Architecture Preflight — PR #159;
-13. Guarded AI Research Assistance v1 implementation — PR #161.
+1. Evidence Intelligence / Research Change Feed — PR #139;
+2. Industry Beneficiary Workspace v1 — PR #143;
+3. first reading-surface consolidation — PR #145;
+4. Company Research Workspace v1 — PR #151;
+5. Guarded AI Research Assistance v1 — PR #161;
+6. Company Research and Guarded AI consolidation — PR #163;
+7. risk-tiered governance workflow — PR #167;
+8. Typed Beneficiary Evidence Semantics v1 Architecture Preflight — PR #165;
+9. Typed Beneficiary Evidence Semantics v1 implementation — PR #169.
 
-Active documentation gate:
+Deferred:
 
-- Company Research and Guarded AI consolidation review — Issue #162.
-
-Deferred design work:
-
-- Evidence Ingestion Architecture Preflight — Issue #154 / closed-unmerged PR #155;
+- Evidence Ingestion Issue #154 / closed-unmerged PR #155;
 - no ingestion implementation, migration, dependency, source adapter or runtime behavior reached `main`.
 
-Current authorization state:
+## Current authorization state
 
-- Issue #162 documentation-only consolidation review is the only active gate;
-- no new application implementation, Provider, schema, migration, dependency, release or version change is authorized;
-- no second AI job, persisted AI state, provider registry, agent, tools, retrieval or background work is authorized;
-- Evidence Ingestion remains deferred;
-- Canonical Price, Comparison Eligibility, ranking, scoring, target price, expected return and recommendation state remain unauthorized.
+- Typed Beneficiary Evidence Semantics v1 is merged and Issue #168 is completed.
+- No active production implementation, schema, migration, Provider, external-network, AI-transmission, release or version change is authorized.
+- Owner authorization advances only the next roadmap architecture phase.
+- The next gate is a Strict Architecture Preflight for Company Research Priority Comparison v1.
+- No implementation task may merge before independent fixed-head architecture and implementation reviews.
+- Evidence Ingestion remains deferred.
+- Canonical Price and Comparison Eligibility remain separate and unauthorized.
+- Buy/sell/hold, target price, expected return, portfolio and trading remain prohibited.
 
-## Recommended forward sequence
-
-This ordering is not implementation authorization. Every item requires its own linked Issue and applicable review gate.
-
-1. complete Issue #162 documentation-only consolidation review and independent fixed-head approval;
-2. merge its three-file documentation PR only after owner authorization;
-3. if the accepted review retains the current finding, open a separate Typed Beneficiary Evidence Semantics Architecture Preflight;
-4. create no implementation task until that preflight establishes exact field ownership, source reachability, revision and migration decisions;
-5. reconsider Evidence Ingestion only through a new explicit restart decision that avoids manual PDF upload as a required workflow;
-6. continue the parallel Canonical Price and Comparison Eligibility infrastructure track only through separate Architecture Preflight;
-7. reconsider any second AI job, persisted draft, monitoring, comparison or ranking only through separate authorization.
-
-## Candidate next architecture gate: Typed Beneficiary Evidence Semantics v1
-
-This candidate is not authorized until Issue #162 is accepted and the owner explicitly advances it.
+## Next Strict architecture gate: Company Research Priority Comparison v1
 
 Candidate user job:
 
-> For one explicitly selected persisted Industry Map and one existing Stage 1 beneficiary identity, record and review typed beneficiary exposure and execution-evidence states with exact source, revision, cutoff, conflict and missing-data provenance, without ranking companies or inferring accepted state from free text or AI output.
+> For one explicit persisted Industry Map or candidate-pool revision, review multiple exact company-research records side by side across industry benefit, typed execution evidence, financial transmission, expectations, catalysts, risks, quality judgments, conflicts and freshness, without hiding the complete beneficiary universe or issuing investment recommendations.
 
-The Architecture Preflight must establish:
+The Architecture Preflight must decide:
 
-1. authoritative owner and append-only revision identity;
-2. whether the capability extends Stage 1 or uses a separate semantic layer;
-3. accepted beneficiary taxonomy and compatibility with current `direct / secondary / potential` labels;
-4. driver type and subtype ownership;
-5. customer, certification, capacity, production and order-stage vocabularies;
-6. exact evidence-link requirements;
-7. missing, unknown and conflicting-state behavior;
-8. deterministic rule versus explicit analyst ownership;
-9. cutoff, recorded UTC, supersession and historical-freeze rules;
-10. migration and rollback decision;
-11. production-realistic offline golden and failure paths;
-12. no free-text, Provider-name, security-code or LLM acceptance inference;
+1. exact comparison identity, selector and frozen input revisions;
+2. whether the first slice is component-only comparison, categorical research status, deterministic score or no computed ordering;
+3. ownership of industry certainty, beneficiary execution, financial transmission, expectations, catalyst, risk, evidence quality and freshness components;
+4. separation of industry-benefit certainty from investment-attractiveness research judgment;
+5. missing, disputed, stale and not-applicable treatment;
+6. rule version, weights, penalties and explanation if any D2 classification or score is proposed;
+7. whether any price or valuation comparison requires Canonical Price and Comparison Eligibility and therefore must be excluded or stopped;
+8. cutoff, recorded UTC, supersession and historical-freeze behavior;
+9. query-count and complete-universe visibility requirements;
+10. explicit D0/D1/D2/D3 presentation and non-advisory language;
+11. production-realistic offline golden path and fail-closed path;
+12. schema/migration decision, rollback and downgrade behavior;
 13. exact API/UI, tests, exclusions and stop conditions.
 
-The preflight must stop if required fields cannot be sourced or owned without hidden inference.
+The preflight must stop if:
+
+- comparison requires hidden company, industry, price, currency or unit inference;
+- a total score cannot expose deterministic inputs and missing treatment;
+- price attractiveness cannot be separated from non-canonical price context;
+- complete beneficiary-universe visibility would be lost;
+- output would function as buy/sell/hold guidance or conceal conflicts.
 
 ## Locked exclusions for the next gate
 
-- no Evidence Ingestion restart, PDF requirement, crawling, scraping, browsing or external search;
-- no automatic evidence acquisition or accepted evidence promotion;
-- no automatic company/industry identity inference;
-- no AI-owned taxonomy or accepted field state;
+- no external evidence acquisition, crawling, scraping, browsing or hidden network;
+- no automatic accepted evidence promotion;
+- no automatic company, industry, market, exchange, currency or price identity inference;
+- no AI-owned score, ranking, taxonomy or accepted field state;
 - no generic agent, RAG, vector database, tools or provider framework;
-- no cross-company ranking, score or research-priority ordering;
-- no Canonical Price or Comparison Eligibility;
-- no fair value, target price, expected return, upside/downside, buy/sell/hold or recommendation state;
+- no fair value, target price, expected return, upside/downside or buy/sell/hold state;
 - no monitoring, alerts, tasks, portfolio or trading;
 - no release or version change.
 
-## Preserved canonical-price no-DoR conclusion
+## Preserved Canonical Price no-DoR conclusion
 
-Canonical price remains a parallel infrastructure track and is still required for canonical comparison, price judgment and Comparison Eligibility.
+Canonical Price remains a parallel infrastructure track and is required before canonical price comparison, price judgment or Comparison Eligibility.
 
 Unauthorized assumptions remain:
 
 - exchange inference from security-code prefix;
 - treating null exchange as a specific market;
 - defaulting currency without recorded source;
-- inferring unit/currency from Provider name;
+- inferring unit or currency from Provider name;
 - silent fallback to another Provider;
 - treating a linked daily-price row, valuation `observed_value` or AI output as automatically canonical.
 
-No prospective item is authorized by this document alone.
+No prospective implementation is authorized by this document alone.
