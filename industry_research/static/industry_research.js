@@ -10,6 +10,7 @@ const mapSummaryPanel = document.getElementById("map-summary-panel");
 const mapSummary = document.getElementById("map-summary");
 const observationsPanel = document.getElementById("observations-panel");
 const observations = document.getElementById("observations");
+const mapEvidenceSummary = document.getElementById("map-evidence-summary");
 const beneficiariesPanel = document.getElementById("beneficiaries-panel");
 const beneficiaryBody = document.getElementById("beneficiary-body");
 const beneficiaryCount = document.getElementById("beneficiary-count");
@@ -88,6 +89,7 @@ async function fetchJson(path) {
 function resetWorkspace() {
   mapSummary.replaceChildren();
   observations.replaceChildren();
+  mapEvidenceSummary.replaceChildren();
   beneficiaryBody.replaceChildren();
   beneficiaryCount.textContent = "0 家";
   mapSummaryPanel.hidden = true;
@@ -167,6 +169,12 @@ function renderObservations(payload) {
   if (!items.length) {
     observations.append(node("p", "当前冻结地图没有可见的 driver / bottleneck / value_pool_shift 观察。", "muted"));
   }
+  const evidence = payload.map_evidence_summary || {};
+  const grades = evidence.evidence_grade_summary || {};
+  mapEvidenceSummary.replaceChildren();
+  addDefinition(mapEvidenceSummary, "A / B / C / D 证据数", `${grades.A || 0} / ${grades.B || 0} / ${grades.C || 0} / ${grades.D || 0}`);
+  addDefinition(mapEvidenceSummary, "冲突证据", (evidence.conflicts || []).length);
+  addDefinition(mapEvidenceSummary, "缺失证据", (evidence.missing_evidence || []).length);
   observationsPanel.hidden = false;
 }
 
@@ -196,6 +204,9 @@ function renderBeneficiaries(payload) {
     companyBox.append(node("p", `${stock.stock_name || "名称不可用"} · ${item.stock_code}`));
     companyBox.append(node("p", `${stock.exchange || "交易所不可用"} · ${item.source}`, "muted"));
     companyBox.append(node("p", `stock_basic #${stock.stock_basic_record_id ?? "不可用"}`, "muted"));
+    const ingestion = stock.ingestion_run || {};
+    companyBox.append(node("p", `ingestion #${ingestion.ingestion_run_id ?? "不可用"} · ${ingestion.provider || "来源不可用"}`, "muted"));
+    companyBox.append(node("p", `来源截止：${ingestion.information_cutoff_date || "不可用"}`, "muted"));
     appendCell(row, companyBox);
 
     const kindBox = document.createElement("div");
@@ -206,6 +217,7 @@ function renderBeneficiaries(payload) {
     const statusBox = document.createElement("div");
     statusBox.append(node("span", revision.assessment_status, "raw-value"));
     statusBox.append(node("p", `r${revision.revision_no || "?"}`, "muted"));
+    statusBox.append(node("p", `当前修订：${revision.revision_id || "不可用"}`, "muted"));
     appendCell(row, statusBox);
 
     appendCell(row, node("p", revision.rationale_summary || "不可用"));
@@ -220,7 +232,8 @@ function renderBeneficiaries(payload) {
       stage2Box.append(node("span", research.latest_revision.workflow_state, "raw-value"));
       stage2Box.append(node("p", research.latest_revision.conclusion_status || "不可用"));
       stage2Box.append(node("p", research.history_notice, "muted"));
-      stage2Box.append(node("p", `冻结修订：${research.frozen_beneficiary_revision_id}`, "muted"));
+      stage2Box.append(node("p", `当前 Stage 1 修订：${research.current_overview_beneficiary_revision_id}`, "muted"));
+      stage2Box.append(node("p", `Stage 2 冻结修订：${research.frozen_beneficiary_revision_id}`, "muted"));
     } else {
       stage2Box.append(node("p", "尚无冻结的公司财务传导研究"));
     }
