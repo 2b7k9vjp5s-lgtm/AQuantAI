@@ -99,6 +99,7 @@ def test_industry_research_page_is_served() -> None:
     assert "产业受益公司研究" in response.text
     assert "已录入受益公司全量" in response.text
     assert "不是全市场排名" in response.text
+    assert "地图证据状态" in response.text
 
 
 def test_page_script_uses_safe_dom_and_explicit_map_selection() -> None:
@@ -115,6 +116,9 @@ def test_page_script_uses_safe_dom_and_explicit_map_selection() -> None:
     assert 'firstElementChild.value = ""' in script
     assert "/industry-alpha/beneficiaries/" not in script
     assert "beneficiary_detail_path" in script
+    assert "mapEvidenceSummary" in script
+    assert "current_overview_beneficiary_revision_id" in script
+    assert "ingestion.information_cutoff_date" in script
 
 
 def test_selector_and_workspace_api_return_read_only_contract(monkeypatch) -> None:
