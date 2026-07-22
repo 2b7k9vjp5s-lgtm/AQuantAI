@@ -5,12 +5,13 @@
 - Implementation Issue: #181
 - Architecture Issue: #179
 - Architecture PR: #180
-- Architecture fixed head at implementation start: `c2fdd00d1e2b68167fc6b15e19b0c64653f63290`
+- Approved architecture fixed head: `442ed5c01745113eaf4f9abc50d21d9dd54eb924`
 - Required implementation base: `ccb949beb08d25d4b91ae970b1e1781a09d92f8e`
 - Risk tier: **Strict**
 - Owner authorization: `进行下一阶段开发，完成目标实现` on 2026-07-22
+- Owner continuation authorization: `根据最新状态继续开发` on 2026-07-22
 
-Implementation may proceed in parallel, but it must not merge before the architecture is independently approved and merged.
+Implementation may proceed in parallel, but it must not merge before the approved architecture is merged with explicit owner authorization.
 
 ## Objective
 
@@ -55,6 +56,24 @@ No existing-table mutation or backfill. All new records are append-only. Populat
 
 Component revisions are explicit analyst-owned D3 inputs. Scores use decimal text in range 0.00–100.00, standardized with `ROUND_HALF_EVEN` to two decimal places.
 
+## Verification contract
+
+Every component revision stores explicit analyst-owned:
+
+- `verification_state`;
+- `verification_material`;
+- `verification_item_code`;
+- `verification_question`.
+
+Rules:
+
+- `verified` / `not_applicable` require `verification_material=false` and forbid item/question fields;
+- `pending` / `failed` require `verification_material=true`, one closed item code and one bounded question;
+- pending and failed verification both prohibit numeric aggregation and priority ordinal;
+- pending yields `awaiting_verification`;
+- failed yields `not_current_candidate` after the existing missing/disputed precedence;
+- no external verification workflow, hidden inference or AI-owned accepted state.
+
 ## Deterministic rule
 
 Positive weights:
@@ -81,6 +100,14 @@ Reject omission, duplication, substitution or revision mismatch before any inser
 
 `investment_candidate_universe_mismatch`
 
+## Exact provenance invariants
+
+- exact Claim and Evidence inputs must belong to the exact Research Case;
+- supported `evidence_quality` must reuse exact Claim and Evidence inputs from other supported components;
+- Canonical Price and Comparison Eligibility must be supplied as one exact pair whenever either is present;
+- a supported valuation component must bind the same exact price/eligibility pair as the member manifest;
+- all accepted upstream rows must satisfy both information-cutoff and recorded-UTC boundaries.
+
 ## Commands
 
 ```text
@@ -101,11 +128,11 @@ Both require `as_of_cutoff` and timezone-aware `as_of_recorded_at_utc`.
 
 Add a Chinese-first read-only `/investment-candidates` workspace requiring one exact snapshot revision and both boundaries.
 
-The page must highlight up to three priority/watch candidates and also show the entire candidate-pool universe with component/provenance/reason details.
+The page must highlight up to three priority/watch candidates and also show the entire candidate-pool universe with component/provenance/reason and verification-item details.
 
 ## Golden path
 
-One exact three-member pool produces:
+One exact append-only three-member pool produces:
 
 - A: `priority_candidate`
 - B: `pricing_demanding`
@@ -115,7 +142,7 @@ All three remain visible. Verify exact revisions, as-of boundaries, Decimal calc
 
 ## Primary failure path
 
-Omit one member and substitute a newer revision for another. Expected:
+Omit one member or substitute a revision. Expected:
 
 - `investment_candidate_universe_mismatch`
 - zero partial writes
@@ -148,14 +175,14 @@ Do not create a generic scoring, rule, workspace, portfolio or trading framework
 - append-only and stale expected-latest rollback
 - exact upstream revision and chronology tests
 - canonical price/eligibility compatibility tests
-- status precedence, pending, missing, disputed and falsification tests
+- status precedence, pending, failed, missing, disputed and falsification tests
 - deterministic tie break and top-three tests
 - exact-ID API and page tests
 - bounded query-count tests
 - SQLite and PostgreSQL migration round trip
 - PostgreSQL concurrency and populated downgrade refusal
 - full relevant regression
-- offline golden-path fixture demo
+- append-only three-member offline golden path
 - no-hidden-network tests
 
 ## Required implementation approval
