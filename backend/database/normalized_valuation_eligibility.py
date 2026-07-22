@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.canonical_price import (
+    REASON_CODES,
     CanonicalPriceCommandService,
     CanonicalPriceError,
+    CanonicalPriceNotFound,
+    _as_of_revision,
     _chronology,
     _eligibility_input,
     _expected,
+    _iso,
     _latest,
+    _price_payload,
+    _read_boundary,
+    _stored_utc,
+    _visible,
     _visible_upstream,
 )
 from backend.database.canonical_price_models import (
@@ -137,6 +147,125 @@ class NormalizedValuationEligibilityCommandService(CanonicalPriceCommandService)
             **result,
             "assessment_id": str(identity.id),
             "eligibility_revision_id": str(revision.id),
+        }
+
+
+class NormalizedValuationEligibilityQueryService:
+    """Read the Slice 5 eligibility purpose without widening generic writes."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_eligibility(
+        self,
+        identity_id: UUID,
+        *,
+        as_of_cutoff: date,
+        as_of_recorded_at_utc: datetime,
+    ) -> dict[str, Any]:
+        boundary = _read_boundary(as_of_cutoff, as_of_recorded_at_utc)
+        identity = self._session.get(ComparisonEligibilityAssessment, identity_id)
+        if identity is None or identity.purpose_code != NORMALIZED_VALUATION_PURPOSE:
+            raise CanonicalPriceNotFound(
+                "eligibility_not_found",
+                "normalized valuation eligibility assessment was not found",
+            )
+        revision = _as_of_revision(
+            self._session,
+            ComparisonEligibilityRevision,
+            "assessment_id",
+            identity.id,
+            as_of_cutoff,
+            boundary,
+        )
+        if revision is None:
+            raise CanonicalPriceNotFound(
+                "eligibility_not_visible",
+                "normalized valuation eligibility is not visible at the requested boundaries",
+            )
+        members = tuple(
+            self._session.scalars(
+                select(ComparisonEligibilityMember)
+                .where(
+                    ComparisonEligibilityMember.eligibility_revision_id
+                    == revision.id
+                )
+                .order_by(
+                    ComparisonEligibilityMember.position,
+                    ComparisonEligibilityMember.id,
+                )
+            )
+        )
+        prices: list[CanonicalPriceRevision] = []
+        payloads: list[dict[str, Any]] = []
+        for member in members:
+            if _stored_utc(member.recorded_at_utc) > boundary:
+                raise CanonicalPriceError(
+                    "canonical_graph_inconsistent",
+                    "eligibility member is outside the frozen boundary",
+                )
+            price = self._session.get(
+                CanonicalPriceRevision, member.canonical_price_revision_id
+            )
+            if price is None or not _visible(price, as_of_cutoff, boundary):
+                raise CanonicalPriceError(
+                    "canonical_graph_inconsistent",
+                    "eligibility member price is not visible",
+                )
+            if not _visible(
+                price,
+                revision.information_cutoff_date,
+                _stored_utc(revision.recorded_at_utc),
+            ):
+                raise CanonicalPriceError(
+                    "canonical_graph_inconsistent",
+                    "eligibility member exceeds the frozen assessment boundary",
+                )
+            prices.append(price)
+            payloads.append(
+                {
+                    "position": member.position,
+                    "canonical_price_revision": _price_payload(price),
+                }
+            )
+        reasons = revision.reason_codes
+        if (
+            not isinstance(reasons, list)
+            or any(
+                not isinstance(item, str) or item not in REASON_CODES
+                for item in reasons
+            )
+            or reasons != sorted(set(reasons))
+        ):
+            raise CanonicalPriceError(
+                "canonical_graph_inconsistent",
+                "eligibility reasons are not canonical",
+            )
+        _validate_normalized_valuation_eligibility(
+            {
+                "purpose_code": identity.purpose_code,
+                "rule_version": revision.rule_version,
+                "state": revision.state,
+                "reason_codes": tuple(reasons),
+                "requested_trade_date": revision.requested_trade_date,
+            },
+            prices,
+        )
+        return {
+            "assessment_id": str(identity.id),
+            "assessment_key": identity.assessment_key,
+            "purpose_code": identity.purpose_code,
+            "revision": {
+                "id": str(revision.id),
+                "revision_no": revision.revision_no,
+                "rule_version": revision.rule_version,
+                "state": revision.state,
+                "reason_codes": list(revision.reason_codes),
+                "requested_trade_date": revision.requested_trade_date.isoformat(),
+                "information_cutoff_date": revision.information_cutoff_date.isoformat(),
+                "recorded_at_utc": _iso(revision.recorded_at_utc),
+            },
+            "members": payloads,
         }
 
 
