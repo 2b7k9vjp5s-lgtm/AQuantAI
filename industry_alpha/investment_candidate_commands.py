@@ -56,7 +56,7 @@ from industry_alpha.investment_candidate_rules import (
     evaluate_candidate,
     priority_sort_key,
 )
-from industry_alpha.models import ClaimEvidenceLink, ClaimRevision, EvidenceItem
+from industry_alpha.models import Claim, ClaimEvidenceLink, ClaimRevision, EvidenceItem
 from industry_alpha.stage1_models import (
     Stage1BeneficiaryRevision,
     Stage1CandidatePool,
@@ -79,8 +79,6 @@ from industry_alpha.stage2_models import (
     Stage2CompanyResearch,
     Stage2CompanyResearchRevision,
     Stage2FinancialHypothesisRevision,
-    Stage2HandoffClaimLink,
-    Stage2HandoffEvidenceLink,
     Stage2ResearchHypothesisLink,
 )
 
@@ -449,29 +447,20 @@ def _validate_required_groups(component: str, kinds: set[str]) -> None:
             )
 
 
-def _require_exact_research_provenance(
-    session: Session, *, kind: str, target_id: UUID, company_research_id: UUID
+def _require_case_provenance(
+    session: Session, *, kind: str, row: ClaimRevision | EvidenceItem, case_id: UUID
 ) -> None:
     if kind == "claim":
-        linked = session.scalar(
-            select(Stage2HandoffClaimLink.id).where(
-                Stage2HandoffClaimLink.company_research_id == company_research_id,
-                Stage2HandoffClaimLink.claim_revision_id == target_id,
-            )
-        )
+        claim = session.get(Claim, row.claim_id)
+        owned = claim is not None and claim.case_id == case_id
     elif kind == "evidence":
-        linked = session.scalar(
-            select(Stage2HandoffEvidenceLink.id).where(
-                Stage2HandoffEvidenceLink.company_research_id == company_research_id,
-                Stage2HandoffEvidenceLink.evidence_id == target_id,
-            )
-        )
+        owned = row.case_id == case_id
     else:
         return
-    if linked is None:
+    if not owned:
         raise InvestmentCandidateError(
             "investment_candidate_input_invalid",
-            f"{kind} input is not frozen by the exact company research handoff",
+            f"{kind} input does not belong to the exact research case",
         )
 
 
@@ -714,13 +703,13 @@ class InvestmentCandidateCommandService:
                     raise InvestmentCandidateError(
                         "investment_candidate_input_invalid", "claim revision must be supported"
                     )
-                _require_exact_research_provenance(
-                    session, kind=kind, target_id=row.id, company_research_id=research.id
+                _require_case_provenance(
+                    session, kind=kind, row=row, case_id=research.case_id
                 )
                 claim_ids.add(row.id)
             if kind == "evidence":
-                _require_exact_research_provenance(
-                    session, kind=kind, target_id=row.id, company_research_id=research.id
+                _require_case_provenance(
+                    session, kind=kind, row=row, case_id=research.case_id
                 )
                 evidence_ids.add(row.id)
             validated.append((item, column))
