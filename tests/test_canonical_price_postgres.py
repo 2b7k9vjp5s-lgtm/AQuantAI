@@ -79,7 +79,7 @@ def test_postgres_0012_to_head_and_empty_round_trip(postgres_database_url: str):
             "canonical_price_revisions",
         }
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0015"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0016"
     finally:
         engine.dispose()
 

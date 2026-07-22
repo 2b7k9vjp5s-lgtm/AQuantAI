@@ -67,7 +67,7 @@ def test_stage2_migration_from_v05c_and_round_trip(postgres_database_url: str):
         command.upgrade(config, "head")
         assert "stage2_verification_items" in inspect(engine).get_table_names()
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0015"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0016"
     finally:
         engine.dispose()
 
