@@ -38,6 +38,8 @@ def clean_canonical_price(postgres_database_url: str) -> Iterator[None]:
             connection.execute(text("TRUNCATE listed_instruments CASCADE"))
         yield
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE listed_instruments CASCADE"))
         engine.dispose()
 
 
