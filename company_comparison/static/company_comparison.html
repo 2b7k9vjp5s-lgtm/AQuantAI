@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>公司研究组件对比 | AQuantAI</title>
+  <link rel="stylesheet" href="/company-comparison/static/company_comparison.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">AQuantAI · Research Only</p>
+      <h1>公司研究组件对比</h1>
+      <p class="subtitle">完整保留一个候选池修订中的全部公司，并列查看已接受研究组件。仅采用中性标识顺序。</p>
+    </div>
+    <nav aria-label="研究工作台导航">
+      <a href="/industry-research">行业研究</a>
+      <a href="/company-research">公司研究</a>
+      <a href="/evidence-intelligence">证据动态</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="panel selector-panel" aria-labelledby="selector-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Explicit selector</p>
+          <h2 id="selector-title">明确选择冻结范围</h2>
+        </div>
+        <p class="hint">不会默认选择第一条记录，也不会使用当前时间或“最新”作为隐含边界。</p>
+      </div>
+      <form id="comparison-form">
+        <label>
+          候选池修订 ID
+          <input id="pool-revision-id" name="candidate_pool_revision_id" type="text" required autocomplete="off" placeholder="UUID">
+        </label>
+        <label>
+          信息截止日
+          <input id="as-of-cutoff" name="as_of_cutoff" type="date" required>
+        </label>
+        <label>
+          记录时间上限（UTC）
+          <input id="as-of-recorded" name="as_of_recorded_at_utc" type="text" required autocomplete="off" placeholder="2026-07-22T00:00:00Z">
+        </label>
+        <button type="submit">读取完整候选池</button>
+      </form>
+      <p id="status" class="status" role="status" aria-live="polite">请填写三个明确的选择条件。</p>
+    </section>
+
+    <section id="universe-panel" class="panel" hidden aria-labelledby="universe-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Frozen universe</p>
+          <h2 id="universe-title">候选池范围</h2>
+        </div>
+        <span class="neutral-chip">中性标识顺序</span>
+      </div>
+      <dl id="universe-summary" class="summary-grid"></dl>
+      <p class="boundary-note">这里的“完整”仅指所选候选池修订中已持久化的全部成员，不代表全市场或全行业穷尽覆盖。</p>
+    </section>
+
+    <section id="matrix-panel" class="panel" hidden aria-labelledby="matrix-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Component matrix</p>
+          <h2 id="matrix-title">研究组件矩阵</h2>
+        </div>
+        <p class="hint">估值区域只展示方法与状态是否存在，不跨公司比较数值。</p>
+      </div>
+      <div class="table-wrap" tabindex="0" aria-label="公司研究组件矩阵，可横向滚动">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">公司身份</th>
+              <th scope="col">Stage 1</th>
+              <th scope="col">类型化受益语义</th>
+              <th scope="col">公司研究</th>
+              <th scope="col">财务传导</th>
+              <th scope="col">预期 / 估值语境</th>
+              <th scope="col">催化剂 / 风险</th>
+              <th scope="col">行业 / 公司判断</th>
+              <th scope="col">详情</th>
+            </tr>
+          </thead>
+          <tbody id="matrix-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>本页面为本地、只读、研究用途组件视图，不形成价格判断或交易指令。</p>
+  </footer>
+  <script src="/company-comparison/static/company_comparison.js" defer></script>
+</body>
+</html>
