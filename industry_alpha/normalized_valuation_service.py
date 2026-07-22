@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from industry_alpha.normalized_financial_rules import NormalizedMetricError
 from industry_alpha.normalized_valuation_commands import NormalizedValuationMetricCommandService
-from industry_alpha.normalized_valuation_comparison_service import (
-    StrictValuationComparisonCommandService,
+from industry_alpha.normalized_valuation_comparison_exact import (
+    ExactValuationComparisonCommandService,
 )
 from industry_alpha.normalized_valuation_context_commands import (
     ContextAwareNormalizedExpectationGapCommandService,
@@ -29,7 +29,7 @@ class NormalizedValuationCommandService:
             session_factory
         )
         self._metric = NormalizedValuationMetricCommandService(session_factory)
-        self._comparison = StrictValuationComparisonCommandService(session_factory)
+        self._comparison = ExactValuationComparisonCommandService(session_factory)
         self._expectation = ContextAwareNormalizedExpectationGapCommandService(
             session_factory
         )
