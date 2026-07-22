@@ -146,22 +146,41 @@ def test_price_manifest_requires_exact_pair_and_validation(monkeypatch) -> None:
     assert len(calls) == 1
 
 
-class _ScalarSession:
-    def __init__(self, scalar_value):
-        self.scalar_value = scalar_value
+class _GetSession:
+    def __init__(self, row):
+        self.row = row
 
-    def scalar(self, _statement):
-        return self.scalar_value
+    def get(self, _model, _identity):
+        return self.row
 
 
-def test_claim_and_evidence_require_exact_research_handoff() -> None:
-    with pytest.raises(InvestmentCandidateError, match="exact company research handoff"):
-        commands._require_exact_research_provenance(
-            _ScalarSession(None), kind="claim", target_id=uuid4(), company_research_id=uuid4()
-        )
-    commands._require_exact_research_provenance(
-        _ScalarSession(object()), kind="evidence", target_id=uuid4(), company_research_id=uuid4()
+def test_claim_and_evidence_require_exact_research_case() -> None:
+    case_id = uuid4()
+    claim_revision = SimpleNamespace(claim_id=uuid4())
+    claim = SimpleNamespace(case_id=case_id)
+    commands._require_case_provenance(
+        _GetSession(claim), kind="claim", row=claim_revision, case_id=case_id
     )
+    with pytest.raises(InvestmentCandidateError, match="exact research case"):
+        commands._require_case_provenance(
+            _GetSession(SimpleNamespace(case_id=uuid4())),
+            kind="claim",
+            row=claim_revision,
+            case_id=case_id,
+        )
+    commands._require_case_provenance(
+        object(),
+        kind="evidence",
+        row=SimpleNamespace(case_id=case_id),
+        case_id=case_id,
+    )
+    with pytest.raises(InvestmentCandidateError, match="exact research case"):
+        commands._require_case_provenance(
+            object(),
+            kind="evidence",
+            row=SimpleNamespace(case_id=uuid4()),
+            case_id=case_id,
+        )
 
 
 class _ScalarsSession:
