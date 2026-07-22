@@ -8,10 +8,10 @@ Create Date: 2026-07-22
 from __future__ import annotations
 
 from collections.abc import Sequence
-
 from alembic import op
 import sqlalchemy as sa
 
+import industry_alpha.normalized_valuation_context  # noqa: F401 - install typed context columns
 from industry_alpha.normalized_valuation_models import NORMALIZED_VALUATION_MODELS
 
 revision: str = "20260722_0015"
