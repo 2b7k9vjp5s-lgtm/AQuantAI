@@ -67,8 +67,8 @@ Process:
 
 - one architecture note or Architecture Preflight and one implementation PR;
 - a `.codex/tasks/` snapshot is required;
-- one independent fixed-head architecture review before production merge;
-- one independent fixed-head implementation review before production merge;
+- one process-independent fixed-head architecture review before production merge;
+- one process-independent fixed-head implementation review before production merge;
 - implementation may begin in parallel after the architecture note exists and the owner explicitly authorizes it, but the implementation PR must not merge before architecture approval;
 - avoid extra synchronization, reset or consolidation PRs unless a concrete blocker requires them.
 
@@ -168,9 +168,21 @@ A consolidation review may decide no refactor is needed. Never generalize only f
 - Verify the complete base-to-head inventory stays within authorized directories or file families.
 - Keep Strict architecture and implementation PRs Draft until their required reviews; Light and Standard PRs may become Ready after author verification and passing checks.
 
-## Independent review
+## Fixed-head review
 
-Independent fixed-head review is mandatory only for Strict architecture and Strict implementation work, or when the owner explicitly requests it.
+A process-independent fixed-head review is mandatory only for Strict architecture and Strict implementation work, or when the owner explicitly requests it.
+
+“Process-independent” means the reviewer starts a fresh review against one exact immutable HEAD, separately from the implementation pass. It does **not** require a different GitHub account, organization identity or human operator.
+
+The author, committer, PR creator, Codex or another agent may perform and approve the review when all of the following are true:
+
+- the review begins from the exact fixed HEAD rather than relying on the implementation summary;
+- the reviewer re-reads the authoritative Issue, architecture contract, repository workflow, diff and current validation evidence;
+- blocking findings are recorded and approval is withheld until they are closed;
+- the final review records the exact full HEAD SHA and the required approval phrase;
+- any new commit invalidates the prior fixed-head approval and requires a fresh review.
+
+When GitHub refuses an `APPROVE` event because the connected identity is the PR author, a formal `COMMENT` review containing the exact approval phrase counts as the repository-governance approval record. It must not be represented as approval of a different identity.
 
 Review should focus on:
 
@@ -181,11 +193,11 @@ Review should focus on:
 - test sufficiency;
 - prohibited recommendation, price or trading semantics.
 
-Do not generate exhaustive ceremonial checklists when a concise risk-focused review is sufficient.
+Do not generate exhaustive ceremonial checklists when a concise risk-focused review is sufficient. Fixed-head approval never replaces the separate explicit owner authorization required to merge.
 
 ## Transition rule for PR #165
 
-PR #165 remains a Strict architecture artifact. Its implementation may begin after explicit owner authorization, but neither PR #165 nor the related production implementation may merge without the required independent fixed-head architecture approval. Avoid additional planning layers between the approved architecture and implementation.
+PR #165 remains a Strict architecture artifact. Its implementation may begin after explicit owner authorization, but neither PR #165 nor the related production implementation may merge without the required process-independent fixed-head architecture approval. Avoid additional planning layers between the approved architecture and implementation.
 
 ## Completion actions
 
