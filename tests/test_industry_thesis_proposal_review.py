@@ -212,6 +212,7 @@ def test_three_candidate_review_freezes_deterministic_plan(database) -> None:
     )
     assert len(plan["rejected_candidate_revision_ids"]) == 1
     assert len(plan["unresolved_candidate_revision_ids"]) == 1
+    assert len(plan["candidate_sources"]) == 3
 
     with database() as session:
         assert session.scalar(
