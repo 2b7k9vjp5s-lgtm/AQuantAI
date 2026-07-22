@@ -5,13 +5,12 @@
 This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls the scope of Standard or Strict work.
 
 - Released software version: `0.2.0`.
-- Accepted application/product baseline: `22c1951ba23c495cc6070b948149f4118a86ab6d`.
-- Latest merged capability: Company Research Comparison Matrix v1 through architecture PR #172 and implementation PR #174.
-- Active implementation authorization: Issue #177, Canonical Price and Comparison Eligibility v1, pending independent fixed-head review in Draft PR #178.
-- Accepted architecture authorization: Issue #175 and PR #176 define the strict Canonical Price and Comparison Eligibility v1 contract.
+- Accepted application/product baseline: `9ac65e1677d6377958e3c3b6ee71f0178bfb9eda`.
+- Latest merged capability: Investment Candidate Intelligence Layer v1 through architecture PR #180 and implementation PR #182.
+- Canonical Price and Comparison Eligibility v1 is merged through architecture PR #176 and implementation PR #178.
+- Active authorization: Issue #183, Strict Architecture Preflight for Normalized Valuation and Expectation Metrics v1.
 - Evidence Ingestion remains deferred after Issue #154 / closed-unmerged PR #155; no ingestion runtime capability reached `main`.
-- Canonical Price and Comparison Eligibility implementation is present only on the Issue #177 review branch until Draft PR #178 is independently approved and merged.
-- Company Research Comparison remains component-only and contains no canonical-price comparison, expectation gap, score, ranking, recommendation or price judgment.
+- No production implementation for Slice 5 is authorized until Issue #183 architecture receives independent fixed-head approval and owner-authorized merge.
 
 Documentation may advance `main` without changing release or runtime behavior. This document records accepted current state; it does not itself authorize production implementation.
 
@@ -21,26 +20,32 @@ AQuantAI is a local-first, personal-use, research-only and non-advisory workbenc
 
 Deterministic calculations, canonicalization, selectors and workflow state belong to reviewed application code. An LLM may assist only behind an explicit bounded adapter and may not own evidence qualification, deterministic state, accepted research state, execution or trading behavior.
 
+The product may identify current research-priority candidates under an explicit rule, but it must preserve the complete beneficiary universe and expose every component, missing state, penalty and reason. It must not produce unexplained recommendations, target prices, expected returns, position sizes or trading actions.
+
 ## Implemented dependency direction
 
 ```text
-market-data evidence
+market-data persistence
   -> v0.5 Evidence Ledger
   -> v0.5B Industry Map
   -> v0.5C Stage 1 beneficiary identity and revisions
        -> Typed Beneficiary Evidence Semantics v1
        -> v0.6A Company Research and financial-transmission hypotheses
-  -> v0.6B expectations and valuation observations
-  -> v0.6C catalyst and risk assessments
-  -> v0.6D industry and company quality judgments
+       -> v0.6B expectations and valuation observations
+       -> v0.6C catalyst and risk assessments
+       -> v0.6D industry and company quality judgments
+  -> Canonical Price and Comparison Eligibility v1
   -> read-only product workspaces
-       -> complete-universe Company Research Comparison Matrix v1
+       -> Evidence Intelligence / Research Change Feed
+       -> Industry Beneficiary Workspace
+       -> Company Research Workspace
+       -> Company Research Comparison Matrix
+       -> Investment Candidate Workspace
+  -> Investment Candidate Intelligence Layer v1
   -> optional company-scoped Guarded AI D3 draft assistance
 ```
 
-Typed Beneficiary Evidence Semantics extends one exact Stage 1 beneficiary through a separate append-only profile. It does not rewrite the Stage 1 beneficiary contract and does not automatically relink frozen Stage 2 records.
-
-Downstream accepted records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state or rewrite historical meaning.
+Downstream accepted records freeze exact accepted upstream revisions and links. They do not silently select newer records, infer missing state, parse free text or rewrite historical meaning.
 
 ## Current runtime and product surfaces
 
@@ -53,160 +58,153 @@ When the configured database and local assets are available, the reviewed runtim
 5. Company Research Workspace v1;
 6. Guarded AI Research Assistance v1, disabled by default;
 7. Typed Beneficiary Evidence Semantics v1 detail inside Industry Research;
-8. Company Research Comparison Matrix v1.
+8. Company Research Comparison Matrix v1;
+9. exact-ID Canonical Price and Comparison Eligibility APIs plus local write commands;
+10. Investment Candidate Intelligence v1 APIs, commands and Chinese-first `/investment-candidates` workspace.
 
-The Issue #177 review branch additionally contains exact-ID, read-only Canonical
-Price and Comparison Eligibility v1 surfaces. They are not part of the accepted
-`main` baseline until the Strict implementation gate completes.
+No current runtime surface provides normalized PE/PS/EV/EBITDA/FCF-yield comparison, structured numeric expectation gap, fair value, target price or expected return.
 
-### Canonical Price and Comparison Eligibility v1 review candidate
-
-- existing `IngestionRun`, `StockBasicRecord` and `DailyPriceRecord` remain Provider-normalized L1 rows and are not altered or backfilled;
-- explicit listed-instrument identity owns market, exchange namespace/code, currency, security type and listing chronology without prefix, name, Provider, UI or AI inference;
-- accepted price-series revisions freeze one exact instrument revision, Provider, dataset, series key, source stock code, source adjustment type and decimal contract;
-- `float_repr_decimal_v1` uses the source float round-trip representation, `Decimal`, bounded scale and `ROUND_HALF_EVEN`, while disclosing `binary_float_normalized` fidelity;
-- canonical prices freeze one exact succeeded ingestion run and one exact daily-price row in append-only revisions;
-- Comparison Eligibility is a separate append-only D2 assessment for `company_research_price_context_v1` and does not authorize cross-company arithmetic, valuation normalization, ranking or advice;
-- all write commands are local JSON-only, expected-latest protected, atomic, dry-run capable and network-free;
-- all read surfaces require an exact UUID plus explicit information-cutoff and recorded-UTC boundaries;
-- migration `20260722_0013` creates exactly nine additive tables, performs no backfill and refuses populated downgrade before any drop.
+## Accepted capability contracts
 
 ### Evidence Intelligence / Research Change Feed
 
 - Chinese-first read-only surface for recent evidence and research changes;
 - explicit time window, cutoff, provenance and deterministic ordering;
-- no opportunity ranking, score, recommendation or trading state;
-- detail navigation reuses accepted owning-domain contracts.
+- no opportunity ranking or recommendation;
+- navigation reuses accepted owning-domain contracts.
 
 ### Industry Beneficiary Workspace v1
 
-- Chinese-first read-only `/industry-research` workspace;
 - requires explicit persisted Industry Map selection;
-- shows the complete cutoff-visible persisted Stage 1 beneficiary set for the selected map;
-- preserves exact stored legacy beneficiary and assessment values;
-- loads full beneficiary, typed-semantic or Stage 2 detail only after explicit user action;
-- does not claim full-market exhaustive coverage and does not rank beneficiaries.
+- shows the complete cutoff-visible Stage 1 beneficiary set for the selected map;
+- preserves exact legacy beneficiary and typed-semantic values;
+- does not claim full-market exhaustive coverage;
+- never ranks beneficiaries.
 
 ### Typed Beneficiary Evidence Semantics v1
 
-- separate append-only profile identity for one exact existing Stage 1 beneficiary;
-- immutable revisions freeze exact beneficiary revision, selected map revision, driver observation revision and accepted claim revisions;
-- taxonomy version is `aquantai.typed-beneficiary-evidence-semantics.v1`;
-- exposure taxonomy is exactly `direct / conditional / indirect / conceptual`;
-- legacy Stage 1 `direct / secondary / potential` is preserved and never automatically mapped;
-- driver, offering, customer, certification, capacity, production and order vocabularies are closed;
-- positive assertions require already-frozen claim revisions and attributable A/B/C evidence paths;
-- `missing`, `disputed` and `not_applicable` remain distinct;
-- all accepted semantic values are explicit analyst-owned D3 judgments;
-- deterministic code validates identity, chronology, vocabulary and evidence sufficiency but does not infer values from text, Provider metadata, company name, security code or AI output;
-- local CLI is the only write path; API and page are read-only;
-- writes are atomic and append-only with expected-latest conflict protection;
-- migration `20260721_0012` performs no backfill and refuses populated downgrade before any drop;
-- no network, LLM, ranking, score, valuation, recommendation, alert, portfolio or trading behavior.
+- separate append-only profile for one exact Stage 1 beneficiary;
+- exact beneficiary, map, observation, claim and evidence revisions;
+- exposure taxonomy `direct / conditional / indirect / conceptual`;
+- closed execution-evidence vocabularies;
+- analyst-owned D3 judgments with deterministic validation;
+- no automatic legacy mapping, extraction, ranking or recommendation.
 
 ### Company Research Workspace v1
 
-- Chinese-first read-only `/company-research` workspace;
-- requires one explicit persisted `company_research_id` and never silently selects the first row;
-- selector uses exactly 3 SQL statements and selected workspace uses exactly 14 SQL statements;
-- shows exact frozen Stage 1, stock, ingestion and v0.6A-v0.6D revision provenance;
-- keeps latest cutoff-visible revisions separate from exact frozen historical revisions;
-- displays historical revision mismatch and never automatically relinks it;
-- loads full owning-domain claim/evidence detail only after explicit user action;
-- uses safe DOM methods and no untrusted `innerHTML`;
-- presents valuation observations and optional L1 local-price provenance only;
-- does not create Canonical Price, Comparison Eligibility, fair value, target price, expected return, ranking, score or recommendation state.
+- requires one explicit persisted Company Research identity;
+- shows exact frozen v0.6A-v0.6D and provenance state;
+- keeps latest cutoff-visible and exact frozen historical revisions separate;
+- displays v0.6B valuation observations as research context only;
+- does not convert free-text valuation context into comparable metrics.
 
 ### Company Research Comparison Matrix v1
 
-- Chinese-first read-only `/company-comparison` surface;
-- requires one exact persisted candidate-pool revision, explicit information cutoff and explicit recorded-UTC boundary;
-- preserves every exact frozen candidate-pool membership even when Company Research or Typed Semantics is missing;
-- attaches Company Research and Typed Semantics only through exact frozen beneficiary, membership and map revisions;
-- full path uses 13 set-based SQL statements independent of member count;
-- displays component availability and historical mismatch without loading the full claim/evidence graph;
-- uses neutral source, stock-code and beneficiary-ID ordering only;
-- excludes valuation numeric comparison, observed-value ordering, expectation gap, canonical price, score, priority order and recommendation.
+- requires one exact candidate-pool revision and both as-of boundaries;
+- preserves every exact frozen member;
+- attaches exact Company Research and Typed Semantics state;
+- uses neutral deterministic ordering;
+- excludes numeric valuation comparison, expectation gap, priority and advice.
+
+### Canonical Price and Comparison Eligibility v1
+
+- explicit listed-instrument identity owns market, exchange namespace/code, currency, security type and listing chronology;
+- accepted price-series revisions freeze exact instrument, Provider, dataset, series key, adjustment and decimal contracts;
+- canonical prices freeze one exact succeeded ingestion run and one exact daily-price row;
+- official-close values use deterministic Decimal normalization with disclosed source-float fidelity;
+- Comparison Eligibility is separate append-only D2 state with explicit purpose and reason codes;
+- local commands are JSON-only, dry-run capable, atomic, expected-latest protected and network-free;
+- exact-ID reads require information cutoff and recorded-UTC boundaries;
+- migration `20260722_0013` creates nine additive tables with populated downgrade refusal;
+- Canonical Price does not itself authorize valuation arithmetic or attractiveness judgment.
+
+### Investment Candidate Intelligence Layer v1
+
+- preserves one complete exact Stage 1 candidate-pool revision and all members;
+- records eight explicit analyst-owned D3 components:
+  - `industry_opportunity`
+  - `beneficiary_strength`
+  - `earnings_conversion`
+  - `expectation_gap`
+  - `valuation_context`
+  - `catalyst_readiness`
+  - `evidence_quality`
+  - `risk_penalty`;
+- deterministically calculates weighted score, risk deduction, status, reason codes and bounded priority under an explicit rule version;
+- missing, disputed, pending and failed states are never imputed or reweighted;
+- pending and failed verification prohibit numeric aggregation;
+- uses exact Canonical Price and Comparison Eligibility revisions when valuation context is supported;
+- exposes the complete pool beneath highlighted priority/watch candidates;
+- local commands and exact-ID reads remain network-free;
+- migration `20260722_0014` creates exactly eight additive append-only tables and refuses populated downgrade;
+- candidate status is research prioritization, not buy/sell/hold advice.
 
 ### Guarded AI Research Assistance v1
 
 - available only inside one explicitly selected Company Research workspace;
-- local preview projects an immutable deterministic Manifest and exact SHA-256 fingerprint;
-- Manifest projection performs zero SQL, filesystem or network I/O beyond the completed workspace read;
-- generation requires explicit remote-transmission confirmation and exact expected fingerprint;
+- deterministic immutable Manifest and SHA-256 fingerprint;
 - disabled by default with one explicit HTTPS OpenAI-compatible profile;
-- no default provider, endpoint or model;
-- no retry, fallback, streaming, tools, browsing, search, retrieval, embeddings or background execution;
-- strict application-owned response, section, fingerprint and Manifest-item citation validation;
-- prohibited recommendation and price-judgment language fails closed;
-- output is ephemeral D3 draft assistance only;
-- no prompt, model response, draft identity, revision, review state or accepted-domain mutation is persisted.
-
-## Consolidation decisions
-
-The accepted consolidation reviews remain binding:
-
-- no generic product-workspace framework merely for router, page or DOM similarity;
-- no generic AI-agent, provider registry, prompt, RAG, vector database or tool framework;
-- domain serializers, notices, cutoff rules and failure semantics remain domain-local;
-- Company Research projection, deterministic AI Manifest, provider transport and response validation remain separate bounded responsibilities;
-- Typed Beneficiary semantics remains a separate Stage 1 extension rather than modifying the accepted Stage 1 contract;
-- Company Comparison remains a product-local read model and does not become a generic comparison engine;
-- no new consolidation review is required until 5–6 implemented slices accumulate or concrete duplication/ownership/test-growth evidence appears.
+- explicit remote-transmission confirmation;
+- no retry, fallback, tools, browsing, search, retrieval or background execution;
+- strict output and citation validation;
+- ephemeral D3 draft only, with no accepted-state persistence.
 
 ## Field and infrastructure ownership
 
 | Information or mechanism | Authoritative owner | Rule |
 | --- | --- | --- |
-| Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit Provider per run and series; no silent fallback, relabeling or row-level mixing |
-| Canonical market-price value, instrument identity, unit, currency and comparison eligibility | `backend.database.canonical_price*` review candidate in Issue #177 | Explicit frozen identities and append-only revisions only; no downstream inference or arithmetic-comparison authority |
+| Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit Provider per run/series; no fallback or row mixing |
+| Canonical instrument, price, unit, currency and price eligibility | `backend.database.canonical_price*` | Exact append-only revisions and purpose-specific eligibility |
 | Evidence grades, claims, links and conflicts | v0.5 Evidence Ledger | Downstream records freeze exact revisions and links |
-| Industry map, nodes, relationships and observations | v0.5B | Exact persisted identities and cutoff-visible revisions only |
-| Legacy beneficiary identity/classification and rationale | v0.5C Stage 1 | Preserve exact `direct / secondary / potential` values and revision history |
-| Typed beneficiary exposure and execution-evidence profile | `industry_alpha.beneficiary_semantics_*` | Separate append-only D3 profile; no automatic legacy mapping or hidden inference |
-| Typed semantic write transaction | `beneficiary_semantics_commands.py` | CLI-only, atomic, expected-latest and append-only |
-| Typed semantic read projection | `beneficiary_semantics_query.py` and read-only API | Explicit beneficiary selector and exact revision/evidence provenance |
-| Company-research workflow and financial hypotheses | v0.6A | Downstream records bind exact revisions |
-| Expectations and valuation observations | v0.6B | Stored research context only without Comparison Eligibility |
-| Catalyst and risk assessments | v0.6C | Not monitors, alerts, tasks or timing models |
-| Industry/company quality outcome and evidence state | v0.6D | Does not generate price, timing or recommendation state |
-| Product overview aggregation | Product-specific read repository/query | Explicit selectors, bounded query counts and no domain-meaning change |
-| Component-only Company Research comparison | `company_comparison` read repository/query | Complete frozen universe, neutral ordering and no computed priority or price judgment |
-| Company Research AI input projection | `guarded_ai_manifest.py` | Deterministic zero-I/O Manifest, stable item IDs and SHA-256 fingerprint |
-| Guarded AI profile and HTTPS request | `guarded_ai_adapter.py` | One disabled-by-default explicit profile, one request, no retry or fallback |
-| Guarded AI confirmation and output validation | `guarded_ai_service.py` | Exact fingerprint, strict schema/citations and D3-only result |
-| Future ingestion raw capture and review state | Deferred / not assigned | Restart requires a new explicit source decision and Architecture Preflight |
-| Future research-priority score or ordering | Unassigned | Must not be inferred from component state, evidence count, price context or AI output |
+| Industry map, nodes, relationships and observations | v0.5B | Exact persisted identities and cutoff-visible revisions |
+| Legacy beneficiary identity/classification | v0.5C Stage 1 | Preserve exact history |
+| Typed beneficiary exposure and execution evidence | `industry_alpha.beneficiary_semantics_*` | Separate analyst-owned D3 profile |
+| Company Research and financial hypotheses | v0.6A | Downstream records bind exact revisions |
+| Narrative expectations and valuation observations | v0.6B | Research context only; no automatic numeric normalization |
+| Catalyst and risk assessments | v0.6C | Not monitors, alerts or timing engines |
+| Industry/company quality judgment | v0.6D | Does not generate price or recommendation state |
+| Component-only company comparison | `company_comparison` | Complete universe, neutral ordering, no price arithmetic |
+| Investment Candidate component state | `industry_alpha.investment_candidate_*` | Analyst-owned D3 inputs plus deterministic D2 aggregation |
+| Investment Candidate complete-universe snapshot | `industry_alpha.investment_candidate_*` | Exact frozen membership; omission/substitution fails closed |
+| Guarded AI Manifest and transport | Guarded AI modules | Explicit fingerprint/profile/confirmation; draft only |
+| Future structured financial observations | Unassigned until Issue #183 approval | Must be explicit, append-only and provenance-backed |
+| Future normalized valuation arithmetic | Unassigned until Issue #183 approval | Must use exact price/financial inputs and versioned Decimal rules |
+| Future peer membership | Analyst-owned D3 candidate in Issue #183 | Must not be inferred from codes, names, Provider or AI |
+| Future normalized expectation gap | Unassigned until Issue #183 approval | Exact numeric expected/actual inputs only |
+| Future ingestion raw capture and review state | Deferred / not assigned | Requires source authorization and new Architecture Preflight |
 
 ## Shared architecture invariants
 
 1. Local and non-advisory: no advice, performance promise, broker, real order or automated trading.
 2. Deterministic calculations and accepted state stay outside LLM ownership.
 3. Imports, startup, tests, CI, fixture demos and ordinary reads perform no hidden external network access.
-4. Exact IDs, series keys, scopes, dates, revisions and selectors are explicit.
+4. Exact IDs, scopes, dates, revisions and selectors are explicit.
 5. Downstream accepted records freeze exact revisions and links.
 6. Corrections append revisions; accepted history is not mutated through ordinary paths.
-7. Information cutoff and recorded UTC chronology both prevent later-information leakage.
-8. Conflicts, contradictions, missing evidence and uncertainty remain visible.
+7. Information cutoff and recorded UTC both prevent later-information leakage.
+8. Conflicts, missing evidence, stale state and uncertainty remain visible.
 9. Identity, revision and links commit or roll back together.
 10. Ordering, revision allocation, decimal text and strict JSON are deterministic across supported databases.
-11. Fixture success paths use contracts reachable through reviewed production boundaries.
-12. Mutations, notifications, tasks and portfolio state require separate authorization.
-13. Credentials and raw connection details never enter source, fixtures, Issues, PRs, logs or user errors.
-14. Capability, product-surface and consolidation merges do not change released version without a separate release decision.
-15. A product reading surface cannot upgrade Semantic Level or Derivation Level through display, non-null fields or inference.
-16. Initial overview query count remains bounded independently of displayed row count unless explicitly reviewed.
-17. External-source ingestion requires explicit source authorization and may not appear as hidden runtime or test network access.
-18. Candidate entity matching is not accepted identity; human review is required before accepted evidence linkage unless a reviewed deterministic contract says otherwise.
-19. Model-generated text is D3 draft assistance and cannot self-promote to accepted D0, D1, D2 or domain state.
-20. Guarded AI may consume only an explicit Manifest of accepted persisted inputs and may not fetch missing evidence or mutate accepted records.
-21. A remote Guarded AI request requires local preview, explicit confirmation, exact expected fingerprint and one explicit provider/model profile.
-22. Unknown model citations, malformed output, fingerprint mismatch and prohibited recommendation/price language fail closed.
-23. No generic AI-agent, provider registry, prompt framework, RAG layer or tool system without a separate Architecture Preflight.
-24. Typed beneficiary values remain analyst-owned D3 judgments; closed vocabularies and evidence checks do not convert them into D2 rules.
-25. Legacy and typed beneficiary classifications may disagree; disagreement is visible history, not an automatic correction or mapping.
-26. No research-priority comparison may collapse industry benefit, company execution, evidence quality, valuation context and risk into an unexplained total.
-27. Existing `DailyPriceRecord` and `StockBasicRecord.exchange` remain Provider-normalized L1 context until an accepted canonical contract explicitly binds instrument, market, exchange, currency, unit, adjustment and decimal semantics.
+11. Fixture success paths use fields reachable through reviewed production boundaries.
+12. Credentials and raw connection details never enter source, fixtures, Issues, PRs, logs or user errors.
+13. Capability merges do not change released version without a separate release decision.
+14. A reading surface cannot upgrade Semantic or Derivation Level through display or inference.
+15. Overview query counts remain bounded independently of displayed row count unless explicitly reviewed.
+16. External-source ingestion requires explicit source authorization.
+17. Candidate entity matching is not accepted identity without reviewed acceptance.
+18. Model-generated text is D3 draft assistance and cannot self-promote.
+19. Guarded AI consumes only an explicit accepted Manifest and may not fetch missing evidence.
+20. No generic AI-agent, provider registry, RAG or tool framework without separate preflight.
+21. Legacy and typed beneficiary classifications may disagree; disagreement remains visible.
+22. No research-priority result may collapse components into an unexplained total.
+23. Existing Provider-normalized price rows are not canonical unless bound through Canonical Price.
+24. Complete beneficiary and candidate-pool universes remain visible before and after downstream overlays.
+25. Missing, disputed, pending or failed values are never silently zero or neutral.
+26. Purpose-specific Comparison Eligibility cannot be reused as a different purpose without an exact reviewed contract.
+27. Existing v0.6B free text is not parsed into structured financial, valuation or expectation metrics.
+28. Peer membership, valuation attractiveness and accepted component scores cannot be inferred by AI or metadata.
+29. No automatic rescore or rewrite of Investment Candidate history from newer normalized context.
+30. FX, corporate-action normalization and external consensus acquisition require separate authorization.
 
 ## Semantic and derivation levels
 
@@ -215,53 +213,55 @@ The accepted consolidation reviews remain binding:
 - **L0 — Raw Provider Data:** source output before internal normalization; audit only.
 - **L1 — Provider Normalized:** project fields with Provider-specific constraints; not automatically comparable.
 - **L2 — Standardized:** standardized through an explicit accepted contract; usable only within that contract.
-- **L3 — Canonical:** identity, measurement, unit, currency, market, adjustment, provenance, cutoff, chronology, decimal and missing-state contract. No current production price implementation has reached L3.
+- **L3 — Canonical:** identity, measurement, unit, currency, market, adjustment, provenance, cutoff, chronology, decimal and missing-state contract.
 
-A level cannot be upgraded through inference, non-null fields, UI display, AI output or guesswork.
+Canonical Price v1 owns L3 price state within its accepted contract. No other value becomes L3 by display, inference or non-null storage.
 
 ### Evidence Qualification / Derivation Level
 
 - **D0 — Direct Fact:** directly supported by an explicit source.
 - **D1 — Deterministic Aggregation:** fully recorded inputs, scope, algorithm and missing treatment.
 - **D2 — Rule Classification:** explicit versioned rules and responsibility boundary.
-- **D3 — Analytical Judgment:** analysis or interpretation, including typed beneficiary semantics and AI drafts.
+- **D3 — Analytical Judgment:** analysis or interpretation, including typed beneficiary semantics, peer selection, Investment Candidate component assessments and AI drafts.
 
-D3 does not automatically enter buy/sell guidance, target prices, return promises, trading signals or cross-company rankings.
+D3 does not automatically enter buy/sell guidance, target prices, return promises or trading signals.
 
 ## Capability matrix
 
 | Capability | Merged boundary | Remaining boundary |
 | --- | --- | --- |
-| Market-data persistence | Complete-snapshot PostgreSQL persistence, ingestion attempts, canonical series and cutoff-aware reads | Canonical market-price evidence still has no implementation DoR |
-| Market Cockpit | Read-only selected-scope breadth/risk, context, liquidity and descriptive price behavior | No official full-market, valuation, signal or recommendation claims |
-| Evidence Ledger / Industry Map | Evidence, claims, conflicts, map identities and exact revisions | No external automated evidence acquisition |
-| Stage 1 beneficiary | Legacy beneficiary identity/classification and candidate-pool handoff | No automatic full-market beneficiary discovery |
-| Typed Beneficiary Semantics | Merged append-only exposure and execution-evidence profiles | No automatic mapping, extraction, ranking or recommendation |
-| Company Research v0.6A-v0.6D | Financial hypotheses, expectations, valuation observations, catalysts, risks and quality judgments | No automatic acceptance, price judgment or recommendation |
-| Evidence Intelligence | Merged read-only Research Change Feed | No attention-to-opportunity promotion |
-| Industry Research | Merged beneficiary workspace plus explicit typed-semantic detail | No automatic discovery or ranking |
-| Company Research | Merged exact company workspace and complete-universe component comparison | No computed expectation gap, price-attractiveness judgment, score or recommendation |
-| Guarded AI | Merged company-scoped preview and explicit ephemeral D3 generation | No second AI job, persisted draft, tools, retrieval or accepted-state mutation |
-| Evidence Ingestion | Not implemented and deferred | Requires explicit source authorization and restart Architecture Preflight |
-| Research Priority Comparison | Component-only matrix merged through PR #174 | Price comparison, computed priority and ordering remain unauthorized |
-| Canonical Price / Comparison Eligibility | Strict Architecture Preflight active under Issue #175 | No production implementation or migration DoR |
+| Market-data persistence | Complete-snapshot persistence and cutoff-aware reads | No hidden Provider expansion |
+| Canonical Price | Listed identity, official close, exact provenance and price eligibility | No FX, corporate actions or valuation arithmetic |
+| Evidence Ledger / Industry Map | Evidence, claims, conflicts, map identities and revisions | No external automated acquisition |
+| Stage 1 beneficiary | Legacy identity/classification and candidate-pool handoff | No automatic full-market discovery |
+| Typed Beneficiary Semantics | Append-only exposure and execution-evidence profiles | No automatic extraction or ranking |
+| Company Research v0.6A-v0.6D | Hypotheses, narrative expectations/valuation, catalysts, risks and quality | No automatic acceptance or structured numeric comparison |
+| Company Comparison | Complete-universe component comparison | No normalized valuation or expectation gap |
+| Investment Candidates | Transparent components, deterministic status and bounded priority | No automatic component scoring or normalized metric integration |
+| Guarded AI | Explicit ephemeral company-scoped draft assistance | No persisted AI state, tools or retrieval |
+| Normalized Valuation / Expectation | Strict architecture active under Issue #183 | No implementation, schema or migration authorization |
+| Evidence Ingestion | Deferred | Requires explicit source authorization |
+| Market Attention / Daily Radar | Not authorized | Requires acquisition and separate architecture |
 
 ## Architecture debt register
 
-- **D1 Documentation drift — updated by Issue #175 preflight:** baseline records PR #174 and the active Canonical Price gate.
-- **D2 Repeated Stage 2 structure — bounded:** neutral mechanics are shared; generic graph loading remains unjustified.
-- **D3 Read utilities — reviewed:** evidence serializers and domain notices remain local.
-- **D4 Command lifecycle and concurrency — partially reduced:** integrity translation and process-local locks are shared; allocation and transactions remain local.
-- **D5 ORM lifecycle — bounded:** accepted listener/import/mapper/metadata compatibility remains in place.
-- **D6 Test-matrix growth — bounded:** shared-invariant and domain-semantic tests remain distinct.
-- **D7 Fixture-versus-production Provider reachability — deferred:** Hithink live contract and permission are not established.
-- **D8 Canonical market-price semantics — active architecture work:** Issue #175 defines identity, decimal, provenance and eligibility boundaries; implementation is not authorized.
-- **D9 Product overview query architecture — resolved for current surfaces:** bounded query boundaries remain product-local.
-- **D10 Consolidation cadence — reset:** new risk-tiered cadence is 5–6 slices or concrete duplication/ownership evidence.
-- **D11 Evidence-ingestion source and review ownership — deferred.**
+- **D1 Current-state documentation drift — addressed in Issue #183 preflight:** baseline now records PR #178 and PR #182.
+- **D2 Repeated Stage 2 structure — bounded:** generic graph loading remains unjustified.
+- **D3 Read utilities — bounded:** serializers, notices and failure semantics remain domain-local.
+- **D4 Command lifecycle and concurrency — partially shared:** transactions and semantic validation remain domain-local.
+- **D5 ORM lifecycle — bounded:** append-only listener/import/metadata compatibility remains tested.
+- **D6 Test-matrix growth — monitored:** Slice 5 must use focused semantic tests plus shared migration invariants.
+- **D7 Provider reachability — deferred:** live source contracts are not established.
+- **D8 Canonical market-price semantics — resolved for v1.**
+- **D9 Product overview query architecture — resolved for current surfaces.**
+- **D10 Consolidation cadence — 5–6 slices or concrete duplication/ownership/test-growth evidence.**
+- **D11 Evidence-ingestion source/review ownership — deferred.**
 - **D12 Guarded AI ownership — resolved for v1.**
-- **D13 Typed beneficiary evidence semantics — resolved for v1:** ownership, taxonomy, evidence, revision, migration and UI boundaries are implemented.
-- **D14 Research-priority comparison semantics — resolved for component-only v1:** complete-universe component comparison is merged; computed price/priority semantics remain unauthorized.
+- **D13 Typed beneficiary semantics — resolved for v1.**
+- **D14 Complete-universe company comparison — resolved for v1.**
+- **D15 Investment Candidate scoring/status semantics — resolved for v1.**
+- **D16 Structured financial-input ownership — active under Issue #183.**
+- **D17 Normalized valuation/expectation comparison semantics — active under Issue #183.**
 
 ## Accepted product sequence
 
@@ -274,75 +274,59 @@ Completed:
 5. Guarded AI Research Assistance v1 — PR #161;
 6. Company Research and Guarded AI consolidation — PR #163;
 7. risk-tiered governance workflow — PR #167;
-8. Typed Beneficiary Evidence Semantics v1 Architecture Preflight — PR #165;
-9. Typed Beneficiary Evidence Semantics v1 implementation — PR #169;
-10. Company Research Comparison Matrix v1 Architecture Preflight — PR #172;
-11. Company Research Comparison Matrix v1 implementation — PR #174.
+8. Typed Beneficiary Evidence Semantics architecture — PR #165;
+9. Typed Beneficiary Evidence Semantics implementation — PR #169;
+10. Company Research Comparison Matrix architecture — PR #172;
+11. Company Research Comparison Matrix implementation — PR #174;
+12. Canonical Price and Comparison Eligibility architecture — PR #176;
+13. Canonical Price and Comparison Eligibility implementation — PR #178;
+14. Investment Candidate Intelligence architecture — PR #180;
+15. Investment Candidate Intelligence implementation — PR #182.
+
+Active:
+
+16. Normalized Valuation and Expectation Metrics v1 Strict Architecture Preflight — Issue #183.
 
 Deferred:
 
 - Evidence Ingestion Issue #154 / closed-unmerged PR #155;
-- no ingestion implementation, migration, dependency, source adapter or runtime behavior reached `main`.
+- Market Attention and Daily Radar until authorized acquisition exists.
 
 ## Current authorization state
 
-- Company Research Comparison Matrix v1 is merged and Issue #173 is completed.
-- Issue #175 authorizes one Strict Architecture Preflight for Canonical Price and Comparison Eligibility v1.
-- No production implementation, schema, migration, Provider, external-network, AI-transmission, release or version change is authorized.
-- No implementation Issue may be opened before Issue #175's architecture PR is independently approved and merged.
+- PR #182 is merged as `9ac65e1677d6377958e3c3b6ee71f0178bfb9eda`.
+- Issues #179 and #181 are completed.
+- Issue #183 authorizes architecture-only work for Normalized Valuation and Expectation Metrics v1.
+- Production models, migration, commands, APIs and UI for Slice 5 are not yet authorized.
+- An implementation Issue may be opened only after the architecture note exists and the owner explicitly authorizes parallel implementation; its PR may not merge before architecture approval and merge.
 - Evidence Ingestion remains deferred.
-- Buy/sell/hold, target price, expected return, portfolio and trading remain prohibited.
+- Buy/sell/hold, target price, fair value, expected return, portfolio and trading remain prohibited.
 
-## Next Strict architecture gate: Canonical Price and Comparison Eligibility v1
+## Next Strict architecture gate: Normalized Valuation and Expectation Metrics v1
 
 The Architecture Preflight must establish:
 
-1. explicit listed-instrument, market, exchange and currency ownership;
-2. exact relationship between Provider-normalized `DailyPriceRecord` rows and canonical-price revisions;
-3. L0/L1/L2/L3 transition and deterministic decimal conversion, scale and rounding;
-4. price kind, adjustment basis, unit and source-series contract;
-5. append-only canonical-price identity/revision and exact source links;
-6. versioned D2 Comparison Eligibility purpose, state and reason codes;
-7. both information-cutoff and recorded-UTC visibility;
-8. additive schema and populated-downgrade refusal;
-9. local commands and read-only exact-ID API candidates;
-10. one production-reachable offline golden path and one fail-closed identity path;
-11. explicit downstream fields that may later enter Company Comparison;
-12. exclusions for valuation, expected return, ranking and recommendation.
+1. explicit structured financial observation ownership and provenance;
+2. exact period, horizon, accounting-scope, unit and currency semantics;
+3. versioned PE, PS, EV/EBITDA and FCF-yield formulas;
+4. Decimal precision and deterministic rounding;
+5. non-meaningful denominator and negative-value behavior;
+6. exact Canonical Price and purpose-specific eligibility use;
+7. capital-structure, freshness and no-FX boundaries;
+8. frozen historical comparison membership and percentile formula;
+9. analyst-owned peer membership and deterministic peer context;
+10. structured actual-versus-expected comparison;
+11. additive, non-automatic links to Investment Candidate component revisions;
+12. minimum append-only schema and populated downgrade refusal;
+13. local commands, exact-ID reads and bounded Company Research sub-surface;
+14. one production-reachable offline golden path and one fail-closed compatibility path;
+15. exclusions for fair value, target price, expected return, recommendation and trading.
 
 The preflight must stop if:
 
-- market, exchange or currency would be inferred from code, name, Provider or UI context;
-- existing floating-point source rows would be silently relabeled canonical;
-- decimal conversion or adjustment meaning is not explicit and versioned;
-- source selection uses fallback or newest-looking rows;
-- Comparison Eligibility meaning is ambiguous or implies attractiveness;
-- implementation requires Provider, ingestion, network, FX or corporate-action changes;
-- output expands into fair value, target price, expected return, ranking or recommendation.
-
-## Locked exclusions for the next gate
-
-- no production implementation or migration;
-- no external evidence acquisition, crawling, scraping, browsing or hidden network;
-- no automatic company, market, exchange, currency, unit, adjustment or price identity inference;
-- no Provider fallback or row-level source mixing;
-- no AI-owned canonical or eligibility state;
-- no generic agent, RAG, vector database, tools or provider framework;
-- no fair value, target price, expected return, upside/downside or buy/sell/hold state;
-- no ranking, score, monitoring, alerts, tasks, portfolio or trading;
-- no release or version change.
-
-## Preserved Canonical Price implementation no-DoR conclusion
-
-Issue #175 defines architecture only. Canonical Price and Comparison Eligibility remain unimplemented until the architecture PR is independently approved and a separate Strict implementation Issue is authorized.
-
-Unauthorized assumptions remain:
-
-- exchange inference from security-code prefix;
-- treating null exchange as a specific market;
-- defaulting currency without recorded source;
-- inferring unit or currency from Provider name;
-- silent fallback to another Provider;
-- treating a linked daily-price row, valuation `observed_value` or AI output as automatically canonical.
-
-No prospective implementation is authorized by this document alone.
+- a required financial value has no authoritative owner;
+- existing free text would need parsing;
+- success requires Provider/network, FX or hidden corporate-action inference;
+- peer membership would be inferred;
+- comparison meaning is ambiguous or attractiveness-labeled;
+- normalized context would automatically change existing Investment Candidate accepted state.
