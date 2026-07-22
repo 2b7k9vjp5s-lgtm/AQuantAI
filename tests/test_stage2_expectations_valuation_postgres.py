@@ -128,7 +128,7 @@ def test_postgres_v06b_migration_from_v06a_and_round_trip(postgres_database_url:
         command.upgrade(config, "head")
         assert "stage2_valuation_snapshots" in inspect(engine).get_table_names()
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0015"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0016"
     finally:
         engine.dispose()
 
