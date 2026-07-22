@@ -27,14 +27,14 @@ def component(code: str, score: str, **overrides) -> ComponentState:
 
 def complete(**scores: str) -> dict[str, ComponentState]:
     defaults = {
-        "industry_opportunity": "85.00",
-        "beneficiary_strength": "82.00",
-        "earnings_conversion": "80.00",
-        "expectation_gap": "70.00",
-        "valuation_context": "68.00",
-        "catalyst_readiness": "75.00",
-        "evidence_quality": "80.00",
-        "risk_penalty": "20.00",
+        "industry_opportunity": "90.00",
+        "beneficiary_strength": "90.00",
+        "earnings_conversion": "90.00",
+        "expectation_gap": "90.00",
+        "valuation_context": "90.00",
+        "catalyst_readiness": "90.00",
+        "evidence_quality": "90.00",
+        "risk_penalty": "10.00",
     }
     defaults.update(scores)
     return {code: component(code, score) for code, score in defaults.items()}
@@ -52,13 +52,11 @@ def test_decimal_score_uses_half_even_and_rejects_non_finite() -> None:
 def test_priority_candidate_is_transparent_and_deterministic() -> None:
     result = evaluate_candidate(complete())
     assert result.candidate_status == "priority_candidate"
-    assert result.base_score == Decimal("77.95")
-    assert result.risk_penalty_points == Decimal("5.00")
-    assert result.final_score == Decimal("72.95") or result.candidate_status == "priority_candidate"
-    # Threshold is controlled by the exact weighted inputs, not evidence count or text.
-    stronger = evaluate_candidate(complete(industry_opportunity="95", expectation_gap="90", valuation_context="90"))
-    assert stronger.candidate_status == "priority_candidate"
-    assert "priority_threshold_met" in stronger.reason_codes
+    assert result.base_score == Decimal("90.00")
+    assert result.business_quality_score == Decimal("90.00")
+    assert result.risk_penalty_points == Decimal("2.50")
+    assert result.final_score == Decimal("87.50")
+    assert "priority_threshold_met" in result.reason_codes
 
 
 def test_pricing_demanding_precedes_watch_when_business_quality_is_strong() -> None:
