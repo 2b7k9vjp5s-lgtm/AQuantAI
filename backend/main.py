@@ -11,6 +11,7 @@ from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
 from backend.api.industry_research import router as industry_research_router
+from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
 from dashboard import build_dashboard_overview, build_dashboard_report
 
@@ -33,6 +34,9 @@ COMPANY_RESEARCH_STATIC_DIR = (
 )
 COMPANY_COMPARISON_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "company_comparison" / "static"
+)
+INVESTMENT_CANDIDATES_STATIC_DIR = (
+    Path(__file__).resolve().parents[1] / "investment_candidates" / "static"
 )
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
 app.mount(
@@ -60,6 +64,11 @@ app.mount(
     StaticFiles(directory=COMPANY_COMPARISON_STATIC_DIR),
     name="company-comparison-static",
 )
+app.mount(
+    "/investment-candidates/static",
+    StaticFiles(directory=INVESTMENT_CANDIDATES_STATIC_DIR),
+    name="investment-candidates-static",
+)
 app.include_router(market_cockpit_router)
 app.include_router(industry_alpha_router)
 app.include_router(beneficiary_semantics_router)
@@ -68,6 +77,7 @@ app.include_router(industry_research_router)
 app.include_router(company_research_router)
 app.include_router(company_comparison_router)
 app.include_router(canonical_price_router)
+app.include_router(investment_candidate_router)
 
 
 @app.get("/")
@@ -142,5 +152,14 @@ def company_comparison_page() -> FileResponse:
     """Serve the component-only Company Research Comparison Matrix."""
     return FileResponse(
         COMPANY_COMPARISON_STATIC_DIR / "company_comparison.html",
+        media_type="text/html",
+    )
+
+
+@app.get("/investment-candidates", include_in_schema=False)
+def investment_candidates_page() -> FileResponse:
+    """Serve the complete-universe Investment Candidate workspace."""
+    return FileResponse(
+        INVESTMENT_CANDIDATES_STATIC_DIR / "investment_candidates.html",
         media_type="text/html",
     )
