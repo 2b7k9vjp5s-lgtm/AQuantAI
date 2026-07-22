@@ -6,6 +6,9 @@ from datetime import timezone
 
 from sqlalchemy import event, select
 
+import backend.database.canonical_price_models  # noqa: F401 - register listed instruments
+import industry_alpha.chain_map_models  # noqa: F401 - register Industry Map targets
+import industry_alpha.stage1_models  # noqa: F401 - register candidate-pool targets
 from industry_alpha.errors import EvidenceLedgerImmutableError
 from industry_alpha.industry_thesis_models import (
     IndustryThesisCandidateRevision,
