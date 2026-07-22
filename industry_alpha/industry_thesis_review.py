@@ -146,9 +146,7 @@ def _normalize_decision(raw: Any, index: int) -> dict[str, Any]:
             "review rationale must be a non-empty JSON object",
         )
     uncertainty_state = (
-        uncertainty_value.get("state")
-        if isinstance(uncertainty_value, dict)
-        else None
+        uncertainty_value.get("state") if isinstance(uncertainty_value, dict) else None
     )
     if (
         not isinstance(uncertainty_value, dict)
@@ -265,7 +263,9 @@ class IndustryThesisProposalReviewService:
                 "proposal review requires a non-empty candidate universe",
             )
 
-        latest_rows: list[tuple[IndustryThesisCandidateIdentity, IndustryThesisCandidateRevision]] = []
+        latest_rows: list[
+            tuple[IndustryThesisCandidateIdentity, IndustryThesisCandidateRevision]
+        ] = []
         for identity in identities:
             latest = session.scalar(
                 select(IndustryThesisCandidateRevision)
@@ -283,7 +283,8 @@ class IndustryThesisProposalReviewService:
                 )
             if (
                 latest.session_revision_id != source_revision.id
-                or latest.information_cutoff_date != source_revision.information_cutoff_date
+                or latest.information_cutoff_date
+                != source_revision.information_cutoff_date
             ):
                 raise IndustryThesisError(
                     "industry_thesis_review_stale_universe",
@@ -382,6 +383,10 @@ class IndustryThesisProposalReviewService:
             _next_utc(session_recorded_at),
             _next_utc(latest_candidate_recorded),
         )
+        source_recorded_boundary = max(
+            stored_utc(source_revision.recorded_at_utc),
+            latest_candidate_recorded,
+        )
         if source_revision.information_cutoff_date > session_recorded_at.date():
             raise IndustryThesisError(
                 "industry_thesis_chronology_invalid",
@@ -391,7 +396,7 @@ class IndustryThesisProposalReviewService:
         plan = self._build_plan(
             source_revision=source_revision,
             reviewed_session_revision_id=reviewed_session_revision_id,
-            candidate_recorded_at=candidate_recorded_at,
+            source_recorded_boundary=source_recorded_boundary,
             prepared=prepared,
         )
         session_payload = session_revision_to_input(source_revision)
@@ -505,10 +510,10 @@ class IndustryThesisProposalReviewService:
             )
         stock_id = latest.proposed_stock_basic_record_id
         instrument_id = latest.proposed_listed_instrument_id
-        if stock_id is None and instrument_id is None:
+        if (stock_id is None) == (instrument_id is None):
             raise IndustryThesisError(
                 "industry_thesis_identity_invalid",
-                "selected candidates require one exact persisted identity",
+                "selected candidates require exactly one authoritative persisted identity",
             )
         if stock_id is not None and session.get(StockBasicRecord, stock_id) is None:
             raise IndustryThesisError(
@@ -534,7 +539,7 @@ class IndustryThesisProposalReviewService:
         *,
         source_revision: IndustryThesisSessionRevision,
         reviewed_session_revision_id: UUID,
-        candidate_recorded_at: datetime,
+        source_recorded_boundary: datetime,
         prepared: list[dict[str, Any]],
     ) -> dict[str, Any]:
         selected: list[dict[str, Any]] = []
@@ -593,7 +598,7 @@ class IndustryThesisProposalReviewService:
             "source_session_revision_id": str(source_revision.id),
             "reviewed_session_revision_id": str(reviewed_session_revision_id),
             "information_cutoff_date": source_revision.information_cutoff_date.isoformat(),
-            "recorded_at_utc_boundary": candidate_recorded_at.isoformat(),
+            "recorded_at_utc_boundary": stored_utc(source_recorded_boundary).isoformat(),
             "coverage_state": source_revision.coverage_state,
             "selected_candidates": selected,
             "rejected_candidate_revision_ids": rejected,
@@ -669,18 +674,34 @@ class IndustryThesisReviewedPlanQueryService:
                 "industry_thesis_graph_incomplete",
                 "stored acceptance-plan fingerprint or revision binding is invalid",
             )
-        candidate_ids = [
-            UUID(item["candidate_revision_id"])
-            for item in plan.get("selected_candidates", [])
-        ]
-        candidate_ids.extend(
-            UUID(value)
-            for value in plan.get("rejected_candidate_revision_ids", [])
-        )
-        candidate_ids.extend(
-            UUID(value)
-            for value in plan.get("unresolved_candidate_revision_ids", [])
-        )
+        try:
+            plan_boundary = datetime.fromisoformat(plan["recorded_at_utc_boundary"])
+            plan_boundary = _validate_recorded_boundary(plan_boundary)
+            candidate_ids = [
+                UUID(item["candidate_revision_id"])
+                for item in plan.get("selected_candidates", [])
+            ]
+            candidate_ids.extend(
+                UUID(value)
+                for value in plan.get("rejected_candidate_revision_ids", [])
+            )
+            candidate_ids.extend(
+                UUID(value)
+                for value in plan.get("unresolved_candidate_revision_ids", [])
+            )
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored acceptance-plan identifiers or boundary are invalid",
+            ) from exc
+        if (
+            plan.get("information_cutoff_date") != revision.information_cutoff_date.isoformat()
+            or plan_boundary > recorded_boundary
+        ):
+            raise IndustryThesisNotFound(
+                "industry_thesis_not_visible",
+                "reviewed plan is outside the requested as-of boundaries",
+            )
         if len(candidate_ids) != len(set(candidate_ids)):
             raise IndustryThesisError(
                 "industry_thesis_graph_incomplete",
@@ -698,44 +719,58 @@ class IndustryThesisReviewedPlanQueryService:
                 "industry_thesis_graph_incomplete",
                 "stored acceptance plan references missing candidate revisions",
             )
+        if any(
+            row.information_cutoff_date > as_of_cutoff
+            or stored_utc(row.recorded_at_utc) > recorded_boundary
+            for row in rows
+        ):
+            raise IndustryThesisNotFound(
+                "industry_thesis_not_visible",
+                "reviewed plan is outside the requested as-of boundaries",
+            )
+
         source_entries = plan.get("candidate_sources", [])
         if not isinstance(source_entries, list):
             raise IndustryThesisError(
                 "industry_thesis_graph_incomplete",
                 "stored acceptance plan candidate sources are invalid",
             )
-        source_by_id = {
-            UUID(item["candidate_revision_id"]): item
-            for item in source_entries
-            if isinstance(item, dict) and "candidate_revision_id" in item
-        }
+        try:
+            source_by_id = {
+                UUID(item["candidate_revision_id"]): item
+                for item in source_entries
+                if isinstance(item, dict) and "candidate_revision_id" in item
+            }
+            expected_states = {
+                UUID(item["candidate_revision_id"]): "selected_for_acceptance"
+                for item in plan.get("selected_candidates", [])
+            }
+            expected_states.update(
+                {
+                    UUID(value): "rejected_by_user"
+                    for value in plan.get("rejected_candidate_revision_ids", [])
+                }
+            )
+            expected_states.update(
+                {
+                    UUID(value): "unresolved"
+                    for value in plan.get("unresolved_candidate_revision_ids", [])
+                }
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored acceptance-plan candidate bindings are invalid",
+            ) from exc
         if set(source_by_id) != set(candidate_ids):
             raise IndustryThesisError(
                 "industry_thesis_graph_incomplete",
                 "stored acceptance plan does not freeze every candidate source",
             )
-        expected_states = {
-            UUID(item["candidate_revision_id"]): "selected_for_acceptance"
-            for item in plan.get("selected_candidates", [])
-        }
-        expected_states.update(
-            {
-                UUID(value): "rejected_by_user"
-                for value in plan.get("rejected_candidate_revision_ids", [])
-            }
-        )
-        expected_states.update(
-            {
-                UUID(value): "unresolved"
-                for value in plan.get("unresolved_candidate_revision_ids", [])
-            }
-        )
         for row in rows:
             if (
                 row.session_revision_id != revision.id
-                or row.information_cutoff_date > as_of_cutoff
-                or stored_utc(row.recorded_at_utc) > recorded_boundary
-                or row.review_state != expected_states[row.id]
+                or row.review_state != expected_states.get(row.id)
                 or source_by_id[row.id].get("source_kind") != row.source_kind
                 or source_by_id[row.id].get(
                     "source_reference_fingerprint_sha256"
