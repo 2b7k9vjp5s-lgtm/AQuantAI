@@ -71,7 +71,17 @@ def test_pending_missing_disputed_and_falsification_do_not_impute() -> None:
     pending["catalyst_readiness"] = component(
         "catalyst_readiness", "75", verification_state="pending"
     )
-    assert evaluate_candidate(pending).candidate_status == "awaiting_verification"
+    pending_result = evaluate_candidate(pending)
+    assert pending_result.candidate_status == "awaiting_verification"
+    assert pending_result.final_score is None
+
+    failed = complete()
+    failed["catalyst_readiness"] = component(
+        "catalyst_readiness", "75", verification_state="failed", verification_material=True
+    )
+    failed_result = evaluate_candidate(failed)
+    assert failed_result.candidate_status == "not_current_candidate"
+    assert failed_result.final_score is None
 
     missing = complete()
     missing.pop("valuation_context")

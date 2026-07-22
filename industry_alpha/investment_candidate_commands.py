@@ -34,6 +34,7 @@ from industry_alpha.investment_candidate_models import (
     ASSESSMENT_STATES,
     COMPONENT_CODES,
     FALSIFICATION_STATES,
+    VERIFICATION_ITEM_CODES,
     VERIFICATION_STATES,
     InvestmentCandidateComponentAssessment,
     InvestmentCandidateComponentInputLink,
@@ -260,12 +261,24 @@ def _parse_component(raw: dict[str, Any]) -> dict[str, Any]:
     fields = {
         "assessment_key", "beneficiary_id", "beneficiary_revision_id",
         "company_research_revision_id", "component_code", "assessment_state",
-        "verification_state", "verification_material", "score_text", "missing_reason",
+        "verification_state", "verification_material", "verification_item_code",
+        "verification_question", "score_text", "missing_reason",
         "rationale", "falsification_condition", "falsification_state",
         "information_cutoff_date", "recorded_at_utc", "recorded_by",
         "expected_latest_revision_id", "inputs",
     }
-    _keys(raw, fields, fields - {"score_text", "missing_reason", "expected_latest_revision_id"})
+    _keys(
+        raw,
+        fields,
+        fields
+        - {
+            "verification_item_code",
+            "verification_question",
+            "score_text",
+            "missing_reason",
+            "expected_latest_revision_id",
+        },
+    )
     component = _text(raw["component_code"], "component_code", 32)
     state = _text(raw["assessment_state"], "assessment_state", 24)
     verification = _text(raw["verification_state"], "verification_state", 24)
@@ -281,6 +294,31 @@ def _parse_component(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw["verification_material"], bool):
         raise InvestmentCandidateError(
             "investment_candidate_input_invalid", "verification_material must be boolean"
+        )
+    verification_item_code = _text(
+        raw.get("verification_item_code"), "verification_item_code", 40, optional=True
+    )
+    verification_question = _text(
+        raw.get("verification_question"), "verification_question", 2000, optional=True
+    )
+    if verification in {"pending", "failed"}:
+        if (
+            raw["verification_material"] is not True
+            or verification_item_code not in VERIFICATION_ITEM_CODES
+            or verification_question is None
+        ):
+            raise InvestmentCandidateError(
+                "investment_candidate_verification_invalid",
+                "pending or failed verification requires material=true, a closed item code and a question",
+            )
+    elif (
+        raw["verification_material"] is not False
+        or verification_item_code is not None
+        or verification_question is not None
+    ):
+        raise InvestmentCandidateError(
+            "investment_candidate_verification_invalid",
+            "verified or not-applicable verification forbids material state and verification item fields",
         )
     source_text, score = decimal_score(raw.get("score_text"), required=state == "supported")
     missing_reason = _text(raw.get("missing_reason"), "missing_reason", 500, optional=True)
@@ -326,6 +364,8 @@ def _parse_component(raw: dict[str, Any]) -> dict[str, Any]:
         "component_code": component, "assessment_state": state,
         "verification_state": verification,
         "verification_material": raw["verification_material"],
+        "verification_item_code": verification_item_code,
+        "verification_question": verification_question,
         "source_score_text": source_text, "score_value": score,
         "missing_reason": missing_reason,
         "rationale": _text(raw["rationale"], "rationale", 4000),
@@ -628,6 +668,9 @@ class InvestmentCandidateCommandService:
             "component_code": data["component_code"],
             "next_revision_no": next_revision,
             "standardized_score_text": None if data["score_value"] is None else format(data["score_value"], ".2f"),
+            "verification_state": data["verification_state"],
+            "verification_item_code": data["verification_item_code"],
+            "verification_question": data["verification_question"],
             "input_count": len(validated),
         }
         if dry_run:
@@ -644,7 +687,10 @@ class InvestmentCandidateCommandService:
             beneficiary_revision_id=beneficiary_revision.id,
             company_research_revision_id=research_revision.id,
             assessment_state=data["assessment_state"], verification_state=data["verification_state"],
-            verification_material=data["verification_material"], source_score_text=data["source_score_text"],
+            verification_material=data["verification_material"],
+            verification_item_code=data["verification_item_code"],
+            verification_question=data["verification_question"],
+            source_score_text=data["source_score_text"],
             score_value=data["score_value"], missing_reason=data["missing_reason"], rationale=data["rationale"],
             falsification_condition=data["falsification_condition"], falsification_state=data["falsification_state"],
             information_cutoff_date=data["information_cutoff_date"], recorded_at_utc=data["recorded_at_utc"],

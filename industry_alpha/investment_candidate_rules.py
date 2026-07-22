@@ -150,10 +150,7 @@ def evaluate_candidate(components: dict[str, ComponentState]) -> CandidateResult
     if any(c.falsification_state == "active" for c in components.values()):
         reasons.add("falsification_triggered")
         return _without_aggregate("not_current_candidate", reasons)
-    if any(
-        c.verification_state == "failed" and c.verification_material
-        for c in components.values()
-    ):
+    if any(c.verification_state == "failed" for c in components.values()):
         reasons.add("verification_failed")
         return _without_aggregate("not_current_candidate", reasons)
     if any(c.verification_state == "pending" for c in components.values()):
