@@ -4,7 +4,7 @@
 
 This document is an authoritative amendment to Issue #188 and `docs/cninfo_acquisition_preflight.md`.
 
-Where this document is more specific than the main preflight, this document controls the future implementation contract. It exists to close two infrastructure and chronology choices found during the first fixed-head architecture review.
+Where this document is more specific than the main preflight, this document controls the future implementation contract. It exists to close infrastructure, chronology and reference-implementation choices found during fixed-head architecture review.
 
 No production implementation, migration, dependency, credential or live request is authorized here.
 
@@ -93,6 +93,63 @@ Confidential documents and credentials remain outside the repository. The reposi
 
 If those facts are unavailable, the architecture may be merged as a governed source decision, but production implementation remains explicitly blocked.
 
+## Decision 4 — `rollysys/use_cninfo` is reference-only
+
+The repository `rollysys/use_cninfo` was reviewed at exact upstream commit `7b85afc5a84171d436724331c4a236343be90c82`.
+
+It is useful as an empirical behavior catalogue and test-design reference, but it is not an authorized transport implementation for AQuantAI.
+
+### Patterns absorbed into the future contract
+
+The future implementation and fixtures should preserve these bounded lessons where they are also supported by the reviewed official source contract:
+
+1. acquisition remains explicit and on demand; there is no scheduler, daemon or startup request;
+2. ordinary tests block real network by default and use captured offline fixtures;
+3. metadata bytes, document bytes and derived text are distinct artifacts;
+4. a replay is considered a complete local hit only when every required exact artifact and provenance link exists;
+5. pagination, source item ceilings and terminal conditions are tested explicitly;
+6. source publication timestamps are normalized through an explicit timezone contract rather than host-local time;
+7. title markup or source decoration is removed only through a deterministic source-specific normalizer;
+8. periodic-report body selection must distinguish the report body from summaries, audit reports, internal-control reports and notice-only records;
+9. duplicate source records may point to identical document bytes, so exact document SHA-256 is authoritative for byte identity while source natural IDs remain separately preserved;
+10. inaccessible legacy document objects, empty extracted text and scanned-document state remain explicit failures or review states rather than silently disappearing;
+11. derived text extraction never replaces the immutable official document bytes;
+12. OCR remains outside v1 and cannot be used as a hidden fallback;
+13. cache/integrity verification concepts are absorbed as database provenance-integrity checks, not as mutable filesystem cache behavior.
+
+### Implementations explicitly rejected
+
+AQuantAI must not vendor, import, invoke as a subprocess, or reimplement the following `use_cninfo` transport behaviors:
+
+- undocumented `hisAnnouncement/query` or `topSearch/query` endpoints;
+- browser-header or `X-Requested-With` request simulation;
+- HTTP transport or manually constructed public-site PDF URLs when not present in an authorized contract;
+- HTML scraping, redirect inspection or reverse engineering to obtain `orgId`;
+- anti-throttling heuristics, long-running crawl advice or hidden retry loops;
+- plate/exchange identity guessing from security-code prefixes as accepted identity;
+- title/date/file-size deduplication as authoritative duplicate identity;
+- filesystem PDF/Markdown/metadata triplets as accepted persistence;
+- PyMuPDF Markdown output as an Evidence Ledger source object;
+- automatic classification or announcement ontology output as accepted evidence grade, company identity or claim state.
+
+### Dependency and license decision
+
+- No runtime dependency on `cninfo-cli` is authorized.
+- No source code from `rollysys/use_cninfo` is copied by this architecture PR.
+- Its MIT license permits later bounded code reuse, but any future copied or substantially adapted code must preserve the upstream copyright and license notice and must pass the same source-authorization review as new code.
+- Empirical endpoint knowledge from that repository does not establish CNINFO permission, stability, retention rights or an official API contract.
+
+### Source-portfolio consequence
+
+The owner has approved a future dual-source direction:
+
+- an official, account-authorized 同花顺金融数据 API may later provide structured market, financial-statement, sector and market-attention Provider data for personal local research;
+- CNINFO or another authorized disclosure channel remains responsible for official announcement metadata and document evidence;
+- the two sources must use separate source registrations, adapter contracts, raw objects, provenance and failure states;
+- no automatic fallback, row mixing or promotion from structured Provider data to official announcement evidence is permitted.
+
+This direction is queued only. Under the project workflow, no separate 同花顺 architecture or implementation slice begins before PR #189 is merged and separately authorized.
+
 ## Updated golden-path requirement
 
 The implementation golden path must prove database-owned binary capture and system-owned chronology:
@@ -101,10 +158,13 @@ The implementation golden path must prove database-owned binary capture and syst
 2. exact bytes, SHA-256 and byte length commit into database binary columns;
 3. generated UTC times satisfy request/fetch/record chronology;
 4. identical replay is idempotent;
-5. oversized metadata/document objects fail closed without truncation;
-6. human review and Evidence Ledger acceptance occur only after capture and use system-owned times;
-7. rollback leaves no partial EvidenceItem, claim link or provenance bridge;
-8. ordinary tests and fixture demo use the injected test clock and zero live network.
+5. duplicate source records with identical document bytes preserve both source identities without duplicating byte content semantics;
+6. report-body selection excludes summary/audit/internal-control-only records deterministically;
+7. oversized metadata/document objects fail closed without truncation;
+8. empty extracted text remains explicit while official document bytes stay available;
+9. human review and Evidence Ledger acceptance occur only after capture and use system-owned times;
+10. rollback leaves no partial EvidenceItem, claim link or provenance bridge;
+11. ordinary tests and fixture demo use the injected test clock and zero live network.
 
 ## Updated primary failure requirements
 
@@ -116,9 +176,13 @@ The future implementation must fail closed for:
 - `raw_length_mismatch`;
 - `raw_fingerprint_mismatch`;
 - `generated_chronology_invalid`;
+- `document_unavailable`;
+- `document_text_empty`;
+- `source_identity_collision`;
 - any production input containing a forbidden generated-time override;
-- any attempt to use filesystem/object-store storage in the v1 command path.
+- any attempt to use filesystem/object-store storage in the v1 command path;
+- any attempt to invoke undocumented website endpoints or import `cninfo-cli` as a transport dependency.
 
 ## Review consequence
 
-The former architecture candidate head `e1d48da44f2b65bec14e82e96482e5a29b0c5e49` is superseded and must not be approved. A fresh fixed-head review is required after this amendment and passing CI.
+The former architecture candidate heads `e1d48da44f2b65bec14e82e96482e5a29b0c5e49` and `e151e4a9e304200a9cad5d61ada95bfcd7f4c146` are superseded and must not be approved. A fresh fixed-head review is required after this amendment and passing CI.
