@@ -138,15 +138,27 @@ def _normalize_decision(raw: Any, index: int) -> dict[str, Any]:
         )
     rationale_json = canonical_json_text(raw["rationale"], "review rationale")
     uncertainty_json = canonical_json_text(raw["uncertainty"], "review uncertainty")
-    if not isinstance(json_value(rationale_json, "review rationale"), dict):
+    rationale_value = json_value(rationale_json, "review rationale")
+    uncertainty_value = json_value(uncertainty_json, "review uncertainty")
+    if not isinstance(rationale_value, dict) or not rationale_value:
         raise IndustryThesisError(
             "industry_thesis_review_invalid",
-            "review rationale must be a JSON object",
+            "review rationale must be a non-empty JSON object",
         )
-    if not isinstance(json_value(uncertainty_json, "review uncertainty"), dict):
+    uncertainty_state = (
+        uncertainty_value.get("state")
+        if isinstance(uncertainty_value, dict)
+        else None
+    )
+    if (
+        not isinstance(uncertainty_value, dict)
+        or not uncertainty_value
+        or not isinstance(uncertainty_state, str)
+        or not uncertainty_state.strip()
+    ):
         raise IndustryThesisError(
             "industry_thesis_review_invalid",
-            "review uncertainty must be a JSON object",
+            "review uncertainty must be a non-empty object with an explicit state",
         )
     return {
         "candidate_revision_id": parse_uuid(
@@ -528,10 +540,21 @@ class IndustryThesisProposalReviewService:
         selected: list[dict[str, Any]] = []
         rejected: list[str] = []
         unresolved: list[str] = []
+        candidate_sources: list[dict[str, str]] = []
         for item in prepared:
             latest = item["latest"]
             decision = item["decision"]
             reviewed_id = str(item["reviewed_candidate_revision_id"])
+            source_reference_fingerprint = fingerprint(
+                json_value(latest.source_reference_json, "source_reference")
+            )
+            candidate_sources.append(
+                {
+                    "candidate_revision_id": reviewed_id,
+                    "source_kind": latest.source_kind,
+                    "source_reference_fingerprint_sha256": source_reference_fingerprint,
+                }
+            )
             if decision["decision"] == "selected_for_acceptance":
                 selected.append(
                     {
@@ -547,12 +570,7 @@ class IndustryThesisProposalReviewService:
                             "final_proposed_exposure_type"
                         ],
                         "source_kind": latest.source_kind,
-                        "source_reference_fingerprint_sha256": fingerprint(
-                            json_value(
-                                latest.source_reference_json,
-                                "source_reference",
-                            )
-                        ),
+                        "source_reference_fingerprint_sha256": source_reference_fingerprint,
                     }
                 )
             elif decision["decision"] == "rejected_by_user":
@@ -568,6 +586,7 @@ class IndustryThesisProposalReviewService:
         )
         rejected.sort()
         unresolved.sort()
+        candidate_sources.sort(key=lambda item: item["candidate_revision_id"])
         base = {
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
             "session_id": str(source_revision.session_id),
@@ -579,6 +598,7 @@ class IndustryThesisProposalReviewService:
             "selected_candidates": selected,
             "rejected_candidate_revision_ids": rejected,
             "unresolved_candidate_revision_ids": unresolved,
+            "candidate_sources": candidate_sources,
         }
         return {
             **base,
@@ -678,6 +698,22 @@ class IndustryThesisReviewedPlanQueryService:
                 "industry_thesis_graph_incomplete",
                 "stored acceptance plan references missing candidate revisions",
             )
+        source_entries = plan.get("candidate_sources", [])
+        if not isinstance(source_entries, list):
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored acceptance plan candidate sources are invalid",
+            )
+        source_by_id = {
+            UUID(item["candidate_revision_id"]): item
+            for item in source_entries
+            if isinstance(item, dict) and "candidate_revision_id" in item
+        }
+        if set(source_by_id) != set(candidate_ids):
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored acceptance plan does not freeze every candidate source",
+            )
         expected_states = {
             UUID(item["candidate_revision_id"]): "selected_for_acceptance"
             for item in plan.get("selected_candidates", [])
@@ -700,6 +736,11 @@ class IndustryThesisReviewedPlanQueryService:
                 or row.information_cutoff_date > as_of_cutoff
                 or stored_utc(row.recorded_at_utc) > recorded_boundary
                 or row.review_state != expected_states[row.id]
+                or source_by_id[row.id].get("source_kind") != row.source_kind
+                or source_by_id[row.id].get(
+                    "source_reference_fingerprint_sha256"
+                )
+                != fingerprint(json_value(row.source_reference_json, "source_reference"))
             ):
                 raise IndustryThesisError(
                     "industry_thesis_graph_incomplete",
