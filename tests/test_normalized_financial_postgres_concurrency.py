@@ -25,6 +25,22 @@ from industry_alpha.stage2_expectations_fixtures import (
 from industry_alpha.stage2_models import Stage2CompanyResearch, Stage2CompanyResearchRevision
 
 
+def _truncate(database_url: str) -> None:
+    engine = build_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "TRUNCATE structured_financial_observations, "
+                    "normalized_valuation_metrics, valuation_comparison_sets, "
+                    "normalized_expectation_gaps, research_cases, listed_instruments "
+                    "RESTART IDENTITY CASCADE"
+                )
+            )
+    finally:
+        engine.dispose()
+
+
 @pytest.fixture(scope="module")
 def postgres_database_url() -> Iterator[str]:
     database_url = os.getenv("TEST_DATABASE_URL", "").strip()
@@ -37,20 +53,17 @@ def postgres_database_url() -> Iterator[str]:
     command.downgrade(config, "base")
     command.upgrade(config, "head")
     yield database_url
+    _truncate(database_url)
     command.downgrade(config, "base")
 
 
 @pytest.fixture(autouse=True)
 def clean_database(postgres_database_url: str) -> Iterator[None]:
-    engine = build_engine(postgres_database_url)
+    _truncate(postgres_database_url)
     try:
-        with engine.begin() as connection:
-            connection.execute(
-                text("TRUNCATE research_cases, listed_instruments RESTART IDENTITY CASCADE")
-            )
         yield
     finally:
-        engine.dispose()
+        _truncate(postgres_database_url)
 
 
 def test_same_identity_concurrent_first_observation_has_one_winner(
