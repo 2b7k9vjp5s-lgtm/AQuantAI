@@ -7,6 +7,7 @@
 - Risk tier: **Strict**
 - Owner authorization: `进行下一阶段开发，完成目标实现` on 2026-07-22
 - Architecture only; no production schema, migration, runtime, Provider, release or version change
+- `docs/investment_candidate_intelligence_verification_correction.md` is the authoritative correction for verification-state semantics and supersedes only the conflicting verification portions of the main preflight.
 
 ## Objective
 
@@ -65,6 +66,8 @@ Candidate statuses:
 
 Any numeric score or ordering must expose component values, weights, contributions, penalties, rule version, missing treatment and deterministic tie breaks. No unexplained total score is permitted.
 
+Pending and failed verification follow the correction contract: both require explicit closed item code plus bounded question text, both prohibit aggregation, pending yields `awaiting_verification`, and failed yields `not_current_candidate` after existing missing/disputed precedence.
+
 ## Required architecture decisions
 
 - stable snapshot identity and append-only revisions;
@@ -72,6 +75,7 @@ Any numeric score or ordering must expose component values, weights, contributio
 - exact member-level upstream revision graph;
 - component assessment identity/revision model;
 - deterministic aggregation rule and reason-code vocabulary;
+- closed verification-state, materiality, item-code and question contract;
 - Canonical Price and Comparison Eligibility use;
 - valuation and expectation-gap boundaries;
 - minimum additive schema;
@@ -97,7 +101,8 @@ Fail before any write if:
 - any exact candidate-pool member is omitted, duplicated or substituted;
 - any frozen revision lies outside either as-of boundary;
 - a critical price/valuation input is stale, conflicting, rejected or ineligible;
-- a component value requires hidden inference or an unowned default.
+- a component value requires hidden inference or an unowned default;
+- a pending/failed verification lacks its closed item code and exact bounded question.
 
 No partial snapshot, fallback selection or silent reweighting is allowed.
 
@@ -105,6 +110,7 @@ No partial snapshot, fallback selection or silent reweighting is allowed.
 
 - this task snapshot;
 - `docs/investment_candidate_intelligence_preflight.md`;
+- `docs/investment_candidate_intelligence_verification_correction.md`;
 - Draft architecture PR based exactly on the required base;
 - repository checks and author fixed-head handoff;
 - independent fixed-head architecture review.
