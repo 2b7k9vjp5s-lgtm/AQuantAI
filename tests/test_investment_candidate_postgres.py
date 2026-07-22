@@ -118,7 +118,7 @@ def test_postgres_0013_to_0014_and_empty_round_trip(
         with engine.connect() as connection:
             assert (
                 connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "20260722_0014"
+                == "20260722_0015"
             )
         command.downgrade(config, "20260722_0013")
         assert EXPECTED_TABLES.isdisjoint(inspect(engine).get_table_names())
@@ -142,7 +142,7 @@ def test_postgres_populated_downgrade_refuses_before_any_drop(
         with engine.connect() as connection:
             assert (
                 connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "20260722_0014"
+                == "20260722_0015"
             )
     finally:
         engine.dispose()
