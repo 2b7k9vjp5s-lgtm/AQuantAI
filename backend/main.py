@@ -11,6 +11,7 @@ from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
 from backend.api.industry_research import router as industry_research_router
+from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
 from dashboard import build_dashboard_overview, build_dashboard_report
 
@@ -20,46 +21,23 @@ app = FastAPI(
     description="A-share AI multi-factor quantitative research platform with a local read-only Dashboard.",
 )
 
-DASHBOARD_STATIC_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "static"
-MARKET_COCKPIT_STATIC_DIR = Path(__file__).resolve().parents[1] / "market_cockpit" / "static"
-EVIDENCE_INTELLIGENCE_STATIC_DIR = (
-    Path(__file__).resolve().parents[1] / "evidence_intelligence" / "static"
-)
-INDUSTRY_RESEARCH_STATIC_DIR = (
-    Path(__file__).resolve().parents[1] / "industry_research" / "static"
-)
-COMPANY_RESEARCH_STATIC_DIR = (
-    Path(__file__).resolve().parents[1] / "company_research" / "static"
-)
-COMPANY_COMPARISON_STATIC_DIR = (
-    Path(__file__).resolve().parents[1] / "company_comparison" / "static"
-)
+ROOT_DIR = Path(__file__).resolve().parents[1]
+DASHBOARD_STATIC_DIR = ROOT_DIR / "dashboard" / "static"
+MARKET_COCKPIT_STATIC_DIR = ROOT_DIR / "market_cockpit" / "static"
+EVIDENCE_INTELLIGENCE_STATIC_DIR = ROOT_DIR / "evidence_intelligence" / "static"
+INDUSTRY_RESEARCH_STATIC_DIR = ROOT_DIR / "industry_research" / "static"
+COMPANY_RESEARCH_STATIC_DIR = ROOT_DIR / "company_research" / "static"
+COMPANY_COMPARISON_STATIC_DIR = ROOT_DIR / "company_comparison" / "static"
+INVESTMENT_CANDIDATES_STATIC_DIR = ROOT_DIR / "investment_candidates" / "static"
+
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
-app.mount(
-    "/market-cockpit/static",
-    StaticFiles(directory=MARKET_COCKPIT_STATIC_DIR),
-    name="market-cockpit-static",
-)
-app.mount(
-    "/evidence-intelligence/static",
-    StaticFiles(directory=EVIDENCE_INTELLIGENCE_STATIC_DIR),
-    name="evidence-intelligence-static",
-)
-app.mount(
-    "/industry-research/static",
-    StaticFiles(directory=INDUSTRY_RESEARCH_STATIC_DIR),
-    name="industry-research-static",
-)
-app.mount(
-    "/company-research/static",
-    StaticFiles(directory=COMPANY_RESEARCH_STATIC_DIR),
-    name="company-research-static",
-)
-app.mount(
-    "/company-comparison/static",
-    StaticFiles(directory=COMPANY_COMPARISON_STATIC_DIR),
-    name="company-comparison-static",
-)
+app.mount("/market-cockpit/static", StaticFiles(directory=MARKET_COCKPIT_STATIC_DIR), name="market-cockpit-static")
+app.mount("/evidence-intelligence/static", StaticFiles(directory=EVIDENCE_INTELLIGENCE_STATIC_DIR), name="evidence-intelligence-static")
+app.mount("/industry-research/static", StaticFiles(directory=INDUSTRY_RESEARCH_STATIC_DIR), name="industry-research-static")
+app.mount("/company-research/static", StaticFiles(directory=COMPANY_RESEARCH_STATIC_DIR), name="company-research-static")
+app.mount("/company-comparison/static", StaticFiles(directory=COMPANY_COMPARISON_STATIC_DIR), name="company-comparison-static")
+app.mount("/investment-candidates/static", StaticFiles(directory=INVESTMENT_CANDIDATES_STATIC_DIR), name="investment-candidates-static")
+
 app.include_router(market_cockpit_router)
 app.include_router(industry_alpha_router)
 app.include_router(beneficiary_semantics_router)
@@ -68,6 +46,7 @@ app.include_router(industry_research_router)
 app.include_router(company_research_router)
 app.include_router(company_comparison_router)
 app.include_router(canonical_price_router)
+app.include_router(investment_candidate_router)
 
 
 @app.get("/")
@@ -104,43 +83,37 @@ def dashboard_report() -> dict:
 @app.get("/market-cockpit", include_in_schema=False)
 def market_cockpit_page() -> FileResponse:
     """Serve the read-only database-backed Market Cockpit page."""
-    return FileResponse(
-        MARKET_COCKPIT_STATIC_DIR / "market_cockpit.html",
-        media_type="text/html",
-    )
+    return FileResponse(MARKET_COCKPIT_STATIC_DIR / "market_cockpit.html", media_type="text/html")
 
 
 @app.get("/evidence-intelligence", include_in_schema=False)
 def evidence_intelligence_page() -> FileResponse:
     """Serve the read-only Evidence Intelligence research-change page."""
-    return FileResponse(
-        EVIDENCE_INTELLIGENCE_STATIC_DIR / "evidence_intelligence.html",
-        media_type="text/html",
-    )
+    return FileResponse(EVIDENCE_INTELLIGENCE_STATIC_DIR / "evidence_intelligence.html", media_type="text/html")
 
 
 @app.get("/industry-research", include_in_schema=False)
 def industry_research_page() -> FileResponse:
     """Serve the read-only Industry Beneficiary Workspace page."""
-    return FileResponse(
-        INDUSTRY_RESEARCH_STATIC_DIR / "industry_research.html",
-        media_type="text/html",
-    )
+    return FileResponse(INDUSTRY_RESEARCH_STATIC_DIR / "industry_research.html", media_type="text/html")
 
 
 @app.get("/company-research", include_in_schema=False)
 def company_research_page() -> FileResponse:
     """Serve the read-only Company Research Workspace page."""
-    return FileResponse(
-        COMPANY_RESEARCH_STATIC_DIR / "company_research.html",
-        media_type="text/html",
-    )
+    return FileResponse(COMPANY_RESEARCH_STATIC_DIR / "company_research.html", media_type="text/html")
 
 
 @app.get("/company-comparison", include_in_schema=False)
 def company_comparison_page() -> FileResponse:
     """Serve the component-only Company Research Comparison Matrix."""
+    return FileResponse(COMPANY_COMPARISON_STATIC_DIR / "company_comparison.html", media_type="text/html")
+
+
+@app.get("/investment-candidates", include_in_schema=False)
+def investment_candidates_page() -> FileResponse:
+    """Serve the complete-universe Investment Candidate workspace."""
     return FileResponse(
-        COMPANY_COMPARISON_STATIC_DIR / "company_comparison.html",
+        INVESTMENT_CANDIDATES_STATIC_DIR / "investment_candidates.html",
         media_type="text/html",
     )
