@@ -121,7 +121,7 @@ Define bounded dry-run-capable commands requiring:
 - exact capability/data-family key;
 - explicit instrument, date, period or list selector;
 - maximum pages/items/bytes;
-- information cutoff and recorded-at boundary;
+- explicit information cutoff, with request/fetch/recorded timestamps owned by the system;
 - explicit remote-access confirmation;
 - expected-latest protection where revisions are created.
 
