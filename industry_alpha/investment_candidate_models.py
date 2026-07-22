@@ -38,6 +38,15 @@ COMPONENT_CODES = (
 )
 ASSESSMENT_STATES = ("supported", "missing", "disputed", "not_applicable")
 VERIFICATION_STATES = ("verified", "pending", "failed", "not_applicable")
+VERIFICATION_ITEM_CODES = (
+    "certification",
+    "order",
+    "capacity",
+    "production",
+    "financial_confirmation",
+    "customer_confirmation",
+    "other_explicit",
+)
 FALSIFICATION_STATES = ("inactive", "active", "not_applicable")
 CANDIDATE_STATUSES = (
     "priority_candidate",
@@ -100,6 +109,22 @@ class InvestmentCandidateComponentRevision(Base):
             name="ck_investment_candidate_verification_state",
         ),
         CheckConstraint(
+            f"verification_item_code IS NULL OR verification_item_code IN ({_sql_values(VERIFICATION_ITEM_CODES)})",
+            name="ck_investment_candidate_verification_item_code",
+        ),
+        CheckConstraint(
+            "(verification_state IN ('pending','failed') "
+            "AND verification_material = true "
+            "AND verification_item_code IS NOT NULL "
+            "AND verification_question IS NOT NULL "
+            "AND length(trim(verification_question)) > 0) OR "
+            "(verification_state IN ('verified','not_applicable') "
+            "AND verification_material = false "
+            "AND verification_item_code IS NULL "
+            "AND verification_question IS NULL)",
+            name="ck_investment_candidate_verification_contract",
+        ),
+        CheckConstraint(
             f"falsification_state IN ({_sql_values(FALSIFICATION_STATES)})",
             name="ck_investment_candidate_falsification_state",
         ),
@@ -140,6 +165,8 @@ class InvestmentCandidateComponentRevision(Base):
     assessment_state: Mapped[str] = mapped_column(String(24), nullable=False)
     verification_state: Mapped[str] = mapped_column(String(24), nullable=False)
     verification_material: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    verification_item_code: Mapped[str | None] = mapped_column(String(40))
+    verification_question: Mapped[str | None] = mapped_column(String(2000))
     source_score_text: Mapped[str | None] = mapped_column(String(64))
     score_value: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     missing_reason: Mapped[str | None] = mapped_column(String(500))
