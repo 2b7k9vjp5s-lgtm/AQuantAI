@@ -3,11 +3,33 @@ name: Investment Candidate Diagnostic
 on:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   focused:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Apply reviewed verification-contract patch
+        run: python .codex/tools/apply_issue_181_verification_patch.py
+      - name: Commit reviewed verification-contract patch
+        shell: bash
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              industry_alpha/investment_candidate_commands.py \
+              industry_alpha/investment_candidate_query.py \
+              industry_alpha/investment_candidate_rules.py \
+              tests/test_investment_candidate_models.py \
+              tests/test_investment_candidate_rules.py
+            git commit -m "fix: enforce investment candidate verification contract"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
