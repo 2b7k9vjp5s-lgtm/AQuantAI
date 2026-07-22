@@ -236,7 +236,7 @@ async function load(kind) {
     const message = document.createElement("p");
     message.textContent = `读取失败：${error instanceof Error ? error.message : "未知错误"}`;
     output.appendChild(message);
-    status.textContent = "读取失败；页面未回退到其他记录。";
+    status.textContent = "读取失败；页面不会自动回退到其他记录。";
   }
 }
 
