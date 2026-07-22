@@ -110,11 +110,13 @@ def evaluate_normalized_valuation(
 
     if metric_code not in VALUATION_METRIC_CODES:
         raise NormalizedMetricError(
-            "normalized_valuation_metric_invalid", f"unsupported valuation metric: {metric_code}"
+            "normalized_valuation_metric_invalid",
+            f"unsupported valuation metric: {metric_code}",
         )
     if not isinstance(target_period_key, str) or not target_period_key.strip():
         raise NormalizedMetricError(
-            "normalized_valuation_period_invalid", "target_period_key must be explicit"
+            "normalized_valuation_period_invalid",
+            "target_period_key must be explicit",
         )
 
     price_failure = _validate_price(price, valuation_as_of_date)
@@ -127,13 +129,19 @@ def evaluate_normalized_valuation(
         "ev_ebitda": "ebitda",
         "fcf_yield": "free_cash_flow",
     }[metric_code]
-    if shares.metric_code != "diluted_shares_outstanding" or denominator.metric_code != required_denominator:
+    if (
+        shares.metric_code != "diluted_shares_outstanding"
+        or denominator.metric_code != required_denominator
+    ):
         return _without_value(metric_code, "incompatible_input", {"unit_mismatch"})
-    if metric_code == "ev_ebitda" and (net_debt is None or net_debt.metric_code != "net_debt"):
+    if metric_code == "ev_ebitda" and (
+        net_debt is None or net_debt.metric_code != "net_debt"
+    ):
         return _without_value(metric_code, "missing_input", {"input_missing"})
     if metric_code != "ev_ebitda" and net_debt is not None:
         raise NormalizedMetricError(
-            "normalized_valuation_extra_input", "net debt is only valid for ev_ebitda"
+            "normalized_valuation_extra_input",
+            "net debt is only valid for ev_ebitda",
         )
 
     state_failure = _observation_state_failure(shares, denominator, net_debt)
@@ -152,12 +160,17 @@ def evaluate_normalized_valuation(
         net_debt=net_debt,
     )
     if reasons:
-        state = "stale_input" if reasons <= {"financial_observation_too_old"} else "incompatible_input"
+        state = (
+            "stale_input"
+            if reasons <= {"financial_observation_too_old"}
+            else "incompatible_input"
+        )
         return _without_value(metric_code, state, reasons)
 
     if price.value <= ZERO:
         raise NormalizedMetricError(
-            "normalized_valuation_equity_value_invalid", "canonical price must be strictly positive"
+            "normalized_valuation_equity_value_invalid",
+            "canonical price must be strictly positive",
         )
     if shares.value is None or denominator.value is None:
         return _without_value(metric_code, "missing_input", {"input_missing"})
@@ -227,11 +240,14 @@ def evaluate_normalized_valuation(
             result = (denominator.value / equity_value * HUNDRED).quantize(
                 FOUR_PLACES, rounding=ROUND_HALF_EVEN
             )
-            state = "calculated_negative" if denominator.value < ZERO else "calculated"
-            if state == "calculated_negative":
-                reasons = {"free_cash_flow_negative"}
-            else:
-                reasons = set()
+            state = (
+                "calculated_negative" if denominator.value < ZERO else "calculated"
+            )
+            reasons = (
+                {"free_cash_flow_negative"}
+                if state == "calculated_negative"
+                else set()
+            )
 
     return ValuationResult(
         metric_code=metric_code,
@@ -249,14 +265,17 @@ def calculate_historical_context(
     """Calculate a frozen historical context with exact sufficiency rules."""
 
     _validate_comparison_members(subject_member_id, members)
-    dates = [member.valuation_date for member in members]
-    if len(set(dates)) != len(dates):
-        raise NormalizedMetricError(
-            "normalized_comparison_duplicate_date", "historical valuation dates must be unique"
-        )
     eligible = _eligible_members(members)
+    eligible_dates = [member.valuation_date for member in eligible]
+    if len(set(eligible_dates)) != len(eligible_dates):
+        raise NormalizedMetricError(
+            "normalized_comparison_duplicate_date",
+            "eligible historical valuation dates must be unique",
+        )
     subject = _subject(subject_member_id, members)
-    span_days = (max(dates) - min(dates)).days if dates else 0
+    span_days = (
+        (max(eligible_dates) - min(eligible_dates)).days if eligible_dates else 0
+    )
     distinct_periods = len({member.period_end_date for member in eligible})
     sufficient = (
         subject.eligible
@@ -289,16 +308,25 @@ def calculate_peer_context(
     return _calculate_statistics("calculated", subject, members, eligible)
 
 
-def price_failure_for(metric_code: str, state: str, reasons: set[str]) -> ValuationResult:
+def price_failure_for(
+    metric_code: str, state: str, reasons: set[str]
+) -> ValuationResult:
     return _without_value(metric_code, state, reasons)
 
 
 def _validate_price(
     price: CanonicalPriceInput, valuation_as_of_date: date
 ) -> tuple[str, set[str]] | None:
-    if price.canonical_status != "accepted" or price.price_kind != "official_close" or price.adjustment_basis != "unadjusted":
+    if (
+        price.canonical_status != "accepted"
+        or price.price_kind != "official_close"
+        or price.adjustment_basis != "unadjusted"
+    ):
         return "ineligible_price", {"price_not_accepted"}
-    if price.eligibility_state != "eligible" or price.eligibility_purpose != PRICE_PURPOSE_CODE:
+    if (
+        price.eligibility_state != "eligible"
+        or price.eligibility_purpose != PRICE_PURPOSE_CODE
+    ):
         return "ineligible_price", {"price_purpose_ineligible"}
     if price.unit_code != "currency_per_share":
         return "incompatible_input", {"unit_mismatch"}
@@ -359,7 +387,10 @@ def _compatibility_reasons(
 
     if shares.effective_start_date is None or not (
         shares.effective_start_date <= price.trade_date
-        and (shares.effective_end_date is None or price.trade_date <= shares.effective_end_date)
+        and (
+            shares.effective_end_date is None
+            or price.trade_date <= shares.effective_end_date
+        )
     ):
         reasons.add("share_effective_range_mismatch")
 
@@ -403,7 +434,8 @@ def _without_value(
 def _sorted_reasons(values: set[str]) -> tuple[str, ...]:
     if not values.issubset(REASON_CODES):
         raise NormalizedMetricError(
-            "normalized_valuation_reason_invalid", "unknown normalized valuation reason code"
+            "normalized_valuation_reason_invalid",
+            "unknown normalized valuation reason code",
         )
     return tuple(sorted(values))
 
@@ -413,16 +445,19 @@ def _validate_comparison_members(
 ) -> None:
     if not members:
         raise NormalizedMetricError(
-            "normalized_comparison_members_required", "comparison members are required"
+            "normalized_comparison_members_required",
+            "comparison members are required",
         )
     ids = [member.member_id for member in members]
     if len(set(ids)) != len(ids):
         raise NormalizedMetricError(
-            "normalized_comparison_duplicate_member", "comparison member IDs must be unique"
+            "normalized_comparison_duplicate_member",
+            "comparison member IDs must be unique",
         )
     if ids.count(subject_member_id) != 1:
         raise NormalizedMetricError(
-            "normalized_comparison_subject_invalid", "subject must appear exactly once"
+            "normalized_comparison_subject_invalid",
+            "subject must appear exactly once",
         )
     for member in members:
         if member.eligible and member.value is None:
@@ -437,12 +472,18 @@ def _validate_comparison_members(
             )
 
 
-def _subject(subject_member_id: str, members: tuple[ComparisonMember, ...]) -> ComparisonMember:
+def _subject(
+    subject_member_id: str, members: tuple[ComparisonMember, ...]
+) -> ComparisonMember:
     return next(member for member in members if member.member_id == subject_member_id)
 
 
-def _eligible_members(members: tuple[ComparisonMember, ...]) -> tuple[ComparisonMember, ...]:
-    return tuple(member for member in members if member.eligible and member.value is not None)
+def _eligible_members(
+    members: tuple[ComparisonMember, ...],
+) -> tuple[ComparisonMember, ...]:
+    return tuple(
+        member for member in members if member.eligible and member.value is not None
+    )
 
 
 def _empty_comparison(
