@@ -513,17 +513,27 @@ def _validate_evidence_quality_overlap(
         for link in links
         if link.component_revision_id == quality.id and link.evidence_id is not None
     }
+    supported_other_ids = {
+        revision.id
+        for code, revision in components.items()
+        if code != "evidence_quality" and revision.assessment_state == "supported"
+    }
     other_claims = {
         link.claim_revision_id
         for link in links
-        if link.component_revision_id != quality.id and link.claim_revision_id is not None
+        if link.component_revision_id in supported_other_ids and link.claim_revision_id is not None
     }
     other_evidence = {
         link.evidence_id
         for link in links
-        if link.component_revision_id != quality.id and link.evidence_id is not None
+        if link.component_revision_id in supported_other_ids and link.evidence_id is not None
     }
-    if not quality_claims.intersection(other_claims) or not quality_evidence.intersection(other_evidence):
+    if (
+        not quality_claims
+        or not quality_evidence
+        or not quality_claims.issubset(other_claims)
+        or not quality_evidence.issubset(other_evidence)
+    ):
         raise InvestmentCandidateError(
             "investment_candidate_input_invalid",
             "supported evidence quality must reuse exact claim and evidence inputs from another supported component",

@@ -190,3 +190,6 @@ def test_supported_evidence_quality_reuses_other_component_provenance() -> None:
     commands._validate_evidence_quality_overlap(_ScalarsSession(rows), components)
     with pytest.raises(InvestmentCandidateError, match="reuse exact claim and evidence"):
         commands._validate_evidence_quality_overlap(_ScalarsSession(rows[:2]), components)
+    components["industry_opportunity"].assessment_state = "missing"
+    with pytest.raises(InvestmentCandidateError, match="reuse exact claim and evidence"):
+        commands._validate_evidence_quality_overlap(_ScalarsSession(rows), components)
