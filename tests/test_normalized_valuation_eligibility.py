@@ -9,13 +9,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.database.canonical_price import (
     CanonicalPriceCommandService,
     CanonicalPriceError,
-    CanonicalPriceQueryService,
 )
 from backend.database.models import Base, DailyPriceRecord, IngestionRun
 from backend.database.normalized_valuation_eligibility import (
     NORMALIZED_VALUATION_PURPOSE,
     NORMALIZED_VALUATION_RULE_VERSION,
     NormalizedValuationEligibilityCommandService,
+    NormalizedValuationEligibilityQueryService,
     _validate_normalized_valuation_eligibility,
 )
 
@@ -229,12 +229,18 @@ def test_production_service_records_exact_slice5_purpose(database) -> None:
         }
     )
     with database() as session:
-        payload = CanonicalPriceQueryService(session).get_eligibility(
+        payload = NormalizedValuationEligibilityQueryService(
+            session
+        ).get_eligibility(
             UUID(eligibility["assessment_id"]),
             as_of_cutoff=date(2026, 6, 30),
             as_of_recorded_at_utc=datetime(2026, 7, 1, tzinfo=UTC),
         )
-    assert payload["identity"]["purpose_code"] == NORMALIZED_VALUATION_PURPOSE
+    assert payload["purpose_code"] == NORMALIZED_VALUATION_PURPOSE
     assert payload["revision"]["rule_version"] == NORMALIZED_VALUATION_RULE_VERSION
     assert payload["revision"]["state"] == "eligible"
-    assert payload["members"] == [price["canonical_price_revision_id"]]
+    assert len(payload["members"]) == 1
+    assert (
+        payload["members"][0]["canonical_price_revision"]["id"]
+        == price["canonical_price_revision_id"]
+    )
