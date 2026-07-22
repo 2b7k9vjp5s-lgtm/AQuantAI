@@ -35,3 +35,18 @@ jobs:
           path: investment-candidate-pytest.log
           if-no-files-found: error
           retention-days: 3
+      - name: Upload implementation source snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investment-candidate-source
+          path: |
+            industry_alpha/investment_candidate_commands.py
+            industry_alpha/investment_candidate_models.py
+            industry_alpha/investment_candidate_query.py
+            industry_alpha/investment_candidate_rules.py
+            tests/test_investment_candidate_rules.py
+            tests/test_investment_candidate_models.py
+            tests/test_investment_candidate_migration.py
+          if-no-files-found: error
+          retention-days: 1
