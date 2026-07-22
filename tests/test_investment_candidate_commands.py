@@ -6,7 +6,7 @@ import json
 from uuid import UUID
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -528,12 +528,24 @@ def test_three_member_offline_golden_path_and_exact_read(database):
 
     result = service.record_snapshot(payload)
     boundary = datetime(2026, 7, 22, 18, tzinfo=UTC)
-    with database() as session:
-        output = InvestmentCandidateQueryService(session).get_snapshot_revision(
-            UUID(result["snapshot_revision_id"]),
-            as_of_cutoff=CUTOFF,
-            as_of_recorded_at_utc=boundary,
-        )
+    query_count = 0
+
+    def count_statement(*_args) -> None:
+        nonlocal query_count
+        query_count += 1
+
+    engine = database.kw["bind"]
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        with database() as session:
+            output = InvestmentCandidateQueryService(session).get_snapshot_revision(
+                UUID(result["snapshot_revision_id"]),
+                as_of_cutoff=CUTOFF,
+                as_of_recorded_at_utc=boundary,
+            )
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
+    assert query_count == 9
     statuses = {row["candidate_status"] for row in output["members"]}
     assert statuses == {
         "priority_candidate",
