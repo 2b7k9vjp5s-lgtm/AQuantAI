@@ -39,20 +39,7 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run tests
-        shell: bash
-        run: |
-          set +e
-          python -m pytest 2>&1 | tee pytest-remediation.txt
-          status=${PIPESTATUS[0]}
-          exit "$status"
-
-      - name: Upload remediation output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: normalized-valuation-remediation
-          path: pytest-remediation.txt
-          if-no-files-found: error
+        run: python -m pytest
 
       - name: Run local fixture demo
         run: python -m scripts.demo_research_flow
