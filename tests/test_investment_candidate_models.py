@@ -37,7 +37,7 @@ def test_read_routes_are_get_only_and_page_is_non_advisory() -> None:
     routes = {
         route.path: route.methods
         for route in app.routes
-        if route.path.startswith("/investment-candidates")
+        if route.path.startswith("/investment-candidates") and hasattr(route, "methods")
     }
     assert routes["/investment-candidates/component-revisions/{component_revision_id}"] == {"GET"}
     assert routes["/investment-candidates/snapshot-revisions/{snapshot_revision_id}"] == {"GET"}
