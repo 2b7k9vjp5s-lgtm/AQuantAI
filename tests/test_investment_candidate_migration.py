@@ -38,7 +38,7 @@ def test_migration_creates_exact_eight_tables_and_empty_round_trip(tmp_path) -> 
     try:
         assert EXPECTED_TABLES.issubset(inspect(engine).get_table_names())
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0014"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0015"
     finally:
         engine.dispose()
     command.downgrade(config, "20260722_0013")
