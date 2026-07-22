@@ -1,5 +1,26 @@
 # Scripts
 
+## Investment Candidate Intelligence v1
+
+The two commands below accept one bounded local UTF-8 JSON file, perform no
+network or AI call, reject unknown fields, emit deterministic strict JSON, and
+support `--dry-run` validation without database writes:
+
+```text
+python -m scripts.record_investment_candidate_component --input local/component.json --dry-run
+python -m scripts.record_investment_candidate_snapshot --input local/snapshot.json --dry-run
+```
+
+Remove `--dry-run` only after reviewing the manifest. Component inputs must
+provide explicit analyst-owned scores and exact upstream revision IDs. Snapshot
+inputs must enumerate the complete exact membership set of one persisted Stage
+1 candidate-pool revision; omission, duplication, substitution, or silent
+relinking fails closed. The commands do not infer scores from text, company
+names, stock codes, Provider metadata, evidence counts, price movement, or AI
+output. Candidate states are research-priority context only and never generate
+buy/sell/hold instructions, target prices, expected returns, positions, or
+trades.
+
 ## Canonical Price and Comparison Eligibility v1
 
 The four commands below accept one bounded local UTF-8 JSON file, perform no
