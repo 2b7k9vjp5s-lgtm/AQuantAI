@@ -79,6 +79,8 @@ from industry_alpha.stage2_models import (
     Stage2CompanyResearch,
     Stage2CompanyResearchRevision,
     Stage2FinancialHypothesisRevision,
+    Stage2HandoffClaimLink,
+    Stage2HandoffEvidenceLink,
     Stage2ResearchHypothesisLink,
 )
 
@@ -447,6 +449,87 @@ def _validate_required_groups(component: str, kinds: set[str]) -> None:
             )
 
 
+def _require_exact_research_provenance(
+    session: Session, *, kind: str, target_id: UUID, company_research_id: UUID
+) -> None:
+    if kind == "claim":
+        linked = session.scalar(
+            select(Stage2HandoffClaimLink.id).where(
+                Stage2HandoffClaimLink.company_research_id == company_research_id,
+                Stage2HandoffClaimLink.claim_revision_id == target_id,
+            )
+        )
+    elif kind == "evidence":
+        linked = session.scalar(
+            select(Stage2HandoffEvidenceLink.id).where(
+                Stage2HandoffEvidenceLink.company_research_id == company_research_id,
+                Stage2HandoffEvidenceLink.evidence_id == target_id,
+            )
+        )
+    else:
+        return
+    if linked is None:
+        raise InvestmentCandidateError(
+            "investment_candidate_input_invalid",
+            f"{kind} input is not frozen by the exact company research handoff",
+        )
+
+
+def _validate_member_price_manifest(
+    session: Session, manifest: dict[str, Any], cutoff: date, recorded_at: datetime
+) -> None:
+    price_id = manifest["canonical_price_revision_id"]
+    eligibility_id = manifest["comparison_eligibility_revision_id"]
+    if (price_id is None) != (eligibility_id is None):
+        raise InvestmentCandidateError(
+            "investment_candidate_universe_mismatch",
+            "canonical price and comparison eligibility must be supplied as one exact pair",
+        )
+    if price_id is not None and eligibility_id is not None:
+        _price_graph(session, price_id, eligibility_id, cutoff, recorded_at)
+
+
+def _validate_evidence_quality_overlap(
+    session: Session, components: dict[str, InvestmentCandidateComponentRevision]
+) -> None:
+    quality = components.get("evidence_quality")
+    if quality is None or quality.assessment_state != "supported":
+        return
+    revision_ids = [revision.id for revision in components.values()]
+    links = list(
+        session.scalars(
+            select(InvestmentCandidateComponentInputLink).where(
+                InvestmentCandidateComponentInputLink.component_revision_id.in_(revision_ids)
+            )
+        )
+    )
+    quality_claims = {
+        link.claim_revision_id
+        for link in links
+        if link.component_revision_id == quality.id and link.claim_revision_id is not None
+    }
+    quality_evidence = {
+        link.evidence_id
+        for link in links
+        if link.component_revision_id == quality.id and link.evidence_id is not None
+    }
+    other_claims = {
+        link.claim_revision_id
+        for link in links
+        if link.component_revision_id != quality.id and link.claim_revision_id is not None
+    }
+    other_evidence = {
+        link.evidence_id
+        for link in links
+        if link.component_revision_id != quality.id and link.evidence_id is not None
+    }
+    if not quality_claims.intersection(other_claims) or not quality_evidence.intersection(other_evidence):
+        raise InvestmentCandidateError(
+            "investment_candidate_input_invalid",
+            "supported evidence quality must reuse exact claim and evidence inputs from another supported component",
+        )
+
+
 def _price_graph(
     session: Session,
     price_revision_id: UUID,
@@ -621,8 +704,14 @@ class InvestmentCandidateCommandService:
                     raise InvestmentCandidateError(
                         "investment_candidate_input_invalid", "claim revision must be supported"
                     )
+                _require_exact_research_provenance(
+                    session, kind=kind, target_id=row.id, company_research_id=research.id
+                )
                 claim_ids.add(row.id)
             if kind == "evidence":
+                _require_exact_research_provenance(
+                    session, kind=kind, target_id=row.id, company_research_id=research.id
+                )
                 evidence_ids.add(row.id)
             validated.append((item, column))
             kinds.add(kind)
@@ -886,6 +975,8 @@ class InvestmentCandidateCommandService:
                 falsification_state=revision.falsification_state,
                 score=revision.score_value,
             )
+        _validate_evidence_quality_overlap(session, components)
+        _validate_member_price_manifest(session, manifest, cutoff, recorded_at)
         result = evaluate_candidate(states)
         valuation = components.get("valuation_context")
         if valuation is not None and valuation.assessment_state == "supported":
@@ -909,7 +1000,6 @@ class InvestmentCandidateCommandService:
                 raise InvestmentCandidateError(
                     "investment_candidate_universe_mismatch", "price manifest does not match valuation component"
                 )
-            _price_graph(session, price_ids[0], eligibility_ids[0], cutoff, recorded_at)
         return {"manifest": manifest, "components": components, "result": result, "priority_ordinal": None}
 
     @staticmethod
