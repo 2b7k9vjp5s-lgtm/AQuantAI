@@ -7,10 +7,10 @@ This document is the authoritative architecture and current-state baseline. `.co
 - Released software version: `0.2.0`.
 - Accepted application/product baseline: `22c1951ba23c495cc6070b948149f4118a86ab6d`.
 - Latest merged capability: Company Research Comparison Matrix v1 through architecture PR #172 and implementation PR #174.
-- Active application implementation, migration, Provider, release or version authorization: none.
-- Active architecture authorization: Issue #175, Canonical Price and Comparison Eligibility v1 documentation only.
+- Active implementation authorization: Issue #177, Canonical Price and Comparison Eligibility v1, pending independent fixed-head review in Draft PR #178.
+- Accepted architecture authorization: Issue #175 and PR #176 define the strict Canonical Price and Comparison Eligibility v1 contract.
 - Evidence Ingestion remains deferred after Issue #154 / closed-unmerged PR #155; no ingestion runtime capability reached `main`.
-- Canonical Price and Comparison Eligibility have an active Strict Architecture Preflight but no implementation Definition of Ready.
+- Canonical Price and Comparison Eligibility implementation is present only on the Issue #177 review branch until Draft PR #178 is independently approved and merged.
 - Company Research Comparison remains component-only and contains no canonical-price comparison, expectation gap, score, ranking, recommendation or price judgment.
 
 Documentation may advance `main` without changing release or runtime behavior. This document records accepted current state; it does not itself authorize production implementation.
@@ -54,6 +54,22 @@ When the configured database and local assets are available, the reviewed runtim
 6. Guarded AI Research Assistance v1, disabled by default;
 7. Typed Beneficiary Evidence Semantics v1 detail inside Industry Research;
 8. Company Research Comparison Matrix v1.
+
+The Issue #177 review branch additionally contains exact-ID, read-only Canonical
+Price and Comparison Eligibility v1 surfaces. They are not part of the accepted
+`main` baseline until the Strict implementation gate completes.
+
+### Canonical Price and Comparison Eligibility v1 review candidate
+
+- existing `IngestionRun`, `StockBasicRecord` and `DailyPriceRecord` remain Provider-normalized L1 rows and are not altered or backfilled;
+- explicit listed-instrument identity owns market, exchange namespace/code, currency, security type and listing chronology without prefix, name, Provider, UI or AI inference;
+- accepted price-series revisions freeze one exact instrument revision, Provider, dataset, series key, source stock code, source adjustment type and decimal contract;
+- `float_repr_decimal_v1` uses the source float round-trip representation, `Decimal`, bounded scale and `ROUND_HALF_EVEN`, while disclosing `binary_float_normalized` fidelity;
+- canonical prices freeze one exact succeeded ingestion run and one exact daily-price row in append-only revisions;
+- Comparison Eligibility is a separate append-only D2 assessment for `company_research_price_context_v1` and does not authorize cross-company arithmetic, valuation normalization, ranking or advice;
+- all write commands are local JSON-only, expected-latest protected, atomic, dry-run capable and network-free;
+- all read surfaces require an exact UUID plus explicit information-cutoff and recorded-UTC boundaries;
+- migration `20260722_0013` creates exactly nine additive tables, performs no backfill and refuses populated downgrade before any drop.
 
 ### Evidence Intelligence / Research Change Feed
 
@@ -143,7 +159,7 @@ The accepted consolidation reviews remain binding:
 | Information or mechanism | Authoritative owner | Rule |
 | --- | --- | --- |
 | Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit Provider per run and series; no silent fallback, relabeling or row-level mixing |
-| Canonical market-price value, instrument identity, unit, currency and comparison eligibility | Architecture candidate in Issue #175 | No implementation DoR; downstream code must not invent or infer it |
+| Canonical market-price value, instrument identity, unit, currency and comparison eligibility | `backend.database.canonical_price*` review candidate in Issue #177 | Explicit frozen identities and append-only revisions only; no downstream inference or arithmetic-comparison authority |
 | Evidence grades, claims, links and conflicts | v0.5 Evidence Ledger | Downstream records freeze exact revisions and links |
 | Industry map, nodes, relationships and observations | v0.5B | Exact persisted identities and cutoff-visible revisions only |
 | Legacy beneficiary identity/classification and rationale | v0.5C Stage 1 | Preserve exact `direct / secondary / potential` values and revision history |

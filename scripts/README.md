@@ -1,5 +1,23 @@
 # Scripts
 
+## Canonical Price and Comparison Eligibility v1
+
+The four commands below accept one bounded local UTF-8 JSON file, perform no
+network access, and support `--dry-run` validation without database writes:
+
+```text
+python -m scripts.record_listed_instrument --input local/instrument.json --dry-run
+python -m scripts.record_canonical_price_series --input local/series.json --dry-run
+python -m scripts.record_canonical_price --input local/price.json --dry-run
+python -m scripts.record_price_comparison_eligibility --input local/eligibility.json --dry-run
+```
+
+Remove `--dry-run` only after reviewing the manifest. Inputs require explicit
+identity, source, cutoff, UTC recording time, `recorded_by`, and expected-latest
+revision values. The commands never infer exchange, currency, adjustment basis,
+or a replacement source row. Canonical price is research context only; it does
+not authorize cross-company arithmetic, ranking, target prices, or advice.
+
 Run the deterministic v0.4D liquidity-distribution demonstration without network access:
 
 ```bash
