@@ -20,7 +20,21 @@ from industry_alpha.investment_candidate_service import (
 router = APIRouter(prefix="/investment-candidates", tags=["investment-candidates"])
 
 
-def get_investment_candidate_session_factory() -> Iterator[sessionmaker[Session]]:
+def _boundary(cutoff: date, value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() != timezone.utc.utcoffset(value):
+        raise HTTPException(status_code=422, detail="as_of_recorded_at_utc must be an explicit UTC timestamp")
+    result = value.astimezone(timezone.utc)
+    if cutoff > result.date():
+        raise HTTPException(status_code=422, detail="as_of_cutoff cannot be later than as_of_recorded_at_utc")
+    return result
+
+
+def get_investment_candidate_session_factory(
+    as_of_cutoff: date = Query(),
+    as_of_recorded_at_utc: datetime = Query(),
+) -> Iterator[sessionmaker[Session]]:
+    """Validate required read boundaries before opening the local database."""
+    _boundary(as_of_cutoff, as_of_recorded_at_utc)
     try:
         engine = build_engine()
     except (RuntimeError, SQLAlchemyError) as exc:
@@ -32,15 +46,6 @@ def get_investment_candidate_session_factory() -> Iterator[sessionmaker[Session]
         yield build_session_factory(engine)
     finally:
         engine.dispose()
-
-
-def _boundary(cutoff: date, value: datetime) -> datetime:
-    if value.tzinfo is None or value.utcoffset() != timezone.utc.utcoffset(value):
-        raise HTTPException(status_code=422, detail="as_of_recorded_at_utc must be an explicit UTC timestamp")
-    result = value.astimezone(timezone.utc)
-    if cutoff > result.date():
-        raise HTTPException(status_code=422, detail="as_of_cutoff cannot be later than as_of_recorded_at_utc")
-    return result
 
 
 def _read(action):
