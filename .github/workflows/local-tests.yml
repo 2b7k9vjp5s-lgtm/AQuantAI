@@ -30,17 +30,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Upload normalized valuation fix targets
-        uses: actions/upload-artifact@v4
-        with:
-          name: normalized-valuation-fix-targets
-          path: |
-            tests/test_normalized_valuation_eligibility.py
-            tests/test_normalized_valuation_golden_path.py
-            company_research/static/valuation_context.js
-            industry_alpha/normalized_valuation_service.py
-            industry_alpha/normalized_comparison_guarded.py
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -50,17 +39,7 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run tests
-        shell: bash
-        run: |
-          set -o pipefail
-          python -m pytest 2>&1 | tee pytest-output.txt
-
-      - name: Upload pytest output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: normalized-valuation-pytest-output
-          path: pytest-output.txt
+        run: python -m pytest
 
       - name: Run local fixture demo
         run: python -m scripts.demo_research_flow
