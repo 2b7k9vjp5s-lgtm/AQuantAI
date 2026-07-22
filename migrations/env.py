@@ -20,6 +20,7 @@ import industry_alpha.stage2_judgments_models  # noqa: F401 - register v0.6D met
 import industry_alpha.beneficiary_semantics_models  # noqa: F401 - register typed semantics
 import industry_alpha.investment_candidate_models  # noqa: F401 - register investment candidate metadata
 import industry_alpha.normalized_valuation_models  # noqa: F401 - register normalized valuation metadata
+import industry_alpha.normalized_valuation_context  # noqa: F401 - register typed v0.6B context columns
 
 config = context.config
 
