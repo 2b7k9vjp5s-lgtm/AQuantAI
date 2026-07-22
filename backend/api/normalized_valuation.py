@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import build_engine, build_session_factory
 from industry_alpha.normalized_financial_rules import NormalizedMetricError
-from industry_alpha.normalized_valuation_query import (
+from industry_alpha.normalized_valuation_service import (
     NormalizedMetricNotFound,
     NormalizedValuationQueryService,
 )
