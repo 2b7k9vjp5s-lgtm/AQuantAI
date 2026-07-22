@@ -440,7 +440,7 @@ def reject_industry_thesis_mutation(
     _flush_context: object,
     _instances: object,
 ) -> None:
-    """Preserve append-only history while allowing bounded identity pointers."""
+    """Preserve append-only history and immutable identity fields."""
 
     for row in session.deleted:
         if isinstance(row, INDUSTRY_THESIS_MODELS):
@@ -461,10 +461,7 @@ def reject_industry_thesis_mutation(
             for attribute in inspect(row).attrs
             if attribute.history.has_changes()
         }
-        allowed = {"latest_revision_number"}
-        if isinstance(row, IndustryThesisSessionIdentity):
-            allowed.add("state")
-        if changed - allowed:
+        if changed - {"latest_revision_number"}:
             raise EvidenceLedgerImmutableError(
                 f"{type(row).__name__} identity fields are immutable."
             )
