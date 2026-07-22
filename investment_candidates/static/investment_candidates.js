@@ -5,7 +5,9 @@ const labels = {
   pricing_demanding:"定价偏贵", evidence_insufficient:"证据不足", not_current_candidate:"暂非候选",
   industry_opportunity:"产业机会", beneficiary_strength:"受益强度", earnings_conversion:"业绩兑现",
   expectation_gap:"预期差", valuation_context:"估值语境", catalyst_readiness:"催化准备",
-  evidence_quality:"证据质量", risk_penalty:"风险惩罚"
+  evidence_quality:"证据质量", risk_penalty:"风险惩罚",
+  certification:"客户认证", order:"订单确认", capacity:"产能确认", production:"投产确认",
+  financial_confirmation:"财务确认", customer_confirmation:"客户确认", other_explicit:"其他明确事项"
 };
 const form=document.querySelector("#snapshot-form");
 const statusNode=document.querySelector("#status");
@@ -31,7 +33,19 @@ function renderDetail(member){
   const section=node("section","","member-detail");
   section.append(node("h3",member.stock_name||member.stock_code||member.beneficiary_id),node("p",`候选状态：${label(member.candidate_status)}；产业受益：${text(member.beneficiary_kind)}`));
   const components=node("div","","components");
-  (member.components||[]).forEach(component=>{const card=node("article","","component");card.append(node("strong",label(component.component_code)),node("p",`状态：${text(component.assessment_state)} / 验证：${text(component.verification_state)}`),node("p",`分值：${text(component.score_value)} · 权重：${text(component.rule_weight)} · 贡献：${text(component.contribution_amount)}`),node("p",`修订：${text(component.component_revision_id)}`,"muted"));components.appendChild(card);});
+  (member.components||[]).forEach(component=>{
+    const card=node("article","","component");
+    card.append(
+      node("strong",label(component.component_code)),
+      node("p",`状态：${text(component.assessment_state)} / 验证：${text(component.verification_state)}`),
+      node("p",`分值：${text(component.score_value)} · 权重：${text(component.rule_weight)} · 贡献：${text(component.contribution_amount)}`)
+    );
+    if(component.verification_state==="pending"||component.verification_state==="failed"){
+      card.append(node("p",`验证事项：${label(component.verification_item_code)}；问题：${text(component.verification_question)}`));
+    }
+    card.append(node("p",`修订：${text(component.component_revision_id)}`,"muted"));
+    components.appendChild(card);
+  });
   section.appendChild(components);target.appendChild(section);
 }
 function renderUniverse(members){
