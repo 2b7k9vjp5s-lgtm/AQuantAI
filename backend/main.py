@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.beneficiary_semantics import router as beneficiary_semantics_router
+from backend.api.company_comparison import router as company_comparison_router
 from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
@@ -29,6 +30,9 @@ INDUSTRY_RESEARCH_STATIC_DIR = (
 COMPANY_RESEARCH_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "company_research" / "static"
 )
+COMPANY_COMPARISON_STATIC_DIR = (
+    Path(__file__).resolve().parents[1] / "company_comparison" / "static"
+)
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
 app.mount(
     "/market-cockpit/static",
@@ -50,12 +54,18 @@ app.mount(
     StaticFiles(directory=COMPANY_RESEARCH_STATIC_DIR),
     name="company-research-static",
 )
+app.mount(
+    "/company-comparison/static",
+    StaticFiles(directory=COMPANY_COMPARISON_STATIC_DIR),
+    name="company-comparison-static",
+)
 app.include_router(market_cockpit_router)
 app.include_router(industry_alpha_router)
 app.include_router(beneficiary_semantics_router)
 app.include_router(evidence_intelligence_router)
 app.include_router(industry_research_router)
 app.include_router(company_research_router)
+app.include_router(company_comparison_router)
 
 
 @app.get("/")
@@ -121,5 +131,14 @@ def company_research_page() -> FileResponse:
     """Serve the read-only Company Research Workspace page."""
     return FileResponse(
         COMPANY_RESEARCH_STATIC_DIR / "company_research.html",
+        media_type="text/html",
+    )
+
+
+@app.get("/company-comparison", include_in_schema=False)
+def company_comparison_page() -> FileResponse:
+    """Serve the component-only Company Research Comparison Matrix."""
+    return FileResponse(
+        COMPANY_COMPARISON_STATIC_DIR / "company_comparison.html",
         media_type="text/html",
     )
