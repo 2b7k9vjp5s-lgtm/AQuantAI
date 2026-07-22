@@ -91,22 +91,26 @@ def test_postgres_populated_downgrade_refuses_before_any_drop(
     engine = build_engine(postgres_database_url)
     try:
         with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "INSERT INTO structured_financial_observations "
-                    "(id, observation_key, company_research_id, instrument_id, metric_code, "
-                    "source_kind, target_period_key, accounting_scope, currency_code, unit_code, "
-                    "created_at_utc) VALUES "
-                    "(:id, 'postgres-migration-test', :research, :instrument, 'revenue', "
-                    "'actual', 'TTM-2026-06-30', 'consolidated', 'CNY', "
-                    "'currency_amount', '2026-07-22 10:00:00+00')"
-                ),
-                {
-                    "id": str(uuid4()),
-                    "research": str(uuid4()),
-                    "instrument": str(uuid4()),
-                },
-            )
+            connection.execute(text("SET session_replication_role = 'replica'"))
+            try:
+                connection.execute(
+                    text(
+                        "INSERT INTO structured_financial_observations "
+                        "(id, observation_key, company_research_id, instrument_id, metric_code, "
+                        "source_kind, target_period_key, accounting_scope, currency_code, unit_code, "
+                        "created_at_utc) VALUES "
+                        "(:id, 'postgres-migration-test', :research, :instrument, 'revenue', "
+                        "'actual', 'TTM-2026-06-30', 'consolidated', 'CNY', "
+                        "'currency_amount', '2026-07-22 10:00:00+00')"
+                    ),
+                    {
+                        "id": str(uuid4()),
+                        "research": str(uuid4()),
+                        "instrument": str(uuid4()),
+                    },
+                )
+            finally:
+                connection.execute(text("SET session_replication_role = 'origin'"))
         with pytest.raises(RuntimeError, match="Cannot downgrade Normalized Valuation"):
             command.downgrade(config, "20260722_0014")
         assert EXPECTED_TABLES.issubset(inspect(engine).get_table_names())
