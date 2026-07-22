@@ -13,6 +13,7 @@ from backend.api.industry_alpha import router as industry_alpha_router
 from backend.api.industry_research import router as industry_research_router
 from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
+from backend.api.normalized_valuation import router as normalized_valuation_router
 from dashboard import build_dashboard_overview, build_dashboard_report
 
 app = FastAPI(
@@ -78,6 +79,7 @@ app.include_router(company_research_router)
 app.include_router(company_comparison_router)
 app.include_router(canonical_price_router)
 app.include_router(investment_candidate_router)
+app.include_router(normalized_valuation_router)
 
 
 @app.get("/")
@@ -143,6 +145,15 @@ def company_research_page() -> FileResponse:
     """Serve the read-only Company Research Workspace page."""
     return FileResponse(
         COMPANY_RESEARCH_STATIC_DIR / "company_research.html",
+        media_type="text/html",
+    )
+
+
+@app.get("/company-research/valuation-context", include_in_schema=False)
+def company_research_valuation_context_page() -> FileResponse:
+    """Serve the exact-ID normalized valuation and expectation context page."""
+    return FileResponse(
+        COMPANY_RESEARCH_STATIC_DIR / "valuation_context.html",
         media_type="text/html",
     )
 

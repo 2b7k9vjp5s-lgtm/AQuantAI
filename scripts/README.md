@@ -32,6 +32,38 @@ evidence counts, price movement, or AI output. Candidate states are
 research-priority context only and never generate buy/sell/hold instructions,
 target prices, expected returns, positions, or trades.
 
+## Normalized Valuation and Expectation Metrics v1
+
+The four commands below accept one bounded local UTF-8 JSON object, reject
+unknown fields, use explicit revision IDs and dual as-of boundaries, support
+`--dry-run`, and perform no network or AI call:
+
+```text
+python -m scripts.record_structured_financial_observation --input local/financial-observation.json --dry-run
+python -m scripts.record_normalized_valuation_metric --input local/valuation-metric.json --dry-run
+python -m scripts.record_valuation_comparison_set --input local/comparison-set.json --dry-run
+python -m scripts.record_normalized_expectation_gap --input local/expectation-gap.json --dry-run
+```
+
+Structured observations support only the reviewed metric, source, period,
+accounting-scope, currency and unit vocabularies. Supported sourced values must
+freeze exact Claim and Evidence links; explicit research assumptions require a
+rationale and falsification condition. Existing v0.6B text is never parsed or
+promoted into a numeric input.
+
+Normalized valuation requires one exact accepted unadjusted official-close
+Canonical Price revision and one exact eligible Comparison Eligibility revision
+for purpose `normalized_valuation_metric_v1`. PE, PS, EV/EBITDA and FCF yield
+use deterministic Decimal arithmetic with `ROUND_HALF_EVEN`; missing values are
+never imputed and nonpositive denominators remain explicit non-meaningful states.
+Historical and peer comparison commands preserve every explicit member, including
+excluded members and their reason codes. Expectation-gap commands compare one
+exact expected observation with one exact actual observation and do not change
+Investment Candidate scores or snapshots.
+
+These commands produce research context only. They do not calculate fair value,
+target price, expected return, position size, buy/sell/hold output or a trade.
+
 ## Canonical Price and Comparison Eligibility v1
 
 The four commands below accept one bounded local UTF-8 JSON file, perform no

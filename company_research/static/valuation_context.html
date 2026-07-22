@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>标准化估值与预期上下文 · AQuantAI</title>
+  <link rel="stylesheet" href="/company-research/static/company_research.css">
+  <script src="/company-research/static/valuation_context.js" defer></script>
+</head>
+<body>
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">AQuantAI · Normalized Valuation and Expectation Metrics v1</p>
+      <h1>标准化估值与预期上下文</h1>
+      <p class="lead">通过明确的修订 ID、信息截止日和记录时间，读取可复现的财务观察、估值公式、历史/同业集合与实际—预期差。</p>
+    </div>
+    <aside class="boundary" aria-label="研究边界">
+      <strong>只读研究边界</strong>
+      <span>数值用于研究上下文，不代表合理价值、目标价、预期收益、买卖建议、持仓建议或交易信号。</span>
+    </aside>
+  </header>
+
+  <main>
+    <section class="panel controls" aria-labelledby="boundary-title">
+      <div>
+        <h2 id="boundary-title">明确读取边界</h2>
+        <p>页面不会自动选择最新记录，不会根据股票代码、名称、行业或文本推断身份。</p>
+      </div>
+      <div class="control-grid">
+        <label>公司研究 ID<input id="companyResearchId" type="text" autocomplete="off" placeholder="仅用于核对显示"></label>
+        <label>信息截止日<input id="cutoffInput" type="date" required></label>
+        <label>记录时间（UTC）<input id="recordedInput" type="text" required placeholder="2026-07-01T00:00:00Z"></label>
+      </div>
+      <p id="globalStatus" class="status" role="status" aria-live="polite">请填写双时点与需要读取的精确修订 ID。</p>
+    </section>
+
+    <section class="panel" aria-labelledby="observation-title">
+      <div class="section-heading"><div><p class="level">D0 / D3 · 明确来源</p><h2 id="observation-title">结构化财务观察</h2></div></div>
+      <div class="control-grid">
+        <label>观察修订 ID<input id="observationId" type="text" autocomplete="off"></label>
+        <button data-kind="observation" type="button">读取观察</button>
+      </div>
+      <div id="observationOutput"><p>尚未读取。</p></div>
+    </section>
+
+    <section class="panel" aria-labelledby="metric-title">
+      <div class="section-heading"><div><p class="level">D1 · 版本化确定性计算</p><h2 id="metric-title">标准化估值指标</h2></div></div>
+      <div class="control-grid">
+        <label>估值指标修订 ID<input id="metricId" type="text" autocomplete="off"></label>
+        <button data-kind="metric" type="button">读取估值指标</button>
+      </div>
+      <div id="metricOutput"><p>尚未读取。</p></div>
+    </section>
+
+    <section class="panel" aria-labelledby="comparison-title">
+      <div class="section-heading"><div><p class="level">D1 / D3 · 冻结集合</p><h2 id="comparison-title">历史或同业比较上下文</h2></div></div>
+      <div class="control-grid">
+        <label>比较集合修订 ID<input id="comparisonId" type="text" autocomplete="off"></label>
+        <button data-kind="comparison" type="button">读取比较集合</button>
+      </div>
+      <div id="comparisonOutput"><p>尚未读取。</p></div>
+    </section>
+
+    <section class="panel" aria-labelledby="gap-title">
+      <div class="section-heading"><div><p class="level">D1 · 实际与预期差</p><h2 id="gap-title">标准化预期差</h2></div></div>
+      <div class="control-grid">
+        <label>预期差修订 ID<input id="gapId" type="text" autocomplete="off"></label>
+        <button data-kind="gap" type="button">读取预期差</button>
+      </div>
+      <div id="gapOutput"><p>尚未读取。</p></div>
+    </section>
+  </main>
+</body>
+</html>
