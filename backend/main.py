@@ -149,6 +149,15 @@ def company_research_page() -> FileResponse:
     )
 
 
+@app.get("/company-research/valuation-context", include_in_schema=False)
+def company_research_valuation_context_page() -> FileResponse:
+    """Serve the exact-ID normalized valuation and expectation context page."""
+    return FileResponse(
+        COMPANY_RESEARCH_STATIC_DIR / "valuation_context.html",
+        media_type="text/html",
+    )
+
+
 @app.get("/company-comparison", include_in_schema=False)
 def company_comparison_page() -> FileResponse:
     """Serve the component-only Company Research Comparison Matrix."""
