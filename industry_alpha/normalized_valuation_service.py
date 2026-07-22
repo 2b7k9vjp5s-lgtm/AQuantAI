@@ -1,4 +1,4 @@
-"""Public normalized valuation and expectation command surface."""
+"""Public normalized valuation and expectation service surface."""
 
 from __future__ import annotations
 
@@ -11,6 +11,10 @@ from industry_alpha.normalized_expectation_commands import NormalizedExpectation
 from industry_alpha.normalized_financial_commands import StructuredFinancialObservationCommandService
 from industry_alpha.normalized_financial_rules import NormalizedMetricError
 from industry_alpha.normalized_valuation_commands import NormalizedValuationMetricCommandService
+from industry_alpha.normalized_valuation_query import (
+    NormalizedMetricNotFound,
+    NormalizedValuationQueryService,
+)
 
 
 class NormalizedValuationCommandService:
@@ -43,4 +47,9 @@ class NormalizedValuationCommandService:
         return self._expectation.record_expectation_gap(raw, dry_run=dry_run)
 
 
-__all__ = ("NormalizedValuationCommandService", "NormalizedMetricError")
+__all__ = (
+    "NormalizedValuationCommandService",
+    "NormalizedValuationQueryService",
+    "NormalizedMetricError",
+    "NormalizedMetricNotFound",
+)
