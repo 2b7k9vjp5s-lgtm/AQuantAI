@@ -132,7 +132,7 @@ class IndustryThesisQueryService:
     ) -> dict[str, Any]:
         recorded_boundary = _validate_recorded_boundary(as_of_recorded_at_utc)
         identity = self._session.get(IndustryThesisSessionIdentity, session_id)
-        if identity is None:
+        if identity is None or stored_utc(identity.created_recorded_utc) > recorded_boundary:
             raise IndustryThesisNotFound(
                 "industry_thesis_session_not_found",
                 "exact industry-thesis session was not found",
@@ -153,7 +153,9 @@ class IndustryThesisQueryService:
             "created_recorded_utc": stored_utc(identity.created_recorded_utc).isoformat(),
             "created_by_kind": identity.created_by_kind,
             "state": identity.state,
-            "current_latest_revision_number": identity.latest_revision_number,
+            "visible_latest_revision_number": (
+                None if not revisions else revisions[-1].revision_number
+            ),
             "visible_revision_count": len(revisions),
             "visible_revisions": [_session_revision_value(revision) for revision in revisions],
         }
@@ -191,7 +193,7 @@ class IndustryThesisQueryService:
             )
         _visible(revision, as_of_cutoff, recorded_boundary)
         identity = self._session.get(IndustryThesisCandidateIdentity, revision.candidate_id)
-        if identity is None:
+        if identity is None or stored_utc(identity.created_recorded_utc) > stored_utc(revision.recorded_at_utc):
             raise IndustryThesisError(
                 "industry_thesis_graph_incomplete",
                 "candidate identity graph is incomplete",
@@ -231,6 +233,12 @@ class IndustryThesisQueryService:
                 )
             ).all()
         )
+        for identity, revision in rows:
+            if stored_utc(identity.created_recorded_utc) > stored_utc(revision.recorded_at_utc):
+                raise IndustryThesisError(
+                    "industry_thesis_graph_incomplete",
+                    "candidate identity chronology is incomplete",
+                )
         rows.sort(
             key=lambda pair: (
                 SOURCE_PRECEDENCE[pair[1].source_kind],
