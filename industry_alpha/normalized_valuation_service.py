@@ -6,13 +6,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from industry_alpha.normalized_comparison_guarded import (
-    GuardedValuationComparisonCommandService,
-)
 from industry_alpha.normalized_expectation_commands import NormalizedExpectationGapCommandService
 from industry_alpha.normalized_financial_commands import StructuredFinancialObservationCommandService
 from industry_alpha.normalized_financial_rules import NormalizedMetricError
 from industry_alpha.normalized_valuation_commands import NormalizedValuationMetricCommandService
+from industry_alpha.normalized_valuation_comparison_service import (
+    StrictValuationComparisonCommandService,
+)
 from industry_alpha.normalized_valuation_query import (
     NormalizedMetricNotFound,
     NormalizedValuationQueryService,
@@ -25,7 +25,7 @@ class NormalizedValuationCommandService:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._observation = StructuredFinancialObservationCommandService(session_factory)
         self._metric = NormalizedValuationMetricCommandService(session_factory)
-        self._comparison = GuardedValuationComparisonCommandService(session_factory)
+        self._comparison = StrictValuationComparisonCommandService(session_factory)
         self._expectation = NormalizedExpectationGapCommandService(session_factory)
 
     def record_observation(
