@@ -1,5 +1,6 @@
 """Append-only Industry Alpha research evidence ledger."""
 
+import industry_alpha.industry_thesis_invariants  # noqa: F401 - install cross-row guards
 from industry_alpha.commands import EvidenceLedgerCommandService
 from industry_alpha.chain_map_commands import IndustryChainMapCommandService
 from industry_alpha.chain_map_query import IndustryChainMapQueryService
