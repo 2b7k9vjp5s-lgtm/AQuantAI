@@ -16,4 +16,22 @@ jobs:
       - name: Compile new modules
         run: python -m compileall -q industry_alpha/investment_candidate_*.py backend/api/investment_candidate.py scripts/record_investment_candidate_*.py
       - name: Run focused tests
-        run: python -m pytest -q --tb=short tests/test_investment_candidate_rules.py tests/test_investment_candidate_models.py tests/test_investment_candidate_migration.py
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q --tb=short \
+            tests/test_investment_candidate_rules.py \
+            tests/test_investment_candidate_models.py \
+            tests/test_investment_candidate_migration.py \
+            > investment-candidate-pytest.log 2>&1
+          status=$?
+          cat investment-candidate-pytest.log
+          exit $status
+      - name: Upload focused pytest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investment-candidate-pytest-log
+          path: investment-candidate-pytest.log
+          if-no-files-found: error
+          retention-days: 3
