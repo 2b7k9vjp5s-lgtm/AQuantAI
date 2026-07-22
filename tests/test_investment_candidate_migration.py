@@ -24,9 +24,15 @@ def config_for(path) -> Config:
     return config
 
 
+def prepare_prior_head(config: Config) -> None:
+    """Test the 0013 -> 0014 delta without replaying legacy SQLite-incompatible DDL."""
+    command.stamp(config, "20260722_0013")
+
+
 def test_migration_creates_exact_eight_tables_and_empty_round_trip(tmp_path) -> None:
     database = tmp_path / "investment-candidate.db"
     config = config_for(database)
+    prepare_prior_head(config)
     command.upgrade(config, "head")
     engine = create_engine(f"sqlite:///{database}")
     try:
@@ -46,6 +52,7 @@ def test_migration_creates_exact_eight_tables_and_empty_round_trip(tmp_path) -> 
 def test_populated_downgrade_refuses_before_any_drop(tmp_path) -> None:
     database = tmp_path / "investment-candidate-populated.db"
     config = config_for(database)
+    prepare_prior_head(config)
     command.upgrade(config, "head")
     engine = create_engine(f"sqlite:///{database}")
     try:
