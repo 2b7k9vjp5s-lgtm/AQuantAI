@@ -5,7 +5,6 @@ from uuid import UUID
 
 import pytest
 from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from backend.database.canonical_price_models import ListedInstrument
@@ -104,12 +103,18 @@ def proposal(
         "source_reference": source_reference,
         "company_label_original": label,
         "benefit_path_text": f"{label} participates in the reviewed synthetic chain.",
-        "proposed_exposure_type": "direct" if identity_state == "exact_accepted_identity" else "unknown",
+        "proposed_exposure_type": (
+            "direct" if identity_state == "exact_accepted_identity" else "unknown"
+        ),
         "proposal_confidence": "medium",
         "identity_state": identity_state,
         "review_state": "proposed",
         "rationale": {"reason": "explicit local test input"},
-        "uncertainty": {"state": "none" if identity_state == "exact_accepted_identity" else "identity_pending"},
+        "uncertainty": {
+            "state": "none"
+            if identity_state == "exact_accepted_identity"
+            else "identity_pending"
+        },
     }
     if instrument_id is not None:
         raw["proposed_listed_instrument_id"] = str(instrument_id)
@@ -149,14 +154,20 @@ def test_market_scope_is_explicit_and_unknown_fields_fail() -> None:
 
 
 def test_create_revise_and_query_dual_as_of(database) -> None:
-    clock = SequenceClock(BASE_TIME, BASE_TIME + timedelta(seconds=1))
+    clock = SequenceClock(
+        BASE_TIME,
+        BASE_TIME + timedelta(seconds=1),
+        BASE_TIME + timedelta(seconds=2),
+    )
     service = IndustryThesisCommandService(database, clock=clock)
 
     dry_run = service.create_session(session_input(), dry_run=True)
     assert dry_run["dry_run"] is True
     assert dry_run["session_id"] is None
     with database() as session:
-        assert session.scalar(select(func.count()).select_from(IndustryThesisSessionIdentity)) == 0
+        assert session.scalar(
+            select(func.count()).select_from(IndustryThesisSessionIdentity)
+        ) == 0
 
     created = service.create_session(session_input())
     assert created["revision_number"] == 1
@@ -192,25 +203,24 @@ def test_create_revise_and_query_dual_as_of(database) -> None:
         first = query.get_session_revision(
             first_revision_id,
             as_of_cutoff=CUTOFF,
-            as_of_recorded_at_utc=BASE_TIME,
+            as_of_recorded_at_utc=BASE_TIME + timedelta(seconds=1),
         )
         assert first["revision_number"] == 1
         overview = query.get_session(
             session_id,
             as_of_cutoff=CUTOFF,
-            as_of_recorded_at_utc=BASE_TIME + timedelta(seconds=1),
+            as_of_recorded_at_utc=BASE_TIME + timedelta(seconds=2),
         )
         assert overview["visible_revision_count"] == 2
         with pytest.raises(IndustryThesisNotFound, match="recorded-time"):
             query.get_session_revision(
                 UUID(revised["session_revision_id"]),
                 as_of_cutoff=CUTOFF,
-                as_of_recorded_at_utc=BASE_TIME,
+                as_of_recorded_at_utc=BASE_TIME + timedelta(seconds=1),
             )
 
 
 def test_three_proposal_golden_path_and_deterministic_order(database) -> None:
-    instrument_id: UUID
     with database.begin() as session:
         instrument = ListedInstrument(
             instrument_key="fixture-exact-company",
@@ -222,7 +232,11 @@ def test_three_proposal_golden_path_and_deterministic_order(database) -> None:
 
     service = IndustryThesisCommandService(
         database,
-        clock=SequenceClock(BASE_TIME, BASE_TIME + timedelta(seconds=1)),
+        clock=SequenceClock(
+            BASE_TIME,
+            BASE_TIME + timedelta(seconds=1),
+            BASE_TIME + timedelta(seconds=2),
+        ),
     )
     created = service.create_session(
         session_input(workflow_state="candidate_build_ready")
@@ -276,13 +290,17 @@ def test_three_proposal_golden_path_and_deterministic_order(database) -> None:
         result = query.list_candidate_revisions(
             UUID(created["session_revision_id"]),
             as_of_cutoff=CUTOFF,
-            as_of_recorded_at_utc=BASE_TIME + timedelta(seconds=1),
+            as_of_recorded_at_utc=BASE_TIME + timedelta(seconds=2),
         )
         assert result["candidate_count"] == 3
         assert result["coverage_state"] == "partial_local_coverage"
         assert result["candidates"][0]["company_label_original"] == "Company A"
-        assert session.scalar(select(func.count()).select_from(IndustryThesisCandidateIdentity)) == 3
-        assert session.scalar(select(func.count()).select_from(IndustryThesisCandidateRevision)) == 3
+        assert session.scalar(
+            select(func.count()).select_from(IndustryThesisCandidateIdentity)
+        ) == 3
+        assert session.scalar(
+            select(func.count()).select_from(IndustryThesisCandidateRevision)
+        ) == 3
 
 
 def test_duplicate_source_ai_and_stale_candidate_updates_fail(database) -> None:
@@ -294,7 +312,9 @@ def test_duplicate_source_ai_and_stale_candidate_updates_fail(database) -> None:
             BASE_TIME + timedelta(seconds=2),
         ),
     )
-    created = service.create_session(session_input(workflow_state="candidate_build_ready"))
+    created = service.create_session(
+        session_input(workflow_state="candidate_build_ready")
+    )
     base_proposal = proposal(
         source_kind="user_seed",
         source_reference={"seed_key": "duplicate"},
@@ -328,7 +348,7 @@ def test_duplicate_source_ai_and_stale_candidate_updates_fail(database) -> None:
 def test_append_only_revision_mutation_is_rejected(database) -> None:
     service = IndustryThesisCommandService(database, clock=SequenceClock(BASE_TIME))
     created = service.create_session(session_input())
-    with database.begin() as session:
+    with database() as session:
         revision = session.get(
             IndustryThesisSessionRevision,
             UUID(created["session_revision_id"]),
@@ -336,3 +356,4 @@ def test_append_only_revision_mutation_is_rejected(database) -> None:
         revision.thesis_text_original = "mutated"
         with pytest.raises(EvidenceLedgerImmutableError, match="append-only"):
             session.flush()
+        session.rollback()
