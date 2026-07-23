@@ -11,6 +11,12 @@ from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
 from backend.api.industry_analysis import router as industry_analysis_router
+from backend.api.industry_analysis_candidates import (
+    api_router as industry_analysis_candidates_api_router,
+)
+from backend.api.industry_analysis_candidates import (
+    page_router as industry_analysis_candidates_page_router,
+)
 from backend.api.industry_research import router as industry_research_router
 from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
@@ -85,6 +91,8 @@ app.include_router(beneficiary_semantics_router)
 app.include_router(evidence_intelligence_router)
 app.include_router(industry_research_router)
 app.include_router(industry_analysis_router)
+app.include_router(industry_analysis_candidates_api_router)
+app.include_router(industry_analysis_candidates_page_router)
 app.include_router(company_research_router)
 app.include_router(company_comparison_router)
 app.include_router(canonical_price_router)
