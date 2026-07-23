@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -86,7 +86,6 @@ class SessionPatchRequest(_StrictModel):
     coverage_state: str | None = None
     workflow_state: str | None = None
     information_cutoff_date: date | None = None
-    revision_note: str | None = Field(default=None, exclude=True)
 
 
 class SessionRevisionRequest(_StrictModel):
@@ -255,7 +254,7 @@ def get_industry_analysis_write_factory() -> Iterator[sessionmaker[Session]]:
 def list_industry_thesis_sessions(
     as_of_cutoff: date = Query(),
     as_of_recorded_at_utc: datetime = Query(),
-    limit: int = Query(default=50, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=100),
     session_factory: sessionmaker[Session] = Depends(get_industry_analysis_session_factory),
 ) -> dict:
     try:
