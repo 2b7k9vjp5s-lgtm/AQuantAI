@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 import pytest
@@ -242,6 +243,10 @@ def test_create_dry_run_is_non_persistent_and_commit_creates_revision_one(
     assert result["history_path"] == "/industry-analysis"
     assert "session_id=" in result["edit_scope_path"]
     assert "session_revision_id=" in result["edit_scope_path"]
+    parsed = urlparse(result["edit_scope_path"])
+    query = parse_qs(parsed.query)
+    assert query["as_of_recorded_at_utc"] == [result["recorded_at_utc"]]
+    assert "%2B00%3A00" in result["edit_scope_path"]
     assert _counts(database) == (1, 1)
 
 
