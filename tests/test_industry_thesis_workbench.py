@@ -7,8 +7,13 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
+from backend.database.canonical_price_models import (
+    ListedInstrument,
+    ListedInstrumentRevision,
+)
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
+from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 import industry_alpha.stage1_models  # noqa: F401 - register output-link FK targets
 from industry_alpha.industry_thesis_models import (
     IndustryThesisSessionIdentity,
@@ -158,6 +163,129 @@ def _seed(database) -> dict[str, UUID]:
     }
 
 
+def _seed_local_options(database) -> dict[str, UUID]:
+    map_a = UUID(int=1001)
+    map_b = UUID(int=1002)
+    map_a_revision_1 = UUID(int=1101)
+    map_a_revision_2 = UUID(int=1102)
+    map_b_revision_1 = UUID(int=1201)
+    instrument_a = UUID(int=2001)
+    instrument_b = UUID(int=2002)
+    instrument_a_revision = UUID(int=2101)
+    instrument_b_revision = UUID(int=2201)
+
+    with database.begin() as db:
+        db.add_all(
+            [
+                IndustryMap(
+                    id=map_a,
+                    case_id=UUID(int=3001),
+                    map_key="gas-map",
+                    created_at_utc=BASE_TIME,
+                ),
+                IndustryMap(
+                    id=map_b,
+                    case_id=UUID(int=3002),
+                    map_key="advanced-material-map",
+                    created_at_utc=BASE_TIME,
+                ),
+                ListedInstrument(
+                    id=instrument_a,
+                    instrument_key="CN_A:688001.SH",
+                    created_at_utc=BASE_TIME,
+                ),
+                ListedInstrument(
+                    id=instrument_b,
+                    instrument_key="CN_A:600000.SH",
+                    created_at_utc=BASE_TIME,
+                ),
+            ]
+        )
+
+    with database.begin() as db:
+        db.add_all(
+            [
+                IndustryMapRevision(
+                    id=map_a_revision_1,
+                    map_id=map_a,
+                    revision_no=1,
+                    title="电子特气产业链",
+                    scope="纯化、现场制气与客户认证",
+                    information_cutoff_date=date(2026, 7, 22),
+                    recorded_at_utc=BASE_TIME + timedelta(minutes=2),
+                    supersedes_revision_id=None,
+                ),
+                IndustryMapRevision(
+                    id=map_b_revision_1,
+                    map_id=map_b,
+                    revision_no=1,
+                    title="先进材料产业链",
+                    scope="上游材料与工艺瓶颈",
+                    information_cutoff_date=date(2026, 7, 22),
+                    recorded_at_utc=BASE_TIME + timedelta(minutes=3),
+                    supersedes_revision_id=None,
+                ),
+                ListedInstrumentRevision(
+                    id=instrument_a_revision,
+                    instrument_id=instrument_a,
+                    revision_no=1,
+                    canonical_symbol="688001.SH",
+                    security_type="common_equity",
+                    market_code="CN_A",
+                    exchange_code_namespace="SSE",
+                    exchange_code="688001",
+                    currency_code="CNY",
+                    listing_date=date(2020, 1, 1),
+                    delisting_date=None,
+                    listing_status="active",
+                    recorded_by="local-fixture",
+                    information_cutoff_date=date(2026, 7, 22),
+                    recorded_at_utc=BASE_TIME + timedelta(minutes=4),
+                    supersedes_revision_id=None,
+                ),
+                ListedInstrumentRevision(
+                    id=instrument_b_revision,
+                    instrument_id=instrument_b,
+                    revision_no=1,
+                    canonical_symbol="600000.SH",
+                    security_type="common_equity",
+                    market_code="CN_A",
+                    exchange_code_namespace="SSE",
+                    exchange_code="600000",
+                    currency_code="CNY",
+                    listing_date=date(1999, 11, 10),
+                    delisting_date=None,
+                    listing_status="active",
+                    recorded_by="local-fixture",
+                    information_cutoff_date=date(2026, 7, 22),
+                    recorded_at_utc=BASE_TIME + timedelta(minutes=5),
+                    supersedes_revision_id=None,
+                ),
+            ]
+        )
+
+    with database.begin() as db:
+        db.add(
+            IndustryMapRevision(
+                id=map_a_revision_2,
+                map_id=map_a,
+                revision_no=2,
+                title="电子特气产业链（更新）",
+                scope="新增海外产能与认证边界",
+                information_cutoff_date=date(2026, 7, 24),
+                recorded_at_utc=BASE_TIME + timedelta(days=1),
+                supersedes_revision_id=map_a_revision_1,
+            )
+        )
+
+    return {
+        "map_a_revision_1": map_a_revision_1,
+        "map_a_revision_2": map_a_revision_2,
+        "instrument_a": instrument_a,
+        "instrument_b": instrument_b,
+    }
+
+
 def test_empty_history_is_explicit(database) -> None:
     with database() as session:
         result = IndustryThesisWorkbenchQueryService(session).list_sessions(
@@ -229,6 +357,88 @@ def test_limit_is_bounded_and_reports_more(database) -> None:
     assert result["has_more"] is True
 
 
+def test_map_options_use_latest_visible_revision_and_deterministic_order(database) -> None:
+    ids = _seed_local_options(database)
+    with database() as session:
+        result = IndustryThesisWorkbenchQueryService(session).list_map_options(
+            as_of_cutoff=date(2026, 7, 23),
+            as_of_recorded_at_utc=BASE_TIME + timedelta(hours=1),
+            limit=20,
+        )
+
+    assert [item["title"] for item in result["options"]] == [
+        "电子特气产业链",
+        "先进材料产业链",
+    ]
+    assert result["options"][0]["map_revision_id"] == str(
+        ids["map_a_revision_1"]
+    )
+    assert result["notices"]["explicit_selection_required"] is True
+    assert result["notices"]["accepted_membership_not_inferred"] is True
+
+
+def test_map_option_query_is_bounded_without_latest_fallback(database) -> None:
+    ids = _seed_local_options(database)
+    with database() as session:
+        result = IndustryThesisWorkbenchQueryService(session).list_map_options(
+            as_of_cutoff=date(2026, 7, 23),
+            as_of_recorded_at_utc=BASE_TIME + timedelta(hours=1),
+            query="电子特气",
+            limit=1,
+        )
+
+    assert result["option_count"] == 1
+    assert result["options"][0]["map_revision_id"] == str(
+        ids["map_a_revision_1"]
+    )
+    assert result["options"][0]["map_revision_id"] != str(
+        ids["map_a_revision_2"]
+    )
+
+
+def test_company_options_require_explicit_query_and_never_auto_select(database) -> None:
+    _seed_local_options(database)
+    with database() as session:
+        service = IndustryThesisWorkbenchQueryService(session)
+        with pytest.raises(IndustryThesisWorkbenchError):
+            service.list_company_options(
+                as_of_cutoff=date(2026, 7, 23),
+                as_of_recorded_at_utc=BASE_TIME + timedelta(hours=1),
+                query="6",
+                limit=20,
+            )
+        result = service.list_company_options(
+            as_of_cutoff=date(2026, 7, 23),
+            as_of_recorded_at_utc=BASE_TIME + timedelta(hours=1),
+            query=".SH",
+            limit=20,
+        )
+
+    assert [item["code"] for item in result["options"]] == [
+        "600000.SH",
+        "688001.SH",
+    ]
+    assert all(item["source_kind"] == "listed_instrument" for item in result["options"])
+    assert result["notices"]["first_result_not_selected"] is True
+    assert result["notices"]["text_match_is_not_identity"] is True
+
+
+def test_company_exact_code_exception_returns_exact_identity(database) -> None:
+    ids = _seed_local_options(database)
+    with database() as session:
+        result = IndustryThesisWorkbenchQueryService(session).list_company_options(
+            as_of_cutoff=date(2026, 7, 23),
+            as_of_recorded_at_utc=BASE_TIME + timedelta(hours=1),
+            query="688001.SH",
+            limit=20,
+        )
+
+    assert result["option_count"] == 1
+    assert result["options"][0]["listed_instrument_id"] == str(
+        ids["instrument_a"]
+    )
+
+
 @pytest.mark.parametrize(
     ("cutoff", "recorded_at"),
     [
@@ -241,10 +451,18 @@ def test_invalid_boundaries_fail_closed(cutoff, recorded_at) -> None:
         validate_workbench_boundary(cutoff, recorded_at)
 
 
-def test_limit_outside_contract_fails_closed(database) -> None:
-    with database() as session, pytest.raises(IndustryThesisWorkbenchError):
-        IndustryThesisWorkbenchQueryService(session).list_sessions(
-            as_of_cutoff=date(2026, 7, 23),
-            as_of_recorded_at_utc=BASE_TIME,
-            limit=101,
-        )
+def test_limits_outside_contract_fail_closed(database) -> None:
+    with database() as session:
+        service = IndustryThesisWorkbenchQueryService(session)
+        with pytest.raises(IndustryThesisWorkbenchError):
+            service.list_sessions(
+                as_of_cutoff=date(2026, 7, 23),
+                as_of_recorded_at_utc=BASE_TIME,
+                limit=101,
+            )
+        with pytest.raises(IndustryThesisWorkbenchError):
+            service.list_map_options(
+                as_of_cutoff=date(2026, 7, 23),
+                as_of_recorded_at_utc=BASE_TIME,
+                limit=21,
+            )
