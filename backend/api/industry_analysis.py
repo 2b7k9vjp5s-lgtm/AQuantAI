@@ -197,19 +197,19 @@ def get_workbench_bootstrap() -> dict:
     return {
         "product": "AQuantAI",
         "surface": "personal_research_workbench",
-        "phase": "ui_phase_2b",
+        "phase": "ui_phase_1d",
         "active_slices": {
             "scope_creation": "ui_phase_1b",
             "candidate_universe": "ui_phase_1c",
             "candidate_review": "ui_phase_1d",
             "exact_review_result": "ui_phase_1d",
-            "ordinary_user_continuity": "ui_phase_2b",
         },
         "language": "zh-CN",
         "database_available": _database_available(),
         "modules": list(_MODULES),
         "capabilities": {
             "thesis_history": True,
+            "ordinary_user_continuity": True,
             "scope_entry_preview": False,
             "local_option_reads": True,
             "session_write": True,
