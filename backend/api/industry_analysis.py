@@ -1,4 +1,4 @@
-"""Local JSON adapter for Personal Research Workbench UI Phase 1B."""
+"""Local JSON adapter for Personal Research Workbench UI Phase 1C."""
 
 from __future__ import annotations
 
@@ -198,6 +198,10 @@ def get_workbench_bootstrap() -> dict:
         "product": "AQuantAI",
         "surface": "personal_research_workbench",
         "phase": "ui_phase_1b",
+        "active_slices": {
+            "scope_creation": "ui_phase_1b",
+            "candidate_universe": "ui_phase_1c",
+        },
         "language": "zh-CN",
         "database_available": _database_available(),
         "modules": list(_MODULES),
@@ -208,6 +212,8 @@ def get_workbench_bootstrap() -> dict:
             "session_write": True,
             "session_revision_write": True,
             "candidate_build": False,
+            "candidate_universe_build": True,
+            "candidate_universe_read": True,
             "candidate_review": False,
             "accepted_output_write": False,
             "network_acquisition": False,

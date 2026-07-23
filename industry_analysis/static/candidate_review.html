@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQuantAI 候选公司池</title>
+  <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
+  <link rel="stylesheet" href="/industry-analysis/static/candidate_review.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="/industry-analysis" aria-label="AQuantAI 产业研究首页">
+        <span class="brand-mark">AQ</span>
+        <span><strong>AQuantAI</strong><small>个人研究工作台</small></span>
+      </a>
+      <nav class="primary-nav">
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>今日市场</span><small>后续阶段</small></span>
+        <a class="nav-item nav-active" href="/industry-analysis" aria-current="page"><span>产业研究</span><small>本地研究</small></a>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
+        <a class="nav-item" href="/workbench/settings"><span>系统设置</span><small>显示偏好</small></a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>研究用途</strong>
+        <p>候选公司是待审阅研究对象，不是推荐、排名或正式受益公司。</p>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">LOCAL CANDIDATE UNIVERSE · PHASE 1C</p>
+          <p class="page-context">候选公司池</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="page-state" class="status-pill">正在读取精确研究</span>
+          <a class="button button-secondary" href="/industry-analysis">返回研究历史</a>
+        </div>
+      </header>
+
+      <main id="main-content" tabindex="-1" class="candidate-page">
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow">BUILD COMPLETE LOCAL UNIVERSE</p>
+            <h1>构建候选公司池</h1>
+            <p>仅使用已保存的精确公司种子和你明确选择的冻结 Stage 1 候选池。地图标题、公司名称或市场热度不会自动建立身份或受益关系。</p>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="research-summary-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="research-summary-title">精确研究范围</h2>
+              <p>当前页面固定在链接中的 session revision、信息截止日和系统记录时间，不会自动跳到更新版本。</p>
+            </div>
+            <a id="edit-scope-link" class="button button-secondary" href="/industry-analysis">编辑范围</a>
+          </div>
+          <div id="research-summary" class="summary-grid" aria-live="polite"></div>
+          <div class="notice-panel">
+            <strong>覆盖边界</strong>
+            <p>当前候选池只代表已确认本地范围，不代表全市场完整覆盖。</p>
+          </div>
+        </section>
+
+        <section id="prepare-panel" class="panel" aria-labelledby="prepare-title" hidden>
+          <div class="panel-heading">
+            <div>
+              <h2 id="prepare-title">准备候选池</h2>
+              <p>当前精确修订仍是范围草稿。准备操作只追加一个新的范围修订，不会创建候选公司。</p>
+            </div>
+          </div>
+          <button id="prepare-button" class="button button-primary" type="button">确认范围并准备候选池</button>
+          <p id="prepare-status" class="status-message" role="status" aria-live="polite"></p>
+        </section>
+
+        <section id="build-panel" class="panel" aria-labelledby="build-title" hidden>
+          <div class="panel-heading">
+            <div>
+              <h2 id="build-title">确认候选来源</h2>
+              <p>公司种子来自你已保存的明确选择；每个产业地图的冻结候选池必须单独选择，系统不会默认选择第一项。</p>
+            </div>
+          </div>
+
+          <section aria-labelledby="seed-title">
+            <h3 id="seed-title">已确认公司种子</h3>
+            <div id="company-seeds" class="source-list"></div>
+          </section>
+
+          <section aria-labelledby="map-pool-title">
+            <h3 id="map-pool-title">产业地图与冻结候选池</h3>
+            <div id="map-pools" class="map-pool-list"></div>
+          </section>
+
+          <div class="button-row">
+            <button id="candidate-check-button" class="button button-secondary" type="button">检查候选构建</button>
+            <button id="candidate-build-button" class="button button-primary" type="button">构建完整候选池</button>
+          </div>
+          <p id="build-status" class="status-message" role="status" aria-live="polite"></p>
+          <div id="build-preview" class="preview-list" hidden></div>
+        </section>
+
+        <section class="panel" aria-labelledby="universe-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="universe-title">当前已构建本地范围全量候选</h2>
+              <p id="universe-summary">正在读取候选记录。</p>
+            </div>
+            <button class="button button-disabled" type="button" disabled>开始三态审阅（Phase 1D）</button>
+          </div>
+          <div id="universe-empty" class="empty-state" hidden>
+            <h3>尚未构建候选公司池</h3>
+            <p>先确认上方精确来源并执行检查。地图没有冻结候选池时不会产生隐式候选。</p>
+          </div>
+          <div class="table-wrap" id="universe-table-wrap" hidden>
+            <table class="candidate-table">
+              <thead>
+                <tr>
+                  <th scope="col">公司</th>
+                  <th scope="col">精确来源</th>
+                  <th scope="col">身份状态</th>
+                  <th scope="col">Stage 1 类型</th>
+                  <th scope="col">候选理由</th>
+                  <th scope="col">待确认</th>
+                  <th scope="col">详情</th>
+                </tr>
+              </thead>
+              <tbody id="candidate-rows"></tbody>
+            </table>
+          </div>
+          <p id="universe-status" class="status-message" role="status" aria-live="polite"></p>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="/industry-analysis/static/candidate_review.js" defer></script>
+</body>
+</html>

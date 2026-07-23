@@ -46,3 +46,6 @@ jobs:
 
       - name: Run personal workbench fixture demo
         run: python -m scripts.demo_industry_analysis_workbench
+
+      - name: Run candidate universe fixture demo
+        run: python -m scripts.demo_industry_analysis_candidates
