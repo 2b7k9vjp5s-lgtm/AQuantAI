@@ -317,7 +317,7 @@ def test_exact_revision_reopens_and_revise_dry_run_then_commit_is_append_only(
     assert identity.latest_revision_number == 2
 
 
-def test_stale_expected_latest_and_no_change_return_409_without_write(
+def test_conflicts_fail_closed_without_additional_write(
     database,
     monkeypatch,
 ) -> None:
@@ -367,6 +367,18 @@ def test_stale_expected_latest_and_no_change_return_409_without_write(
                 "revision_note": "没有变化",
             },
         )
+        backward_changes = dict(changes)
+        backward_changes["thesis_title_reviewed"] = "截止日向后移动"
+        backward_changes["information_cutoff_date"] = "2026-07-22"
+        chronology = client.post(
+            f"/industry-analysis/api/sessions/{created['session_id']}/revisions",
+            params={"dry_run": "false"},
+            json={
+                "expected_latest_revision_number": 2,
+                "changes": backward_changes,
+                "revision_note": "非法时间倒退",
+            },
+        )
     finally:
         _clear_overrides()
 
@@ -375,6 +387,8 @@ def test_stale_expected_latest_and_no_change_return_409_without_write(
     assert stale.json()["detail"]["code"] == "industry_thesis_revision_conflict"
     assert no_change.status_code == 409
     assert no_change.json()["detail"]["code"] == "industry_thesis_no_change"
+    assert chronology.status_code == 409
+    assert chronology.json()["detail"]["code"] == "industry_thesis_chronology_invalid"
     assert _counts(database) == (1, 2)
 
 
