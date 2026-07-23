@@ -83,6 +83,34 @@ def _view() -> dict:
     }
 
 
+def _review_payload() -> dict:
+    return {
+        "expected_session_latest_revision_number": 2,
+        "acceptance_plan_version": review_api.ACCEPTANCE_PLAN_VERSION,
+        "decisions": [
+            {
+                "candidate_revision_id": str(CANDIDATE_A),
+                "expected_latest_revision_number": 1,
+                "decision": "selected_for_acceptance",
+                "final_proposed_exposure_type": "direct",
+                "rationale_text": "产品和认证路径直接对应需求扩张。",
+                "uncertainty_state": "limited_evidence",
+                "uncertainty_note": "仍需验证收入占比。",
+            },
+            {
+                "candidate_revision_id": str(CANDIDATE_B),
+                "expected_latest_revision_number": 1,
+                "decision": "unresolved",
+                "final_proposed_exposure_type": None,
+                "rationale_text": "受益路径存在但尚不完整。",
+                "uncertainty_state": "awaiting_verification",
+                "uncertainty_note": "等待客户认证信息。",
+            },
+        ],
+        "revision_note": "完整审阅两条精确候选路径",
+    }
+
+
 def test_review_and_result_pages_are_active_and_static_boundaries_are_safe(client) -> None:
     http, _ = client
     review = http.get(
@@ -162,12 +190,28 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
         f"/industry-analysis/api/session-revisions/{SOURCE_REVISION_ID}/reviews?"
         f"{_query(dry_run='false')}"
     )
+    wrong_type = http.post(
+        url,
+        content="{}",
+        headers={"Content-Type": "text/plain"},
+    )
+    assert wrong_type.status_code == 400
+    assert wrong_type.json()["detail"]["code"] == "industry_analysis_json_required"
+
     malformed = http.post(
         url,
         content=b'{"expected_session_latest_revision_number":',
         headers={"Content-Type": "application/json"},
     )
     assert malformed.status_code == 400
+
+    oversized = http.post(
+        url,
+        content=b"{" + b" " * 1_048_576 + b"}",
+        headers={"Content-Type": "application/json"},
+    )
+    assert oversized.status_code == 413
+    assert oversized.json()["detail"]["code"] == "industry_analysis_body_too_large"
 
     unknown = http.post(
         url,
@@ -229,31 +273,7 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
         "IndustryThesisProposalReviewService",
         FakeReviewService,
     )
-    payload = {
-        "expected_session_latest_revision_number": 2,
-        "acceptance_plan_version": review_api.ACCEPTANCE_PLAN_VERSION,
-        "decisions": [
-            {
-                "candidate_revision_id": str(CANDIDATE_A),
-                "expected_latest_revision_number": 1,
-                "decision": "selected_for_acceptance",
-                "final_proposed_exposure_type": "direct",
-                "rationale_text": "产品和认证路径直接对应需求扩张。",
-                "uncertainty_state": "limited_evidence",
-                "uncertainty_note": "仍需验证收入占比。",
-            },
-            {
-                "candidate_revision_id": str(CANDIDATE_B),
-                "expected_latest_revision_number": 1,
-                "decision": "unresolved",
-                "final_proposed_exposure_type": None,
-                "rationale_text": "受益路径存在但尚不完整。",
-                "uncertainty_state": "awaiting_verification",
-                "uncertainty_note": "等待客户认证信息。",
-            },
-        ],
-        "revision_note": "完整审阅两条精确候选路径",
-    }
+    payload = _review_payload()
     response = http.post(url, json=payload)
     assert response.status_code == 200
     result = response.json()
@@ -279,6 +299,19 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
     response = http.post(url, json=incomplete)
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "industry_thesis_review_incomplete"
+
+    duplicate = dict(payload)
+    duplicate["decisions"] = [payload["decisions"][0], payload["decisions"][0]]
+    response = http.post(url, json=duplicate)
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "industry_thesis_duplicate_review"
+
+    invalid_exposure = _review_payload()
+    invalid_exposure["decisions"][1]["decision"] = "rejected_by_user"
+    invalid_exposure["decisions"][1]["final_proposed_exposure_type"] = "indirect"
+    response = http.post(url, json=invalid_exposure)
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "industry_thesis_review_invalid"
 
 
 def test_reviewed_plan_adapter_preserves_exact_result_route(client) -> None:
