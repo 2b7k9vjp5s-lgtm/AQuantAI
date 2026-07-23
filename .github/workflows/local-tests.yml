@@ -17,7 +17,7 @@ jobs:
         run: python3 -m pip install -q -e ".[dev]"
 
       - name: Run populated Today Market catalog test
-        run: python3 -m pytest -q tests/test_today_market.py -k "catalog_lists" --tb=long
+        run: python3 -m pytest -q tests/test_today_market.py -k "catalog_lists" --tb=line
 
   pytest-and-demo:
     runs-on: ubuntu-latest
