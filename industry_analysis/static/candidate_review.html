@@ -6,6 +6,7 @@
   <title>AQuantAI 候选公司审阅</title>
   <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
   <link rel="stylesheet" href="/industry-analysis/static/candidate_review.css">
+  <link rel="stylesheet" href="/industry-analysis/static/workbench_phase2b.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -31,7 +32,7 @@
     <div class="app-main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">COMPLETE CANDIDATE REVIEW · PHASE 1D</p>
+          <p class="eyebrow">COMPLETE CANDIDATE REVIEW · PHASE 2B</p>
           <p class="page-context">候选公司池与审阅</p>
         </div>
         <div class="topbar-actions">
@@ -47,6 +48,18 @@
             <h1>构建并审阅完整候选公司池</h1>
             <p>系统只使用已保存的精确公司种子与明确选择的冻结 Stage 1 候选池。每条来源路径独立保留，审阅不会自动合并同一公司。</p>
           </div>
+        </section>
+
+        <section class="panel" aria-labelledby="workflow-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="workflow-title">研究流程</h2>
+              <p>当前步骤只由精确路由和本页已读取的工作流状态决定。</p>
+            </div>
+          </div>
+          <div id="phase2b-workflow" class="phase2b-workflow"></div>
+          <div id="phase2b-state" class="phase2b-state"></div>
+          <div id="phase2b-coverage-state" class="phase2b-state" hidden></div>
         </section>
 
         <section class="panel" aria-labelledby="research-summary-title">
@@ -133,8 +146,8 @@
               <p>本页只生成可复现的审阅计划，不会写入正式产业地图、Stage 1 受益公司、投资候选快照或任何交易状态。</p>
             </div>
             <div class="button-row sticky-actions">
-              <button id="review-check-button" class="button button-secondary" type="button">检查审阅结果</button>
-              <button id="review-save-button" class="button button-primary" type="button" disabled>保存审阅计划</button>
+              <button id="review-check-button" class="button button-primary" type="button">检查审阅结果</button>
+              <button id="review-save-button" class="button button-secondary" type="button" disabled>保存审阅计划</button>
             </div>
           </form>
           <p id="review-status" class="status-message" role="status" aria-live="polite"></p>
@@ -150,6 +163,7 @@
       </main>
     </div>
   </div>
+  <script src="/industry-analysis/static/workbench_phase2b.js" defer></script>
   <script src="/industry-analysis/static/candidate_review.js" defer></script>
 </body>
 </html>
