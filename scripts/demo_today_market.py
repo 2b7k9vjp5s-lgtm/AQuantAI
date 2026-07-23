@@ -21,7 +21,11 @@ from backend.database.benchmark_data import BenchmarkPersistenceService
 from backend.database.engine import build_session_factory
 from backend.database.market_data import MarketDataPersistenceService
 from backend.database.models import Base, IngestionRun
-from backend.database.sector_data import SectorPersistenceService
+from backend.database.sector_data import (
+    SECTOR_DAILY_CONTRACT_VERSION,
+    SECTOR_DEFINITION_CONTRACT_VERSION,
+    SectorPersistenceService,
+)
 from market_cockpit.benchmark_fixtures import (
     BENCHMARK_FIXTURE_CURRENT_CUTOFF,
     BENCHMARK_FIXTURE_END_DATE,
@@ -215,7 +219,27 @@ def _ingest_sector(session_factory: sessionmaker[Session]):
         taxonomy_endpoint="fixture_sector_taxonomy",
         history_endpoint="fixture_sector_history",
         adapter_compatibility_version="today-market-demo-v1",
-        provider_request_metadata={"network_mode": "offline-fixture"},
+        provider_request_metadata={
+            "taxonomy_endpoint": "fixture_sector_taxonomy",
+            "history_endpoint": "fixture_sector_history",
+            "classification_system": "eastmoney_industry_board",
+            "classification_level": None,
+            "frequency": "daily",
+            "adjust_type": "",
+            "sector_codes": list(SECTOR_FIXTURE_SCOPE["sector_codes"]),
+            "start_date": SECTOR_FIXTURE_START_DATE,
+            "end_date": SECTOR_FIXTURE_END_DATE,
+            "network_mode": "offline-fixture",
+            "timeout_seconds": 1.0,
+            "max_retries": 0,
+            "akshare_package_version": "fixture",
+            "definition_contract_version": SECTOR_DEFINITION_CONTRACT_VERSION,
+            "daily_contract_version": SECTOR_DAILY_CONTRACT_VERSION,
+            "adapter_version": "today-market-demo-v1",
+            "adapter_compatibility_version": "today-market-demo-v1",
+            "collection_timestamp_utc": "2026-04-05T12:00:00Z",
+            "effective_information_cutoff_date": SECTOR_FIXTURE_CURRENT_CUTOFF,
+        },
         adapter_version="today-market-demo-v1",
     )
 
