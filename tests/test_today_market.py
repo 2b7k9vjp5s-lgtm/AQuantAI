@@ -412,6 +412,8 @@ def test_today_market_page_is_selection_first_and_never_auto_loads_snapshot() ->
     assert script.status_code == 200
     assert 'snapshotButton.addEventListener("click"' in script.text
     assert "activeBoundaries = null" in script.text
+    assert "invalidateCatalogForBoundaryChange" in script.text
+    assert 'input.addEventListener("input", invalidateCatalogForBoundaryChange)' in script.text
     assert workbench.status_code == 200
     assert workbench.history[0].status_code == 307
     assert workbench.url.path == "/industry-analysis"
