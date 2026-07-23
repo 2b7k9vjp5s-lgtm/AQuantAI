@@ -12,20 +12,17 @@ from backend.database.engine import build_session_factory
 from backend.database.models import Base
 import industry_alpha.stage1_models  # noqa: F401 - register output-link FK targets
 from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
-from industry_alpha.industry_thesis_workbench import (
-    IndustryThesisWorkbenchQueryService,
-)
+from industry_alpha.industry_thesis_workbench import IndustryThesisWorkbenchQueryService
 
 UTC = timezone.utc
 BASE_TIME = datetime(2026, 7, 23, 2, 0, tzinfo=UTC)
 CUTOFF = date(2026, 7, 23)
+WORKBENCH_SCOPE_CONTRACT = "aquantai.personal-research-workbench.scope.v1"
 
 
 def _input() -> dict:
     return {
-        "thesis_text_original": (
-            "AI 数据中心与半导体扩产是否提升高纯电子气体需求"
-        ),
+        "thesis_text_original": "AI 数据中心与半导体扩产是否提升高纯电子气体需求",
         "thesis_title_reviewed": "高纯电子气体",
         "driver_type": "demand_expansion",
         "analysis_horizon_kind": "medium_term",
@@ -50,6 +47,7 @@ def _input() -> dict:
         "seed_technologies": ["气体纯化"],
         "seed_bottlenecks": ["客户认证"],
         "draft_graph": {
+            "workbench_contract": WORKBENCH_SCOPE_CONTRACT,
             "exact_industry_map_references": [],
             "nodes": [],
             "relationships": [],
@@ -91,10 +89,7 @@ def run_demo() -> dict:
             factory,
             clock=lambda: BASE_TIME + timedelta(minutes=1),
         )
-        create_preview = create_service.create_session(
-            _input(),
-            dry_run=True,
-        )
+        create_preview = create_service.create_session(_input(), dry_run=True)
         assert create_preview["dry_run"] is True
         assert create_preview["session_id"] is None
 
@@ -139,25 +134,17 @@ def run_demo() -> dict:
         assert revised["revision_number"] == 2
 
         with factory() as session:
-            history = IndustryThesisWorkbenchQueryService(
-                session
-            ).list_sessions(
+            history = IndustryThesisWorkbenchQueryService(session).list_sessions(
                 as_of_cutoff=CUTOFF,
-                as_of_recorded_at_utc=BASE_TIME
-                + timedelta(minutes=5),
+                as_of_recorded_at_utc=BASE_TIME + timedelta(minutes=5),
                 limit=20,
             )
         assert history["session_count"] == 1
         assert history["sessions"][0]["visible_revision_count"] == 2
-        assert history["sessions"][0]["thesis_title"] == (
-            "高纯电子气体需求与认证"
-        )
+        assert history["sessions"][0]["thesis_title"] == "高纯电子气体需求与认证"
         assert history["notices"]["accepted_outputs_not_inferred"] is True
         return {
-            "options": {
-                "maps": maps,
-                "companies": companies,
-            },
+            "options": {"maps": maps, "companies": companies},
             "create_preview": create_preview,
             "created": created,
             "revision_preview": revision_preview,
@@ -169,14 +156,7 @@ def run_demo() -> dict:
 
 
 def main() -> None:
-    print(
-        json.dumps(
-            run_demo(),
-            ensure_ascii=False,
-            sort_keys=True,
-            indent=2,
-        )
-    )
+    print(json.dumps(run_demo(), ensure_ascii=False, sort_keys=True, indent=2))
 
 
 if __name__ == "__main__":
