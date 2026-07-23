@@ -49,3 +49,6 @@ jobs:
 
       - name: Run candidate universe fixture demo
         run: python -m scripts.demo_industry_analysis_candidates
+
+      - name: Run candidate review and exact result fixture demo
+        run: python -m scripts.demo_industry_analysis_review
