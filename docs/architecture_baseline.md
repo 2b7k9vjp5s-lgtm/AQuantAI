@@ -5,13 +5,14 @@
 This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls Standard or Strict scope.
 
 - Released software version: `0.2.0`.
-- Current accepted `main` baseline: `be18f407fb42b6caf22d339285e17f830052af91`.
-- Latest merged runtime capability: Normalized Valuation and Expectation Metrics v1 through architecture PR #184 and implementation PR #186.
+- Current accepted `main` baseline: `1ce3abace07d00e60fd911f9cc4f96a768f47a06`.
+- Latest merged runtime capability: Industry Thesis Proposal Review and Acceptance Plan v1 through architecture PR #193, foundation PR #195 and proposal-review PR #197.
+- Normalized Valuation and Expectation Metrics v1 remains accepted through architecture PR #184 and implementation PR #186.
 - Latest merged external-data architecture decision: Account-Authorized THS Structured Financial Data v1 through PR #191.
 - Authorized CNINFO Disclosure Acquisition v1 architecture remains accepted through PR #189.
 - Review-identity governance is merged through PR #187.
 - Canonical Price and Comparison Eligibility v1 remains the authoritative price owner through PRs #176/#178.
-- Active Strict architecture gate: Issue #192, Industry Thesis Intake and Research Orchestration v1.
+- Active Strict Product / Architecture gate: Issue #198, Chinese Personal Investment Research Workbench UI Phase 1.
 - CNINFO automated acquisition remains implementation-blocked pending a separately accepted source/access contract.
 - THS production implementation remains blocked pending exact non-secret account capability, host, endpoint, limit, retention and revision facts.
 - Earlier Evidence Ingestion Issue #154 / PR #155 remains closed-unmerged and reference only.
@@ -25,6 +26,16 @@ AQuantAI is a local-first, personal-use, research-only and non-advisory A-share 
 Deterministic calculations, canonicalization, selectors and accepted workflow state belong to reviewed application code. An LLM may assist only behind an explicit bounded adapter and may not own evidence qualification, deterministic state, accepted research state, execution or trading behavior.
 
 The product may identify current research-priority candidates under an explicit rule. It must preserve the complete beneficiary universe and expose every component, missing state, penalty and reason. It must not produce unexplained recommendations, target prices, expected returns, position sizes or trading actions.
+
+The target personal-product shell contains five modules:
+
+1. 今日市场;
+2. 产业研究;
+3. 关注与跟踪;
+4. 研究组合;
+5. 系统设置.
+
+Only separately approved phases may activate those modules. Disabled future modules must not display fabricated data.
 
 ## Accepted dependency direction
 
@@ -56,13 +67,22 @@ market-data persistence
        -> Investment Candidate Workspace
   -> optional company-scoped Guarded AI D3 draft assistance
 
-active architecture candidate
-  -> explicit industry/thesis intake session
-  -> deterministic local candidate proposals
-  -> explicit user review and acceptance plan
-  -> existing Industry Map and Stage 1 owner writes
-  -> exact orchestration output links
-  -> existing readiness and Investment Candidate owners
+accepted Industry Thesis orchestration foundation
+  -> explicit industry/thesis intake session and append-only revisions
+  -> deterministic exact local candidate proposals
+  -> explicit selected / rejected / unresolved review
+  -> deterministic reviewed-plan preview and fingerprint
+  -> reviewed_plan_ready session revision
+  -> future existing-owner acceptance transaction and exact output links
+  -> future readiness and Investment Candidate handoff
+
+active UI architecture candidate
+  -> Chinese-first personal workbench shell
+  -> ordinary-language thesis intake with explicit scope confirmation
+  -> deterministic local source selection
+  -> complete reviewed local-scope candidate universe
+  -> evidence drawer and progressive technical details
+  -> reviewed-plan history and exact reopening
 
 future authorized acquisition
   -> exact source authorization and capability manifest
@@ -95,9 +115,10 @@ When the configured database and local assets are available, the reviewed runtim
 9. exact-ID Canonical Price and Comparison Eligibility APIs plus local write commands;
 10. Investment Candidate Intelligence v1 APIs, commands and Chinese-first `/investment-candidates` workspace;
 11. exact-ID normalized financial, valuation, comparison and expectation-gap APIs;
-12. Chinese-first read-only `/company-research/valuation-context` requiring explicit revision IDs and both as-of boundaries.
+12. Chinese-first read-only `/company-research/valuation-context` requiring explicit revision IDs and both as-of boundaries;
+13. local JSON-only Industry Thesis session/candidate commands, exact dual-as-of reads, proposal review and reviewed-plan reads.
 
-No current runtime surface provides industry-thesis intake/orchestration, fair value, target price, expected return, buy/sell/hold output, position sizing, broker execution, automated trading or external Provider/disclosure acquisition.
+No current browser surface provides Industry Thesis intake/review. No current runtime provides the thesis owner-acceptance transaction or output links, daily news/announcement radar, followed-entity alerts, observation/simulated portfolio, fair value, target price, expected return, buy/sell/hold output, position sizing, broker execution, automated trading or external Provider/disclosure acquisition.
 
 ## Accepted capability contracts
 
@@ -219,26 +240,45 @@ PR #191 defines an accepted external Provider architecture but authorizes no pro
 - Market attention cannot create beneficiary, evidence-grade, candidate, recommendation or trading state.
 - No scheduler, background worker, hidden fallback or read-triggered network is included.
 
-## Active architecture candidate: Industry Thesis Intake and Research Orchestration v1
+### Industry Thesis Intake and Research Orchestration foundation
 
-Issue #192 defines the only active product-orchestration architecture gate.
+PRs #193, #195 and #197 define and implement the accepted offline orchestration foundation.
+
+- One append-only session identity and revision history owns the exact user thesis, explicit market scope, driver/horizon, chain boundary, exclusions, seeds, coverage and both as-of boundaries.
+- Candidate proposals are non-accepted orchestration state sourced only from exact accepted local mappings, exact existing Industry Map revisions or explicit user seeds in the current implementation.
+- AI draft candidates remain rejected in the implemented builder and require a later separately authorized slice.
+- Candidate identities and revisions preserve exact source references, identity state, exposure proposal, rationale, uncertainty and review state.
+- Proposal review requires the complete exact latest candidate universe and explicit selected/rejected/unresolved decisions.
+- Selected candidates require exactly one authoritative persisted identity and explicit non-unknown exposure.
+- The reviewed plan is deterministic, input-order-independent, fingerprinted and dual-as-of readable.
+- Dry-run/commit plan parity is independent of invocation time.
+- Normal historical invisibility returns not-visible rather than false graph corruption.
+- The implemented state stops at `reviewed_plan_ready`.
+- No Industry Map, Stage 1, typed-semantics, output-link, Company Research, price, valuation or Investment Candidate owner write occurs.
+- Migration `20260722_0016` owns six additive append-only orchestration table families and refuses populated downgrade.
+- Full tests and a production-boundary three-candidate offline demo are merged.
+
+## Active architecture candidate: Personal Research Workbench UI Phase 1
+
+Issue #198 defines the only active UI/product architecture gate.
 
 Candidate boundary:
 
-- one explicit user-entered industry/theme thesis and exact local session revision;
-- explicit market scope, driver type/horizon, chain boundary, exclusions and information cutoff;
-- deterministic candidate proposals from exact local mappings, existing exact maps/beneficiaries and user seeds;
-- optional industry-level AI proposals only as later disabled-by-default D3 drafts;
-- explicit coverage state: reviewed local scope, partial local coverage or unknown coverage;
-- exact accepted company identity before any Stage 1 write;
-- explicit user-selected acceptance plan;
-- existing Industry Map, beneficiary and typed-semantics owners remain authoritative;
-- exact output links to accepted map/pool/beneficiary revisions;
-- readiness inspection and thin handoff to the existing Investment Candidate owner;
-- complete Stage 1 universe remains visible before and after Stage B overlays;
-- news, announcements, THS and market attention remain optional enrichment.
+- a Chinese-first application shell with five visible modules;
+- only the manual/offline 产业研究 workbench and minimal local display settings are active in Phase 1;
+- ordinary-language thesis input is followed by explicit scope confirmation;
+- fuzzy text never establishes company identity or full-market coverage;
+- exact existing maps, mappings and explicitly selected persisted company/instrument records are the deterministic candidate sources;
+- the UI wraps existing session, candidate, review and reviewed-plan services;
+- a bounded session-history read, exact local-option search, deterministic proposal composer and non-persistent view-model adapter are the only candidate backend seams;
+- the complete reviewed local-scope universe remains visible;
+- facts, deterministic calculations, analyst judgments and AI drafts are visually distinct;
+- technical IDs and fingerprints are available through progressive disclosure but are not ordinary inputs;
+- existing static HTML/CSS/vanilla JavaScript and FastAPI page/JSON patterns are reused;
+- no new front-end framework, UI persistence table, Provider, scheduler, notification, AI call or portfolio ledger is included;
+- the result page must state that `reviewed_plan_ready` is not accepted Industry Map/Stage 1 or Investment Candidate state.
 
-Candidate persistence is a maximum six-table additive orchestration domain after `20260722_0015`; no migration is authorized by Issue #192.
+The architecture detail and route/API contracts are defined in `docs/personal_research_workbench_ui_phase1_preflight.md`.
 
 ## Field and infrastructure ownership
 
@@ -264,9 +304,11 @@ Candidate persistence is a maximum six-table additive orchestration domain after
 | CNINFO source authorization and disclosure capture | Accepted architecture in PR #189 | Production path remains separately gated |
 | Future accepted disclosure evidence | Existing Evidence Ledger | Explicit human acceptance transaction only |
 | THS source authorization, raw capture and source normalization | Accepted architecture in PR #191 | Contract-gated, source-specific and disabled by default |
-| Thesis session, proposal and exact output-link audit state | Candidate orchestration domain in Issue #192 | Non-accepted coordination state only |
-| Accepted thesis-derived map and beneficiary state | Existing Industry Map / Stage 1 / typed-semantics owners | Explicit user plan and owner transaction only |
+| Thesis session, proposal and reviewed-plan audit state | `industry_alpha.industry_thesis_*` | Non-accepted append-only coordination state |
+| Accepted thesis-derived map and beneficiary state | Existing Industry Map / Stage 1 / typed-semantics owners | Future explicit user plan and owner transaction only |
 | Thesis-derived research priority | Existing Investment Candidate owner | Existing exact rule version; no second scoring owner |
+| UI page labels, grouping and navigation | Candidate non-persistent workbench adapter in Issue #198 | Presentation only; cannot create product meaning |
+| Browser-local appearance/density preferences | Browser local storage | No credentials or research state |
 
 ## Shared architecture invariants
 
@@ -315,6 +357,11 @@ Candidate persistence is a maximum six-table additive orchestration domain after
 43. Coverage completeness is explicit and separate from evidence quality and candidate status.
 44. Valuation, popularity, price performance or missing data cannot remove a reviewed Stage 1 member.
 45. Thesis orchestration may coordinate existing owners but cannot duplicate their accepted fields or calculations.
+46. A UI label, group, count or visual emphasis cannot create identity, evidence quality, beneficiary status or research priority.
+47. Ordinary users must not be required to enter technical identifiers that the selected local record already owns.
+48. Disabled future modules must not display sample values as if they were live product state.
+49. Filtering candidate rows cannot alter the complete universe submitted for review.
+50. UI write conflicts preserve unsaved user decisions and require explicit reload/review; they never silently rebase.
 
 ## Semantic and derivation levels
 
@@ -325,7 +372,7 @@ Candidate persistence is a maximum six-table additive orchestration domain after
 - **L2 — Standardized:** standardized through an explicit accepted contract; usable only within that contract.
 - **L3 — Canonical:** identity, measurement, unit, currency, market, adjustment, provenance, cutoff, chronology, decimal and missing-state contract.
 
-Canonical Price owns L3 price state within its contract. Structured financial/valuation records remain contract-specific standardized state. Disclosure and THS normalization remain L1 until explicit existing-owner acceptance. Thesis candidate proposals are orchestration drafts and do not gain semantic authority through persistence.
+Canonical Price owns L3 price state within its contract. Structured financial/valuation records remain contract-specific standardized state. Disclosure and THS normalization remain L1 until explicit existing-owner acceptance. Thesis candidate proposals and UI view models are orchestration/presentation state and do not gain semantic authority through persistence or display.
 
 ### Evidence Qualification / Derivation Level
 
@@ -352,17 +399,20 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 | Guarded AI | Explicit ephemeral company-scoped drafts | No persisted accepted AI state, tools or retrieval |
 | CNINFO Disclosure Acquisition | Architecture accepted through PR #189 | Production acquisition remains separately gated |
 | THS Structured Provider | Architecture accepted through PR #191 | No implementation until exact account contract facts and separate authorization |
-| Industry Thesis Orchestration | Strict architecture active in Issue #192 | No implementation until fixed-head approval and separate authorization |
-| Market Attention / Daily Radar | Source observations remain isolated candidates | Separate product/rule authorization required |
+| Industry Thesis Orchestration | Session/candidate/reviewed-plan foundation merged through PR #197 | No owner-acceptance transaction, output links or browser workbench yet |
+| Personal Research Workbench UI | Product target and Phase 1 preflight active in Issue #198 | No production UI/API until fixed-head approval and separate authorization |
+| Market Attention / Daily Radar | Source observations remain isolated candidates | Separate Provider, ingestion, scheduler and product authorization required |
+| Follow / Track | No accepted followed-entity or alert state | Separate persistence, change-rule and notification architecture required |
+| Research Portfolio | Existing research/price foundations only | Separate observation/simulated ledger and corporate-action architecture required |
 
 ## Architecture debt register
 
-- **D1 Current-state documentation drift — active in PR for Issue #192:** synchronize `main`, accepted THS architecture and the new orchestration gate.
+- **D1 Current-state documentation drift — addressed in Issue #198 preflight:** synchronize merged thesis orchestration and the active UI gate.
 - **D2 Repeated Stage 2 structure — bounded:** generic graph loading remains unjustified.
 - **D3 Read utilities — bounded:** serializers, notices and failures remain domain-local.
 - **D4 Command lifecycle/concurrency — partially shared:** semantic validation remains domain-local.
 - **D5 ORM lifecycle — bounded:** append-only listener/import/metadata compatibility remains tested.
-- **D6 Test-matrix growth — monitored:** new orchestration must add one offline end-to-end path without hidden network.
+- **D6 Test-matrix growth — monitored:** UI implementation must add one offline browser/API path without hidden network.
 - **D7 External Provider reachability — blocked:** THS implementation awaits exact account contract facts.
 - **D8 Canonical market-price semantics — resolved for v1; Provider promotion remains separately gated.**
 - **D9 Product overview query architecture — resolved for current surfaces.**
@@ -377,8 +427,10 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 - **D18 Account-authorized THS architecture — resolved by PR #191; implementation facts remain blocked.**
 - **D19 Provider taxonomy chronology — active:** current snapshots must not masquerade as historical membership.
 - **D20 Market-attention isolation — active:** attention remains separate from beneficiary and candidate quality.
-- **D21 Industry-thesis entry/orchestration — active in Issue #192:** define reproducible draft, review, owner handoff and coverage semantics.
-- **D22 Industry-level AI assistance — deferred:** optional proposal-only extension after offline orchestration proves useful.
+- **D21 Industry-thesis entry/orchestration — foundation and proposal review resolved through PRs #193/#195/#197; owner acceptance remains a later slice.**
+- **D22 Industry-level AI assistance — deferred:** optional proposal-only extension after the offline workbench proves useful.
+- **D23 Personal workbench composition — active in Issue #198:** define ordinary-user routes, exact read/write adapters, evidence presentation and honest unavailable states.
+- **D24 Free-text discovery gap — explicit:** Phase 1 requires exact local map/mapping/company selections; automatic fuzzy discovery remains later governed assistance.
 
 ## Accepted product sequence
 
@@ -403,11 +455,22 @@ Completed:
 17. Normalized Valuation and Expectation Metrics implementation — PR #186;
 18. fixed-head review identity governance — PR #187;
 19. Authorized CNINFO Disclosure Acquisition architecture — PR #189;
-20. Account-Authorized THS Structured Financial Data architecture — PR #191.
+20. Account-Authorized THS Structured Financial Data architecture — PR #191;
+21. Industry Thesis Intake and Research Orchestration architecture — PR #193;
+22. Industry Thesis offline persistence/command/query foundation — PR #195;
+23. Industry Thesis proposal review and deterministic reviewed plan — PR #197.
 
 Active architecture gate:
 
-21. Industry Thesis Intake and Research Orchestration v1 — Issue #192.
+24. Chinese Personal Investment Research Workbench UI Phase 1 — Issue #198.
+
+Planned later product phases, each separately governed:
+
+25. Today Market with authorized market/sector data;
+26. Daily Industry Radar with authorized news/announcement ingestion and scheduler;
+27. Follow and Track with followed-entity/change/notification contracts;
+28. Research Portfolio, observation first and simulated ledger later;
+29. advanced model/Provider settings with credential security and explicit role boundaries.
 
 Deferred:
 
@@ -417,38 +480,40 @@ Deferred:
 - Market Attention scoring and Daily Radar product behavior;
 - OCR and automatic accepted evidence drafting;
 - FX and accepted corporate-action normalization;
-- industry-level guarded AI drafting until the offline orchestration foundation is approved and separately authorized.
+- industry-level guarded AI drafting until a separately accepted proposal-only slice;
+- owner acceptance/output links from a reviewed thesis plan;
+- followed-entity alerts and portfolio ledgers.
 
 ## Current authorization state
 
-- `main` includes PR #191 at `be18f407fb42b6caf22d339285e17f830052af91`.
-- Issue #190 is completed; PR #191 authorizes THS architecture only.
-- The owner authorized the next development step on 2026-07-22 as Issue #192 architecture work.
-- Issue #192 authorizes architecture documentation only for industry-thesis intake and orchestration.
-- No production code, migration, dependency, API/UI implementation, fixture or AI call is authorized yet.
-- No news, announcement, THS, Provider or web acquisition is required by the orchestration golden path.
-- No automatic company acceptance, evidence acceptance, component scoring, recommendation, portfolio or trading behavior is authorized.
+- `main` includes PR #197 at `1ce3abace07d00e60fd911f9cc4f96a768f47a06`.
+- Issues #194 and #196 are completed; PRs #195 and #197 implement the offline session/candidate/reviewed-plan foundation.
+- Issue #198 records the owner-approved five-module product target and authorizes Product / Architecture Preflight for UI Phase 1 only.
+- The active architecture branch may modify only its task snapshot, `docs/personal_research_workbench_ui_phase1_preflight.md` and this baseline.
+- No production UI/API code, migration, dependency, fixture or executable test is authorized by the preflight.
+- No Provider, news, announcement, THS, browser acquisition, scheduler, notification, AI call or portfolio ledger is authorized.
+- No Industry Map, Stage 1, typed-semantics, output-link, Investment Candidate or portfolio owner write is authorized.
+- No recommendation, target price, expected return, position size, broker, order or automated trading behavior is authorized.
 
 ## Next governed gate
 
-Issue #192 and its Draft architecture PR must establish and receive process-independent fixed-head approval for:
+Issue #198 and its Draft architecture PR must establish and receive process-independent fixed-head approval for:
 
-1. exact thesis/session identity and append-only revision contract;
-2. explicit market scope, driver, horizon, chain boundary, exclusions and both as-of boundaries;
-3. deterministic candidate-source precedence and provenance;
-4. coverage semantics independent of evidence quality;
-5. exact company identity and duplicate/ambiguity failure behavior;
-6. draft, selection and accepted-owner boundaries;
-7. complete Stage 1 universe preservation;
-8. atomic handoff to existing Industry Map, beneficiary and typed-semantics owners;
-9. exact orchestration output links;
-10. readiness inspection and thin handoff to the existing Investment Candidate owner;
-11. a maximum six-table additive migration candidate with populated downgrade refusal;
-12. JSON-only dry-run commands and exact-ID reads;
-13. Chinese-first `/industry-analysis/new` workflow;
-14. one fully offline three-company golden path;
-15. fail-closed ambiguous identity, stale revision, missing-price and AI-owned acceptance paths;
-16. optional industry-level AI as a later disabled-by-default proposal-only slice;
-17. locked exclusions for external acquisition, recommendation, portfolio and trading behavior.
+1. exact Phase 1 page routes and five-module shell behavior;
+2. the existing static HTML/CSS/vanilla JavaScript stack decision;
+3. ordinary-language input followed by explicit scope confirmation;
+4. exact local map/mapping/company source selection and no fuzzy identity;
+5. session-history and exact local-option read contracts;
+6. deterministic candidate-proposal composition from accepted local records;
+7. bounded web adapters over existing session/candidate/review services;
+8. complete-universe candidate review and conflict preservation;
+9. evidence drawer and fact/calculation/judgment/AI visual separation;
+10. ordinary-versus-advanced technical metadata policy;
+11. loading, empty, partial, stale, conflict, database and future-feature states;
+12. responsive and accessibility behavior;
+13. one fully offline production-boundary three-candidate golden path;
+14. one atomic stale/ambiguous review failure path;
+15. no-migration and no-new-framework decisions;
+16. locked exclusions for owner acceptance, Provider, scheduler, alerts, portfolio and trading.
 
-No production implementation is authorized by this baseline or Issue #192 alone.
+No production implementation is authorized by this baseline or Issue #198 alone.
