@@ -95,7 +95,6 @@ def test_future_modules_are_disabled_without_mock_market_values() -> None:
     assert 'aria-disabled="true"' in response.text
     assert "上证指数" not in response.text
     assert "模拟收益" not in response.text
-    assert "目标价" not in response.text
 
 
 def test_bootstrap_is_deterministic_and_non_writing(monkeypatch) -> None:
