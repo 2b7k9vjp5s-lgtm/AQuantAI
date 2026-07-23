@@ -274,7 +274,9 @@
       databaseState.textContent = "本地快照读取失败";
       showPendingSnapshot("本地快照读取失败", error.message);
     } finally {
-      if (requestVersion === snapshotRequestVersion) updateSnapshotAvailability();
+      if (requestVersion === snapshotRequestVersion) {
+        snapshotButton.disabled = !(activeBoundaries && equitySelect.value);
+      }
     }
   });
 
