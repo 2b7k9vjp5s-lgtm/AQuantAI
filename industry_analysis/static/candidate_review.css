@@ -1,0 +1,147 @@
+.candidate-page {
+  display: grid;
+  gap: 20px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summary-item {
+  border: 1px solid var(--border-color, #d9e0ea);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface-muted, #f7f9fc);
+}
+
+.summary-item strong,
+.summary-item span {
+  display: block;
+}
+
+.summary-item span {
+  margin-top: 4px;
+  color: var(--text-muted, #5c667a);
+  overflow-wrap: anywhere;
+}
+
+.source-list,
+.map-pool-list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 20px;
+}
+
+.source-card,
+.map-card {
+  border: 1px solid var(--border-color, #d9e0ea);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--surface, #fff);
+}
+
+.source-card header,
+.map-card header,
+.pool-option {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.source-card p,
+.map-card p,
+.pool-option p {
+  margin: 6px 0 0;
+  color: var(--text-muted, #5c667a);
+}
+
+.locked-source {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--success-color, #157347);
+}
+
+.pool-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pool-option {
+  border-top: 1px solid var(--border-color, #d9e0ea);
+  padding-top: 10px;
+}
+
+.pool-option label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.pool-option input {
+  margin-top: 4px;
+}
+
+.source-unavailable {
+  border-left: 4px solid var(--warning-color, #a15c00);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.candidate-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.candidate-table th,
+.candidate-table td {
+  padding: 12px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-color, #d9e0ea);
+}
+
+.candidate-table th {
+  font-size: 0.82rem;
+  color: var(--text-muted, #5c667a);
+}
+
+.candidate-table td {
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+
+.candidate-table small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted, #5c667a);
+}
+
+.json-block {
+  margin: 8px 0 0;
+  padding: 8px;
+  max-width: 360px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--surface-muted, #f7f9fc);
+  font-size: 0.76rem;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .source-card header,
+  .map-card header,
+  .pool-option {
+    display: block;
+  }
+}
