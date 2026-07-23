@@ -1,4 +1,4 @@
-"""Local JSON adapter for Personal Research Workbench UI Phase 1D."""
+"""Local JSON adapter for Personal Research Workbench UI Phase 2B."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ _MAX_BODY_BYTES = 1_048_576
 _Model = TypeVar("_Model", bound=BaseModel)
 
 _MODULES = (
-    {"key": "today-market", "label": "今日市场", "state": "future", "path": None},
+    {"key": "today-market", "label": "今日市场", "state": "active", "path": "/today-market"},
     {"key": "industry-analysis", "label": "产业研究", "state": "active", "path": "/industry-analysis"},
     {"key": "follow-track", "label": "关注与跟踪", "state": "future", "path": None},
     {"key": "research-portfolio", "label": "研究组合", "state": "future", "path": None},
@@ -197,12 +197,13 @@ def get_workbench_bootstrap() -> dict:
     return {
         "product": "AQuantAI",
         "surface": "personal_research_workbench",
-        "phase": "ui_phase_1d",
+        "phase": "ui_phase_2b",
         "active_slices": {
             "scope_creation": "ui_phase_1b",
             "candidate_universe": "ui_phase_1c",
             "candidate_review": "ui_phase_1d",
             "exact_review_result": "ui_phase_1d",
+            "ordinary_user_continuity": "ui_phase_2b",
         },
         "language": "zh-CN",
         "database_available": _database_available(),
@@ -259,6 +260,75 @@ def get_industry_analysis_write_factory() -> Iterator[sessionmaker[Session]]:
             engine.dispose()
 
 
+def _unavailable_continuation(reason_code: str = "unsupported_workflow_state") -> dict[str, str | None]:
+    return {
+        "kind": "unavailable",
+        "label": "当前记录不可继续",
+        "path": None,
+        "reason_code": reason_code,
+    }
+
+
+def _exact_continuation(item: dict[str, Any]) -> dict[str, str | None]:
+    try:
+        session_id = str(UUID(str(item["session_id"])))
+        revision_id = str(UUID(str(item["visible_latest_revision_id"])))
+        revision_number = int(item["visible_latest_revision_number"])
+        if revision_number < 1:
+            raise ValueError("revision number must be positive")
+        cutoff = date.fromisoformat(str(item["information_cutoff_date"]))
+        recorded_text = str(item["recorded_at_utc"])
+        recorded_at = datetime.fromisoformat(recorded_text.replace("Z", "+00:00"))
+        if recorded_at.tzinfo is None or recorded_at.utcoffset() is None:
+            raise ValueError("recorded boundary must be timezone-aware")
+    except (KeyError, TypeError, ValueError):
+        return _unavailable_continuation("malformed_exact_metadata")
+
+    workflow_state = item.get("workflow_state")
+    boundary_query = {
+        "as_of_cutoff": cutoff.isoformat(),
+        "as_of_recorded_at_utc": recorded_text,
+    }
+    if workflow_state == "draft":
+        query = urlencode(
+            {
+                "session_id": session_id,
+                "session_revision_id": revision_id,
+                "revision_number": revision_number,
+                **boundary_query,
+            }
+        )
+        return {
+            "kind": "scope",
+            "label": "继续确认范围",
+            "path": f"/industry-analysis/new?{query}",
+            "reason_code": "exact_draft_revision",
+        }
+    if workflow_state in {"candidate_build_ready", "awaiting_review"}:
+        query = urlencode(boundary_query)
+        label = "构建候选公司" if workflow_state == "candidate_build_ready" else "继续人工审核"
+        return {
+            "kind": "candidate_review",
+            "label": label,
+            "path": f"/industry-analysis/sessions/{session_id}/revisions/{revision_id}/review?{query}",
+            "reason_code": f"exact_{workflow_state}",
+        }
+    if workflow_state == "reviewed_plan_ready":
+        query = urlencode(boundary_query)
+        return {
+            "kind": "result",
+            "label": "查看研究结果",
+            "path": f"/industry-analysis/sessions/{session_id}/revisions/{revision_id}/result?{query}",
+            "reason_code": "exact_reviewed_plan_ready",
+        }
+    reason_codes = {
+        "accepted_outputs_linked": "accepted_outputs_not_supported_in_phase2b",
+        "superseded": "superseded_record",
+        "abandoned": "abandoned_record",
+    }
+    return _unavailable_continuation(reason_codes.get(str(workflow_state), "unknown_workflow_state"))
+
+
 @router.get("/sessions")
 def list_industry_thesis_sessions(
     as_of_cutoff: date = Query(),
@@ -269,11 +339,14 @@ def list_industry_thesis_sessions(
     try:
         boundary = validate_workbench_boundary(as_of_cutoff, as_of_recorded_at_utc)
         with session_factory() as session:
-            return IndustryThesisWorkbenchQueryService(session).list_sessions(
+            result = IndustryThesisWorkbenchQueryService(session).list_sessions(
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=boundary,
                 limit=limit,
             )
+        for item in result.get("sessions", []):
+            item["continuation"] = _exact_continuation(item)
+        return result
     except IndustryThesisWorkbenchError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
