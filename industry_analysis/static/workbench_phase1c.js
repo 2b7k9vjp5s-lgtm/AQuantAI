@@ -105,7 +105,24 @@ function enhanceSaveSuccess() {
   actions.appendChild(link);
 }
 
+function activateTodayMarketNavigation() {
+  const item = Array.from(document.querySelectorAll(".primary-nav .nav-disabled"))
+    .find((candidate) => candidate.querySelector("span")?.textContent.trim() === "今日市场");
+  if (!item || item.dataset.todayMarketActive) return;
+  const link = document.createElement("a");
+  link.className = "nav-item";
+  link.href = "/today-market";
+  link.dataset.todayMarketActive = "true";
+  const label = document.createElement("span");
+  label.textContent = "今日市场";
+  const detail = document.createElement("small");
+  detail.textContent = "本地快照";
+  link.append(label, detail);
+  item.replaceWith(link);
+}
+
 function enhancePhase1DSurfaces() {
+  activateTodayMarketNavigation();
   updateCandidatePlaceholder();
   enhanceHistoryCards();
   enhanceSaveSuccess();

@@ -27,6 +27,7 @@ from backend.api.industry_research import router as industry_research_router
 from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
 from backend.api.normalized_valuation import router as normalized_valuation_router
+from backend.api.today_market import router as today_market_router
 from dashboard import build_dashboard_overview, build_dashboard_report
 
 app = FastAPI(
@@ -37,6 +38,7 @@ app = FastAPI(
 
 DASHBOARD_STATIC_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "static"
 MARKET_COCKPIT_STATIC_DIR = Path(__file__).resolve().parents[1] / "market_cockpit" / "static"
+TODAY_MARKET_STATIC_DIR = Path(__file__).resolve().parents[1] / "today_market" / "static"
 EVIDENCE_INTELLIGENCE_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "evidence_intelligence" / "static"
 )
@@ -60,6 +62,11 @@ app.mount(
     "/market-cockpit/static",
     StaticFiles(directory=MARKET_COCKPIT_STATIC_DIR),
     name="market-cockpit-static",
+)
+app.mount(
+    "/today-market/static",
+    StaticFiles(directory=TODAY_MARKET_STATIC_DIR),
+    name="today-market-static",
 )
 app.mount(
     "/evidence-intelligence/static",
@@ -92,6 +99,7 @@ app.mount(
     name="investment-candidates-static",
 )
 app.include_router(market_cockpit_router)
+app.include_router(today_market_router)
 app.include_router(industry_alpha_router)
 app.include_router(beneficiary_semantics_router)
 app.include_router(evidence_intelligence_router)
@@ -138,6 +146,16 @@ def personal_research_workbench_page() -> FileResponse:
 
     return FileResponse(
         INDUSTRY_ANALYSIS_STATIC_DIR / "workbench.html",
+        media_type="text/html",
+    )
+
+
+@app.get("/today-market", include_in_schema=False)
+def today_market_page() -> FileResponse:
+    """Serve the local-only Today Market page."""
+
+    return FileResponse(
+        TODAY_MARKET_STATIC_DIR / "today_market.html",
         media_type="text/html",
     )
 

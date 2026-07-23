@@ -52,3 +52,6 @@ jobs:
 
       - name: Run candidate review and exact result fixture demo
         run: python -m scripts.demo_industry_analysis_review
+
+      - name: Run Today Market local snapshot fixture demo
+        run: python -m scripts.demo_today_market
