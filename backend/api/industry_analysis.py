@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from datetime import date, datetime
 from typing import Any, TypeVar
+from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -356,14 +357,16 @@ def get_exact_session_revision(
 def _edit_scope_path(result: dict) -> str | None:
     if result["session_revision_id"] is None:
         return None
-    return (
-        "/industry-analysis/new"
-        f"?session_id={result['session_id']}"
-        f"&session_revision_id={result['session_revision_id']}"
-        f"&revision_number={result['revision_number']}"
-        f"&as_of_cutoff={result['information_cutoff_date']}"
-        f"&as_of_recorded_at_utc={result['recorded_at_utc']}"
+    query = urlencode(
+        {
+            "session_id": result["session_id"],
+            "session_revision_id": result["session_revision_id"],
+            "revision_number": result["revision_number"],
+            "as_of_cutoff": result["information_cutoff_date"],
+            "as_of_recorded_at_utc": result["recorded_at_utc"],
+        }
     )
+    return f"/industry-analysis/new?{query}"
 
 
 @router.post("/sessions")
