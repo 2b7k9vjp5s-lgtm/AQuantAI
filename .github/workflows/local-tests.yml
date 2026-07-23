@@ -36,10 +36,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -q -e ".[dev]"
 
       - name: Run tests
-        run: python -m pytest
+        run: python -m pytest -q --tb=short
 
       - name: Run local fixture demo
         run: python -m scripts.demo_research_flow
+
+      - name: Run personal workbench fixture demo
+        run: python -m scripts.demo_industry_analysis_workbench
