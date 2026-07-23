@@ -1,6 +1,6 @@
 # AQuantAI
 
-AQuantAI is a local-first personal A-share research workbench built around attributable market data, deterministic quantitative research, evidence-backed industry/company research, backtesting foundations and future guarded AI assistance.
+AQuantAI is a local-first personal A-share research workbench built around attributable market data, deterministic quantitative research, evidence-backed industry/company research, backtesting foundations and guarded AI assistance.
 
 It is for research and learning only. It does not provide investment advice, recommendations, broker connectivity, real orders or automated trading, and it is not production-ready.
 
@@ -11,8 +11,9 @@ AQuantAI uses three independent status axes:
 | Axis | Current state |
 | --- | --- |
 | Released software version | `0.2.0` |
-| Merged capability stage on `main` | v0.6D |
-| Runtime surfaces | Local fixture-backed read-only Dashboard plus reviewed database-backed read-only Market Cockpit and Industry Alpha APIs/demos when configured |
+| Current accepted `main` baseline | `1f9edfc0719c9d512ed95c2330db78dadea17eea` |
+| Latest merged product capability | Personal Research Workbench UI Phase 2A — local-only Today Market through PRs #209 and #212 |
+| Runtime surfaces | Local Dashboard, technical Market Cockpit, Today Market, Industry Research, Company Research, Investment Candidates and related exact-ID APIs/commands when configured |
 
 Merged capability stages do not automatically publish a new release. The application version remains `0.2.0` until a separate release decision.
 
@@ -31,41 +32,49 @@ The authoritative state, dependency direction, ownership rules, invariants, arch
 - fixture-backed read-only `/dashboard` page and JSON endpoints;
 - local fixture demo and no-network test discipline.
 
-### Market-data persistence and Market Cockpit
+### Market-data persistence, Market Cockpit and Today Market
 
 - PostgreSQL market-data migrations and explicit session boundary;
 - immutable ingestion attempts and complete-snapshot reconciliation;
 - canonical snapshot-series identities isolating scopes, dates, adjustment and contract parameters;
 - controlled manual AKShare ingestion with explicit network opt-in and offline fixture mode;
 - cutoff-aware deterministic reads;
-- selected-universe breadth/risk, optional benchmark and sector context, liquidity distribution and descriptive price-behavior proxies;
-- read-only database-backed Market Cockpit API/page when configured.
+- technical read-only `/market-cockpit` using exact selected series;
+- Chinese-first `/today-market` with an explicit local equity selection, optional benchmark/sector selections, required information-cutoff and recorded-UTC boundaries;
+- existing `MarketCockpitService` remains the sole deterministic price, liquidity, benchmark and sector calculation owner;
+- no automatic series selection, remote refresh, full-market breadth claim, anomaly/cause inference or hidden network access.
 
-### Industry Alpha and Stage 2 research
+### Industry and company research
 
-Merged reviewed foundations through v0.6D include:
+Merged reviewed foundations include:
 
 - v0.5A research cases, evidence, claims, conflicts and immutable revisions;
 - v0.5B industry maps, nodes, relationships, drivers, bottlenecks and value-pool observations;
 - v0.5C beneficiary classifications and exact candidate-pool handoff;
+- typed beneficiary evidence semantics;
 - v0.6A company research and financial-transmission hypotheses;
 - v0.6B market expectations and valuation observations;
 - v0.6C catalyst and risk assessments;
-- v0.6D independent industry/company quality judgments.
+- v0.6D independent industry/company quality judgments;
+- complete-universe company comparison;
+- Canonical Price and purpose-specific Comparison Eligibility;
+- transparent Investment Candidate components, statuses and bounded priority;
+- normalized financial, valuation, comparison and expectation-gap contracts;
+- Chinese-first Personal Research Workbench for scope confirmation, complete candidate construction, complete review and exact history reopening.
 
-These records are append-only, cutoff-aware, evidence-bound and read-only. They do not produce target prices, fair values, expected returns, rankings, recommendations, Watchlist state, portfolio actions or trading behavior.
+These records are append-only, cutoff-aware and evidence-bound. They do not produce target prices, fair values, expected returns, unexplained recommendations, Watchlist state, portfolio actions or trading behavior.
 
-## Architecture freeze
+## Governed boundaries
 
 The attempted v0.6E price-observation judgment path in Issue #70 and PR #71 is superseded and closed without merge.
 
-Before any new domain is authorized, the project must complete the architecture-baseline review and a separately authorized Stage 2 consolidation characterization. No v0.6E, v0.7 or new migration is currently authorized.
+Canonical Price and Comparison Eligibility now own accepted price identity and purpose-specific use. A generic valuation `observed_value` or Provider-normalized market row is not automatically canonical or eligible for comparison.
 
-A local `daily_price` row linked to a v0.6B valuation remains provenance/context. Generic valuation `observed_value` is not automatically eligible for price comparison. Canonical market-price measurement, unit and currency semantics require a separately reviewed upstream contract.
+No next product phase is currently authorized. Roadmap Issue #210 describes a possible Personal Research Workbench UI Phase 2B, but it does not authorize architecture, implementation or production changes. Every future phase still requires its own linked Issue, bounded scope, validation and explicit merge authorization.
 
 ## Technology stack
 
-- Python 3.12
+- Python 3.12+
 - FastAPI
 - SQLAlchemy and Alembic
 - PostgreSQL
@@ -88,20 +97,29 @@ Run the API:
 uvicorn backend.main:app --reload
 ```
 
-Available baseline endpoints include:
+Available local surfaces include:
 
 - `GET /`
 - `GET /health`
 - `GET /dashboard`
-- `GET /dashboard/overview`
-- `GET /dashboard/report`
+- `GET /workbench`
+- `GET /industry-analysis`
+- `GET /today-market`
+- `GET /market-cockpit`
+- `GET /investment-candidates`
 
-The fixture Dashboard remains local, read-only and sample-data-only.
+The fixture Dashboard remains local, read-only and sample-data-only. Database-backed surfaces require an explicitly configured local database and exact persisted records.
 
 Run the local research flow demo:
 
 ```bash
 python -m scripts.demo_research_flow
+```
+
+Run the Today Market offline demo:
+
+```bash
+python -m scripts.demo_today_market
 ```
 
 Run tests:
@@ -157,6 +175,12 @@ After persisting a compatible explicit snapshot series:
 
 Equity, benchmark and sector series remain explicit and independent. The API never selects by provider alone and never stitches incompatible runs.
 
+### Today Market
+
+Open `/today-market`, choose an explicit local equity series, optionally choose exact benchmark and sector series, set both requested boundaries and select `查看本地市场快照`.
+
+Today Market reads only already persisted local data. It never auto-selects a series, advances a requested boundary, performs remote refresh or represents an exact selected universe as complete A-share market coverage.
+
 ## Development workflow
 
 GitHub is the source of truth for authorization and review. Every task must follow `.codex/WORKFLOW.md` and the active linked Issue.
@@ -164,11 +188,10 @@ GitHub is the source of truth for authorization and review. Every task must foll
 The required sequence is:
 
 ```text
-Architecture Preflight
+Architecture Preflight when required by risk
   -> Definition of Ready
-  -> concise authoritative Issue
-  -> task synchronization/planning review
-  -> implementation review
+  -> authoritative Issue and bounded branch/PR
+  -> validation and applicable fixed-head review
   -> explicit merge authorization
   -> architecture/status synchronization
 ```
