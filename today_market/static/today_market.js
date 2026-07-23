@@ -14,6 +14,8 @@
   const snapshotButton = document.querySelector("#snapshot-button");
   const snapshotStatus = document.querySelector("#snapshot-status");
   const emptyState = document.querySelector("#empty-state");
+  const emptyTitle = document.querySelector("#empty-title");
+  const emptyMessage = emptyState.querySelector("p");
   const snapshotContent = document.querySelector("#snapshot-content");
 
   const statePill = document.querySelector("#snapshot-state-pill");
@@ -29,10 +31,19 @@
   const technical = document.querySelector("#technical-details");
 
   let activeBoundaries = null;
+  let catalogRequestVersion = 0;
+  let snapshotRequestVersion = 0;
 
   function setStatus(element, message, isError = false) {
     element.textContent = message;
     element.classList.toggle("error", isError);
+  }
+
+  function showPendingSnapshot(title, message) {
+    emptyTitle.textContent = title;
+    emptyMessage.textContent = message;
+    emptyState.hidden = false;
+    snapshotContent.hidden = true;
   }
 
   function recordedUtc() {
@@ -48,6 +59,33 @@
     const recorded = recordedUtc();
     if (!cutoff || !recorded) return null;
     return { cutoff, recorded };
+  }
+
+  function sameBoundaries(left, right) {
+    return Boolean(
+      left
+      && right
+      && left.cutoff === right.cutoff
+      && left.recorded === right.recorded
+    );
+  }
+
+  function currentSelection() {
+    return {
+      equity: equitySelect.value,
+      benchmark: benchmarkSelect.value,
+      sector: sectorSelect.value,
+    };
+  }
+
+  function sameSelection(left, right) {
+    return Boolean(
+      left
+      && right
+      && left.equity === right.equity
+      && left.benchmark === right.benchmark
+      && left.sector === right.sector
+    );
   }
 
   function queryString(boundary, extra = {}) {
@@ -107,11 +145,7 @@
   }
 
   function saveSelections() {
-    localStorage.setItem(storageKey, JSON.stringify({
-      equity: equitySelect.value,
-      benchmark: benchmarkSelect.value,
-      sector: sectorSelect.value,
-    }));
+    localStorage.setItem(storageKey, JSON.stringify(currentSelection()));
   }
 
   function updateSnapshotAvailability() {
@@ -121,16 +155,26 @@
   }
 
   function invalidateCatalogForBoundaryChange() {
-    if (!activeBoundaries) return;
+    catalogRequestVersion += 1;
+    snapshotRequestVersion += 1;
+    if (!activeBoundaries && selectionPanel.hidden) {
+      if (databaseState.textContent === "正在读取本地数据库") {
+        databaseState.textContent = "读取边界已更改";
+        setStatus(catalogStatus, "读取边界已更改，请重新读取本地数据列表。");
+      }
+      return;
+    }
     activeBoundaries = null;
     selectionPanel.hidden = true;
-    snapshotContent.hidden = true;
-    emptyState.hidden = false;
     snapshotButton.disabled = true;
     snapshotButton.textContent = "查看本地市场快照";
     databaseState.textContent = "读取边界已更改";
     setStatus(catalogStatus, "读取边界已更改，请重新读取本地数据列表。");
     setStatus(snapshotStatus, "请先按新边界读取本地数据列表。");
+    showPendingSnapshot(
+      "读取边界已更改",
+      "旧的数据列表和快照已失效。请按新的双时间边界重新读取本地数据列表。",
+    );
   }
 
   [cutoffInput, recordedInput].forEach((input) => {
@@ -144,15 +188,23 @@
       setStatus(catalogStatus, "请填写有效的双时间边界。", true);
       return;
     }
+    const requestVersion = ++catalogRequestVersion;
+    snapshotRequestVersion += 1;
     activeBoundaries = null;
     snapshotButton.disabled = true;
     selectionPanel.hidden = true;
-    snapshotContent.hidden = true;
-    emptyState.hidden = false;
+    showPendingSnapshot(
+      "正在读取本地数据列表",
+      "系统只会读取当前明确设置的双时间边界。",
+    );
     setStatus(catalogStatus, "正在读取本地数据列表……");
     databaseState.textContent = "正在读取本地数据库";
     try {
       const payload = await jsonRequest(`/today-market/api/local-series?${queryString(boundary)}`);
+      if (
+        requestVersion !== catalogRequestVersion
+        || !sameBoundaries(boundary, boundaries())
+      ) return;
       activeBoundaries = boundary;
       resetSelect(equitySelect, "请选择股票数据范围");
       resetSelect(benchmarkSelect, "不选择本地基准数据");
@@ -162,18 +214,32 @@
       appendOptions(sectorSelect, payload.families.sector);
       restoreExactSelections(payload.families);
       selectionPanel.hidden = false;
+      showPendingSnapshot(
+        "尚未读取本地市场快照",
+        "明确选择一个股票数据范围后，点击“查看本地市场快照”。选择前不会显示指标。",
+      );
       databaseState.textContent = payload.status === "ready" ? "本地数据列表已读取" : "当前边界内没有本地数据";
       setStatus(catalogStatus, payload.message);
       updateSnapshotAvailability();
     } catch (error) {
+      if (requestVersion !== catalogRequestVersion) return;
       databaseState.textContent = "本地数据库读取失败";
       setStatus(catalogStatus, error.message, true);
+      showPendingSnapshot("本地数据列表读取失败", error.message);
     }
   });
 
   [equitySelect, benchmarkSelect, sectorSelect].forEach((select) => {
     select.addEventListener("change", () => {
+      snapshotRequestVersion += 1;
       saveSelections();
+      snapshotButton.textContent = "查看本地市场快照";
+      showPendingSnapshot(
+        equitySelect.value ? "数据选择已更改" : "尚未选择本地市场数据",
+        equitySelect.value
+          ? "请重新点击“查看本地市场快照”，旧结果不会继续显示。"
+          : "请明确选择一个股票数据范围。",
+      );
       updateSnapshotAvailability();
     });
   });
@@ -181,13 +247,21 @@
   snapshotButton.addEventListener("click", async () => {
     if (!activeBoundaries || !equitySelect.value) return;
     saveSelections();
+    const requestVersion = ++snapshotRequestVersion;
+    const requestBoundaries = { ...activeBoundaries };
+    const requestSelection = currentSelection();
     snapshotButton.disabled = true;
     setStatus(snapshotStatus, "正在读取明确选择的本地市场快照……");
-    const extra = { equity_series_key: equitySelect.value };
-    if (benchmarkSelect.value) extra.benchmark_series_key = benchmarkSelect.value;
-    if (sectorSelect.value) extra.sector_series_key = sectorSelect.value;
+    const extra = { equity_series_key: requestSelection.equity };
+    if (requestSelection.benchmark) extra.benchmark_series_key = requestSelection.benchmark;
+    if (requestSelection.sector) extra.sector_series_key = requestSelection.sector;
     try {
-      const payload = await jsonRequest(`/today-market/api/snapshot?${queryString(activeBoundaries, extra)}`);
+      const payload = await jsonRequest(`/today-market/api/snapshot?${queryString(requestBoundaries, extra)}`);
+      if (
+        requestVersion !== snapshotRequestVersion
+        || !sameBoundaries(requestBoundaries, activeBoundaries)
+        || !sameSelection(requestSelection, currentSelection())
+      ) return;
       renderSnapshot(payload);
       emptyState.hidden = true;
       snapshotContent.hidden = false;
@@ -195,10 +269,12 @@
       setStatus(snapshotStatus, payload.state_explanation.what_happened);
       databaseState.textContent = "本地快照已读取";
     } catch (error) {
+      if (requestVersion !== snapshotRequestVersion) return;
       setStatus(snapshotStatus, error.message, true);
       databaseState.textContent = "本地快照读取失败";
+      showPendingSnapshot("本地快照读取失败", error.message);
     } finally {
-      snapshotButton.disabled = false;
+      if (requestVersion === snapshotRequestVersion) updateSnapshotAvailability();
     }
   });
 
