@@ -61,8 +61,9 @@ def test_exact_candidate_page_route_and_static_boundary(client) -> None:
     )
     assert response.status_code == 200
     assert "当前已构建本地范围全量候选" in response.text
-    assert "开始三态审阅（Phase 1D）" in response.text
-    assert "disabled" in response.text
+    assert "逐条完成三态审阅" in response.text
+    assert "检查审阅结果" in response.text
+    assert "review-save-button" in response.text
     assert "candidate_review.js" in response.text
 
     root = Path(__file__).resolve().parents[1]
@@ -72,7 +73,8 @@ def test_exact_candidate_page_route_and_static_boundary(client) -> None:
     assert all(value not in script for value in forbidden)
     assert "window.location.assign" in script
     assert "页面不会自动重试" in script
-    assert "data-phase1c-link" in enhancement
+    assert "data-phase1d-link" in enhancement
+    assert 'isResult ? "result" : "review"' in enhancement
 
 
 def test_source_options_adapter_preserves_exact_route_arguments(client) -> None:
@@ -236,4 +238,4 @@ def test_candidate_universe_adapter_preserves_every_row(client) -> None:
     assert payload["candidate_count"] == 3
     assert [item["candidate_key"] for item in payload["candidates"]] == ["a", "b", "c"]
     assert payload["universe_label"] == "当前已构建本地范围全量候选"
-    assert payload["review_enabled"] is False
+    assert payload["review_enabled"] is True

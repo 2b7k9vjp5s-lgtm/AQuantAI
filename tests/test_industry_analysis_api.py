@@ -146,10 +146,16 @@ def test_future_modules_are_disabled_without_mock_market_values() -> None:
     assert "模拟收益" not in response.text
 
 
-def test_bootstrap_enables_only_phase_1b_scope_writes(monkeypatch) -> None:
+def test_bootstrap_reports_active_phase_1d_without_output_authority(monkeypatch) -> None:
     monkeypatch.setattr(industry_api, "_database_available", lambda: True)
     payload = TestClient(app).get("/industry-analysis/api/bootstrap").json()
-    assert payload["phase"] == "ui_phase_1b"
+    assert payload["phase"] == "ui_phase_1d"
+    assert payload["active_slices"] == {
+        "scope_creation": "ui_phase_1b",
+        "candidate_universe": "ui_phase_1c",
+        "candidate_review": "ui_phase_1d",
+        "exact_review_result": "ui_phase_1d",
+    }
     assert payload["database_available"] is True
     assert [item["label"] for item in payload["modules"]] == [
         "今日市场",
@@ -163,9 +169,14 @@ def test_bootstrap_enables_only_phase_1b_scope_writes(monkeypatch) -> None:
     assert payload["capabilities"]["session_write"] is True
     assert payload["capabilities"]["session_revision_write"] is True
     assert payload["capabilities"]["candidate_build"] is False
-    assert payload["capabilities"]["candidate_review"] is False
+    assert payload["capabilities"]["candidate_universe_build"] is True
+    assert payload["capabilities"]["candidate_universe_read"] is True
+    assert payload["capabilities"]["candidate_review"] is True
+    assert payload["capabilities"]["reviewed_plan_read"] is True
     assert payload["capabilities"]["accepted_output_write"] is False
     assert payload["capabilities"]["network_acquisition"] is False
+    assert payload["capabilities"]["ai_assistance"] is False
+    assert payload["capabilities"]["portfolio"] is False
     assert payload["capabilities"]["trading"] is False
 
 

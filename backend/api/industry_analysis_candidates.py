@@ -1,4 +1,4 @@
-"""Isolated local web adapters for Personal Research Workbench UI Phase 1C."""
+"""Isolated local web adapters for Personal Research Workbench UI Phase 1C/1D."""
 
 from __future__ import annotations
 
@@ -189,7 +189,7 @@ def get_complete_candidate_universe(
         result["as_of_cutoff"] = as_of_cutoff.isoformat()
         result["as_of_recorded_at_utc"] = as_of_recorded_at_utc.isoformat()
         result["universe_label"] = "当前已构建本地范围全量候选"
-        result["review_enabled"] = False
+        result["review_enabled"] = result["candidate_count"] > 0
         result["review_phase"] = "Phase 1D"
         result["review_path"] = _review_path(
             session_id=str(session_id),
@@ -238,7 +238,7 @@ async def build_candidate_universe(
         ).build_candidates(command, dry_run=dry_run)
         result["composition"] = composition
         result["universe_label"] = "当前已构建本地范围全量候选"
-        result["review_enabled"] = False
+        result["review_enabled"] = (not dry_run) and result["candidate_count"] > 0
         result["review_phase"] = "Phase 1D"
         result["review_path"] = _review_path(
             session_id=result["session_id"],
