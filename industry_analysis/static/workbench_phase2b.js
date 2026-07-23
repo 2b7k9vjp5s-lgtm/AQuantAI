@@ -8,7 +8,22 @@
     awaiting_review: 3,
     reviewed_plan_ready: 4,
   };
+  const COVERAGE_LABELS = {
+    reviewed_local_scope: "已审阅本地范围",
+    partial_local_coverage: "本地覆盖不完整",
+    coverage_unknown: "覆盖范围未知",
+  };
   const WORKFLOW_COPY = {
+    loading: {
+      happened: "正在读取精确本地状态。",
+      important: "读取完成前不会推测当前步骤或可执行操作。",
+      next: "保持当前页面，等待本地响应。",
+    },
+    research_topic: {
+      happened: "正在描述新的研究主题。",
+      important: "明确问题是后续范围确认和完整候选池的起点。",
+      next: "填写研究问题、市场和信息截止日。",
+    },
     draft: {
       happened: "研究主题已经记录，范围仍需要确认。",
       important: "未确认范围时不能安全构建完整候选池。",
@@ -28,6 +43,21 @@
       happened: "完整审阅计划已经生成。",
       important: "结果可以复现，但尚未写入正式领域所有者，也不是投资建议。",
       next: "查看精确研究结果、来源和双时间边界。",
+    },
+    accepted_outputs_linked: {
+      happened: "该历史记录已关联到后续正式输出。",
+      important: "Phase 2B 不推断这些输出的当前所有权或继续入口。",
+      next: "查看技术详情，或明确发起一项新研究。",
+    },
+    superseded: {
+      happened: "该研究记录已被后续精确修订替代。",
+      important: "自动跳到新修订会改变当前历史记录的含义。",
+      next: "保留本记录用于审计，或从历史列表明确选择另一记录。",
+    },
+    abandoned: {
+      happened: "该研究记录已经停止。",
+      important: "停止状态不能被包装成可继续或成功状态。",
+      next: "保留本记录用于审计，或明确发起一项新研究。",
     },
     reviewed_local_scope: {
       happened: "当前确认的本地范围已经完整审阅。",
@@ -125,8 +155,8 @@
     const path = window.location.pathname;
     if (path === "/industry-analysis") return "history";
     if (path === "/industry-analysis/new") return "scope";
-    if (/\/industry-analysis\/sessions\/[0-9a-f-]+\/revisions\/[0-9a-f-]+\/review$/i.test(path)) return "review";
-    if (/\/industry-analysis\/sessions\/[0-9a-f-]+\/revisions\/[0-9a-f-]+\/result$/i.test(path)) return "result";
+    if (/^\/industry-analysis\/sessions\/[0-9a-f-]+\/revisions\/[0-9a-f-]+\/review$/i.test(path)) return "review";
+    if (/^\/industry-analysis\/sessions\/[0-9a-f-]+\/revisions\/[0-9a-f-]+\/result$/i.test(path)) return "result";
     return "other";
   }
 
@@ -205,6 +235,16 @@
     node.classList.add("button-primary");
   }
 
+  function hasExactQuery(parsed, kind) {
+    if (!parsed.searchParams.get("as_of_cutoff") || !parsed.searchParams.get("as_of_recorded_at_utc")) return false;
+    if (kind !== "scope") return true;
+    return Boolean(
+      parsed.searchParams.get("session_id")
+      && parsed.searchParams.get("session_revision_id")
+      && parsed.searchParams.get("revision_number"),
+    );
+  }
+
   function safeContinuation(continuation) {
     if (!continuation || typeof continuation !== "object") return null;
     const kind = continuation.kind;
@@ -213,13 +253,19 @@
     if (kind === "unavailable") return path === null ? { ...continuation, path: null } : null;
     if (!["scope", "candidate_review", "result"].includes(kind)) return null;
     if (typeof label !== "string" || typeof path !== "string") return null;
+    const allowedLabels = {
+      scope: ["继续确认范围"],
+      candidate_review: ["构建候选公司", "继续人工审核"],
+      result: ["查看研究结果"],
+    };
+    if (!allowedLabels[kind].includes(label)) return null;
     let parsed;
     try {
       parsed = new URL(path, window.location.origin);
     } catch (_error) {
       return null;
     }
-    if (parsed.origin !== window.location.origin) return null;
+    if (parsed.origin !== window.location.origin || !hasExactQuery(parsed, kind)) return null;
     const valid = kind === "scope"
       ? parsed.pathname === "/industry-analysis/new"
       : kind === "candidate_review"
@@ -229,8 +275,8 @@
   }
 
   function localTime(value) {
-    const date = new Date(value);
-    return Number.isNaN(date.valueOf()) ? "时间不可用" : date.toLocaleString("zh-CN", { hour12: false });
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.valueOf()) ? "时间不可用" : parsed.toLocaleString("zh-CN", { hour12: false });
   }
 
   function currentStepLabel(workflowState) {
@@ -302,7 +348,11 @@
     const meta = el("div", null, "phase2b-recent-meta");
     meta.append(
       el("span", currentStepLabel(item.workflow_state), "meta-chip"),
-      el("span", item.coverage_state || "coverage_unknown", `meta-chip${item.coverage_state === "reviewed_local_scope" ? "" : " is-warning"}`),
+      el(
+        "span",
+        COVERAGE_LABELS[item.coverage_state] || "覆盖状态不可识别",
+        `meta-chip${item.coverage_state === "reviewed_local_scope" ? "" : " is-warning"}`,
+      ),
       el("span", `更新于 ${localTime(item.recorded_at_utc)}`, "meta-chip"),
     );
     copy.append(meta, recentTechnical(item));
@@ -342,13 +392,15 @@
   function renderFlowState(state, coverageState) {
     renderWorkflow(state);
     renderState(state);
-    const coverage = coverageState && coverageState !== "reviewed_local_scope"
-      ? document.querySelector("#phase2b-coverage-state")
-      : null;
-    if (coverage) {
-      coverage.hidden = false;
-      renderState(coverageState, "#phase2b-coverage-state");
+    const coverage = document.querySelector("#phase2b-coverage-state");
+    if (!coverage) return;
+    if (!coverageState || coverageState === "reviewed_local_scope") {
+      coverage.hidden = true;
+      coverage.replaceChildren();
+      return;
     }
+    coverage.hidden = false;
+    renderState(coverageState, "#phase2b-coverage-state");
   }
 
   function scopePrimary(validated) {
@@ -376,7 +428,11 @@
         : state === "awaiting_review"
           ? ["#review-check-button"]
           : [];
-    const action = selectors.map((selector) => document.querySelector(selector)).find(Boolean);
+    let action = null;
+    for (const selector of selectors) {
+      action = document.querySelector(selector);
+      if (action) break;
+    }
     if (action) makePrimary(action);
   }
 
@@ -464,7 +520,7 @@
 
   function initializeReview() {
     renderWorkflow(null);
-    renderState("malformed_metadata");
+    renderState("loading");
     const form = document.querySelector("#review-form");
     if (form) {
       form.addEventListener("input", () => {
