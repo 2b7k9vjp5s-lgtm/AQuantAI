@@ -1,0 +1,160 @@
+.phase2b-workflow,
+.phase2b-state,
+.phase2b-recent {
+  margin-bottom: 1rem;
+}
+
+.phase2b-workflow-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: phase2b-step;
+}
+
+.phase2b-workflow-step {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #d8dde6);
+  border-radius: 0.75rem;
+  background: var(--panel-background, #fff);
+}
+
+.phase2b-workflow-step::before {
+  counter-increment: phase2b-step;
+  content: counter(phase2b-step);
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-right: 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.phase2b-workflow-step strong,
+.phase2b-workflow-step small {
+  display: block;
+}
+
+.phase2b-workflow-step small {
+  margin-top: 0.35rem;
+  color: var(--muted-color, #657083);
+}
+
+.phase2b-workflow-step.is-complete {
+  border-style: dashed;
+}
+
+.phase2b-workflow-step.is-current {
+  border-width: 2px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.phase2b-workflow-step.is-unavailable {
+  opacity: 0.68;
+}
+
+.phase2b-state-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.phase2b-state-grid article {
+  padding: 0.9rem;
+  border: 1px solid var(--border-color, #d8dde6);
+  border-radius: 0.75rem;
+  background: var(--panel-background, #fff);
+}
+
+.phase2b-state-grid h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.phase2b-state-grid p {
+  margin: 0;
+}
+
+.phase2b-recent-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+}
+
+.phase2b-recent-copy h3,
+.phase2b-recent-copy p {
+  margin-top: 0;
+}
+
+.phase2b-recent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.phase2b-recent-action {
+  min-width: 10rem;
+  text-align: center;
+}
+
+.phase2b-first-use ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phase2b-first-use li {
+  padding: 0.9rem;
+  border: 1px solid var(--border-color, #d8dde6);
+  border-radius: 0.75rem;
+}
+
+.phase2b-first-use strong,
+.phase2b-first-use span {
+  display: block;
+}
+
+.phase2b-first-use span {
+  margin-top: 0.35rem;
+}
+
+.phase2b-copy-warning {
+  border-left: 4px solid currentColor;
+}
+
+.phase2b-technical-grid {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.phase2b-secondary-primary {
+  box-shadow: none !important;
+}
+
+@media (max-width: 860px) {
+  .phase2b-workflow-list,
+  .phase2b-state-grid,
+  .phase2b-first-use ol {
+    grid-template-columns: 1fr;
+  }
+
+  .phase2b-recent-card {
+    grid-template-columns: 1fr;
+  }
+
+  .phase2b-recent-action {
+    width: 100%;
+  }
+}
