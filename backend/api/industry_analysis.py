@@ -8,30 +8,20 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database import build_engine, build_session_factory
-from industry_alpha.industry_thesis_rules import (
-    IndustryThesisError,
-    IndustryThesisNotFound,
-)
-from industry_alpha.industry_thesis_service import (
-    IndustryThesisCommandService,
-    IndustryThesisQueryService,
-)
+from industry_alpha.industry_thesis_rules import IndustryThesisError, IndustryThesisNotFound
+from industry_alpha.industry_thesis_service import IndustryThesisCommandService, IndustryThesisQueryService
 from industry_alpha.industry_thesis_workbench import (
     IndustryThesisWorkbenchError,
     IndustryThesisWorkbenchQueryService,
     validate_workbench_boundary,
 )
 
-router = APIRouter(
-    prefix="/industry-analysis/api",
-    tags=["industry-analysis"],
-)
-
+router = APIRouter(prefix="/industry-analysis/api", tags=["industry-analysis"])
 _MAX_BODY_BYTES = 1_048_576
 _Model = TypeVar("_Model", bound=BaseModel)
 
@@ -95,6 +85,7 @@ class SessionPatchRequest(_StrictModel):
     coverage_state: str | None = None
     workflow_state: str | None = None
     information_cutoff_date: date | None = None
+    revision_note: str | None = Field(default=None, exclude=True)
 
 
 class SessionRevisionRequest(_StrictModel):
@@ -170,19 +161,13 @@ async def _validated_json_body(request: Request, model: type[_Model]) -> _Model:
     if "application/json" not in content_type.lower():
         raise HTTPException(
             status_code=400,
-            detail={
-                "code": "industry_analysis_json_required",
-                "message": "请求必须使用 application/json。",
-            },
+            detail={"code": "industry_analysis_json_required", "message": "请求必须使用 application/json。"},
         )
     body = await request.body()
     if len(body) > _MAX_BODY_BYTES:
         raise HTTPException(
             status_code=413,
-            detail={
-                "code": "industry_analysis_body_too_large",
-                "message": "请求内容超过 1 MiB 限制。",
-            },
+            detail={"code": "industry_analysis_body_too_large", "message": "请求内容超过 1 MiB 限制。"},
         )
     try:
         return model.model_validate_json(body)
@@ -190,10 +175,7 @@ async def _validated_json_body(request: Request, model: type[_Model]) -> _Model:
         if any(error.get("type") == "json_invalid" for error in exc.errors()):
             raise HTTPException(
                 status_code=400,
-                detail={
-                    "code": "industry_analysis_json_invalid",
-                    "message": "请求不是有效 JSON。",
-                },
+                detail={"code": "industry_analysis_json_invalid", "message": "请求不是有效 JSON。"},
             ) from exc
         raise HTTPException(
             status_code=422,
@@ -206,10 +188,7 @@ async def _validated_json_body(request: Request, model: type[_Model]) -> _Model:
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail={
-                "code": "industry_analysis_json_invalid",
-                "message": "请求不是有效 JSON。",
-            },
+            detail={"code": "industry_analysis_json_invalid", "message": "请求不是有效 JSON。"},
         ) from exc
 
 
@@ -236,11 +215,7 @@ def get_workbench_bootstrap() -> dict:
             "portfolio": False,
             "trading": False,
         },
-        "notices": {
-            "local_first": True,
-            "research_only": True,
-            "not_investment_advice": True,
-        },
+        "notices": {"local_first": True, "research_only": True, "not_investment_advice": True},
     }
 
 
@@ -252,7 +227,6 @@ def get_industry_analysis_session_factory(
         validate_workbench_boundary(as_of_cutoff, as_of_recorded_at_utc)
     except IndustryThesisWorkbenchError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-
     engine = None
     try:
         engine = build_engine()
@@ -296,10 +270,7 @@ def list_industry_thesis_sessions(
     except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=503,
-            detail={
-                "code": "industry_analysis_query_failed",
-                "message": "产业研究历史读取失败，请检查本地数据库和迁移状态。",
-            },
+            detail={"code": "industry_analysis_query_failed", "message": "产业研究历史读取失败，请检查本地数据库和迁移状态。"},
         ) from exc
 
 
@@ -404,8 +375,7 @@ async def create_industry_thesis_session(
     payload = await _validated_json_body(request, SessionPayloadRequest)
     try:
         result = IndustryThesisCommandService(session_factory).create_session(
-            payload.model_dump(mode="json"),
-            dry_run=dry_run,
+            payload.model_dump(mode="json"), dry_run=dry_run
         )
     except IndustryThesisError as exc:
         raise _domain_http_error(exc) from exc
@@ -429,10 +399,7 @@ async def revise_industry_thesis_session(
         "revision_note": payload.revision_note,
     }
     try:
-        result = IndustryThesisCommandService(session_factory).revise_session(
-            raw,
-            dry_run=dry_run,
-        )
+        result = IndustryThesisCommandService(session_factory).revise_session(raw, dry_run=dry_run)
     except IndustryThesisError as exc:
         raise _domain_http_error(exc) from exc
     result["history_path"] = "/industry-analysis"
