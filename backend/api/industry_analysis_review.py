@@ -264,7 +264,12 @@ async def review_candidate_universe(
             item["candidate_revision_id"] for item in view["candidates"]
         }
         submitted_ids = {str(item.candidate_revision_id) for item in payload.decisions}
-        if submitted_ids != expected_ids or len(submitted_ids) != len(payload.decisions):
+        if len(submitted_ids) != len(payload.decisions):
+            raise IndustryThesisError(
+                "industry_thesis_duplicate_review",
+                "one review request cannot contain the same candidate revision twice",
+            )
+        if submitted_ids != expected_ids:
             raise IndustryThesisError(
                 "industry_thesis_review_incomplete",
                 "review decisions must cover the complete exact latest universe",
