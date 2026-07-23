@@ -5,15 +5,17 @@
 This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls Standard or Strict scope.
 
 - Released software version: `0.2.0`.
-- Current accepted `main` baseline: `98a67c36f5cd968f17898038c786d3720b793dab`.
-- Latest merged product capability: Personal Research Workbench UI Phase 1A–1D through architecture PR #199 and implementation PRs #201, #203, #205 and #207.
+- Phase 2A capability merge commit: `1f9edfc0719c9d512ed95c2330db78dadea17eea`.
+- Latest merged product capability: Personal Research Workbench UI Phase 2A through architecture PR #209 and implementation PR #212.
+- Personal Research Workbench UI Phase 1A–1D remains accepted through architecture PR #199 and implementation PRs #201, #203, #205 and #207.
 - Industry Thesis orchestration foundation and proposal review remain accepted through PRs #193, #195 and #197.
 - Normalized Valuation and Expectation Metrics v1 remains accepted through architecture PR #184 and implementation PR #186.
 - Latest merged external-data architecture decision: Account-Authorized THS Structured Financial Data v1 through PR #191.
 - Authorized CNINFO Disclosure Acquisition v1 architecture remains accepted through PR #189.
 - Review-identity governance is merged through PR #187.
 - Canonical Price and Comparison Eligibility v1 remains the authoritative price owner through PRs #176/#178.
-- Active Strict Product / Architecture gate: Issue #208, Personal Research Workbench UI Phase 2A — Today Market Local Snapshot.
+- No product or architecture phase is currently authorized. Roadmap Issue #210 is planning only and does not start Phase 2B.
+- Issue #213 is a Light project-state housekeeping task only; it is not a product gate.
 - CNINFO automated acquisition remains implementation-blocked pending a separately accepted source/access contract.
 - THS production implementation remains blocked pending exact non-secret account capability, host, endpoint, limit, retention and revision facts.
 - Earlier Evidence Ingestion Issue #154 / PR #155 remains closed-unmerged and reference only.
@@ -67,6 +69,7 @@ market-data persistence
        -> Company Research Valuation Context
        -> Investment Candidate Workspace
        -> Market Cockpit
+       -> Today Market
   -> optional company-scoped Guarded AI D3 draft assistance
 
 accepted Industry Thesis orchestration foundation
@@ -87,7 +90,7 @@ merged Personal Research Workbench UI Phase 1
   -> exact reviewed-plan result and history reopening
   -> browser-local display settings
 
-active UI Phase 2A architecture candidate
+merged Personal Research Workbench UI Phase 2A
   -> explicit persisted local equity series
   -> optional explicit persisted benchmark and sector series
   -> explicit information-cutoff and recorded-UTC boundaries
@@ -129,11 +132,12 @@ When the configured database and local assets are available, the reviewed runtim
 12. Chinese-first read-only `/company-research/valuation-context` requiring explicit revision IDs and both as-of boundaries;
 13. local JSON-only Industry Thesis session/candidate commands, exact dual-as-of reads, proposal review and reviewed-plan reads;
 14. Chinese-first `/industry-analysis` Personal Research Workbench with scope creation/revision, complete candidate construction, complete three-state review, exact reviewed-plan result and history reopening;
-15. browser-local `/workbench/settings` for presentation-only preferences.
+15. browser-local `/workbench/settings` for presentation-only preferences;
+16. Chinese-first local-only `/today-market`, exact local-series catalog and snapshot API requiring explicit information-cutoff and recorded-UTC boundaries.
 
 No current runtime provides the thesis owner-acceptance transaction or output links, daily news/announcement radar, followed-entity alerts, observation/simulated portfolio, fair value, target price, expected return, buy/sell/hold output, position sizing, broker execution, automated trading or external Provider/disclosure acquisition.
 
-The existing `/market-cockpit` is a separate read-only technical surface. It does not yet activate 今日市场 inside the five-module Personal Research Workbench and does not expose an ordinary-user local series catalog or caller-supplied recorded-UTC boundary.
+The existing `/market-cockpit` remains a separate read-only technical surface. `/today-market` is the ordinary-user workbench surface for explicit persisted local equity, optional benchmark/sector context and dual-as-of visibility. Neither surface performs remote refresh or upgrades an exact selected series into full-market coverage.
 
 ## Accepted capability contracts
 
@@ -292,25 +296,23 @@ PR #199 defines the architecture; PRs #201, #203, #205 and #207 implement the ac
 - Browser-local settings contain presentation preferences only.
 - No Provider, scheduler, notification, AI call, portfolio ledger or trading behavior is included.
 
-## Active architecture candidate: Personal Research Workbench UI Phase 2A
+### Personal Research Workbench UI Phase 2A — Today Market
 
-Issue #208 defines the only active UI/product architecture gate.
+PR #209 defines the accepted architecture; PR #212 implements the local-only Today Market slice.
 
-Candidate boundary:
+- 今日市场 is active at `/today-market` while `/workbench` continues to enter 产业研究.
+- Only exact successful complete local equity, benchmark and sector series are eligible.
+- The ordinary-user local-series catalog uses deterministic labels, explicit selection and no first/newest auto-selection.
+- Catalog and snapshot reads require explicit information-cutoff and recorded-UTC boundaries.
+- Existing Market Cockpit repositories, calculators and service remain the only deterministic market calculation owner.
+- Today Market adds only a bounded read-only catalog, chronology adapter, projection and static presentation.
+- The page shows selected-universe price behavior, liquidity, benchmark, sector, provenance, scope, completeness and alignment state.
+- An exact selected series is never represented as full-market coverage.
+- Unsupported breadth, stock anomaly, event/cause, market-attention and remote-refresh sections remain unavailable.
+- No network, Provider, credential, scheduler, notification, AI or write action occurs.
+- No schema, migration, dependency or new front-end framework was introduced.
 
-- activate 今日市场 at `/today-market` while retaining `/workbench` entry through 产业研究;
-- use only exact successful complete local equity, benchmark and sector series;
-- provide an ordinary-user local series catalog with deterministic labels, explicit selection and no first/newest auto-selection;
-- require information-cutoff and recorded-UTC boundaries for catalog and Today Market snapshot reads;
-- reuse existing Market Cockpit repositories, calculators and service as the only deterministic market calculation owner;
-- add only a bounded non-persistent view model and read adapter;
-- show selected-universe price behavior, liquidity, benchmark, sector, provenance, scope, completeness and alignment state;
-- never claim full-market coverage from an exact selected series;
-- show unsupported breadth, stock anomaly, event/cause and remote-refresh sections as unavailable;
-- perform no network, Provider, credential, scheduler, notification, AI or write action;
-- use no schema, migration, dependency or new front-end framework.
-
-The architecture detail and route/API contracts are defined in `docs/personal_research_workbench_ui_phase2a_preflight.md`.
+The detailed route/API contracts remain recorded in `docs/personal_research_workbench_ui_phase2a_preflight.md` and Issue #211.
 
 ## Field and infrastructure ownership
 
@@ -318,7 +320,7 @@ The architecture detail and route/API contracts are defined in `docs/personal_re
 | --- | --- | --- |
 | Market-data Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit Provider per run/series; no fallback or row mixing |
 | Market Cockpit price/liquidity/benchmark/sector calculations | Existing Market Cockpit repositories, calculators and service | Today Market may present but cannot recalculate or upgrade scope |
-| Today Market labels, grouping and unsupported notices | Non-persistent Today Market adapter in Issue #208 | Presentation only; selected local scope is never full-market identity |
+| Today Market labels, grouping and unsupported notices | `backend.api.today_market` and `today_market/static` | Non-persistent presentation only; selected local scope is never full-market identity |
 | Canonical instrument, price, unit, currency and price eligibility | `backend.database.canonical_price*` | Exact append-only revisions and purpose-specific eligibility |
 | Evidence grades, claims, links and conflicts | v0.5 Evidence Ledger | Acquisition may propose; explicit acceptance owns final state |
 | Industry map, nodes, relationships and observations | v0.5B Industry Map | Exact persisted identities and cutoff-visible revisions |
@@ -425,8 +427,8 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 
 | Capability | Reviewed boundary | Remaining boundary |
 | --- | --- | --- |
-| Market-data persistence | Complete-snapshot persistence and cutoff-aware reads | No hidden Provider expansion; Today Market recorded-UTC adapter remains candidate |
-| Market Cockpit | Exact selected-series price/liquidity plus optional benchmark/sector context | No ordinary local catalog, full-market claim, anomaly/event cause or remote refresh |
+| Market-data persistence | Complete-snapshot persistence, cutoff-aware reads and optional recorded-UTC visibility for Today Market | No hidden Provider expansion or full-market identity inference |
+| Market Cockpit | Exact selected-series price/liquidity plus optional benchmark/sector context | Technical surface only; no full-market claim, anomaly/event cause or remote refresh |
 | Canonical Price | Listed identity, official close, provenance and purpose eligibility | No FX or hidden corporate-action normalization |
 | Evidence Ledger / Industry Map | Evidence, claims, conflicts, map identities and revisions | No automatic external acceptance |
 | Stage 1 beneficiary | Legacy identity/classification and complete-pool handoff | No automatic full-market discovery |
@@ -440,14 +442,14 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 | THS Structured Provider | Architecture accepted through PR #191 | No implementation until exact account contract facts and separate authorization |
 | Industry Thesis Orchestration | Session/candidate/reviewed-plan foundation merged through PR #197 | No owner-acceptance transaction or output links |
 | Personal Research Workbench UI Phase 1 | Scope intake, candidate build, complete review, exact result/history and settings merged through PR #207 | No accepted owner handoff, Provider, alerts or portfolio |
-| Today Market UI Phase 2A | Product/architecture candidate in Issue #208 using persisted local series and Market Cockpit | No production route/catalog until fixed-head approval and separate authorization |
+| Today Market UI Phase 2A | Local-series catalog, dual-as-of snapshot and ordinary-user page merged through PR #212 | No Provider refresh, full-market breadth, anomaly/cause engine, event feed or market-attention data |
 | Market Attention / Daily Radar | Source observations remain isolated candidates | Separate Provider, ingestion, scheduler and product authorization required |
 | Follow / Track | No accepted followed-entity or alert state | Separate persistence, change-rule and notification architecture required |
 | Research Portfolio | Existing research/price foundations only | Separate observation/simulated ledger and corporate-action architecture required |
 
 ## Architecture debt register
 
-- **D1 Current-state documentation drift — synchronized in Issue #208 preflight:** UI Phase 1A–1D and current main are now recorded.
+- **D1 Current-state documentation drift — synchronized through Issue #213 after PR #212.**
 - **D2 Repeated Stage 2 structure — bounded:** generic graph loading remains unjustified.
 - **D3 Read utilities — bounded:** serializers, notices and failures remain domain-local.
 - **D4 Command lifecycle/concurrency — partially shared:** semantic validation remains domain-local.
@@ -455,7 +457,7 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 - **D6 Test-matrix growth — monitored:** each UI phase adds one production-boundary offline path without hidden network.
 - **D7 External Provider reachability — blocked:** THS implementation awaits exact account contract facts.
 - **D8 Canonical market-price semantics — resolved for v1; Provider promotion remains separately gated.**
-- **D9 Product overview query architecture — resolved for current surfaces; Today Market receives an explicit independent ceiling.**
+- **D9 Product overview query architecture — resolved for current surfaces; Today Market has an explicit independent ceiling.**
 - **D10 Consolidation cadence — 5–6 implemented slices or concrete duplication/ownership/test-growth evidence.**
 - **D11 Evidence-ingestion source/review ownership — architecture accepted; production acquisition remains gated.**
 - **D12 Guarded AI company-scope ownership — resolved for v1.**
@@ -469,10 +471,10 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 - **D20 Market-attention isolation — active:** attention remains separate from beneficiary and candidate quality.
 - **D21 Industry-thesis entry/orchestration — offline browser workflow resolved through PR #207; owner acceptance remains later.**
 - **D22 Industry-level AI assistance — deferred:** optional proposal-only extension after the offline workbench proves useful.
-- **D23 Personal workbench composition — Phase 1 resolved through PR #207; Phase 2A Today Market is active in Issue #208.**
+- **D23 Personal workbench composition — Phase 1 resolved through PR #207; Phase 2A Today Market resolved through PR #212.**
 - **D24 Free-text discovery gap — explicit:** automatic fuzzy discovery remains later governed assistance.
-- **D25 Local market series discoverability — active in Issue #208:** define an exact bounded catalog without a second registry or auto-selection.
-- **D26 Market snapshot bitemporality — active in Issue #208:** enforce recorded-UTC visibility without changing source ownership.
+- **D25 Local market series discoverability — resolved through PR #212 with a bounded exact catalog and no auto-selection.**
+- **D26 Market snapshot bitemporality — resolved through PR #212 using recorded-UTC visibility without changing calculation ownership.**
 
 ## Accepted product sequence
 
@@ -505,19 +507,20 @@ Completed:
 25. Personal Research Workbench UI Phase 1A shell/history/settings — PR #201;
 26. Personal Research Workbench UI Phase 1B scope create/revise — PR #203;
 27. Personal Research Workbench UI Phase 1C complete candidate universe — PR #205;
-28. Personal Research Workbench UI Phase 1D complete review and exact result — PR #207.
+28. Personal Research Workbench UI Phase 1D complete review and exact result — PR #207;
+29. Personal Research Workbench UI Phase 2A architecture — PR #209;
+30. Personal Research Workbench UI Phase 2A Today Market implementation — PR #212.
 
-Active architecture gate:
+No product or architecture phase is currently active.
 
-29. Personal Research Workbench UI Phase 2A — Today Market Local Snapshot — Issue #208.
+Planned later product phases, each separately governed and not yet authorized:
 
-Planned later product phases, each separately governed:
-
-30. Today Market Provider-backed refresh and broader exact market contracts after source authorization;
-31. Daily Industry Radar with authorized news/announcement ingestion and scheduler;
-32. Follow and Track with followed-entity/change/notification contracts;
-33. Research Portfolio, observation first and simulated ledger later;
-34. advanced model/Provider settings with credential security and explicit role boundaries.
+31. Personal Research Workbench UI Phase 2B ordinary-user usability consolidation described by roadmap Issue #210;
+32. Today Market Provider-backed refresh and broader exact market contracts after source authorization;
+33. Daily Industry Radar with authorized news/announcement ingestion and scheduler;
+34. Follow and Track with followed-entity/change/notification contracts;
+35. Research Portfolio, observation first and simulated ledger later;
+36. advanced model/Provider settings with credential security and explicit role boundaries.
 
 Deferred:
 
@@ -534,38 +537,22 @@ Deferred:
 
 ## Current authorization state
 
-- `main` includes UI Phase 1D PR #207 at `98a67c36f5cd968f17898038c786d3720b793dab`.
-- Issues #200, #202, #204 and #206 are completed; PRs #201, #203, #205 and #207 implement Personal Research Workbench UI Phase 1A–1D.
-- Issue #208 records the owner-directed next product step and authorizes Product / Architecture Preflight for Today Market Phase 2A only.
-- The active architecture branch may modify only its task snapshot, `docs/personal_research_workbench_ui_phase2a_preflight.md` and this baseline.
-- No production UI/API code, migration, dependency, fixture or executable test is authorized by the preflight.
-- No Provider, news, announcement, THS, browser acquisition, scheduler, notification, AI call or portfolio ledger is authorized.
-- No remote refresh, full-market claim, anomaly/cause engine, accepted evidence, Investment Candidate or portfolio owner write is authorized.
+- Personal Research Workbench UI Phase 2A merged through PR #212; its capability merge commit is `1f9edfc0719c9d512ed95c2330db78dadea17eea`.
+- Issues #208 and #211 are completed; PRs #209 and #212 define and implement the accepted local-only Today Market slice.
+- Historical connectivity Issue #37 and unmerged Draft PR #38 are retired through authorized housekeeping Issue #213.
+- Issue #210 remains a roadmap plan only. It does not authorize a Phase 2B architecture Issue, branch, code change or PR.
+- No product architecture or implementation phase is active.
+- No Provider, news, announcement, THS, browser acquisition, scheduler, notification, new AI call or portfolio ledger is authorized.
+- No remote refresh, full-market claim, anomaly/cause engine, accepted evidence, Investment Candidate or portfolio owner write is authorized by current housekeeping.
 - No recommendation, target price, expected return, position size, broker, order or automated trading behavior is authorized.
+- No release, tag or version change is authorized.
 
 ## Next governed gate
 
-Issue #208 and its Draft architecture PR must establish and receive process-independent fixed-head approval for:
+There is no automatically active next phase.
 
-1. exact `/today-market` route and five-module navigation behavior;
-2. continued `/workbench` entry through 产业研究;
-3. existing static HTML/CSS/vanilla JavaScript stack reuse;
-4. bounded exact local equity/benchmark/sector catalog with no auto-selection;
-5. deterministic labels from validated canonical series identities;
-6. required information-cutoff and recorded-UTC visibility boundaries;
-7. reuse of existing Market Cockpit calculation ownership;
-8. a bounded non-persistent Today Market read/view-model adapter;
-9. selected-universe price behavior and liquidity presentation;
-10. optional exact benchmark and sector contexts with alignment state;
-11. scope, completeness, freshness, provenance and warning presentation;
-12. explicit unavailable breadth, anomaly, event/cause and remote-refresh states;
-13. exact query ceilings and no row-count-dependent queries;
-14. loading, empty, partial, mixed-session, stale and database states;
-15. responsive and accessibility behavior;
-16. one fully offline production-boundary local snapshot golden path;
-17. one recorded-UTC invisibility path with no fallback;
-18. no-migration, no-new-framework, no-network and no-write decisions;
-19. bounded future implementation file families and stop conditions;
-20. locked exclusions for Provider, scheduler, alerts, portfolio and trading.
+A future Phase 2B may begin only after the project owner separately authorizes one Strict architecture-preflight Issue against the then-current exact `main`. That architecture work must remain within the five bounded usability improvements described in roadmap Issue #210, establish exact existing-route/API reuse, file families, state mappings, golden/failure paths and stop conditions, and obtain applicable fixed-head review and separate merge authorization.
 
-No production implementation is authorized by this baseline or Issue #208 alone.
+Roadmap Issue #210, this baseline and housekeeping Issue #213 do not themselves authorize Phase 2B architecture or implementation.
+
+Provider-backed Today Market refresh, Daily Industry Radar, Follow and Track, Research Portfolio, external acquisition and any new AI/credential boundary each require their own separate governed authorization.

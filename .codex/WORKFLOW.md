@@ -109,7 +109,7 @@ Before editing:
 
 1. Inspect the current base, relevant Issue or request, architecture baseline, active PR and latest CI relevant to the change.
 2. Confirm the risk tier and summarize it in the Issue or PR.
-3. Confirm the branch base and avoid unrelated branches and PRs, including PR #38.
+3. Confirm the branch base and avoid unrelated branches and PRs.
 4. Reuse the existing branch and PR when scope is unchanged.
 5. For Standard and Strict work, authorize a directory or file family where practical instead of predicting every helper filename.
 
@@ -194,10 +194,6 @@ Review should focus on:
 - prohibited recommendation, price or trading semantics.
 
 Do not generate exhaustive ceremonial checklists when a concise risk-focused review is sufficient. Fixed-head approval never replaces the separate explicit owner authorization required to merge.
-
-## Transition rule for PR #165
-
-PR #165 remains a Strict architecture artifact. Its implementation may begin after explicit owner authorization, but neither PR #165 nor the related production implementation may merge without the required process-independent fixed-head architecture approval. Avoid additional planning layers between the approved architecture and implementation.
 
 ## Completion actions
 
