@@ -172,7 +172,7 @@ def test_bootstrap_enables_only_phase_1b_scope_writes(monkeypatch) -> None:
     assert payload["capabilities"]["trading"] is False
 
 
-def test_sessions_api_returns_exact_visible_history(database) -> None:
+def test_sessions_api_returns_exact_visible_history_with_default_limit(database) -> None:
     created = DomainCommandService(
         database,
         clock=lambda: NOW,
@@ -186,7 +186,6 @@ def test_sessions_api_returns_exact_visible_history(database) -> None:
             params={
                 "as_of_cutoff": CUTOFF.isoformat(),
                 "as_of_recorded_at_utc": NOW.isoformat(),
-                "limit": 20,
             },
         )
     finally:
@@ -194,6 +193,7 @@ def test_sessions_api_returns_exact_visible_history(database) -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["limit"] == 20
     assert payload["session_count"] == 1
     assert payload["sessions"][0]["session_id"] == created["session_id"]
     assert payload["sessions"][0]["visible_latest_revision_id"] == created[
@@ -414,6 +414,17 @@ def test_request_validation_is_strict_and_occurs_before_command_execution(
             "/industry-analysis/api/sessions",
             json=unknown,
         )
+        nested_unknown = client.post(
+            f"/industry-analysis/api/sessions/{UUID(int=999)}/revisions",
+            json={
+                "expected_latest_revision_number": 1,
+                "changes": {
+                    "thesis_text_original": "范围修订",
+                    "revision_note": "不允许嵌套",
+                },
+                "revision_note": "顶层修订说明",
+            },
+        )
         wrong_type = client.post(
             "/industry-analysis/api/sessions",
             content="{}",
@@ -434,6 +445,8 @@ def test_request_validation_is_strict_and_occurs_before_command_execution(
 
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "industry_analysis_request_invalid"
+    assert nested_unknown.status_code == 422
+    assert nested_unknown.json()["detail"]["code"] == "industry_analysis_request_invalid"
     assert wrong_type.status_code == 400
     assert wrong_type.json()["detail"]["code"] == "industry_analysis_json_required"
     assert malformed.status_code == 400
@@ -507,7 +520,7 @@ def test_missing_database_configuration_returns_stable_503(monkeypatch) -> None:
     )
 
 
-def test_static_assets_are_local_only_preserve_inputs_and_disable_phase_1c() -> None:
+def test_static_assets_are_local_strict_and_preserve_ambiguous_inputs() -> None:
     root = Path(__file__).resolve().parents[1] / "industry_analysis" / "static"
     html = (root / "workbench.html").read_text(encoding="utf-8")
     script = (root / "workbench.js").read_text(encoding="utf-8")
@@ -516,7 +529,10 @@ def test_static_assets_are_local_only_preserve_inputs_and_disable_phase_1c() -> 
     assert "https://" not in script
     assert "localStorage" in script
     assert 'fetch("/industry-analysis/api/' in script
+    assert 'document.querySelector("#history-limit").value = "20"' in script
+    assert "const { revision_note: revisionNote, ...changes } = payload;" in script
     assert "页面已保留你的输入" in script
+    assert "请先返回研究历史确认是否已写入，再重试" in script
     assert "UUID" not in html
     assert "fingerprint" not in html
     assert "检查研究范围" in html
