@@ -22,6 +22,7 @@ from backend.database.engine import build_session_factory
 from backend.database.market_data import MarketDataPersistenceService
 from backend.database.models import Base, IngestionRun
 from backend.database.sector_data import (
+    DEFAULT_SECTOR_REVIEWED_AKSHARE_VERSION,
     SECTOR_DAILY_CONTRACT_VERSION,
     SECTOR_DEFINITION_CONTRACT_VERSION,
     SectorPersistenceService,
@@ -232,7 +233,7 @@ def _ingest_sector(session_factory: sessionmaker[Session]):
             "network_mode": "offline-fixture",
             "timeout_seconds": 1.0,
             "max_retries": 0,
-            "akshare_package_version": "fixture",
+            "akshare_package_version": DEFAULT_SECTOR_REVIEWED_AKSHARE_VERSION,
             "definition_contract_version": SECTOR_DEFINITION_CONTRACT_VERSION,
             "daily_contract_version": SECTOR_DAILY_CONTRACT_VERSION,
             "adapter_version": "today-market-demo-v1",
