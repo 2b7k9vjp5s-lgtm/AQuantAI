@@ -27,6 +27,7 @@ from scripts.demo_industry_analysis_workbench import run_demo
 UTC = timezone.utc
 NOW = datetime(2026, 7, 23, 3, 0, tzinfo=UTC)
 CUTOFF = date(2026, 7, 23)
+WORKBENCH_SCOPE_CONTRACT = "aquantai.personal-research-workbench.scope.v1"
 
 
 @pytest.fixture()
@@ -71,6 +72,7 @@ def _session_input() -> dict:
         "seed_technologies": [],
         "seed_bottlenecks": ["客户认证"],
         "draft_graph": {
+            "workbench_contract": WORKBENCH_SCOPE_CONTRACT,
             "exact_industry_map_references": [],
             "nodes": [],
             "relationships": [],
@@ -120,7 +122,6 @@ def _counts(database) -> tuple[int, int]:
 
 def test_workbench_redirect_and_canonical_pages_are_served() -> None:
     client = TestClient(app)
-
     redirect = client.get("/workbench", follow_redirects=False)
     assert redirect.status_code == 307
     assert redirect.headers["location"] == "/industry-analysis"
@@ -139,7 +140,6 @@ def test_workbench_redirect_and_canonical_pages_are_served() -> None:
 
 def test_future_modules_are_disabled_without_mock_market_values() -> None:
     response = TestClient(app).get("/industry-analysis")
-
     assert response.text.count("后续阶段") >= 3
     assert 'aria-disabled="true"' in response.text
     assert "上证指数" not in response.text
@@ -148,10 +148,7 @@ def test_future_modules_are_disabled_without_mock_market_values() -> None:
 
 def test_bootstrap_enables_only_phase_1b_scope_writes(monkeypatch) -> None:
     monkeypatch.setattr(industry_api, "_database_available", lambda: True)
-    payload = TestClient(app).get(
-        "/industry-analysis/api/bootstrap"
-    ).json()
-
+    payload = TestClient(app).get("/industry-analysis/api/bootstrap").json()
     assert payload["phase"] == "ui_phase_1b"
     assert payload["database_available"] is True
     assert [item["label"] for item in payload["modules"]] == [
@@ -173,11 +170,9 @@ def test_bootstrap_enables_only_phase_1b_scope_writes(monkeypatch) -> None:
 
 
 def test_sessions_api_returns_exact_visible_history_with_default_limit(database) -> None:
-    created = DomainCommandService(
-        database,
-        clock=lambda: NOW,
-    ).create_session(_session_input())
-
+    created = DomainCommandService(database, clock=lambda: NOW).create_session(
+        _session_input()
+    )
     _clear_overrides()
     _override_read_write_factories(database)
     try:
@@ -207,11 +202,7 @@ def test_create_dry_run_is_non_persistent_and_commit_creates_revision_one(
     database,
     monkeypatch,
 ) -> None:
-    _install_clock(
-        monkeypatch,
-        NOW,
-        NOW + timedelta(seconds=1),
-    )
+    _install_clock(monkeypatch, NOW, NOW + timedelta(seconds=1))
     _clear_overrides()
     _override_read_write_factories(database)
     client = TestClient(app)
@@ -301,6 +292,7 @@ def test_exact_revision_reopens_and_revise_dry_run_then_commit_is_append_only(
     assert exact.status_code == 200
     assert exact.json()["session_id"] == created["session_id"]
     assert exact.json()["session_revision_id"] == created["session_revision_id"]
+    assert exact.json()["draft_graph"]["workbench_contract"] == WORKBENCH_SCOPE_CONTRACT
     assert dry_run.status_code == 200
     assert dry_run.json()["dry_run"] is True
     assert dry_run.json()["revision_number"] == 2
@@ -320,9 +312,7 @@ def test_exact_revision_reopens_and_revise_dry_run_then_commit_is_append_only(
             UUID(created["session_id"]),
         )
     assert revision_two is not None
-    assert revision_two.supersedes_revision_id == UUID(
-        created["session_revision_id"]
-    )
+    assert revision_two.supersedes_revision_id == UUID(created["session_revision_id"])
     assert identity is not None
     assert identity.latest_revision_number == 2
 
@@ -399,21 +389,14 @@ def test_request_validation_is_strict_and_occurs_before_command_execution(
         called = True
         raise AssertionError("command service must not run")
 
-    monkeypatch.setattr(
-        industry_api,
-        "IndustryThesisCommandService",
-        forbidden_service,
-    )
+    monkeypatch.setattr(industry_api, "IndustryThesisCommandService", forbidden_service)
     _clear_overrides()
     _override_read_write_factories(database)
     client = TestClient(app)
     try:
         unknown = _session_input()
         unknown["unexpected"] = True
-        response = client.post(
-            "/industry-analysis/api/sessions",
-            json=unknown,
-        )
+        response = client.post("/industry-analysis/api/sessions", json=unknown)
         nested_unknown = client.post(
             f"/industry-analysis/api/sessions/{UUID(int=999)}/revisions",
             json={
@@ -472,7 +455,6 @@ def test_invalid_boundary_fails_before_database_construction(monkeypatch) -> Non
             "as_of_recorded_at_utc": "2026-07-23T03:00:00",
         },
     )
-
     assert response.status_code == 422
     assert called is False
     assert "explicit UTC" in response.json()["detail"]
@@ -494,7 +476,6 @@ def test_cutoff_after_recorded_date_fails_before_database_construction(monkeypat
             "as_of_recorded_at_utc": "2026-07-23T03:00:00Z",
         },
     )
-
     assert response.status_code == 422
     assert called is False
     assert "cannot be later" in response.json()["detail"]
@@ -513,11 +494,8 @@ def test_missing_database_configuration_returns_stable_503(monkeypatch) -> None:
             "as_of_recorded_at_utc": NOW.isoformat(),
         },
     )
-
     assert response.status_code == 503
-    assert response.json()["detail"]["code"] == (
-        "industry_analysis_database_unavailable"
-    )
+    assert response.json()["detail"]["code"] == "industry_analysis_database_unavailable"
 
 
 def test_static_assets_are_local_strict_and_preserve_ambiguous_inputs() -> None:
@@ -531,6 +509,9 @@ def test_static_assets_are_local_strict_and_preserve_ambiguous_inputs() -> None:
     assert 'fetch("/industry-analysis/api/' in script
     assert 'document.querySelector("#history-limit").value = "20"' in script
     assert "const { revision_note: revisionNote, ...changes } = payload;" in script
+    assert WORKBENCH_SCOPE_CONTRACT in script
+    assert "assertEditableRevision(revision);" in script
+    assert "当前页面不会覆盖其结构化数据" in script
     assert "页面已保留你的输入" in script
     assert "请先返回研究历史确认是否已写入，再重试" in script
     assert "UUID" not in html
@@ -547,7 +528,6 @@ def test_static_assets_are_local_strict_and_preserve_ambiguous_inputs() -> None:
 
 def test_offline_workbench_demo_runs_create_revise_history_flow() -> None:
     payload = run_demo()
-
     assert payload["created"]["revision_number"] == 1
     assert payload["revised"]["revision_number"] == 2
     assert payload["history"]["session_count"] == 1
