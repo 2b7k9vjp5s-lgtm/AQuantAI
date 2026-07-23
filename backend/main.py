@@ -120,9 +120,9 @@ app.include_router(normalized_valuation_router)
 def read_root() -> dict[str, str]:
     return {
         "project": "AQuantAI",
-        "status": "local-first personal A-share research workbench",
+        "status": "v0.2 research-only local Dashboard baseline",
         "version": "0.2.0",
-        "phase": "Personal Research Workbench UI Phase 2A merged",
+        "phase": "v0.2 local read-only Dashboard baseline",
     }
 
 
