@@ -36,36 +36,11 @@ _MAX_BODY_BYTES = 1_048_576
 _Model = TypeVar("_Model", bound=BaseModel)
 
 _MODULES = (
-    {
-        "key": "today-market",
-        "label": "今日市场",
-        "state": "future",
-        "path": None,
-    },
-    {
-        "key": "industry-analysis",
-        "label": "产业研究",
-        "state": "active",
-        "path": "/industry-analysis",
-    },
-    {
-        "key": "follow-track",
-        "label": "关注与跟踪",
-        "state": "future",
-        "path": None,
-    },
-    {
-        "key": "research-portfolio",
-        "label": "研究组合",
-        "state": "future",
-        "path": None,
-    },
-    {
-        "key": "settings",
-        "label": "系统设置",
-        "state": "active",
-        "path": "/workbench/settings",
-    },
+    {"key": "today-market", "label": "今日市场", "state": "future", "path": None},
+    {"key": "industry-analysis", "label": "产业研究", "state": "active", "path": "/industry-analysis"},
+    {"key": "follow-track", "label": "关注与跟踪", "state": "future", "path": None},
+    {"key": "research-portfolio", "label": "研究组合", "state": "future", "path": None},
+    {"key": "settings", "label": "系统设置", "state": "active", "path": "/workbench/settings"},
 )
 
 
@@ -142,7 +117,7 @@ def _database_available() -> bool:
             engine.dispose()
 
 
-def _database_unavailable(exc: Exception) -> HTTPException:
+def _database_unavailable(_exc: Exception) -> HTTPException:
     return HTTPException(
         status_code=503,
         detail={
@@ -184,19 +159,13 @@ def _domain_http_error(exc: IndustryThesisError) -> HTTPException:
         status_code=status,
         detail={
             "code": exc.code,
-            "message": chinese.get(
-                exc.code,
-                "研究范围校验失败，请检查输入后重试。",
-            ),
+            "message": chinese.get(exc.code, "研究范围校验失败，请检查输入后重试。"),
             "technical_message": str(exc),
         },
     )
 
 
-async def _validated_json_body(
-    request: Request,
-    model: type[_Model],
-) -> _Model:
+async def _validated_json_body(request: Request, model: type[_Model]) -> _Model:
     content_type = request.headers.get("content-type", "")
     if "application/json" not in content_type.lower():
         raise HTTPException(
@@ -218,6 +187,14 @@ async def _validated_json_body(
     try:
         return model.model_validate_json(body)
     except ValidationError as exc:
+        if any(error.get("type") == "json_invalid" for error in exc.errors()):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "industry_analysis_json_invalid",
+                    "message": "请求不是有效 JSON。",
+                },
+            ) from exc
         raise HTTPException(
             status_code=422,
             detail={
@@ -238,8 +215,6 @@ async def _validated_json_body(
 
 @router.get("/bootstrap")
 def get_workbench_bootstrap() -> dict:
-    """Return deterministic shell capabilities without creating product state."""
-
     return {
         "product": "AQuantAI",
         "surface": "personal_research_workbench",
@@ -273,18 +248,10 @@ def get_industry_analysis_session_factory(
     as_of_cutoff: date = Query(),
     as_of_recorded_at_utc: datetime = Query(),
 ) -> Iterator[sessionmaker[Session]]:
-    """Validate boundaries before constructing local database resources."""
-
     try:
-        validate_workbench_boundary(
-            as_of_cutoff,
-            as_of_recorded_at_utc,
-        )
+        validate_workbench_boundary(as_of_cutoff, as_of_recorded_at_utc)
     except IndustryThesisWorkbenchError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=str(exc),
-        ) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     engine = None
     try:
@@ -297,11 +264,7 @@ def get_industry_analysis_session_factory(
             engine.dispose()
 
 
-def get_industry_analysis_write_factory() -> Iterator[
-    sessionmaker[Session]
-]:
-    """Create local command resources without accepting time from the browser."""
-
+def get_industry_analysis_write_factory() -> Iterator[sessionmaker[Session]]:
     engine = None
     try:
         engine = build_engine()
@@ -318,30 +281,18 @@ def list_industry_thesis_sessions(
     as_of_cutoff: date = Query(),
     as_of_recorded_at_utc: datetime = Query(),
     limit: int = Query(default=50, ge=1, le=100),
-    session_factory: sessionmaker[Session] = Depends(
-        get_industry_analysis_session_factory
-    ),
+    session_factory: sessionmaker[Session] = Depends(get_industry_analysis_session_factory),
 ) -> dict:
-    """Return bounded deterministic history under explicit boundaries."""
-
     try:
-        boundary = validate_workbench_boundary(
-            as_of_cutoff,
-            as_of_recorded_at_utc,
-        )
+        boundary = validate_workbench_boundary(as_of_cutoff, as_of_recorded_at_utc)
         with session_factory() as session:
-            return IndustryThesisWorkbenchQueryService(
-                session
-            ).list_sessions(
+            return IndustryThesisWorkbenchQueryService(session).list_sessions(
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=boundary,
                 limit=limit,
             )
     except IndustryThesisWorkbenchError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=str(exc),
-        ) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=503,
@@ -358,15 +309,11 @@ def list_local_map_options(
     as_of_recorded_at_utc: datetime = Query(),
     q: str | None = Query(default=None, max_length=120),
     limit: int = Query(default=20, ge=1, le=20),
-    session_factory: sessionmaker[Session] = Depends(
-        get_industry_analysis_session_factory
-    ),
+    session_factory: sessionmaker[Session] = Depends(get_industry_analysis_session_factory),
 ) -> dict:
     try:
         with session_factory() as session:
-            return IndustryThesisWorkbenchQueryService(
-                session
-            ).list_map_options(
+            return IndustryThesisWorkbenchQueryService(session).list_map_options(
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
                 query=q,
@@ -375,18 +322,12 @@ def list_local_map_options(
     except IndustryThesisWorkbenchError as exc:
         raise HTTPException(
             status_code=422,
-            detail={
-                "code": "industry_analysis_option_query_invalid",
-                "message": str(exc),
-            },
+            detail={"code": "industry_analysis_option_query_invalid", "message": str(exc)},
         ) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=503,
-            detail={
-                "code": "industry_analysis_option_query_failed",
-                "message": "本地产业地图读取失败。",
-            },
+            detail={"code": "industry_analysis_option_query_failed", "message": "本地产业地图读取失败。"},
         ) from exc
 
 
@@ -396,15 +337,11 @@ def list_local_company_options(
     as_of_recorded_at_utc: datetime = Query(),
     q: str = Query(min_length=1, max_length=120),
     limit: int = Query(default=20, ge=1, le=20),
-    session_factory: sessionmaker[Session] = Depends(
-        get_industry_analysis_session_factory
-    ),
+    session_factory: sessionmaker[Session] = Depends(get_industry_analysis_session_factory),
 ) -> dict:
     try:
         with session_factory() as session:
-            return IndustryThesisWorkbenchQueryService(
-                session
-            ).list_company_options(
+            return IndustryThesisWorkbenchQueryService(session).list_company_options(
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
                 query=q,
@@ -413,18 +350,12 @@ def list_local_company_options(
     except IndustryThesisWorkbenchError as exc:
         raise HTTPException(
             status_code=422,
-            detail={
-                "code": "industry_analysis_option_query_invalid",
-                "message": str(exc),
-            },
+            detail={"code": "industry_analysis_option_query_invalid", "message": str(exc)},
         ) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=503,
-            detail={
-                "code": "industry_analysis_option_query_failed",
-                "message": "本地公司身份读取失败。",
-            },
+            detail={"code": "industry_analysis_option_query_failed", "message": "本地公司身份读取失败。"},
         ) from exc
 
 
@@ -433,15 +364,11 @@ def get_exact_session_revision(
     session_revision_id: UUID,
     as_of_cutoff: date = Query(),
     as_of_recorded_at_utc: datetime = Query(),
-    session_factory: sessionmaker[Session] = Depends(
-        get_industry_analysis_session_factory
-    ),
+    session_factory: sessionmaker[Session] = Depends(get_industry_analysis_session_factory),
 ) -> dict:
     try:
         with session_factory() as session:
-            return IndustryThesisQueryService(
-                session
-            ).get_session_revision(
+            return IndustryThesisQueryService(session).get_session_revision(
                 session_revision_id,
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
@@ -451,48 +378,39 @@ def get_exact_session_revision(
     except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=503,
-            detail={
-                "code": "industry_analysis_query_failed",
-                "message": "精确研究修订读取失败。",
-            },
+            detail={"code": "industry_analysis_query_failed", "message": "精确研究修订读取失败。"},
         ) from exc
+
+
+def _edit_scope_path(result: dict) -> str | None:
+    if result["session_revision_id"] is None:
+        return None
+    return (
+        "/industry-analysis/new"
+        f"?session_id={result['session_id']}"
+        f"&session_revision_id={result['session_revision_id']}"
+        f"&revision_number={result['revision_number']}"
+        f"&as_of_cutoff={result['information_cutoff_date']}"
+        f"&as_of_recorded_at_utc={result['recorded_at_utc']}"
+    )
 
 
 @router.post("/sessions")
 async def create_industry_thesis_session(
     request: Request,
     dry_run: bool = Query(default=True),
-    session_factory: sessionmaker[Session] = Depends(
-        get_industry_analysis_write_factory
-    ),
+    session_factory: sessionmaker[Session] = Depends(get_industry_analysis_write_factory),
 ) -> dict:
-    payload = await _validated_json_body(
-        request,
-        SessionPayloadRequest,
-    )
-    raw = payload.model_dump(mode="json")
+    payload = await _validated_json_body(request, SessionPayloadRequest)
     try:
-        result = IndustryThesisCommandService(
-            session_factory
-        ).create_session(
-            raw,
+        result = IndustryThesisCommandService(session_factory).create_session(
+            payload.model_dump(mode="json"),
             dry_run=dry_run,
         )
     except IndustryThesisError as exc:
         raise _domain_http_error(exc) from exc
     result["history_path"] = "/industry-analysis"
-    result["edit_scope_path"] = (
-        None
-        if result["session_id"] is None
-        else (
-            "/industry-analysis/new"
-            f"?session_id={result['session_id']}"
-            f"&session_revision_id={result['session_revision_id']}"
-            f"&revision_number={result['revision_number']}"
-            f"&as_of_cutoff={result['information_cutoff_date']}"
-            f"&as_of_recorded_at_utc={result['recorded_at_utc']}"
-        )
-    )
+    result["edit_scope_path"] = _edit_scope_path(result)
     return result
 
 
@@ -501,45 +419,22 @@ async def revise_industry_thesis_session(
     session_id: UUID,
     request: Request,
     dry_run: bool = Query(default=True),
-    session_factory: sessionmaker[Session] = Depends(
-        get_industry_analysis_write_factory
-    ),
+    session_factory: sessionmaker[Session] = Depends(get_industry_analysis_write_factory),
 ) -> dict:
-    payload = await _validated_json_body(
-        request,
-        SessionRevisionRequest,
-    )
+    payload = await _validated_json_body(request, SessionRevisionRequest)
     raw = {
         "session_id": str(session_id),
-        "expected_latest_revision_number": (
-            payload.expected_latest_revision_number
-        ),
-        "changes": payload.changes.model_dump(
-            mode="json",
-            exclude_unset=True,
-        ),
+        "expected_latest_revision_number": payload.expected_latest_revision_number,
+        "changes": payload.changes.model_dump(mode="json", exclude_unset=True),
         "revision_note": payload.revision_note,
     }
     try:
-        result = IndustryThesisCommandService(
-            session_factory
-        ).revise_session(
+        result = IndustryThesisCommandService(session_factory).revise_session(
             raw,
             dry_run=dry_run,
         )
     except IndustryThesisError as exc:
         raise _domain_http_error(exc) from exc
     result["history_path"] = "/industry-analysis"
-    result["edit_scope_path"] = (
-        None
-        if result["session_revision_id"] is None
-        else (
-            "/industry-analysis/new"
-            f"?session_id={result['session_id']}"
-            f"&session_revision_id={result['session_revision_id']}"
-            f"&revision_number={result['revision_number']}"
-            f"&as_of_cutoff={result['information_cutoff_date']}"
-            f"&as_of_recorded_at_utc={result['recorded_at_utc']}"
-        )
-    )
+    result["edit_scope_path"] = _edit_scope_path(result)
     return result
