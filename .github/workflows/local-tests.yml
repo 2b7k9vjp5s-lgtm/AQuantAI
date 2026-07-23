@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -q -e ".[dev]"
 
+      - name: Run focused Today Market tests
+        run: python -m pytest -q tests/test_today_market.py --tb=short
+
       - name: Run tests
         run: python -m pytest -q --tb=short
 
