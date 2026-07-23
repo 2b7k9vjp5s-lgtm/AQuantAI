@@ -49,3 +49,17 @@ def test_technical_payload_remains_progressively_disclosed() -> None:
     assert "technical.textContent = JSON.stringify(payload.technical_details" in script
     assert "<details>" in html
     assert "查看数据与技术详情" in html
+
+
+def test_primary_analysis_uses_chinese_projectors_not_raw_context_dumping() -> None:
+    script = _script()
+
+    assert "renderPriceBehavior(priceBehavior" in script
+    assert "renderLiquidity(liquidity" in script
+    assert "renderBenchmark(benchmark" in script
+    assert "renderSector(sector" in script
+    assert "renderCompleteness(completeness" in script
+    assert "renderData(benchmark" not in script
+    assert "renderData(sector" not in script
+    assert "JSON.stringify(value, null, 2)" not in script
+    assert "来源原始单位" in script
