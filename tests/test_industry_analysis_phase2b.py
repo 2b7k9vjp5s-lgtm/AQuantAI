@@ -150,8 +150,8 @@ def test_phase2b_static_helper_uses_same_history_response_and_fail_closed_paths(
     ).read_text(encoding="utf-8")
 
     assert "payload.sessions[0]" in script
-    assert "/industry-analysis/api/sessions" in script
-    assert script.count('/industry-analysis/api/sessions"') == 1
+    assert 'path === "/industry-analysis/api/sessions"' in script
+    assert "fetch(`/industry-analysis/api/sessions" not in script
     assert ".find(" not in script
     assert "parsed.origin !== window.location.origin" in script
     assert "kind === \"unavailable\"" in script
@@ -194,7 +194,7 @@ def test_participating_pages_load_phase2b_before_existing_page_scripts() -> None
         assert "workbench_phase2b.css" in html
         assert "workbench_phase2b.js" in html
         assert html.index("workbench_phase2b.js") < html.index(existing[path.name])
-        assert 'id="phase2b-workflow"' in html or path.name == "workbench.html"
+        assert 'id="phase2b-workflow"' in html
         assert "UUID" not in html
         assert "fingerprint" not in html.lower()
 
@@ -214,7 +214,7 @@ def test_workbench_navigation_and_first_use_are_honest() -> None:
     assert "不会跳过停止或不可继续的记录" in html
     for phrase in ("描述研究主题", "确认研究范围", "审核完整候选池"):
         assert phrase in helper
-    assert "演示数据" not in html
+    assert "不会用演示数据伪装为当前研究" in html
     assert "模拟收益" not in html
 
 
