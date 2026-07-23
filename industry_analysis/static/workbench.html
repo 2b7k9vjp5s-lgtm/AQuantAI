@@ -77,11 +77,11 @@
                 <h2 id="history-title">本地研究记录</h2>
                 <p id="history-summary">尚未读取。</p>
               </div>
-              <a class="button button-secondary" href="/industry-analysis/new">新建范围预览</a>
+              <a class="button button-secondary" href="/industry-analysis/new">发起新研究</a>
             </div>
             <div id="history-empty" class="empty-state" hidden>
               <h3>当前边界内没有研究记录</h3>
-              <p>可以先打开“发起新研究”整理研究范围；实际保存将在后续写入切片开放。</p>
+              <p>可以从一个行业、产业链、技术、政策或投资逻辑开始，并保存为本地研究草稿。</p>
             </div>
             <div id="history-list" class="history-list"></div>
           </section>
@@ -90,51 +90,120 @@
         <section id="new-page" class="page" data-page="new" hidden>
           <div class="page-heading">
             <div>
-              <p class="eyebrow">SCOPE PREVIEW</p>
-              <h1>发起新研究</h1>
-              <p>先用普通中文整理研究问题和边界。本切片只生成浏览器内范围预览，不会写入数据库或创建候选公司。</p>
+              <p class="eyebrow">CREATE LOCAL RESEARCH</p>
+              <h1 id="scope-page-title">发起新研究</h1>
+              <p>用普通中文记录研究问题，明确市场与时间边界，再通过检查后写入本地追加式研究历史。</p>
             </div>
           </div>
-          <div class="two-column">
+
+          <div id="scope-mode-notice" class="notice-panel" hidden></div>
+          <div class="two-column scope-layout">
             <section class="panel" aria-labelledby="scope-form-title">
-              <h2 id="scope-form-title">研究范围</h2>
-              <form id="scope-preview-form" class="stack-form">
-                <label>研究主题或判断<textarea id="thesis-text" rows="5" maxlength="4000" required placeholder="例如：AI 数据中心扩张是否推动高纯电子气体需求，并改变国内供应商利润池？"></textarea></label>
-                <label>市场范围
-                  <select id="market-scope"><option value="中国A股">中国A股</option></select>
+              <h2 id="scope-form-title">一、研究想法</h2>
+              <form id="scope-form" class="stack-form">
+                <label>研究主题或判断
+                  <textarea id="thesis-text" rows="5" maxlength="4000" required placeholder="例如：AI 数据中心扩张是否推动高纯电子气体需求，并改变国内供应商利润池？"></textarea>
                 </label>
-                <label>驱动类型
-                  <select id="driver-type">
-                    <option value="待确认">待确认</option>
-                    <option value="需求扩张">需求扩张</option>
-                    <option value="供给收缩或涨价">供给收缩或涨价</option>
-                    <option value="政策或制度变化">政策或制度变化</option>
-                    <option value="技术替代">技术替代</option>
-                    <option value="事件冲击">事件冲击</option>
-                    <option value="混合驱动">混合驱动</option>
-                  </select>
+                <label>研究标题（可选）
+                  <input id="thesis-title" type="text" maxlength="300" placeholder="例如：高纯电子气体需求与认证">
                 </label>
-                <label>研究周期
-                  <select id="analysis-horizon">
-                    <option value="中期">中期</option>
-                    <option value="短期">短期</option>
-                    <option value="长期">长期</option>
-                    <option value="待确认">待确认</option>
-                  </select>
+                <label class="check-row">
+                  <input id="market-confirmed" type="checkbox" required>
+                  <span>我确认本次研究市场范围为中国 A 股普通股</span>
                 </label>
-                <label>产业链边界<textarea id="chain-boundary" rows="3" placeholder="例如：上游原料、纯化、现场制气和半导体客户认证"></textarea></label>
-                <label>明确排除<textarea id="exclusions" rows="3" placeholder="例如：仅有概念标签、无实际产品或客户验证的公司"></textarea></label>
-                <label>信息截止日<input id="scope-cutoff" type="date" required></label>
-                <button class="button button-primary" type="submit">生成范围预览</button>
+                <div class="form-grid">
+                  <label>驱动类型
+                    <select id="driver-type">
+                      <option value="unknown">暂不确定</option>
+                      <option value="demand_expansion">需求扩张</option>
+                      <option value="supply_contraction_or_pricing">供给收缩或涨价</option>
+                      <option value="policy_or_institutional_change">政策或制度变化</option>
+                      <option value="technology_substitution">技术替代</option>
+                      <option value="event_shock">事件冲击</option>
+                      <option value="mixed">混合驱动</option>
+                      <option value="other">其他</option>
+                    </select>
+                  </label>
+                  <label>研究周期
+                    <select id="analysis-horizon">
+                      <option value="unknown">暂不确定</option>
+                      <option value="near_term">短期</option>
+                      <option value="medium_term">中期</option>
+                      <option value="long_term">长期</option>
+                    </select>
+                  </label>
+                  <label>信息截止日
+                    <input id="scope-cutoff" type="date" required>
+                  </label>
+                </div>
+
+                <h2>二、范围确认</h2>
+                <label>产业链或工艺边界
+                  <textarea id="chain-boundary" rows="3" maxlength="4000" placeholder="例如：上游原料、纯化、现场制气和半导体客户认证"></textarea>
+                </label>
+                <label>已知产品或服务（每行一项）
+                  <textarea id="seed-products" rows="3" placeholder="高纯氦气&#10;高纯二氧化碳"></textarea>
+                </label>
+                <label>已知技术（每行一项）
+                  <textarea id="seed-technologies" rows="3" placeholder="气体纯化&#10;现场制气"></textarea>
+                </label>
+                <label>关键瓶颈（每行一项）
+                  <textarea id="seed-bottlenecks" rows="3" placeholder="客户认证&#10;高纯度稳定供应"></textarea>
+                </label>
+                <label>明确排除（每行一项）
+                  <textarea id="exclusions" rows="3" placeholder="仅有概念标签、无实际产品或客户验证"></textarea>
+                </label>
+
+                <fieldset class="option-fieldset">
+                  <legend>精确本地产业地图（可选）</legend>
+                  <p>搜索结果仅用于导航，必须由你明确选择；不会自动认定受益关系。</p>
+                  <div class="search-row">
+                    <input id="map-query" type="search" maxlength="120" placeholder="输入地图标题、范围或键">
+                    <button id="map-search-button" class="button button-secondary" type="button">搜索本地地图</button>
+                  </div>
+                  <div id="map-results" class="option-results" aria-live="polite"></div>
+                  <div id="selected-maps" class="selected-options"></div>
+                </fieldset>
+
+                <fieldset class="option-fieldset">
+                  <legend>精确公司种子（可选）</legend>
+                  <p>至少输入两个字符，或输入一个完整证券代码。系统不会自动选择第一条结果。</p>
+                  <div class="search-row">
+                    <input id="company-query" type="search" maxlength="120" placeholder="公司名称或完整代码">
+                    <button id="company-search-button" class="button button-secondary" type="button">搜索本地公司</button>
+                  </div>
+                  <div id="company-results" class="option-results" aria-live="polite"></div>
+                  <div id="selected-companies" class="selected-options"></div>
+                </fieldset>
+
+                <div class="notice-panel">
+                  <strong>覆盖边界</strong>
+                  <p>系统只使用你确认的本地范围，不代表全市场完整覆盖。</p>
+                </div>
+                <label>修订说明
+                  <input id="revision-note" type="text" maxlength="1000" value="通过个人研究工作台保存范围">
+                </label>
+                <div class="button-row">
+                  <button id="scope-check-button" class="button button-secondary" type="button">检查研究范围</button>
+                  <button id="scope-save-button" class="button button-primary" type="submit">保存研究主题</button>
+                </div>
               </form>
+              <p id="scope-status" class="status-message" role="status" aria-live="polite"></p>
             </section>
+
             <section class="panel preview-panel" aria-labelledby="scope-preview-title">
-              <div class="panel-heading"><h2 id="scope-preview-title">范围确认预览</h2></div>
-              <div id="scope-preview" class="empty-state">
-                <h3>尚未生成预览</h3>
-                <p>预览只存在于当前浏览器页面，不会确定公司身份，也不会声明全市场覆盖。</p>
+              <div class="panel-heading">
+                <div>
+                  <h2 id="scope-preview-title">范围确认</h2>
+                  <p>先检查，再由你明确保存。检查不会创建本地记录。</p>
+                </div>
               </div>
-              <button class="button button-disabled" type="button" disabled>保存并构建候选（后续切片）</button>
+              <div id="scope-preview" class="empty-state">
+                <h3>尚未检查</h3>
+                <p>填写研究想法和范围后，点击“检查研究范围”。</p>
+              </div>
+              <div id="scope-success" class="success-panel" hidden></div>
+              <button class="button button-disabled" type="button" disabled>构建候选公司池（Phase 1C）</button>
             </section>
           </div>
         </section>
