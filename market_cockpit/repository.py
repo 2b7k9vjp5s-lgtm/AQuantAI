@@ -76,9 +76,11 @@ class MarketCockpitRepository:
         series_key: str | None = None,
         selector: SnapshotSeriesIdentity | None = None,
         as_of_cutoff: str | None = None,
+        as_of_recorded_at_utc: datetime | str | None = None,
     ) -> PersistedMarketDataSnapshot:
         resolved_key, canonical = _resolve_selector(series_key, selector)
         cutoff = _optional_date(as_of_cutoff)
+        recorded_at = _optional_recorded_at(as_of_recorded_at_utc)
         statement = select(IngestionRun).where(
             IngestionRun.series_key == resolved_key,
             IngestionRun.dataset == MARKET_DATASET,
@@ -87,6 +89,12 @@ class MarketCockpitRepository:
         )
         if cutoff is not None:
             statement = statement.where(IngestionRun.information_cutoff_date <= cutoff)
+        if recorded_at is not None:
+            statement = statement.where(
+                IngestionRun.imported_at <= recorded_at,
+                IngestionRun.completed_at.is_not(None),
+                IngestionRun.completed_at <= recorded_at,
+            )
         run = self._session.scalar(
             statement.order_by(
                 IngestionRun.information_cutoff_date.desc(),
@@ -95,7 +103,12 @@ class MarketCockpitRepository:
             ).limit(1)
         )
         if run is None:
-            suffix = f" at or before cutoff {_compact_date(cutoff)}" if cutoff is not None else ""
+            boundaries: list[str] = []
+            if cutoff is not None:
+                boundaries.append(f"cutoff {_compact_date(cutoff)}")
+            if recorded_at is not None:
+                boundaries.append(f"recorded UTC {_utc_iso(recorded_at)}")
+            suffix = f" at or before {' and '.join(boundaries)}" if boundaries else ""
             raise MarketCockpitSnapshotNotFound(
                 f"No successful complete snapshot exists for series {resolved_key}{suffix}."
             )
@@ -217,6 +230,24 @@ def _optional_date(value: str | None) -> date | None:
         return datetime.strptime(normalized, "%Y%m%d").date()
     except ValueError as exc:
         raise MarketCockpitSelectionError("as_of_cutoff must use YYYYMMDD format.") from exc
+
+
+def _optional_recorded_at(value: datetime | str | None) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        parsed = value if isinstance(value, datetime) else datetime.fromisoformat(
+            str(value).strip().replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise MarketCockpitSelectionError(
+            "as_of_recorded_at_utc must use an ISO-8601 timestamp."
+        ) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise MarketCockpitSelectionError(
+            "as_of_recorded_at_utc must include an explicit UTC offset."
+        )
+    return parsed.astimezone(timezone.utc)
 
 
 def _compact_date(value: date | None) -> str:
