@@ -113,6 +113,26 @@ def _review_path(
     )
 
 
+def _reject_multiple_contributing_pools_per_map(command: dict) -> None:
+    pools_by_map: dict[str, set[str]] = {}
+    for proposal in command.get("proposals", []):
+        if proposal.get("source_kind") != "existing_industry_map_revision":
+            continue
+        reference = proposal.get("source_reference")
+        if not isinstance(reference, dict):
+            continue
+        map_revision_id = reference.get("industry_map_revision_id")
+        pool_revision_id = reference.get("candidate_pool_revision_id")
+        if map_revision_id is None or pool_revision_id is None:
+            continue
+        pools_by_map.setdefault(str(map_revision_id), set()).add(str(pool_revision_id))
+    if any(len(pool_ids) > 1 for pool_ids in pools_by_map.values()):
+        raise IndustryThesisError(
+            "industry_thesis_duplicate_source",
+            "one candidate build may use at most one contributing frozen pool revision per exact map",
+        )
+
+
 @page_router.get(
     "/industry-analysis/sessions/{session_id}/revisions/{session_revision_id}/review",
     include_in_schema=False,
@@ -212,6 +232,7 @@ async def build_candidate_universe(
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
             )
+        _reject_multiple_contributing_pools_per_map(command)
         result = IndustryThesisWorkbenchCandidateCommandService(
             write_factory
         ).build_candidates(command, dry_run=dry_run)
