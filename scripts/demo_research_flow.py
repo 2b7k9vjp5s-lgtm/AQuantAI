@@ -10,6 +10,9 @@ import pandas as pd
 from agent import ResearchContext
 from agent.research_agent import DeterministicResearchReportBuilder
 from dashboard import build_dashboard_overview
+from scripts.demo_industry_thesis_review_flow import (
+    build_industry_thesis_review_demo_payload,
+)
 
 
 def build_demo_payload() -> dict[str, Any]:
@@ -48,7 +51,9 @@ def build_demo_payload() -> dict[str, Any]:
 
 
 def main() -> None:
-    print(json.dumps(build_demo_payload(), indent=2, ensure_ascii=True))
+    payload = build_demo_payload()
+    payload["industry_thesis_review"] = build_industry_thesis_review_demo_payload()
+    print(json.dumps(payload, indent=2, ensure_ascii=True))
 
 
 if __name__ == "__main__":
