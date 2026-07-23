@@ -5,7 +5,7 @@
 This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls Standard or Strict scope.
 
 - Released software version: `0.2.0`.
-- Current accepted `main` baseline: `1f9edfc0719c9d512ed95c2330db78dadea17eea`.
+- Phase 2A capability merge commit: `1f9edfc0719c9d512ed95c2330db78dadea17eea`.
 - Latest merged product capability: Personal Research Workbench UI Phase 2A through architecture PR #209 and implementation PR #212.
 - Personal Research Workbench UI Phase 1A–1D remains accepted through architecture PR #199 and implementation PRs #201, #203, #205 and #207.
 - Industry Thesis orchestration foundation and proposal review remain accepted through PRs #193, #195 and #197.
@@ -537,7 +537,7 @@ Deferred:
 
 ## Current authorization state
 
-- `main` includes Personal Research Workbench UI Phase 2A PR #212 at `1f9edfc0719c9d512ed95c2330db78dadea17eea`.
+- Personal Research Workbench UI Phase 2A merged through PR #212; its capability merge commit is `1f9edfc0719c9d512ed95c2330db78dadea17eea`.
 - Issues #208 and #211 are completed; PRs #209 and #212 define and implement the accepted local-only Today Market slice.
 - Historical connectivity Issue #37 and unmerged Draft PR #38 are retired through authorized housekeeping Issue #213.
 - Issue #210 remains a roadmap plan only. It does not authorize a Phase 2B architecture Issue, branch, code change or PR.
