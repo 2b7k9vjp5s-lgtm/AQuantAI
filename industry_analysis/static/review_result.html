@@ -6,6 +6,7 @@
   <title>AQuantAI 审阅计划结果</title>
   <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
   <link rel="stylesheet" href="/industry-analysis/static/review_result.css">
+  <link rel="stylesheet" href="/industry-analysis/static/workbench_phase2b.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -31,12 +32,12 @@
     <div class="app-main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">EXACT REVIEWED PLAN · PHASE 1D</p>
+          <p class="eyebrow">EXACT REVIEWED PLAN · PHASE 2B</p>
           <p class="page-context">审阅计划结果</p>
         </div>
         <div class="topbar-actions">
           <span id="page-state" class="status-pill">正在验证精确计划</span>
-          <a class="button button-secondary" href="/industry-analysis">返回研究历史</a>
+          <a class="button button-primary" href="/industry-analysis">返回研究历史</a>
         </div>
       </header>
 
@@ -47,6 +48,18 @@
             <h1 id="result-title">审阅计划结果</h1>
             <p id="result-thesis">正在读取本地研究内容。</p>
           </div>
+        </section>
+
+        <section class="panel" aria-labelledby="workflow-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="workflow-title">研究流程</h2>
+              <p>当前精确路由固定在研究结果步骤，不会自动移动到其他修订。</p>
+            </div>
+          </div>
+          <div id="phase2b-workflow" class="phase2b-workflow"></div>
+          <div id="phase2b-state" class="phase2b-state"></div>
+          <div id="phase2b-coverage-state" class="phase2b-state" hidden></div>
         </section>
 
         <section class="ownership-banner" aria-labelledby="ownership-title">
@@ -120,6 +133,7 @@
       </main>
     </div>
   </div>
+  <script src="/industry-analysis/static/workbench_phase2b.js" defer></script>
   <script src="/industry-analysis/static/review_result.js" defer></script>
 </body>
 </html>

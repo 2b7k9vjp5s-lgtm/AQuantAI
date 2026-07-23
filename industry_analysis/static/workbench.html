@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AQuantAI 个人研究工作台</title>
   <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
+  <link rel="stylesheet" href="/industry-analysis/static/workbench_phase2b.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -15,7 +16,7 @@
         <span><strong>AQuantAI</strong><small>个人研究工作台</small></span>
       </a>
       <nav class="primary-nav">
-        <span class="nav-item nav-disabled" aria-disabled="true"><span>今日市场</span><small>后续阶段</small></span>
+        <a class="nav-item" href="/today-market"><span>今日市场</span><small>本地快照</small></a>
         <a class="nav-item nav-active" href="/industry-analysis" aria-current="page"><span>产业研究</span><small>本地研究</small></a>
         <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
         <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
@@ -23,7 +24,7 @@
       </nav>
       <div class="sidebar-note">
         <strong>研究用途</strong>
-        <p>不提供买入、卖出、持有、目标价、收益或仓位建议。</p>
+        <p>不提供买入、卖出、持有、目标价、收益或仓位建议。关注与跟踪、研究组合仍属后续阶段。</p>
       </div>
     </aside>
 
@@ -35,7 +36,7 @@
         </div>
         <div class="topbar-actions">
           <span id="database-state" class="status-pill">正在检查本地数据</span>
-          <a class="button button-primary" href="/industry-analysis/new">发起新研究</a>
+          <a class="button button-secondary" href="/industry-analysis/new">发起新研究</a>
         </div>
       </header>
 
@@ -48,6 +49,20 @@
               <p>查看本地 Industry Thesis 编排与审阅历史。这里展示的是研究过程，不代表已接受的产业地图、受益公司或投资候选状态。</p>
             </div>
           </div>
+
+          <section id="recent-research-panel" class="panel phase2b-recent" aria-labelledby="recent-research-title" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">CONTINUE EXACT RESEARCH</p>
+                <h2 id="recent-research-title">继续最近一次精确研究</h2>
+                <p>只显示当前双时间边界下排序第一的精确记录；不会跳过停止或不可继续的记录。</p>
+              </div>
+            </div>
+            <div id="recent-research-content" aria-live="polite">
+              <p>正在读取最近研究。</p>
+            </div>
+            <div id="recent-research-state" class="phase2b-state"></div>
+          </section>
 
           <section class="panel boundary-panel" aria-labelledby="boundary-title">
             <div class="panel-heading">
@@ -66,7 +81,7 @@
                   <option value="100">100 条</option>
                 </select>
               </label>
-              <button class="button button-primary" type="submit">读取研究历史</button>
+              <button class="button button-secondary" type="submit">重新读取当前边界</button>
             </form>
             <p id="history-status" class="status-message" role="status" aria-live="polite"></p>
           </section>
@@ -81,7 +96,7 @@
             </div>
             <div id="history-empty" class="empty-state" hidden>
               <h3>当前边界内没有研究记录</h3>
-              <p>可以从一个行业、产业链、技术、政策或投资逻辑开始，并保存为本地研究草稿。</p>
+              <p>最近研究区域会显示三步首次使用指引；这里不会用演示数据伪装为当前研究。</p>
             </div>
             <div id="history-list" class="history-list"></div>
           </section>
@@ -95,6 +110,18 @@
               <p>用普通中文记录研究问题，明确市场与时间边界，再通过检查后写入本地追加式研究历史。</p>
             </div>
           </div>
+
+          <section class="panel" aria-labelledby="workflow-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="workflow-title">研究流程</h2>
+                <p>流程状态只来自当前精确路由和已读取响应，不会保存为第二套工作流。</p>
+              </div>
+            </div>
+            <div id="phase2b-workflow" class="phase2b-workflow"></div>
+            <div id="phase2b-state" class="phase2b-state"></div>
+            <div id="phase2b-coverage-state" class="phase2b-state" hidden></div>
+          </section>
 
           <div id="scope-mode-notice" class="notice-panel" hidden></div>
           <div class="two-column scope-layout">
@@ -184,8 +211,8 @@
                   <input id="revision-note" type="text" maxlength="1000" value="通过个人研究工作台保存范围">
                 </label>
                 <div class="button-row">
-                  <button id="scope-check-button" class="button button-secondary" type="button">检查研究范围</button>
-                  <button id="scope-save-button" class="button button-primary" type="submit">保存研究主题</button>
+                  <button id="scope-check-button" class="button button-primary" type="button">检查研究范围</button>
+                  <button id="scope-save-button" class="button button-secondary" type="submit" disabled>保存研究主题</button>
                 </div>
               </form>
               <p id="scope-status" class="status-message" role="status" aria-live="polite"></p>
@@ -232,7 +259,7 @@
                   <option value="compact">紧凑</option>
                 </select>
               </label>
-              <label>市场颜色习惯
+              <label>市场颜色
                 <select id="market-colors-setting">
                   <option value="red-up">红涨绿跌</option>
                   <option value="green-up">绿涨红跌</option>
@@ -250,6 +277,9 @@
       </main>
     </div>
   </div>
+  <script src="/industry-analysis/static/workbench_phase2b.js" defer></script>
+  <script src="/industry-analysis/static/workbench_phase2b_history_guard.js" defer></script>
+  <script src="/industry-analysis/static/workbench_phase2b_scope_guard.js" defer></script>
   <script src="/industry-analysis/static/workbench.js" defer></script>
   <script src="/industry-analysis/static/workbench_phase1c.js" defer></script>
 </body>
