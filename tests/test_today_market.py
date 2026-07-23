@@ -17,7 +17,11 @@ from backend.database.benchmark_data import BenchmarkPersistenceService
 from backend.database.engine import build_session_factory
 from backend.database.market_data import MarketDataPersistenceService
 from backend.database.models import Base, IngestionRun
-from backend.database.sector_data import SectorPersistenceService
+from backend.database.sector_data import (
+    SECTOR_DAILY_CONTRACT_VERSION,
+    SECTOR_DEFINITION_CONTRACT_VERSION,
+    SectorPersistenceService,
+)
 from backend.main import app
 from market_cockpit.benchmark_fixtures import (
     BENCHMARK_FIXTURE_CODES,
@@ -133,11 +137,25 @@ def _ingest_sector(session_factory: sessionmaker[Session]):
         adapter_compatibility_version="today-market-sector-v1",
         adapter_version="today-market-sector-v1",
         provider_request_metadata={
-            "collection_timestamp_utc": "2026-04-05T12:00:00Z",
-            "effective_information_cutoff_date": SECTOR_FIXTURE_CURRENT_CUTOFF,
+            "taxonomy_endpoint": "fixture_sector_taxonomy",
+            "history_endpoint": "fixture_sector_history",
+            "classification_system": "eastmoney_industry_board",
+            "classification_level": None,
+            "frequency": "daily",
+            "adjust_type": "",
+            "sector_codes": SECTOR_FIXTURE_CODES,
+            "start_date": SECTOR_FIXTURE_START_DATE,
+            "end_date": SECTOR_FIXTURE_END_DATE,
             "network_mode": "offline-fixture",
             "timeout_seconds": 1.0,
             "max_retries": 0,
+            "akshare_package_version": "fixture",
+            "definition_contract_version": SECTOR_DEFINITION_CONTRACT_VERSION,
+            "daily_contract_version": SECTOR_DAILY_CONTRACT_VERSION,
+            "adapter_version": "today-market-sector-v1",
+            "adapter_compatibility_version": "today-market-sector-v1",
+            "collection_timestamp_utc": "2026-04-05T12:00:00Z",
+            "effective_information_cutoff_date": SECTOR_FIXTURE_CURRENT_CUTOFF,
         },
     )
 
