@@ -7,47 +7,6 @@ on:
       - main
 
 jobs:
-  phase1b-focused:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: python -m pip install -q -e ".[dev]"
-
-      - name: Capture Phase 1B focused result
-        id: focused-tests
-        shell: bash
-        run: |
-          set +e
-          python -m pytest -q --tb=short \
-            tests/test_industry_analysis_api.py \
-            tests/test_industry_thesis_workbench.py \
-            > phase1b-focused-pytest.log 2>&1
-          status=$?
-          echo "status=${status}" >> "$GITHUB_OUTPUT"
-          cat phase1b-focused-pytest.log
-          exit 0
-
-      - name: Upload Phase 1B focused log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase1b-focused-pytest
-          path: phase1b-focused-pytest.log
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Enforce Phase 1B focused result
-        if: steps.focused-tests.outputs.status != '0'
-        run: exit 1
-
   pytest-and-demo:
     runs-on: ubuntu-latest
     services:
