@@ -13,6 +13,13 @@ function phase1cReviewPath(sessionId, revisionId, cutoff, recordedAt) {
   return `/industry-analysis/sessions/${sessionId}/revisions/${revisionId}/review?${query.toString()}`;
 }
 
+function updateCandidatePlaceholder() {
+  const button = document.querySelector(".preview-panel .button-disabled");
+  if (!button || button.dataset.phase1cUpdated) return;
+  button.dataset.phase1cUpdated = "true";
+  button.textContent = "保存研究主题后进入候选公司池";
+}
+
 function enhanceHistoryCards() {
   document.querySelectorAll(".history-card").forEach((card) => {
     if (card.querySelector("[data-phase1c-link]")) return;
@@ -65,6 +72,7 @@ function enhanceSaveSuccess() {
 }
 
 function enhancePhase1CSurfaces() {
+  updateCandidatePlaceholder();
   enhanceHistoryCards();
   enhanceSaveSuccess();
 }
