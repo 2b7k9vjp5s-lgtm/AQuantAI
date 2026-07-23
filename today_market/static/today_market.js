@@ -288,6 +288,11 @@
       explanationCard("现在可以做什么", payload.state_explanation.available_action),
     );
     renderSummary(scopeSummary, payload.scope_and_freshness);
+    appendContextSummary(
+      scopeSummary,
+      payload.supported_analysis.benchmark,
+      payload.supported_analysis.sector,
+    );
     warnings.replaceChildren();
     (payload.scope_and_freshness.warnings || []).forEach((message) => {
       const item = document.createElement("div");
@@ -338,6 +343,63 @@
       wrapper.append(term, description);
       container.append(wrapper);
     });
+  }
+
+  function appendSummaryItem(container, label, value) {
+    const wrapper = document.createElement("dl");
+    wrapper.className = "summary-item";
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = displayValue(value);
+    wrapper.append(term, description);
+    container.append(wrapper);
+  }
+
+  function appendContextSummary(container, benchmarkValue, sectorValue) {
+    if (benchmarkValue && benchmarkValue.status !== "not_selected") {
+      const codes = (benchmarkValue.metrics || []).map((metric) => metric.index_code);
+      appendSummaryItem(
+        container,
+        "基准范围",
+        codes.length
+          ? `${benchmarkValue.requested_code_count} 个明确指数：${codes.slice(0, 5).join("、")}${codes.length > 5 ? " 等" : ""}`
+          : `${benchmarkValue.requested_code_count} 个明确指数`,
+      );
+      appendSummaryItem(
+        container,
+        "基准有效交易日",
+        formatDate(benchmarkValue.effective_benchmark_session),
+      );
+      appendSummaryItem(
+        container,
+        "基准对齐状态",
+        statusLabel(benchmarkValue.alignment_status),
+      );
+    } else {
+      appendSummaryItem(container, "基准范围", "未选择本地基准数据");
+    }
+
+    if (sectorValue && sectorValue.status !== "not_selected") {
+      const provenance = sectorValue.provenance || {};
+      appendSummaryItem(
+        container,
+        "行业分类范围",
+        `${provenance.taxonomy || "明确行业分类"} / ${provenance.classification_level || "未分级"}`,
+      );
+      appendSummaryItem(
+        container,
+        "行业有效交易日",
+        formatDate(sectorValue.effective_sector_session),
+      );
+      appendSummaryItem(
+        container,
+        "行业对齐状态",
+        statusLabel(sectorValue.alignment_status),
+      );
+    } else {
+      appendSummaryItem(container, "行业分类范围", "未选择本地行业数据");
+    }
   }
 
   function renderPriceBehavior(container, value) {
@@ -451,13 +513,13 @@
           ["截止日对齐", statusLabel(value.cutoff_alignment_status)],
           ["请求指数数", value.requested_code_count],
           ["可用指数数", value.available_code_count],
+          ["缺少指数", codeList(value.missing_codes)],
           ["有效交易日", formatDate(value.effective_benchmark_session)],
         ]),
       ),
       dataCard("基准警告", warningText(value.warnings)),
     );
-    const visibleMetrics = (value.metrics || []).slice(0, 12);
-    visibleMetrics.forEach((metric) => {
+    (value.metrics || []).forEach((metric) => {
       container.append(dataCard(
         `指数 ${metric.index_code}`,
         lines([
@@ -470,12 +532,6 @@
         ]),
       ));
     });
-    if ((value.metrics || []).length > visibleMetrics.length) {
-      container.append(dataCard(
-        "其余基准指标",
-        `还有 ${(value.metrics || []).length - visibleMetrics.length} 项，请在技术详情中查看。`,
-      ));
-    }
   }
 
   function renderSector(container, value) {
@@ -485,16 +541,20 @@
       return;
     }
     const cross = value.cross_section || {};
+    const provenance = value.provenance || {};
     container.append(
       dataCard(
         "范围与对齐",
         lines([
+          ["分类体系", provenance.taxonomy],
+          ["分类级别", provenance.classification_level || "未分级"],
           ["覆盖状态", statusLabel(value.coverage_status)],
           ["整体对齐", statusLabel(value.alignment_status)],
           ["交易日对齐", statusLabel(value.session_alignment_status)],
           ["截止日对齐", statusLabel(value.cutoff_alignment_status)],
           ["请求行业数", value.requested_sector_count],
           ["可用行业数", value.available_sector_count],
+          ["缺少行业", codeList(value.missing_sector_codes)],
           ["有效交易日", formatDate(value.effective_sector_session)],
         ]),
       ),
@@ -512,6 +572,7 @@
       dataCard("近 20 日表现靠前", rankedSectorText(cross.top_return_20)),
       dataCard("近 20 日表现靠后", rankedSectorText(cross.bottom_return_20)),
       dataCard("行业警告", warningText(value.warnings)),
+      dataCard("含义边界", "行业强弱只描述明确选择的本地分类范围，不代表产业受益确定性或投资质量。"),
     );
   }
 
@@ -552,6 +613,10 @@
 
   function warningText(values) {
     return Array.isArray(values) && values.length ? values.join("\n") : "无额外警告";
+  }
+
+  function codeList(values) {
+    return Array.isArray(values) && values.length ? values.join("、") : "无";
   }
 
   function rankedSectorText(values) {
