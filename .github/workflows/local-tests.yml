@@ -55,3 +55,6 @@ jobs:
 
       - name: Run Today Market local snapshot fixture demo
         run: python -m scripts.demo_today_market
+
+      - name: Run Phase 2B ordinary-user usability demo
+        run: python -m scripts.demo_industry_analysis_phase2b
