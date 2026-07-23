@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQuantAI 今日市场</title>
+  <link rel="stylesheet" href="/today-market/static/today_market.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="/industry-analysis" aria-label="AQuantAI 个人研究工作台">
+        <span class="brand-mark">AQ</span>
+        <span><strong>AQuantAI</strong><small>个人研究工作台</small></span>
+      </a>
+      <nav class="primary-nav">
+        <a class="nav-item nav-active" href="/today-market" aria-current="page"><span>今日市场</span><small>本地快照</small></a>
+        <a class="nav-item" href="/industry-analysis"><span>产业研究</span><small>本地研究</small></a>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
+        <a class="nav-item" href="/workbench/settings"><span>系统设置</span><small>显示偏好</small></a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>研究用途</strong>
+        <p>只读取明确选择的本地数据，不代表全市场，也不提供交易建议。</p>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">LOCAL-ONLY · DETERMINISTIC</p>
+          <p class="page-context">今日市场</p>
+        </div>
+        <span id="database-state" class="status-pill">尚未读取本地数据</span>
+      </header>
+
+      <main id="main-content" tabindex="-1">
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow">TODAY MARKET · PHASE 2A</p>
+            <h1>本地市场快照</h1>
+            <p>在你明确选择的数据范围和双时间边界内，查看价格行为、流动性以及可选的基准和行业背景。</p>
+          </div>
+          <span class="local-badge">仅本地读取</span>
+        </section>
+
+        <section class="panel boundary-panel" aria-labelledby="boundary-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="boundary-title">一、选择读取边界</h2>
+              <p>系统不会自动使用“最新”数据。请明确选择信息截止日和系统记录时间。</p>
+            </div>
+          </div>
+          <form id="catalog-form" class="boundary-form">
+            <label>信息截止日
+              <input id="as-of-cutoff" type="date" required>
+            </label>
+            <label>系统记录时间
+              <input id="as-of-recorded-at" type="datetime-local" step="1" required>
+            </label>
+            <button class="button button-secondary" type="submit">读取本地数据列表</button>
+          </form>
+          <p id="catalog-status" class="status-message" role="status" aria-live="polite">请先设置双时间边界。</p>
+        </section>
+
+        <section id="selection-panel" class="panel" aria-labelledby="selection-title" hidden>
+          <div class="panel-heading">
+            <div>
+              <h2 id="selection-title">二、明确选择本地数据</h2>
+              <p>股票范围必选；基准和行业数据可选。系统不会自动选择第一项。</p>
+            </div>
+          </div>
+          <div class="selection-grid">
+            <label>股票数据范围（必选）
+              <select id="equity-series">
+                <option value="">请选择股票数据范围</option>
+              </select>
+            </label>
+            <label>基准数据（可选）
+              <select id="benchmark-series">
+                <option value="">不选择本地基准数据</option>
+              </select>
+            </label>
+            <label>行业数据（可选）
+              <select id="sector-series">
+                <option value="">不选择本地行业数据</option>
+              </select>
+            </label>
+          </div>
+          <div class="scope-warning">
+            <strong>覆盖边界</strong>
+            <p>页面只描述你选择的本地范围，不能据此声称“全 A 股”或完整市场覆盖。</p>
+          </div>
+          <button id="snapshot-button" class="button button-primary main-action" type="button" disabled>查看本地市场快照</button>
+          <p id="snapshot-status" class="status-message" role="status" aria-live="polite">请选择股票数据范围。</p>
+        </section>
+
+        <section id="empty-state" class="panel empty-state" aria-labelledby="empty-title">
+          <h2 id="empty-title">尚未选择本地市场数据</h2>
+          <p>设置双时间边界并读取数据列表后，再明确选择一个股票数据范围。选择前不会显示指标卡片。</p>
+        </section>
+
+        <div id="snapshot-content" hidden>
+          <section class="panel scope-panel" aria-labelledby="scope-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="scope-title">范围与数据新鲜度</h2>
+                <p>先确认覆盖范围、截止时间和对齐状态，再阅读具体指标。</p>
+              </div>
+              <span id="snapshot-state-pill" class="status-pill"></span>
+            </div>
+            <div id="state-explanation" class="explanation-grid"></div>
+            <div id="scope-summary" class="summary-grid"></div>
+            <div id="warnings" class="warning-list"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="price-title">
+            <h2 id="price-title">价格行为</h2>
+            <div id="price-behavior" class="data-grid"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="liquidity-title">
+            <h2 id="liquidity-title">流动性</h2>
+            <div id="liquidity" class="data-grid"></div>
+          </section>
+
+          <section class="two-column">
+            <section class="panel" aria-labelledby="benchmark-title">
+              <h2 id="benchmark-title">基准背景</h2>
+              <div id="benchmark" class="data-grid"></div>
+            </section>
+            <section class="panel" aria-labelledby="sector-title">
+              <h2 id="sector-title">行业背景</h2>
+              <div id="sector" class="data-grid"></div>
+            </section>
+          </section>
+
+          <section class="panel" aria-labelledby="completeness-title">
+            <h2 id="completeness-title">数据完整性</h2>
+            <div id="data-completeness" class="data-grid"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="unavailable-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="unavailable-title">当前阶段暂不支持</h2>
+                <p>以下内容没有可靠的本地契约，因此明确显示为不可用，而不是填充推测值。</p>
+              </div>
+            </div>
+            <div id="unavailable-sections" class="unavailable-grid"></div>
+          </section>
+
+          <section class="panel">
+            <details>
+              <summary>查看数据与技术详情</summary>
+              <pre id="technical-details"></pre>
+            </details>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="/today-market/static/today_market.js" defer></script>
+</body>
+</html>
