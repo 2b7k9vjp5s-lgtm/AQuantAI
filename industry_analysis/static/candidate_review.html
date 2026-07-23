@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AQuantAI 候选公司池</title>
+  <title>AQuantAI 候选公司审阅</title>
   <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
   <link rel="stylesheet" href="/industry-analysis/static/candidate_review.css">
 </head>
@@ -24,15 +24,15 @@
       </nav>
       <div class="sidebar-note">
         <strong>研究用途</strong>
-        <p>候选公司是待审阅研究对象，不是推荐、排名或正式受益公司。</p>
+        <p>“纳入后续研究”只是审阅计划，不是正式受益公司、投资推荐或交易指令。</p>
       </div>
     </aside>
 
     <div class="app-main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">LOCAL CANDIDATE UNIVERSE · PHASE 1C</p>
-          <p class="page-context">候选公司池</p>
+          <p class="eyebrow">COMPLETE CANDIDATE REVIEW · PHASE 1D</p>
+          <p class="page-context">候选公司池与审阅</p>
         </div>
         <div class="topbar-actions">
           <span id="page-state" class="status-pill">正在读取精确研究</span>
@@ -43,9 +43,9 @@
       <main id="main-content" tabindex="-1" class="candidate-page">
         <section class="page-heading">
           <div>
-            <p class="eyebrow">BUILD COMPLETE LOCAL UNIVERSE</p>
-            <h1>构建候选公司池</h1>
-            <p>仅使用已保存的精确公司种子和你明确选择的冻结 Stage 1 候选池。地图标题、公司名称或市场热度不会自动建立身份或受益关系。</p>
+            <p class="eyebrow">EXACT LOCAL-SCOPE UNIVERSE</p>
+            <h1>构建并审阅完整候选公司池</h1>
+            <p>系统只使用已保存的精确公司种子与明确选择的冻结 Stage 1 候选池。每条来源路径独立保留，审阅不会自动合并同一公司。</p>
           </div>
         </section>
 
@@ -53,7 +53,7 @@
           <div class="panel-heading">
             <div>
               <h2 id="research-summary-title">精确研究范围</h2>
-              <p>当前页面固定在链接中的 session revision、信息截止日和系统记录时间，不会自动跳到更新版本。</p>
+              <p>页面固定在链接中的 session revision、信息截止日和系统记录边界，不会静默跳到更新版本。</p>
             </div>
             <a id="edit-scope-link" class="button button-secondary" href="/industry-analysis">编辑范围</a>
           </div>
@@ -68,7 +68,7 @@
           <div class="panel-heading">
             <div>
               <h2 id="prepare-title">准备候选池</h2>
-              <p>当前精确修订仍是范围草稿。准备操作只追加一个新的范围修订，不会创建候选公司。</p>
+              <p>当前精确修订仍是范围草稿。准备操作只追加一个范围修订，不会创建候选公司。</p>
             </div>
           </div>
           <button id="prepare-button" class="button button-primary" type="button">确认范围并准备候选池</button>
@@ -79,20 +79,17 @@
           <div class="panel-heading">
             <div>
               <h2 id="build-title">确认候选来源</h2>
-              <p>公司种子来自你已保存的明确选择；每个产业地图的冻结候选池必须单独选择，系统不会默认选择第一项。</p>
+              <p>公司种子来自已保存的明确选择；每个产业地图的冻结候选池必须单独选择，系统不会默认选择第一项。</p>
             </div>
           </div>
-
           <section aria-labelledby="seed-title">
             <h3 id="seed-title">已确认公司种子</h3>
             <div id="company-seeds" class="source-list"></div>
           </section>
-
           <section aria-labelledby="map-pool-title">
             <h3 id="map-pool-title">产业地图与冻结候选池</h3>
             <div id="map-pools" class="map-pool-list"></div>
           </section>
-
           <div class="button-row">
             <button id="candidate-check-button" class="button button-secondary" type="button">检查候选构建</button>
             <button id="candidate-build-button" class="button button-primary" type="button">构建完整候选池</button>
@@ -101,35 +98,54 @@
           <div id="build-preview" class="preview-list" hidden></div>
         </section>
 
-        <section class="panel" aria-labelledby="universe-title">
+        <section id="universe-panel" class="panel" aria-labelledby="universe-title">
           <div class="panel-heading">
             <div>
               <h2 id="universe-title">当前已构建本地范围全量候选</h2>
               <p id="universe-summary">正在读取候选记录。</p>
             </div>
-            <button class="button button-disabled" type="button" disabled>开始三态审阅（Phase 1D）</button>
           </div>
           <div id="universe-empty" class="empty-state" hidden>
             <h3>尚未构建候选公司池</h3>
             <p>先确认上方精确来源并执行检查。地图没有冻结候选池时不会产生隐式候选。</p>
           </div>
-          <div class="table-wrap" id="universe-table-wrap" hidden>
-            <table class="candidate-table">
-              <thead>
-                <tr>
-                  <th scope="col">公司</th>
-                  <th scope="col">精确来源</th>
-                  <th scope="col">身份状态</th>
-                  <th scope="col">Stage 1 类型</th>
-                  <th scope="col">候选理由</th>
-                  <th scope="col">待确认</th>
-                  <th scope="col">详情</th>
-                </tr>
-              </thead>
-              <tbody id="candidate-rows"></tbody>
-            </table>
-          </div>
+          <div id="universe-list" class="candidate-list" hidden></div>
           <p id="universe-status" class="status-message" role="status" aria-live="polite"></p>
+        </section>
+
+        <section id="review-panel" class="panel review-panel" aria-labelledby="review-title" hidden>
+          <div class="panel-heading review-heading">
+            <div>
+              <p class="eyebrow">COMPLETE UNIVERSE DECISION</p>
+              <h2 id="review-title">逐条完成三态审阅</h2>
+              <p>筛选或折叠只影响显示，不影响完整性。保存前每条精确候选路径都必须有决定、理由和不确定性说明。</p>
+            </div>
+            <div id="review-counts" class="count-strip" aria-live="polite"></div>
+          </div>
+          <form id="review-form" novalidate>
+            <div id="review-rows" class="review-list"></div>
+            <div class="review-note-field">
+              <label for="review-revision-note">本次审阅说明</label>
+              <textarea id="review-revision-note" maxlength="1000" required placeholder="说明本次完整候选审阅的范围与目的"></textarea>
+            </div>
+            <div class="ownership-notice">
+              <strong>所有权边界</strong>
+              <p>本页只生成可复现的审阅计划，不会写入正式产业地图、Stage 1 受益公司、投资候选快照或任何交易状态。</p>
+            </div>
+            <div class="button-row sticky-actions">
+              <button id="review-check-button" class="button button-secondary" type="button">检查审阅结果</button>
+              <button id="review-save-button" class="button button-primary" type="button" disabled>保存审阅计划</button>
+            </div>
+          </form>
+          <p id="review-status" class="status-message" role="status" aria-live="polite"></p>
+          <section id="review-preview" class="review-preview" aria-labelledby="review-preview-title" hidden>
+            <h3 id="review-preview-title">审阅计划检查结果</h3>
+            <div id="review-preview-summary" class="summary-grid"></div>
+            <details>
+              <summary>技术详情与指纹</summary>
+              <pre id="review-preview-technical" class="json-block"></pre>
+            </details>
+          </section>
         </section>
       </main>
     </div>
