@@ -238,4 +238,4 @@ def test_candidate_universe_adapter_preserves_every_row(client) -> None:
     assert payload["candidate_count"] == 3
     assert [item["candidate_key"] for item in payload["candidates"]] == ["a", "b", "c"]
     assert payload["universe_label"] == "当前已构建本地范围全量候选"
-    assert payload["review_enabled"] is False
+    assert payload["review_enabled"] is True
