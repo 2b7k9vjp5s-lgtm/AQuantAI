@@ -46,7 +46,7 @@ The preflight improves continuity and comprehension only. It creates no new rese
 
 - this task snapshot;
 - `docs/personal_research_workbench_ui_phase2b_preflight.md`;
-- one Draft architecture PR linked to Issue #215;
+- Draft architecture PR #216 linked to Issue #215;
 - documentation/link validation and complete base-to-head scope inspection;
 - applicable process-independent fixed-head architecture review.
 
@@ -56,14 +56,15 @@ A focused `docs/architecture_baseline.md` synchronization may be added to this s
 
 A later separately authorized implementation Issue may modify only bounded presentation and existing-owner read paths:
 
+- `backend/api/industry_analysis.py`;
+- `backend/api/industry_analysis_candidates.py` and `backend/api/industry_analysis_review.py` only to reuse one bounded exact-route projection helper, with unchanged command semantics;
 - `industry_analysis/static/**`;
-- `today_market/static/**` only for navigation-shell consistency;
-- `backend/api/industry_analysis.py` only for a focused read-only projection correction already owned by the workbench history adapter, if the existing response cannot express an exact link;
-- `industry_alpha/industry_thesis_workbench.py` only for bounded presentation projection fields derived from already owned state, not new workflow semantics;
-- focused workbench tests and one offline ordinary-user golden-path demo;
+- `today_market/static/today_market.html` only when navigation consistency requires a correction;
+- focused workbench, static-navigation and query-count tests;
+- one offline ordinary-user golden-path demo;
 - `.github/workflows/local-tests.yml` only to run that demo without weakening checks.
 
-No new table, domain service, generic activity layer, framework or persistent presentation state is authorized.
+Existing `industry_alpha/industry_thesis_*` domain services, models and workflow semantics are not implementation targets. No new table, domain service, generic activity layer, framework or persistent presentation state is authorized.
 
 ## Locked exclusions
 
@@ -73,8 +74,8 @@ No production code in this preflight. No schema, migration, Provider, remote ref
 
 - Issue: #215.
 - Branch: `docs/personal-research-workbench-ui-phase2b-preflight`.
-- Draft PR: to be created from the exact required base.
-- Architecture files: exactly this task snapshot and the detailed Phase 2B preflight, with an optional focused baseline synchronization in the same PR.
+- Draft PR: #216.
+- Current architecture files: exactly this task snapshot and the detailed Phase 2B preflight.
 - The PR remains Draft and unmerged until exact-head validation, independent review, resolved threads and separate project-owner merge authorization are complete.
 - Required fixed-head approval phrase:
 
