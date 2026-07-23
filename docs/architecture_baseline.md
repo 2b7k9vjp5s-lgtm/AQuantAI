@@ -5,14 +5,15 @@
 This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls Standard or Strict scope.
 
 - Released software version: `0.2.0`.
-- Current accepted `main` baseline: `1ce3abace07d00e60fd911f9cc4f96a768f47a06`.
-- Latest merged runtime capability: Industry Thesis Proposal Review and Acceptance Plan v1 through architecture PR #193, foundation PR #195 and proposal-review PR #197.
+- Current accepted `main` baseline: `98a67c36f5cd968f17898038c786d3720b793dab`.
+- Latest merged product capability: Personal Research Workbench UI Phase 1A–1D through architecture PR #199 and implementation PRs #201, #203, #205 and #207.
+- Industry Thesis orchestration foundation and proposal review remain accepted through PRs #193, #195 and #197.
 - Normalized Valuation and Expectation Metrics v1 remains accepted through architecture PR #184 and implementation PR #186.
 - Latest merged external-data architecture decision: Account-Authorized THS Structured Financial Data v1 through PR #191.
 - Authorized CNINFO Disclosure Acquisition v1 architecture remains accepted through PR #189.
 - Review-identity governance is merged through PR #187.
 - Canonical Price and Comparison Eligibility v1 remains the authoritative price owner through PRs #176/#178.
-- Active Strict Product / Architecture gate: Issue #198, Chinese Personal Investment Research Workbench UI Phase 1.
+- Active Strict Product / Architecture gate: Issue #208, Personal Research Workbench UI Phase 2A — Today Market Local Snapshot.
 - CNINFO automated acquisition remains implementation-blocked pending a separately accepted source/access contract.
 - THS production implementation remains blocked pending exact non-secret account capability, host, endpoint, limit, retention and revision facts.
 - Earlier Evidence Ingestion Issue #154 / PR #155 remains closed-unmerged and reference only.
@@ -65,6 +66,7 @@ market-data persistence
        -> Company Research Comparison Matrix
        -> Company Research Valuation Context
        -> Investment Candidate Workspace
+       -> Market Cockpit
   -> optional company-scoped Guarded AI D3 draft assistance
 
 accepted Industry Thesis orchestration foundation
@@ -76,13 +78,22 @@ accepted Industry Thesis orchestration foundation
   -> future existing-owner acceptance transaction and exact output links
   -> future readiness and Investment Candidate handoff
 
-active UI architecture candidate
-  -> Chinese-first personal workbench shell
+merged Personal Research Workbench UI Phase 1
+  -> Chinese-first five-module shell
   -> ordinary-language thesis intake with explicit scope confirmation
   -> deterministic local source selection
-  -> complete reviewed local-scope candidate universe
-  -> evidence drawer and progressive technical details
-  -> reviewed-plan history and exact reopening
+  -> complete local-scope candidate universe
+  -> complete selected / rejected / unresolved review
+  -> exact reviewed-plan result and history reopening
+  -> browser-local display settings
+
+active UI Phase 2A architecture candidate
+  -> explicit persisted local equity series
+  -> optional explicit persisted benchmark and sector series
+  -> explicit information-cutoff and recorded-UTC boundaries
+  -> existing Market Cockpit deterministic calculation owner
+  -> Chinese-first Today Market local snapshot
+  -> unsupported breadth, anomaly, event and refresh states shown honestly
 
 future authorized acquisition
   -> exact source authorization and capability manifest
@@ -116,9 +127,13 @@ When the configured database and local assets are available, the reviewed runtim
 10. Investment Candidate Intelligence v1 APIs, commands and Chinese-first `/investment-candidates` workspace;
 11. exact-ID normalized financial, valuation, comparison and expectation-gap APIs;
 12. Chinese-first read-only `/company-research/valuation-context` requiring explicit revision IDs and both as-of boundaries;
-13. local JSON-only Industry Thesis session/candidate commands, exact dual-as-of reads, proposal review and reviewed-plan reads.
+13. local JSON-only Industry Thesis session/candidate commands, exact dual-as-of reads, proposal review and reviewed-plan reads;
+14. Chinese-first `/industry-analysis` Personal Research Workbench with scope creation/revision, complete candidate construction, complete three-state review, exact reviewed-plan result and history reopening;
+15. browser-local `/workbench/settings` for presentation-only preferences.
 
-No current browser surface provides Industry Thesis intake/review. No current runtime provides the thesis owner-acceptance transaction or output links, daily news/announcement radar, followed-entity alerts, observation/simulated portfolio, fair value, target price, expected return, buy/sell/hold output, position sizing, broker execution, automated trading or external Provider/disclosure acquisition.
+No current runtime provides the thesis owner-acceptance transaction or output links, daily news/announcement radar, followed-entity alerts, observation/simulated portfolio, fair value, target price, expected return, buy/sell/hold output, position sizing, broker execution, automated trading or external Provider/disclosure acquisition.
+
+The existing `/market-cockpit` is a separate read-only technical surface. It does not yet activate 今日市场 inside the five-module Personal Research Workbench and does not expose an ordinary-user local series catalog or caller-supplied recorded-UTC boundary.
 
 ## Accepted capability contracts
 
@@ -258,33 +273,52 @@ PRs #193, #195 and #197 define and implement the accepted offline orchestration 
 - Migration `20260722_0016` owns six additive append-only orchestration table families and refuses populated downgrade.
 - Full tests and a production-boundary three-candidate offline demo are merged.
 
-## Active architecture candidate: Personal Research Workbench UI Phase 1
+### Personal Research Workbench UI Phase 1
 
-Issue #198 defines the only active UI/product architecture gate.
+PR #199 defines the architecture; PRs #201, #203, #205 and #207 implement the accepted offline workbench slices.
+
+- Chinese-first five-module shell using FastAPI and static HTML/CSS/vanilla JavaScript.
+- `/workbench` enters 产业研究; `/industry-analysis` provides history and ordinary-language intake.
+- Explicit scope confirmation precedes any session write.
+- Exact local maps, mappings, company/instrument records and explicit seeds are the deterministic candidate sources.
+- Fuzzy text never establishes accepted identity or full-market coverage.
+- Candidate construction preserves the complete local-scope universe and duplicate company paths from different exact sources.
+- Review requires explicit selected/rejected/unresolved decisions for every exact latest candidate.
+- Dry-run and commit use the same deterministic reviewed plan and fingerprint.
+- Exact result/history reopening uses explicit dual-as-of boundaries and no hidden latest fallback.
+- Browser conflicts preserve unsaved decisions and never silently retry or rebase.
+- Technical IDs and fingerprints are progressive details, not ordinary inputs.
+- `reviewed_plan_ready` is orchestration state, not accepted Industry Map, Stage 1, typed-semantics, output-link or Investment Candidate state.
+- Browser-local settings contain presentation preferences only.
+- No Provider, scheduler, notification, AI call, portfolio ledger or trading behavior is included.
+
+## Active architecture candidate: Personal Research Workbench UI Phase 2A
+
+Issue #208 defines the only active UI/product architecture gate.
 
 Candidate boundary:
 
-- a Chinese-first application shell with five visible modules;
-- only the manual/offline 产业研究 workbench and minimal local display settings are active in Phase 1;
-- ordinary-language thesis input is followed by explicit scope confirmation;
-- fuzzy text never establishes company identity or full-market coverage;
-- exact existing maps, mappings and explicitly selected persisted company/instrument records are the deterministic candidate sources;
-- the UI wraps existing session, candidate, review and reviewed-plan services;
-- a bounded session-history read, exact local-option search, deterministic proposal composer and non-persistent view-model adapter are the only candidate backend seams;
-- the complete reviewed local-scope universe remains visible;
-- facts, deterministic calculations, analyst judgments and AI drafts are visually distinct;
-- technical IDs and fingerprints are available through progressive disclosure but are not ordinary inputs;
-- existing static HTML/CSS/vanilla JavaScript and FastAPI page/JSON patterns are reused;
-- no new front-end framework, UI persistence table, Provider, scheduler, notification, AI call or portfolio ledger is included;
-- the result page must state that `reviewed_plan_ready` is not accepted Industry Map/Stage 1 or Investment Candidate state.
+- activate 今日市场 at `/today-market` while retaining `/workbench` entry through 产业研究;
+- use only exact successful complete local equity, benchmark and sector series;
+- provide an ordinary-user local series catalog with deterministic labels, explicit selection and no first/newest auto-selection;
+- require information-cutoff and recorded-UTC boundaries for catalog and Today Market snapshot reads;
+- reuse existing Market Cockpit repositories, calculators and service as the only deterministic market calculation owner;
+- add only a bounded non-persistent view model and read adapter;
+- show selected-universe price behavior, liquidity, benchmark, sector, provenance, scope, completeness and alignment state;
+- never claim full-market coverage from an exact selected series;
+- show unsupported breadth, stock anomaly, event/cause and remote-refresh sections as unavailable;
+- perform no network, Provider, credential, scheduler, notification, AI or write action;
+- use no schema, migration, dependency or new front-end framework.
 
-The architecture detail and route/API contracts are defined in `docs/personal_research_workbench_ui_phase1_preflight.md`.
+The architecture detail and route/API contracts are defined in `docs/personal_research_workbench_ui_phase2a_preflight.md`.
 
 ## Field and infrastructure ownership
 
 | Information or mechanism | Authoritative owner | Rule |
 | --- | --- | --- |
 | Market-data Provider rows, series identity, ingestion status and cutoff | Market-data persistence | One explicit Provider per run/series; no fallback or row mixing |
+| Market Cockpit price/liquidity/benchmark/sector calculations | Existing Market Cockpit repositories, calculators and service | Today Market may present but cannot recalculate or upgrade scope |
+| Today Market labels, grouping and unsupported notices | Non-persistent Today Market adapter in Issue #208 | Presentation only; selected local scope is never full-market identity |
 | Canonical instrument, price, unit, currency and price eligibility | `backend.database.canonical_price*` | Exact append-only revisions and purpose-specific eligibility |
 | Evidence grades, claims, links and conflicts | v0.5 Evidence Ledger | Acquisition may propose; explicit acceptance owns final state |
 | Industry map, nodes, relationships and observations | v0.5B Industry Map | Exact persisted identities and cutoff-visible revisions |
@@ -307,7 +341,7 @@ The architecture detail and route/API contracts are defined in `docs/personal_re
 | Thesis session, proposal and reviewed-plan audit state | `industry_alpha.industry_thesis_*` | Non-accepted append-only coordination state |
 | Accepted thesis-derived map and beneficiary state | Existing Industry Map / Stage 1 / typed-semantics owners | Future explicit user plan and owner transaction only |
 | Thesis-derived research priority | Existing Investment Candidate owner | Existing exact rule version; no second scoring owner |
-| UI page labels, grouping and navigation | Candidate non-persistent workbench adapter in Issue #198 | Presentation only; cannot create product meaning |
+| UI page labels, grouping and navigation | Non-persistent workbench adapters | Presentation only; cannot create product meaning |
 | Browser-local appearance/density preferences | Browser local storage | No credentials or research state |
 
 ## Shared architecture invariants
@@ -362,6 +396,10 @@ The architecture detail and route/API contracts are defined in `docs/personal_re
 48. Disabled future modules must not display sample values as if they were live product state.
 49. Filtering candidate rows cannot alter the complete universe submitted for review.
 50. UI write conflicts preserve unsaved user decisions and require explicit reload/review; they never silently rebase.
+51. An exact selected local market series is not full-market coverage unless its accepted selector contract explicitly owns that scope.
+52. Market, benchmark and sector series are never auto-selected or treated as compatible from names, recency or Provider equality.
+53. A Today Market page cannot claim historical reproducibility unless information-cutoff and recorded-UTC visibility are both enforced.
+54. Unsupported breadth, anomaly, event and refresh capabilities remain explicit unavailable states rather than fabricated values.
 
 ## Semantic and derivation levels
 
@@ -372,7 +410,7 @@ The architecture detail and route/API contracts are defined in `docs/personal_re
 - **L2 — Standardized:** standardized through an explicit accepted contract; usable only within that contract.
 - **L3 — Canonical:** identity, measurement, unit, currency, market, adjustment, provenance, cutoff, chronology, decimal and missing-state contract.
 
-Canonical Price owns L3 price state within its contract. Structured financial/valuation records remain contract-specific standardized state. Disclosure and THS normalization remain L1 until explicit existing-owner acceptance. Thesis candidate proposals and UI view models are orchestration/presentation state and do not gain semantic authority through persistence or display.
+Canonical Price owns L3 price state within its contract. Structured financial/valuation records remain contract-specific standardized state. Disclosure and THS normalization remain L1 until explicit existing-owner acceptance. Market Cockpit source observations remain within their source-series contract and do not gain Canonical Price authority through Today Market display. Thesis candidate proposals and UI view models are orchestration/presentation state and do not gain semantic authority through persistence or display.
 
 ### Evidence Qualification / Derivation Level
 
@@ -387,7 +425,8 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 
 | Capability | Reviewed boundary | Remaining boundary |
 | --- | --- | --- |
-| Market-data persistence | Complete-snapshot persistence and cutoff-aware reads | No hidden Provider expansion |
+| Market-data persistence | Complete-snapshot persistence and cutoff-aware reads | No hidden Provider expansion; Today Market recorded-UTC adapter remains candidate |
+| Market Cockpit | Exact selected-series price/liquidity plus optional benchmark/sector context | No ordinary local catalog, full-market claim, anomaly/event cause or remote refresh |
 | Canonical Price | Listed identity, official close, provenance and purpose eligibility | No FX or hidden corporate-action normalization |
 | Evidence Ledger / Industry Map | Evidence, claims, conflicts, map identities and revisions | No automatic external acceptance |
 | Stage 1 beneficiary | Legacy identity/classification and complete-pool handoff | No automatic full-market discovery |
@@ -399,23 +438,24 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 | Guarded AI | Explicit ephemeral company-scoped drafts | No persisted accepted AI state, tools or retrieval |
 | CNINFO Disclosure Acquisition | Architecture accepted through PR #189 | Production acquisition remains separately gated |
 | THS Structured Provider | Architecture accepted through PR #191 | No implementation until exact account contract facts and separate authorization |
-| Industry Thesis Orchestration | Session/candidate/reviewed-plan foundation merged through PR #197 | No owner-acceptance transaction, output links or browser workbench yet |
-| Personal Research Workbench UI | Product target and Phase 1 preflight active in Issue #198 | No production UI/API until fixed-head approval and separate authorization |
+| Industry Thesis Orchestration | Session/candidate/reviewed-plan foundation merged through PR #197 | No owner-acceptance transaction or output links |
+| Personal Research Workbench UI Phase 1 | Scope intake, candidate build, complete review, exact result/history and settings merged through PR #207 | No accepted owner handoff, Provider, alerts or portfolio |
+| Today Market UI Phase 2A | Product/architecture candidate in Issue #208 using persisted local series and Market Cockpit | No production route/catalog until fixed-head approval and separate authorization |
 | Market Attention / Daily Radar | Source observations remain isolated candidates | Separate Provider, ingestion, scheduler and product authorization required |
 | Follow / Track | No accepted followed-entity or alert state | Separate persistence, change-rule and notification architecture required |
 | Research Portfolio | Existing research/price foundations only | Separate observation/simulated ledger and corporate-action architecture required |
 
 ## Architecture debt register
 
-- **D1 Current-state documentation drift — addressed in Issue #198 preflight:** synchronize merged thesis orchestration and the active UI gate.
+- **D1 Current-state documentation drift — synchronized in Issue #208 preflight:** UI Phase 1A–1D and current main are now recorded.
 - **D2 Repeated Stage 2 structure — bounded:** generic graph loading remains unjustified.
 - **D3 Read utilities — bounded:** serializers, notices and failures remain domain-local.
 - **D4 Command lifecycle/concurrency — partially shared:** semantic validation remains domain-local.
 - **D5 ORM lifecycle — bounded:** append-only listener/import/metadata compatibility remains tested.
-- **D6 Test-matrix growth — monitored:** UI implementation must add one offline browser/API path without hidden network.
+- **D6 Test-matrix growth — monitored:** each UI phase adds one production-boundary offline path without hidden network.
 - **D7 External Provider reachability — blocked:** THS implementation awaits exact account contract facts.
 - **D8 Canonical market-price semantics — resolved for v1; Provider promotion remains separately gated.**
-- **D9 Product overview query architecture — resolved for current surfaces.**
+- **D9 Product overview query architecture — resolved for current surfaces; Today Market receives an explicit independent ceiling.**
 - **D10 Consolidation cadence — 5–6 implemented slices or concrete duplication/ownership/test-growth evidence.**
 - **D11 Evidence-ingestion source/review ownership — architecture accepted; production acquisition remains gated.**
 - **D12 Guarded AI company-scope ownership — resolved for v1.**
@@ -427,10 +467,12 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 - **D18 Account-authorized THS architecture — resolved by PR #191; implementation facts remain blocked.**
 - **D19 Provider taxonomy chronology — active:** current snapshots must not masquerade as historical membership.
 - **D20 Market-attention isolation — active:** attention remains separate from beneficiary and candidate quality.
-- **D21 Industry-thesis entry/orchestration — foundation and proposal review resolved through PRs #193/#195/#197; owner acceptance remains a later slice.**
+- **D21 Industry-thesis entry/orchestration — offline browser workflow resolved through PR #207; owner acceptance remains later.**
 - **D22 Industry-level AI assistance — deferred:** optional proposal-only extension after the offline workbench proves useful.
-- **D23 Personal workbench composition — active in Issue #198:** define ordinary-user routes, exact read/write adapters, evidence presentation and honest unavailable states.
-- **D24 Free-text discovery gap — explicit:** Phase 1 requires exact local map/mapping/company selections; automatic fuzzy discovery remains later governed assistance.
+- **D23 Personal workbench composition — Phase 1 resolved through PR #207; Phase 2A Today Market is active in Issue #208.**
+- **D24 Free-text discovery gap — explicit:** automatic fuzzy discovery remains later governed assistance.
+- **D25 Local market series discoverability — active in Issue #208:** define an exact bounded catalog without a second registry or auto-selection.
+- **D26 Market snapshot bitemporality — active in Issue #208:** enforce recorded-UTC visibility without changing source ownership.
 
 ## Accepted product sequence
 
@@ -458,19 +500,24 @@ Completed:
 20. Account-Authorized THS Structured Financial Data architecture — PR #191;
 21. Industry Thesis Intake and Research Orchestration architecture — PR #193;
 22. Industry Thesis offline persistence/command/query foundation — PR #195;
-23. Industry Thesis proposal review and deterministic reviewed plan — PR #197.
+23. Industry Thesis proposal review and deterministic reviewed plan — PR #197;
+24. Personal Research Workbench UI Phase 1 architecture — PR #199;
+25. Personal Research Workbench UI Phase 1A shell/history/settings — PR #201;
+26. Personal Research Workbench UI Phase 1B scope create/revise — PR #203;
+27. Personal Research Workbench UI Phase 1C complete candidate universe — PR #205;
+28. Personal Research Workbench UI Phase 1D complete review and exact result — PR #207.
 
 Active architecture gate:
 
-24. Chinese Personal Investment Research Workbench UI Phase 1 — Issue #198.
+29. Personal Research Workbench UI Phase 2A — Today Market Local Snapshot — Issue #208.
 
 Planned later product phases, each separately governed:
 
-25. Today Market with authorized market/sector data;
-26. Daily Industry Radar with authorized news/announcement ingestion and scheduler;
-27. Follow and Track with followed-entity/change/notification contracts;
-28. Research Portfolio, observation first and simulated ledger later;
-29. advanced model/Provider settings with credential security and explicit role boundaries.
+30. Today Market Provider-backed refresh and broader exact market contracts after source authorization;
+31. Daily Industry Radar with authorized news/announcement ingestion and scheduler;
+32. Follow and Track with followed-entity/change/notification contracts;
+33. Research Portfolio, observation first and simulated ledger later;
+34. advanced model/Provider settings with credential security and explicit role boundaries.
 
 Deferred:
 
@@ -482,38 +529,43 @@ Deferred:
 - FX and accepted corporate-action normalization;
 - industry-level guarded AI drafting until a separately accepted proposal-only slice;
 - owner acceptance/output links from a reviewed thesis plan;
-- followed-entity alerts and portfolio ledgers.
+- followed-entity alerts and portfolio ledgers;
+- full-market breadth, stock anomaly/cause and live refresh beyond the exact Phase 2A local contract.
 
 ## Current authorization state
 
-- `main` includes PR #197 at `1ce3abace07d00e60fd911f9cc4f96a768f47a06`.
-- Issues #194 and #196 are completed; PRs #195 and #197 implement the offline session/candidate/reviewed-plan foundation.
-- Issue #198 records the owner-approved five-module product target and authorizes Product / Architecture Preflight for UI Phase 1 only.
-- The active architecture branch may modify only its task snapshot, `docs/personal_research_workbench_ui_phase1_preflight.md` and this baseline.
+- `main` includes UI Phase 1D PR #207 at `98a67c36f5cd968f17898038c786d3720b793dab`.
+- Issues #200, #202, #204 and #206 are completed; PRs #201, #203, #205 and #207 implement Personal Research Workbench UI Phase 1A–1D.
+- Issue #208 records the owner-directed next product step and authorizes Product / Architecture Preflight for Today Market Phase 2A only.
+- The active architecture branch may modify only its task snapshot, `docs/personal_research_workbench_ui_phase2a_preflight.md` and this baseline.
 - No production UI/API code, migration, dependency, fixture or executable test is authorized by the preflight.
 - No Provider, news, announcement, THS, browser acquisition, scheduler, notification, AI call or portfolio ledger is authorized.
-- No Industry Map, Stage 1, typed-semantics, output-link, Investment Candidate or portfolio owner write is authorized.
+- No remote refresh, full-market claim, anomaly/cause engine, accepted evidence, Investment Candidate or portfolio owner write is authorized.
 - No recommendation, target price, expected return, position size, broker, order or automated trading behavior is authorized.
 
 ## Next governed gate
 
-Issue #198 and its Draft architecture PR must establish and receive process-independent fixed-head approval for:
+Issue #208 and its Draft architecture PR must establish and receive process-independent fixed-head approval for:
 
-1. exact Phase 1 page routes and five-module shell behavior;
-2. the existing static HTML/CSS/vanilla JavaScript stack decision;
-3. ordinary-language input followed by explicit scope confirmation;
-4. exact local map/mapping/company source selection and no fuzzy identity;
-5. session-history and exact local-option read contracts;
-6. deterministic candidate-proposal composition from accepted local records;
-7. bounded web adapters over existing session/candidate/review services;
-8. complete-universe candidate review and conflict preservation;
-9. evidence drawer and fact/calculation/judgment/AI visual separation;
-10. ordinary-versus-advanced technical metadata policy;
-11. loading, empty, partial, stale, conflict, database and future-feature states;
-12. responsive and accessibility behavior;
-13. one fully offline production-boundary three-candidate golden path;
-14. one atomic stale/ambiguous review failure path;
-15. no-migration and no-new-framework decisions;
-16. locked exclusions for owner acceptance, Provider, scheduler, alerts, portfolio and trading.
+1. exact `/today-market` route and five-module navigation behavior;
+2. continued `/workbench` entry through 产业研究;
+3. existing static HTML/CSS/vanilla JavaScript stack reuse;
+4. bounded exact local equity/benchmark/sector catalog with no auto-selection;
+5. deterministic labels from validated canonical series identities;
+6. required information-cutoff and recorded-UTC visibility boundaries;
+7. reuse of existing Market Cockpit calculation ownership;
+8. a bounded non-persistent Today Market read/view-model adapter;
+9. selected-universe price behavior and liquidity presentation;
+10. optional exact benchmark and sector contexts with alignment state;
+11. scope, completeness, freshness, provenance and warning presentation;
+12. explicit unavailable breadth, anomaly, event/cause and remote-refresh states;
+13. exact query ceilings and no row-count-dependent queries;
+14. loading, empty, partial, mixed-session, stale and database states;
+15. responsive and accessibility behavior;
+16. one fully offline production-boundary local snapshot golden path;
+17. one recorded-UTC invisibility path with no fallback;
+18. no-migration, no-new-framework, no-network and no-write decisions;
+19. bounded future implementation file families and stop conditions;
+20. locked exclusions for Provider, scheduler, alerts, portfolio and trading.
 
-No production implementation is authorized by this baseline or Issue #198 alone.
+No production implementation is authorized by this baseline or Issue #208 alone.
