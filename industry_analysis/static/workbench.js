@@ -1,6 +1,7 @@
 "use strict";
 
 const SETTINGS_KEY = "aquantai.workbench.preferences.v1";
+const WORKBENCH_SCOPE_CONTRACT = "aquantai.personal-research-workbench.scope.v1";
 const DEFAULT_SETTINGS = {
   appearance: "system",
   density: "comfortable",
@@ -479,6 +480,7 @@ function buildScopePayload() {
     seed_technologies: linesFrom("#seed-technologies"),
     seed_bottlenecks: linesFrom("#seed-bottlenecks"),
     draft_graph: {
+      workbench_contract: WORKBENCH_SCOPE_CONTRACT,
       exact_industry_map_references: mapReferences,
       nodes: [],
       relationships: [],
@@ -621,6 +623,85 @@ async function submitScope(dryRun) {
   }
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value, allowed) {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function assertEditableRevision(revision) {
+  const graph = revision.draft_graph;
+  const chain = revision.chain_boundary;
+  const scope = revision.market_scope;
+  const listFields = [
+    revision.exclusions,
+    revision.seed_companies,
+    revision.seed_products,
+    revision.seed_technologies,
+    revision.seed_bottlenecks,
+  ];
+  const graphKeys = [
+    "workbench_contract",
+    "exact_industry_map_references",
+    "nodes",
+    "relationships",
+  ];
+  const chainKeys = ["kind", "text"];
+  const scopeKeys = [
+    "market_namespace",
+    "exchange_namespace",
+    "security_type",
+    "include_status",
+    "listed_instrument_ids",
+  ];
+  const graphSafe = isPlainObject(graph)
+    && graph.workbench_contract === WORKBENCH_SCOPE_CONTRACT
+    && hasOnlyKeys(graph, graphKeys)
+    && Array.isArray(graph.exact_industry_map_references)
+    && Array.isArray(graph.nodes)
+    && graph.nodes.length === 0
+    && Array.isArray(graph.relationships)
+    && graph.relationships.length === 0;
+  const chainSafe = isPlainObject(chain)
+    && chain.kind === "user_confirmed_text"
+    && typeof chain.text === "string"
+    && hasOnlyKeys(chain, chainKeys);
+  const scopeSafe = Array.isArray(scope)
+    && scope.length === 1
+    && isPlainObject(scope[0])
+    && hasOnlyKeys(scope[0], scopeKeys)
+    && scope[0].market_namespace === "CN_A"
+    && scope[0].security_type === "common_equity"
+    && scope[0].include_status === "active"
+    && Array.isArray(scope[0].listed_instrument_ids);
+  const listsSafe = listFields.every((value) => Array.isArray(value));
+  const companySafe = Array.isArray(revision.seed_companies)
+    && revision.seed_companies.every((item) => isPlainObject(item)
+      && typeof item.source_kind === "string"
+      && typeof item.label === "string"
+      && typeof item.code === "string"
+      && (item.stock_basic_record_id !== null || item.listed_instrument_id !== null));
+  const mapsSafe = graphSafe
+    && graph.exact_industry_map_references.every((item) => isPlainObject(item)
+      && item.source_kind === "industry_map_revision"
+      && typeof item.map_id === "string"
+      && typeof item.map_revision_id === "string"
+      && Number.isInteger(item.revision_number)
+      && typeof item.title === "string");
+  const scalarSafe = revision.workflow_state === "draft"
+    && ["coverage_unknown", "partial_local_coverage"].includes(revision.coverage_state)
+    && revision.analysis_start_date === null
+    && revision.analysis_end_date === null;
+
+  if (!graphSafe || !chainSafe || !scopeSafe || !listsSafe || !companySafe || !mapsSafe || !scalarSafe) {
+    throw new Error(
+      "该修订不是由当前范围表单创建，当前页面不会覆盖其结构化数据。请返回研究历史。"
+    );
+  }
+}
+
 function fillScopeForm(revision) {
   document.querySelector("#thesis-text").value = revision.thesis_text_original;
   document.querySelector("#thesis-title").value = revision.thesis_title_reviewed || "";
@@ -628,27 +709,22 @@ function fillScopeForm(revision) {
   document.querySelector("#driver-type").value = revision.driver_type;
   document.querySelector("#analysis-horizon").value = revision.analysis_horizon_kind;
   document.querySelector("#scope-cutoff").value = revision.information_cutoff_date;
-  document.querySelector("#chain-boundary").value = revision.chain_boundary && revision.chain_boundary.text
-    ? revision.chain_boundary.text
-    : "";
-  document.querySelector("#seed-products").value = Array.isArray(revision.seed_products) ? revision.seed_products.join("\n") : "";
-  document.querySelector("#seed-technologies").value = Array.isArray(revision.seed_technologies) ? revision.seed_technologies.join("\n") : "";
-  document.querySelector("#seed-bottlenecks").value = Array.isArray(revision.seed_bottlenecks) ? revision.seed_bottlenecks.join("\n") : "";
-  document.querySelector("#exclusions").value = Array.isArray(revision.exclusions) ? revision.exclusions.join("\n") : "";
+  document.querySelector("#chain-boundary").value = revision.chain_boundary.text;
+  document.querySelector("#seed-products").value = revision.seed_products.join("\n");
+  document.querySelector("#seed-technologies").value = revision.seed_technologies.join("\n");
+  document.querySelector("#seed-bottlenecks").value = revision.seed_bottlenecks.join("\n");
+  document.querySelector("#exclusions").value = revision.exclusions.join("\n");
   document.querySelector("#revision-note").value = `修订本地研究范围（基于 revision ${revision.revision_number}）`;
 
   selectedMaps.clear();
-  const mapReferences = revision.draft_graph && Array.isArray(revision.draft_graph.exact_industry_map_references)
-    ? revision.draft_graph.exact_industry_map_references
-    : [];
-  mapReferences.forEach((item) => selectedMaps.set(item.map_revision_id, item));
+  revision.draft_graph.exact_industry_map_references.forEach((item) => {
+    selectedMaps.set(item.map_revision_id, item);
+  });
   selectedCompanies.clear();
-  if (Array.isArray(revision.seed_companies)) {
-    revision.seed_companies.forEach((item) => {
-      const exactId = item.listed_instrument_id || String(item.stock_basic_record_id);
-      selectedCompanies.set(`${item.source_kind}:${exactId}`, { ...item, exact_id: exactId });
-    });
-  }
+  revision.seed_companies.forEach((item) => {
+    const exactId = item.listed_instrument_id || String(item.stock_basic_record_id);
+    selectedCompanies.set(`${item.source_kind}:${exactId}`, { ...item, exact_id: exactId });
+  });
   renderSelectedOptions("#selected-maps", selectedMaps, "尚未选择产业地图。仍可保存为范围草稿。");
   renderSelectedOptions("#selected-companies", selectedCompanies, "尚未选择精确公司种子。仍可保存为范围草稿。");
 }
@@ -685,6 +761,7 @@ async function loadEditContext() {
       || revision.revision_number !== context.revisionNumber) {
     throw new Error("编辑链接与精确研究修订不匹配。 ");
   }
+  assertEditableRevision(revision);
   editContext = context;
   fillScopeForm(revision);
   document.querySelector("#scope-page-title").textContent = "编辑研究范围";
@@ -712,6 +789,7 @@ async function setupScopeForm() {
   } catch (error) {
     setStatus(document.querySelector("#scope-status"), error.message || "精确研究修订读取失败。", "error");
     document.querySelector("#scope-save-button").disabled = true;
+    document.querySelector("#scope-check-button").disabled = true;
   }
 }
 
