@@ -63,3 +63,20 @@ def test_primary_analysis_uses_chinese_projectors_not_raw_context_dumping() -> N
     assert "renderData(sector" not in script
     assert "JSON.stringify(value, null, 2)" not in script
     assert "来源原始单位" in script
+
+
+def test_benchmark_and_sector_context_is_complete_in_ordinary_view() -> None:
+    script = _script()
+
+    assert "appendContextSummary(" in script
+    assert "基准有效交易日" in script
+    assert "基准对齐状态" in script
+    assert "行业有效交易日" in script
+    assert "行业对齐状态" in script
+    assert "(value.metrics || []).forEach" in script
+    assert ".slice(0, 12)" not in script
+    assert "value.missing_codes" in script
+    assert "provenance.taxonomy" in script
+    assert "provenance.classification_level" in script
+    assert "value.missing_sector_codes" in script
+    assert "不代表产业受益确定性或投资质量" in script
