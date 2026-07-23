@@ -11,7 +11,7 @@ AQuantAI uses three independent status axes:
 | Axis | Current state |
 | --- | --- |
 | Released software version | `0.2.0` |
-| Current accepted `main` baseline | `1f9edfc0719c9d512ed95c2330db78dadea17eea` |
+| Phase 2A capability merge commit | `1f9edfc0719c9d512ed95c2330db78dadea17eea` |
 | Latest merged product capability | Personal Research Workbench UI Phase 2A — local-only Today Market through PRs #209 and #212 |
 | Runtime surfaces | Local Dashboard, technical Market Cockpit, Today Market, Industry Research, Company Research, Investment Candidates and related exact-ID APIs/commands when configured |
 
