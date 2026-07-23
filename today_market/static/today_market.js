@@ -120,6 +120,23 @@
     setStatus(snapshotStatus, ready ? "可以读取明确选择的本地快照。" : "请选择股票数据范围。");
   }
 
+  function invalidateCatalogForBoundaryChange() {
+    if (!activeBoundaries) return;
+    activeBoundaries = null;
+    selectionPanel.hidden = true;
+    snapshotContent.hidden = true;
+    emptyState.hidden = false;
+    snapshotButton.disabled = true;
+    snapshotButton.textContent = "查看本地市场快照";
+    databaseState.textContent = "读取边界已更改";
+    setStatus(catalogStatus, "读取边界已更改，请重新读取本地数据列表。");
+    setStatus(snapshotStatus, "请先按新边界读取本地数据列表。");
+  }
+
+  [cutoffInput, recordedInput].forEach((input) => {
+    input.addEventListener("input", invalidateCatalogForBoundaryChange);
+  });
+
   catalogForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const boundary = boundaries();
