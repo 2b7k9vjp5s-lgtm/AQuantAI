@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQuantAI 个人研究工作台</title>
+  <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="/industry-analysis" aria-label="AQuantAI 产业研究首页">
+        <span class="brand-mark">AQ</span>
+        <span><strong>AQuantAI</strong><small>个人研究工作台</small></span>
+      </a>
+      <nav class="primary-nav">
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>今日市场</span><small>后续阶段</small></span>
+        <a class="nav-item nav-active" href="/industry-analysis" aria-current="page"><span>产业研究</span><small>本地研究</small></a>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
+        <a class="nav-item" href="/workbench/settings"><span>系统设置</span><small>显示偏好</small></a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>研究用途</strong>
+        <p>不提供买入、卖出、持有、目标价、收益或仓位建议。</p>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">LOCAL-FIRST · RESEARCH-ONLY</p>
+          <p id="page-context" class="page-context">产业研究</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="database-state" class="status-pill">正在检查本地数据</span>
+          <a class="button button-primary" href="/industry-analysis/new">发起新研究</a>
+        </div>
+      </header>
+
+      <main id="main-content" tabindex="-1">
+        <section id="history-page" class="page" data-page="history" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">INDUSTRY RESEARCH</p>
+              <h1>产业研究</h1>
+              <p>查看本地 Industry Thesis 编排与审阅历史。这里展示的是研究过程，不代表已接受的产业地图、受益公司或投资候选状态。</p>
+            </div>
+          </div>
+
+          <section class="panel boundary-panel" aria-labelledby="boundary-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="boundary-title">历史读取边界</h2>
+                <p>所有结果同时受信息截止日和系统记录时间约束，不会自动跳到更新版本。</p>
+              </div>
+            </div>
+            <form id="history-form" class="boundary-form">
+              <label>信息截止日<input id="as-of-cutoff" type="date" required></label>
+              <label>系统记录时间<input id="as-of-recorded-at" type="datetime-local" step="1" required></label>
+              <label>最多显示
+                <select id="history-limit">
+                  <option value="20">20 条</option>
+                  <option value="50" selected>50 条</option>
+                  <option value="100">100 条</option>
+                </select>
+              </label>
+              <button class="button button-primary" type="submit">读取研究历史</button>
+            </form>
+            <p id="history-status" class="status-message" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel" aria-labelledby="history-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="history-title">本地研究记录</h2>
+                <p id="history-summary">尚未读取。</p>
+              </div>
+              <a class="button button-secondary" href="/industry-analysis/new">新建范围预览</a>
+            </div>
+            <div id="history-empty" class="empty-state" hidden>
+              <h3>当前边界内没有研究记录</h3>
+              <p>可以先打开“发起新研究”整理研究范围；实际保存将在后续写入切片开放。</p>
+            </div>
+            <div id="history-list" class="history-list"></div>
+          </section>
+        </section>
+
+        <section id="new-page" class="page" data-page="new" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">SCOPE PREVIEW</p>
+              <h1>发起新研究</h1>
+              <p>先用普通中文整理研究问题和边界。本切片只生成浏览器内范围预览，不会写入数据库或创建候选公司。</p>
+            </div>
+          </div>
+          <div class="two-column">
+            <section class="panel" aria-labelledby="scope-form-title">
+              <h2 id="scope-form-title">研究范围</h2>
+              <form id="scope-preview-form" class="stack-form">
+                <label>研究主题或判断<textarea id="thesis-text" rows="5" maxlength="4000" required placeholder="例如：AI 数据中心扩张是否推动高纯电子气体需求，并改变国内供应商利润池？"></textarea></label>
+                <label>市场范围
+                  <select id="market-scope"><option value="中国A股">中国A股</option></select>
+                </label>
+                <label>驱动类型
+                  <select id="driver-type">
+                    <option value="待确认">待确认</option>
+                    <option value="需求扩张">需求扩张</option>
+                    <option value="供给收缩或涨价">供给收缩或涨价</option>
+                    <option value="政策或制度变化">政策或制度变化</option>
+                    <option value="技术替代">技术替代</option>
+                    <option value="事件冲击">事件冲击</option>
+                    <option value="混合驱动">混合驱动</option>
+                  </select>
+                </label>
+                <label>研究周期
+                  <select id="analysis-horizon">
+                    <option value="中期">中期</option>
+                    <option value="短期">短期</option>
+                    <option value="长期">长期</option>
+                    <option value="待确认">待确认</option>
+                  </select>
+                </label>
+                <label>产业链边界<textarea id="chain-boundary" rows="3" placeholder="例如：上游原料、纯化、现场制气和半导体客户认证"></textarea></label>
+                <label>明确排除<textarea id="exclusions" rows="3" placeholder="例如：仅有概念标签、无实际产品或客户验证的公司"></textarea></label>
+                <label>信息截止日<input id="scope-cutoff" type="date" required></label>
+                <button class="button button-primary" type="submit">生成范围预览</button>
+              </form>
+            </section>
+            <section class="panel preview-panel" aria-labelledby="scope-preview-title">
+              <div class="panel-heading"><h2 id="scope-preview-title">范围确认预览</h2></div>
+              <div id="scope-preview" class="empty-state">
+                <h3>尚未生成预览</h3>
+                <p>预览只存在于当前浏览器页面，不会确定公司身份，也不会声明全市场覆盖。</p>
+              </div>
+              <button class="button button-disabled" type="button" disabled>保存并构建候选（后续切片）</button>
+            </section>
+          </div>
+        </section>
+
+        <section id="settings-page" class="page" data-page="settings" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">LOCAL DISPLAY SETTINGS</p>
+              <h1>系统设置</h1>
+              <p>当前仅提供浏览器本地显示偏好。数据源、模型、调度和通知设置尚未开放。</p>
+            </div>
+          </div>
+          <section class="panel settings-panel" aria-labelledby="display-settings-title">
+            <h2 id="display-settings-title">普通设置</h2>
+            <form id="settings-form" class="stack-form">
+              <label>外观
+                <select id="appearance-setting">
+                  <option value="system">跟随系统</option>
+                  <option value="light">浅色</option>
+                  <option value="dark">深色</option>
+                </select>
+              </label>
+              <label>信息密度
+                <select id="density-setting">
+                  <option value="comfortable">舒适</option>
+                  <option value="compact">紧凑</option>
+                </select>
+              </label>
+              <label>市场颜色习惯
+                <select id="market-colors-setting">
+                  <option value="red-up">红涨绿跌</option>
+                  <option value="green-up">绿涨红跌</option>
+                </select>
+              </label>
+              <button class="button button-primary" type="submit">保存到当前浏览器</button>
+            </form>
+            <p id="settings-status" class="status-message" role="status" aria-live="polite"></p>
+          </section>
+          <section class="panel future-settings" aria-labelledby="future-settings-title">
+            <h2 id="future-settings-title">高级设置</h2>
+            <p>数据源授权、刷新频率、模型角色、日志和备份将在各自治理阶段开放。当前页面不会收集凭据或触发外部连接。</p>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="/industry-analysis/static/workbench.js" defer></script>
+</body>
+</html>
