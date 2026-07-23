@@ -50,6 +50,7 @@ def _revision(
     cutoff: date,
     workflow_state: str = "draft",
     coverage_state: str = "partial_local_coverage",
+    supersedes_revision_id: UUID | None = None,
 ) -> IndustryThesisSessionRevision:
     return IndustryThesisSessionRevision(
         id=revision_id,
@@ -74,7 +75,7 @@ def _revision(
         information_cutoff_date=cutoff,
         recorded_at_utc=recorded_at,
         input_fingerprint_sha256=(f"{revision_number:x}" * 64)[:64],
-        supersedes_revision_id=None,
+        supersedes_revision_id=supersedes_revision_id,
         revision_note=f"revision {revision_number}",
     )
 
@@ -85,6 +86,7 @@ def _seed(database) -> dict[str, UUID]:
     revision_a1 = UUID(int=101)
     revision_a2 = UUID(int=102)
     revision_b1 = UUID(int=201)
+
     with database.begin() as db:
         db.add_all(
             [
@@ -93,7 +95,7 @@ def _seed(database) -> dict[str, UUID]:
                     created_recorded_utc=BASE_TIME,
                     created_by_kind="local_user",
                     state="active",
-                    latest_revision_number=2,
+                    latest_revision_number=1,
                 ),
                 IndustryThesisSessionIdentity(
                     id=session_b,
@@ -125,19 +127,28 @@ def _seed(database) -> dict[str, UUID]:
                     cutoff=date(2026, 7, 22),
                     workflow_state="awaiting_review",
                 ),
-                _revision(
-                    revision_id=revision_a2,
-                    session_id=session_a,
-                    revision_number=2,
-                    title="先进材料产业链",
-                    text="先进材料需求扩张与纯化瓶颈",
-                    recorded_at=BASE_TIME + timedelta(minutes=30),
-                    cutoff=date(2026, 7, 23),
-                    workflow_state="reviewed_plan_ready",
-                    coverage_state="reviewed_local_scope",
-                ),
             ]
         )
+
+    with database.begin() as db:
+        identity = db.get(IndustryThesisSessionIdentity, session_a)
+        assert identity is not None
+        identity.latest_revision_number = 2
+        db.add(
+            _revision(
+                revision_id=revision_a2,
+                session_id=session_a,
+                revision_number=2,
+                title="先进材料产业链",
+                text="先进材料需求扩张与纯化瓶颈",
+                recorded_at=BASE_TIME + timedelta(minutes=30),
+                cutoff=date(2026, 7, 23),
+                workflow_state="reviewed_plan_ready",
+                coverage_state="reviewed_local_scope",
+                supersedes_revision_id=revision_a1,
+            )
+        )
+
     return {
         "session_a": session_a,
         "session_b": session_b,
