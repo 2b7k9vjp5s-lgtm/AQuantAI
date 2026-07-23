@@ -19,325 +19,334 @@ AQuantAI should converge on one Chinese-first application shell with five visibl
 4. 研究组合;
 5. 系统设置.
 
-The first production slice must implement only the **产业研究 manual/offline workbench** plus minimal local appearance settings. Other navigation items remain visibly planned but disabled. They must not display fabricated market, tracking or portfolio data.
+Phase 1 activates only the manual/offline **产业研究** workbench and minimal browser-local display settings. Future modules remain visibly planned but disabled. They must not show fabricated market, tracking or portfolio values.
 
-The Phase 1 product outcome is:
+The Phase 1 outcome is:
 
 ```text
 ordinary Chinese thesis input
   -> explicit scope confirmation
   -> exact local thesis session/revision
-  -> deterministic candidate proposals from exact local selections
+  -> deterministic proposals from exact local selections
   -> complete reviewed local-scope candidate universe
   -> selected / rejected / unresolved review
   -> exact reviewed-plan result and history reopening
 ```
 
-The user should never need to type or copy UUIDs, revision numbers, fingerprints or database URLs. The application still preserves and exposes those values in an advanced technical-details layer.
+Users do not type or copy UUIDs, revision numbers, fingerprints or database URLs. Those values remain available through advanced technical details and exact internal links.
 
 ## 3. Feasibility decision
 
-### 3.1 What the accepted runtime can support now
+### 3.1 Existing usable foundation
 
 The accepted runtime already provides:
 
 - append-only Industry Thesis session creation and revision;
 - exact local candidate proposal persistence;
-- complete candidate-revision reads under information-cutoff and recorded-UTC boundaries;
+- exact candidate-universe reads under information-cutoff and recorded-UTC boundaries;
 - explicit `selected_for_acceptance`, `rejected_by_user` and `unresolved` review;
 - deterministic reviewed-plan preview and fingerprint;
-- existing Industry Map, Stage 1 beneficiary, Typed Beneficiary Semantics, Company Research, Evidence Intelligence, Canonical Price, normalized valuation and Investment Candidate read contracts;
-- existing static HTML/CSS/vanilla JavaScript pages served by FastAPI `FileResponse`;
-- local database configuration and no-network test discipline.
+- existing Industry Map, Stage 1 beneficiary, Typed Beneficiary Semantics, Company Research, Evidence Intelligence, Canonical Price, normalized valuation and Investment Candidate reads;
+- static HTML/CSS/vanilla JavaScript pages served by FastAPI;
+- local database and no-network test discipline.
 
-### 3.2 What the accepted runtime cannot truthfully support yet
+### 3.2 Unavailable capabilities
 
 The current runtime does not provide:
 
 - free-text-only automatic full-market company discovery;
-- an accepted owner transaction from a reviewed thesis plan into Industry Map / Stage 1 and output links;
-- a deterministic downstream Investment Candidate snapshot automatically linked to a newly reviewed thesis;
+- an accepted owner transaction from a reviewed plan into Industry Map / Stage 1 and output links;
+- automatic downstream Investment Candidate snapshots for a new thesis;
 - authorized news/announcement/market-data acquisition for daily hotspot detection;
-- a scheduler, notifications, followed-entity state or portfolio ledger.
+- scheduler, notifications, followed-entity state or portfolio ledger.
 
-Therefore Phase 1 must not claim that a vague phrase by itself has automatically found all beneficiaries or produced final investable companies.
+Phase 1 must not claim that a vague phrase has automatically found all beneficiaries or produced final investable companies.
 
-### 3.3 Practical Phase 1 compromise
+### 3.3 Practical Phase 1 behavior
 
-A vague thesis is accepted as the starting point, but the user must confirm exact scope and at least one deterministic candidate source before candidate build:
+A vague thesis may start the workflow, but candidate build requires at least one explicit deterministic source:
 
-- one or more explicitly selected existing Industry Map revisions;
-- one or more explicitly selected accepted local mappings when available;
-- one or more explicitly selected persisted company / listed-instrument records as user seeds.
+- an exact existing Industry Map revision;
+- an exact accepted local mapping when available;
+- an explicitly selected persisted company or listed-instrument record as a user seed.
 
-Text search may help the user find local options, but text, ticker prefix, similarity or model output never establishes identity. Clicking an exact persisted result establishes the selected identity.
+Local text search may help users find options, but text, ticker prefix, similarity or model output never establishes identity. Explicit selection of one persisted result establishes the chosen identity.
 
-The complete-universe claim is always qualified as **当前已审阅本地范围全量** and is paired with the persisted coverage state:
+The universe label is always **当前已审阅本地范围全量**, paired with one coverage state:
 
 - `reviewed_local_scope`;
 - `partial_local_coverage`;
 - `coverage_unknown`.
 
-## 4. Technology and delivery decision
+## 4. Technology and shell decision
 
 ### 4.1 Front-end stack
 
-Phase 1 reuses the current repository stack:
+Reuse the current repository stack:
 
 - FastAPI page and JSON routes;
 - static HTML;
-- shared CSS custom properties and responsive layout;
-- vanilla JavaScript using same-origin `fetch`;
-- no Node, npm, bundler, React, Vue or another front-end framework;
-- no server-side template engine unless implementation inspection proves static composition impossible.
+- shared CSS custom properties;
+- vanilla JavaScript with same-origin `fetch`;
+- no Node, npm, bundler, React, Vue or other front-end framework;
+- no new server-side template engine unless implementation proves static composition impossible.
 
-This is the lowest-risk path because the current `/dashboard`, `/market-cockpit`, `/evidence-intelligence`, `/industry-research`, `/company-research`, `/company-comparison` and `/investment-candidates` pages already follow this model.
+This matches the existing Dashboard, Market Cockpit, Evidence Intelligence, Industry Research, Company Research, Company Comparison and Investment Candidate pages.
 
-### 4.2 Application shell
+### 4.2 Shell layout
 
-Phase 1 introduces a new shared shell only for new workbench pages. It does not refactor all existing pages in the first implementation.
+The new workbench pages use a shared shell without refactoring all existing pages in Phase 1:
 
-Shell regions:
-
-- fixed left primary navigation;
-- fixed or sticky top bar;
-- central content workspace;
+- fixed left navigation;
+- sticky top bar;
+- central workspace;
 - optional right evidence/details drawer;
-- global status/notification region using `aria-live`;
-- skip link to the main content.
+- global `aria-live` status region;
+- skip link to main content.
 
-Existing standalone pages remain valid advanced/read-only tools and may be linked from technical details.
+Existing standalone pages remain valid advanced/read-only tools.
 
-### 4.3 No new UI persistence domain
+### 4.3 Top bar contract
 
-Phase 1 adds no UI database tables.
+Phase 1 top bar contains:
+
+- **本地搜索**: searches only visible local research sessions, exact Industry Map options and persisted company/instrument options;
+- **快速研究**: links to `/industry-analysis/new`;
+- **数据边界**: displays the active information cutoff and recorded-UTC boundary;
+- **本地状态**: database available/unavailable and current operation state;
+- **通知**: disabled with `后续阶段`, because no notification contract exists;
+- **设置**: links to `/workbench/settings`.
+
+Search is navigation assistance only. It does not create identity, evidence, membership or candidate status and never calls a network or model.
+
+### 4.4 Persistence decision
+
+No UI database tables are added.
 
 - Research history comes from Industry Thesis identities/revisions.
-- Candidate decisions come from Industry Thesis candidate revisions.
-- Reviewed results come from the reviewed-plan revision.
-- Appearance and density preferences may use browser `localStorage` only.
-- Credentials, model profiles and data-source configuration are not stored through Phase 1 UI.
+- Decisions come from candidate revisions.
+- Results come from reviewed-plan revisions.
+- Appearance/density preferences may use browser `localStorage`.
+- Credentials, model profiles and Provider configuration are not stored through Phase 1 UI.
 
-## 5. Canonical Phase 1 route map
-
-### 5.1 Page routes
+## 5. Canonical page routes
 
 | Route | User job | State |
 | --- | --- | --- |
 | `GET /workbench` | Enter the personal research application | Redirect to `/industry-analysis` |
-| `GET /industry-analysis` | View active and historical manual research sessions | Active in Phase 1 |
-| `GET /industry-analysis/new` | Enter thesis and confirm explicit scope | Active in Phase 1 |
-| `GET /industry-analysis/sessions/{session_id}/review` | Review the exact current session revision and complete candidate universe | Active in Phase 1 |
-| `GET /industry-analysis/sessions/{session_id}/result` | View one exact reviewed plan and its evidence/coverage state | Active in Phase 1 |
-| `GET /workbench/settings` | Adjust local appearance, density and display preferences | Minimal Phase 1 |
+| `GET /industry-analysis` | View active and historical manual research sessions | Active |
+| `GET /industry-analysis/new` | Enter thesis and confirm explicit scope | Active |
+| `GET /industry-analysis/sessions/{session_id}/revisions/{session_revision_id}/review` | Review one exact source revision and its complete candidate universe | Active |
+| `GET /industry-analysis/sessions/{session_id}/revisions/{reviewed_session_revision_id}/result` | View one exact reviewed-plan revision | Active |
+| `GET /workbench/settings` | Adjust browser-local display preferences | Minimal Phase 1 |
 
-The navigation labels 今日市场, 关注与跟踪 and 研究组合 are rendered disabled with `aria-disabled="true"` and a visible `后续阶段` label. They receive no fake page route in Phase 1.
+今日市场, 关注与跟踪 and 研究组合 are rendered disabled with `aria-disabled="true"` and `后续阶段`. They receive no fake page route in Phase 1.
 
-### 5.2 URL and identifier policy
+### Identifier policy
 
-- A session UUID may appear in a browser URL after the user creates or selects a session.
-- Users never manually enter the UUID.
-- Exact revision IDs, candidate revision IDs and plan fingerprints remain internal page state and advanced metadata.
-- Browser back/forward must preserve the current route without issuing a write.
-- A result route re-resolves an exact reviewed session revision from the selected session history; it does not silently use a newer compatible-looking plan.
+- Session and revision IDs may appear in URLs after user selection or creation.
+- Users never manually enter them.
+- The server cross-checks that the route session ID owns the route revision ID.
+- Candidate revision IDs and fingerprints remain internal or advanced metadata.
+- Browser back/forward never issues a write.
+- Review and result deep links are exact and never silently move to a newer revision.
 
-## 6. Canonical Phase 1 API boundary
+## 6. Canonical API boundary
 
-Use a new router prefix `/industry-analysis/api`. It is a thin local web adapter over accepted domain services, not a new domain owner.
+Use router prefix `/industry-analysis/api`. It is a local web adapter over accepted services, not a new business owner.
 
-### 6.1 Read endpoints
+### 6.1 Reads
 
 | Endpoint | Purpose | Owner/service |
 | --- | --- | --- |
-| `GET /industry-analysis/api/bootstrap` | Shell capability flags, database availability and local display metadata | Thin workbench adapter |
-| `GET /industry-analysis/api/sessions` | Deterministic current/history list under explicit boundaries | New read method over Industry Thesis identities/revisions |
-| `GET /industry-analysis/api/sessions/{session_id}` | Session chronology and current visible revision | `IndustryThesisQueryService.get_session` |
+| `GET /industry-analysis/api/bootstrap` | Shell capability flags, local database state and active boundaries | Thin adapter |
+| `GET /industry-analysis/api/sessions` | Deterministic history under explicit boundaries | New read method over thesis identities/revisions |
+| `GET /industry-analysis/api/sessions/{session_id}` | Exact session chronology under explicit boundaries | `IndustryThesisQueryService.get_session` |
 | `GET /industry-analysis/api/session-revisions/{session_revision_id}` | Exact scope revision | `IndustryThesisQueryService.get_session_revision` |
 | `GET /industry-analysis/api/session-revisions/{session_revision_id}/candidates` | Complete exact candidate universe | `IndustryThesisQueryService.list_candidate_revisions` |
 | `GET /industry-analysis/api/reviewed-plans/{reviewed_session_revision_id}` | Exact verified reviewed plan | `IndustryThesisReviewedPlanQueryService.get_reviewed_plan` |
-| `GET /industry-analysis/api/local-options/maps` | Selectable exact local Industry Map revisions | Existing Industry Research/Map query services |
-| `GET /industry-analysis/api/local-options/companies` | Candidate persisted company/instrument options requiring explicit user selection | Thin read adapter over accepted local identity records |
-| `GET /industry-analysis/api/evidence-details` | Bounded details for one exact supported entity/revision | Composition adapter over existing owners; no generic inference |
+| `GET /industry-analysis/api/candidate-revisions/{candidate_revision_id}/details` | Exact candidate source/provenance and supported linked-owner details | Bounded composition adapter |
+| `GET /industry-analysis/api/local-options/maps` | Selectable exact local Industry Map revisions | Existing map query services |
+| `GET /industry-analysis/api/local-options/companies` | Persisted company/instrument candidates requiring explicit selection | Bounded local identity query |
+| `GET /industry-analysis/api/search` | Local navigation results across sessions/maps/companies | Presentation-only search adapter |
 
-Every time-aware read accepts or derives one explicit pair:
+Every time-aware read uses one explicit pair:
 
 - `as_of_cutoff`;
 - `as_of_recorded_at_utc`.
 
-The pair is returned in the response and shown in the page header as `数据截止` and `系统记录边界`.
+Responses return the pair, and pages display it as `数据截止` and `系统记录边界`.
 
-### 6.2 Write endpoints
+The candidate-details endpoint is keyed by one exact candidate revision. It may follow only exact stored source references or exact owner IDs. It never performs generic text inference or latest-record fallback.
+
+### 6.2 Writes
 
 | Endpoint | Purpose | Owner/service |
 | --- | --- | --- |
 | `POST /industry-analysis/api/sessions` | Create one exact thesis session | `IndustryThesisCommandService.create_session` |
 | `POST /industry-analysis/api/sessions/{session_id}/revisions` | Confirm/edit scope through append-only revision | `IndustryThesisCommandService.revise_session` |
-| `POST /industry-analysis/api/session-revisions/{session_revision_id}/candidate-builds` | Persist deterministic candidates from exact selected sources | `IndustryThesisCommandService.build_candidates` plus bounded proposal composer |
-| `POST /industry-analysis/api/session-revisions/{session_revision_id}/reviews` | Review the complete candidate universe and create a reviewed plan | `IndustryThesisProposalReviewService.review_candidates` |
+| `POST /industry-analysis/api/session-revisions/{session_revision_id}/candidate-builds` | Persist candidates from exact selected sources | `IndustryThesisCommandService.build_candidates` plus bounded proposal composer |
+| `POST /industry-analysis/api/session-revisions/{session_revision_id}/reviews` | Review the complete universe and create a reviewed plan | `IndustryThesisProposalReviewService.review_candidates` |
 
 Rules:
 
 - JSON only;
-- Pydantic strict models with `extra="forbid"`;
-- maximum request body 1 MiB;
-- no write through `GET`;
-- no automatic retry;
+- strict Pydantic models with extra fields forbidden;
+- maximum body size 1 MiB;
+- no writes through `GET`;
 - no CORS enablement;
-- browser requests use same-origin JSON fetch;
+- same-origin fetch only;
+- no automatic retry;
 - no hidden AI or network call;
-- domain errors retain structured code and a Chinese user message;
-- all writes preserve expected-latest values and atomic domain behavior.
+- structured error code plus Chinese user message;
+- expected-latest and atomic domain behavior preserved.
 
-### 6.3 Dry-run behavior
+### 6.3 Review dry-run
 
-- The candidate-review page offers `检查审阅结果` before `保存审阅计划`.
-- The check calls the existing review service with `dry_run=true`.
-- The commit sends the same normalized decisions and expected-latest values.
-- Any change or stale revision between check and commit returns a conflict and requires explicit reload/review.
-- The UI never auto-rebases decisions.
+The review page provides:
 
-Session creation and candidate build may expose advanced dry-run controls but do not require a separate ordinary-user confirmation page.
+1. `检查审阅结果` -> `dry_run=true`;
+2. `保存审阅计划` -> commit the same normalized decisions and expected-latest values.
 
-## 7. New bounded backend seams required for implementation
+Any state change between the two calls returns a conflict. The UI retains unsaved decisions and requires explicit reload/review; it never auto-rebases.
 
-### 7.1 Session-history query
+## 7. Existing-service inventory
 
-Add one read-only method to list Industry Thesis sessions visible under explicit boundaries.
+### Directly reusable
 
-Required result fields:
+- `IndustryThesisCommandService.create_session`;
+- `IndustryThesisCommandService.revise_session`;
+- `IndustryThesisCommandService.build_candidates`;
+- `IndustryThesisQueryService.get_session`;
+- `IndustryThesisQueryService.get_session_revision`;
+- `IndustryThesisQueryService.list_candidate_revisions`;
+- `IndustryThesisProposalReviewService.review_candidates`;
+- `IndustryThesisReviewedPlanQueryService.get_reviewed_plan`;
+- existing Industry Map/Beneficiary/Company Research/Evidence/Investment Candidate/Price/Valuation read services where exact IDs already exist.
 
-- session ID;
-- state;
-- visible latest revision ID and revision number;
-- reviewed title or original thesis excerpt;
-- driver type;
-- horizon;
-- workflow state;
-- coverage state;
-- candidate count when bounded without unbounded scans;
-- information cutoff;
-- recorded UTC;
-- last action label.
+### Not directly available
 
-Ordering:
+- session-history listing;
+- bounded local map/company option search designed for explicit selection;
+- deterministic conversion of exact UI selections into candidate proposal payloads;
+- Chinese page view-model composition;
+- browser page/API routes.
 
-1. visible latest revision recorded UTC descending;
-2. session ID ascending as deterministic tie break.
+### Intentionally unavailable
 
-No fuzzy latest fallback is permitted.
+- reviewed-plan owner acceptance;
+- output-link writes;
+- automatic company research or Investment Candidate snapshot creation;
+- Provider/scheduler/notification/portfolio behavior.
 
-### 7.2 Exact local-option queries
+## 8. Required bounded backend seams
 
-The UI needs bounded option lists for:
+### 8.1 Session-history query
 
-- visible Industry Maps;
-- persisted StockBasic / ListedInstrument identities.
+Add a read-only method returning:
 
-A search string is only a display filter. Returned records include exact IDs and source metadata. Identity is accepted only after explicit user selection.
+- session ID and state;
+- exact visible latest revision ID/number;
+- title or thesis excerpt;
+- driver and horizon;
+- workflow and coverage states;
+- bounded candidate/review counts when available;
+- cutoff and recorded time;
+- primary next action.
 
-Limits and behavior:
+Order by visible latest recorded UTC descending, then session ID ascending. No fuzzy latest fallback.
 
-- minimum two visible characters for company search unless an exact code is entered;
-- maximum 20 results;
-- deterministic name/code/ID ordering;
-- no provider-only identity;
-- no network;
-- no AI;
-- no automatic first-result selection.
+### 8.2 Exact local-option queries
 
-### 7.3 Deterministic candidate-proposal composer
+Map options return exact visible map/revision IDs.
 
-The current candidate command accepts explicit proposal objects. Phase 1 needs one pure composition helper that turns exact UI selections into those proposal objects.
+Company options:
 
-Allowed inputs:
+- require at least two characters unless an exact code is supplied;
+- return at most 20 records;
+- include exact persisted IDs and source metadata;
+- use deterministic name/code/ID order;
+- never auto-select the first result;
+- never use provider name alone as identity.
 
-- exact accepted local mapping reference;
-- exact Industry Map/beneficiary revision reference;
+### 8.3 Deterministic proposal composer
+
+Convert exact selections into the existing candidate-build proposal objects.
+
+Allowed sources:
+
+- exact accepted local mapping;
+- exact Industry Map/beneficiary revision;
 - exact user-selected StockBasic or ListedInstrument identity.
 
-The composer may copy labels and exact references from accepted local records. It may not infer benefit strength, exposure type, product fit or industry position from company name or thesis text.
+It may copy labels and exact references. It may not infer exposure, benefit strength, product fit or industry position from company name or thesis text. Unsupported fields remain unknown, nullable or unresolved under the accepted contract.
 
-When those analytical fields are not supplied by an accepted source or explicit user input, they remain `unknown`, nullable or unresolved as allowed by the accepted command contract.
+### 8.4 Non-persistent view-model adapter
 
-### 7.4 Workbench view-model adapter
+May:
 
-Add one non-persistent composition layer for page-friendly Chinese labels and grouped sections.
-
-It may:
-
-- translate closed enum values into Chinese display labels;
-- group candidate rows by review state or source kind;
-- create counts from the exact returned universe;
-- generate navigation links using exact internal IDs;
+- translate closed enums to Chinese labels;
+- group exact rows;
+- calculate counts from the returned complete universe;
+- generate exact navigation links;
 - expose owner/source metadata.
 
-It may not:
+May not:
 
-- create a new score;
-- infer identity;
-- classify benefit strength;
-- choose a candidate decision;
+- create scores;
+- infer identity or benefit classification;
+- choose decisions;
 - hide rejected/unresolved rows;
-- parse narrative valuation text into numeric values;
+- parse narrative valuation into numbers;
 - choose newer domain revisions.
 
-## 8. Page architecture
+### 8.5 Local search adapter
 
-## 8.1 `/industry-analysis` — research home and history
+Searches only:
 
-### User job
+- visible thesis sessions;
+- visible exact Industry Map options;
+- persisted company/instrument options.
 
-Start a new manual industry research session or reopen an existing one.
+It returns grouped navigation candidates. Search results are not accepted identity until the user explicitly selects an exact record in the relevant workflow.
 
-### Primary content
+## 9. Page architecture
 
-- page title and one-sentence boundary;
-- prominent `发起新研究` action;
-- four conceptual tabs:
-  - 每日产业雷达 — disabled, later phase;
-  - 发起新研究 — link to active new page;
-  - 研究进行中;
-  - 历史研究;
+### 9.1 Research home `/industry-analysis`
+
+User job: start a new manual research session or reopen one.
+
+Content:
+
+- boundary statement;
+- dominant `发起新研究` action;
+- tabs: 每日产业雷达 disabled, 发起新研究, 研究进行中, 历史研究;
 - compact session cards/table;
-- explicit database/update state;
-- no market hotspot content in Phase 1.
+- database and boundary status;
+- no market-hotspot content.
 
-### Session card fields
+Session card:
 
-- reviewed title or thesis excerpt;
-- workflow label;
-- driver type;
-- coverage label;
-- candidate counts by review state when available;
-- information cutoff;
-- last recorded time;
-- primary action: `继续审阅` or `查看结果`.
+- title/thesis excerpt;
+- workflow, driver and coverage;
+- counts by review state when available;
+- cutoff and last recorded time;
+- `继续审阅` or `查看结果` using exact revision links.
 
-### Empty state
+Empty state:
 
-```text
-还没有产业研究。
-从一个行业、产业链、技术、政策或投资逻辑开始。
-```
+> 还没有产业研究。可以从一个行业、产业链、技术、政策或投资逻辑开始。
 
-The empty state does not suggest that automatic news scanning is active.
+### 9.2 New research `/industry-analysis/new`
 
-## 8.2 `/industry-analysis/new` — thesis and scope confirmation
+Use one page with two progressive sections.
 
-### User job
-
-Convert an ordinary-language idea into explicit governed research inputs.
-
-### Visible step structure
-
-Use one page with two progressive sections, not a long wizard.
-
-#### A. 研究想法
+#### Research idea
 
 Required:
 
 - thesis text;
-- market scope confirmation, with A股 suggested but not silently persisted;
+- explicit market confirmation;
 - information cutoff.
 
 Optional:
@@ -348,457 +357,358 @@ Optional:
 - bottlenecks;
 - exclusions.
 
-#### B. 确认研究范围
-
-Explicit controls:
+#### Scope confirmation
 
 - reviewed title;
-- driver type including `暂不确定`;
+- driver including `暂不确定`;
 - horizon;
 - chain/process boundary;
 - coverage state;
-- exact existing map selections;
+- exact map selections;
 - exact company seed selections.
 
-The page must state:
+Persistent notice:
 
-> 系统只会使用你确认的本地范围，不代表全市场完整覆盖。
+> 系统只使用你确认的本地范围，不代表全市场完整覆盖。
 
-### Submission result
-
-Successful create/revise returns the internal session ID and navigates to the review route. The user sees a success summary, not raw JSON.
-
-### No-source state
-
-When the user provides only fuzzy text and selects no exact local source, the page may save a draft session but candidate build remains disabled with:
+When only fuzzy text exists, save a draft but disable candidate build:
 
 > 研究主题已保存。请至少选择一张现有产业地图或一个精确公司种子后构建候选公司池。
 
-No hidden fuzzy company discovery occurs.
+### 9.3 Exact candidate review
 
-## 8.3 `/industry-analysis/sessions/{session_id}/review` — complete candidate review
+Route includes both session and source session-revision IDs.
 
-### User job
-
-Understand every candidate in the reviewed local scope and explicitly decide its next state.
-
-### Header
+Header:
 
 - thesis title;
-- workflow and coverage badges;
-- data cutoff and recorded boundary;
-- `编辑研究范围`;
-- `重新读取最新状态`;
-- candidate counts.
+- workflow and coverage;
+- cutoff/recorded boundary;
+- edit scope;
+- reload exact latest state;
+- total/decided/undecided counts.
 
-### Default candidate table/card fields
+Candidate fields:
 
-- company label and code when exact;
+- company label/code when exact;
 - identity state;
 - source kind;
 - product/service fit;
 - industry position;
 - benefit path;
-- proposed exposure type;
+- proposed exposure;
 - proposal confidence;
-- rationale summary;
-- uncertainty state;
-- evidence/source action;
-- one explicit review control.
+- rationale;
+- uncertainty;
+- evidence/details action;
+- explicit decision.
 
-### Review controls
+Decision labels map exactly:
 
-Chinese labels map exactly to domain values:
+- 纳入后续研究 -> `selected_for_acceptance`;
+- 暂不纳入 -> `rejected_by_user`;
+- 待确认 -> `unresolved`.
 
-- `纳入后续研究` -> `selected_for_acceptance`;
-- `暂不纳入` -> `rejected_by_user`;
-- `待确认` -> `unresolved`.
+Selected rows require one authoritative identity, explicit non-unknown final exposure, rationale and uncertainty.
 
-Selected candidates additionally require:
+Filters never alter the submitted universe. Every latest row must have one decision before save.
 
-- one exact authoritative identity;
-- explicit non-unknown final exposure type;
-- non-empty rationale object;
-- explicit uncertainty state.
+### 9.4 Exact result
 
-The ordinary UI supplies structured form fields and serializes strict JSON; users do not edit JSON.
+Route includes both session and reviewed session-revision IDs.
 
-### Complete-universe rule
+Sections:
 
-- Every latest candidate revision must receive one decision before save.
-- Filters may change display but never change the submitted universe.
-- A sticky summary shows total, decided and undecided counts.
-- Rejected and unresolved rows remain visible after save.
-
-### Conflict behavior
-
-On stale expected-latest conflict:
-
-- keep unsaved local choices in memory;
-- block commit;
-- show which session/candidate state changed;
-- offer `打开最新版本并重新核对`;
-- never silently overwrite, merge or rebase.
-
-## 8.4 `/industry-analysis/sessions/{session_id}/result` — reviewed-plan result
-
-### User job
-
-Review the exact saved plan, understand what is selected/rejected/unresolved and reopen evidence.
-
-### Primary sections
-
-1. research summary and boundaries;
+1. research summary and exact boundaries;
 2. coverage notice;
 3. selected candidates;
 4. unresolved candidates;
 5. temporarily excluded candidates;
-6. exact candidate-source summary;
-7. evidence drawer links;
+6. source/provenance summary;
+7. evidence drawer actions;
 8. advanced technical details.
 
-### Important ownership notice
-
-Until a later owner-acceptance implementation exists, the page must show:
+Required ownership notice:
 
 > 审阅计划已生成，但尚未写入正式产业地图、Stage 1 受益公司或投资候选快照。
 
-It must not label `selected_for_acceptance` as accepted beneficiary membership.
+`selected_for_acceptance` is never displayed as accepted beneficiary membership.
 
-### Investment-candidate panel
+An Investment Candidate panel appears only when a future separately authorized exact output link and exact snapshot exist. Otherwise it shows an honest unavailable state and no synthetic ranking.
 
-The panel appears only when an exact accepted output link and exact Investment Candidate snapshot already exist through a separately authorized capability.
+### 9.5 Minimal settings
 
-Otherwise it shows an honest unavailable state and no synthetic ranking.
+Browser-local only:
 
-## 8.5 `/workbench/settings` — minimal local settings
+- light/dark/system appearance;
+- comfortable/compact density;
+- red-up-green-down or green-up-red-down convention for future market pages;
+- advanced metadata shown/hidden by default.
 
-Phase 1 supports only browser-local display preferences:
+No credentials, model settings, Provider settings, scheduler or notifications.
 
-- light / dark / system appearance;
-- comfortable / compact density;
-- red-up-green-down or green-up-red-down display convention for later market surfaces;
-- show/hide advanced technical metadata by default.
+## 10. Evidence drawer
 
-No model credentials, Provider configuration, scheduler, notification or server-side preference persistence is included.
+Open from one exact candidate or exact supported owner record.
 
-## 9. Evidence drawer contract
+### Four lanes
 
-The right evidence drawer is opened from one exact candidate, map observation or supported downstream research record.
+| Lane | Label | Meaning |
+| --- | --- | --- |
+| Fact | 事实证据 | Direct source-backed record |
+| Calculation | 确定性计算 | Deterministic result with inputs |
+| Judgment | 研究判断 | Human D3 interpretation |
+| AI draft | AI 草稿 | Unaccepted bounded model text |
 
-### 9.1 Four visual lanes
+Each lane uses text and icon/shape labels, not color alone.
 
-| Lane | Chinese label | Meaning | Visual role |
-| --- | --- | --- | --- |
-| Fact | 事实证据 | Direct source-backed record | Neutral/gray-blue |
-| Calculation | 确定性计算 | Deterministic formula or count with inputs | Blue |
-| Judgment | 研究判断 | Human D3 interpretation | Orange/amber |
-| AI draft | AI 草稿 | Unaccepted bounded model text | Purple |
+Metadata when owned:
 
-The color is never the only cue; every lane has text and an icon/shape label.
-
-### 9.2 Required metadata
-
-When available from the authoritative owner:
-
-- source kind and title;
-- source reference;
+- source kind/title/reference;
 - information date/cutoff;
 - recorded UTC;
 - evidence grade;
 - conflict/missing/stale/falsified state;
-- exact owner domain;
-- exact revision ID;
+- owner domain and exact revision;
 - fingerprint in advanced details.
 
-### 9.3 Unsupported details
+If only a user-seed source exists, state that no accepted source evidence is attached. Do not generate an explanation.
 
-If a candidate has only a user-seed source and no accepted evidence link, the drawer states that no accepted source evidence is attached. It does not generate an explanation.
+## 11. Ordinary versus advanced information
 
-## 10. Ordinary and advanced information policy
-
-### 10.1 Ordinary layer
-
-Show:
+### Ordinary
 
 - readable names;
 - statuses and reasons;
 - source category;
-- freshness;
-- coverage;
-- missing and uncertainty states;
-- actionable next step.
+- freshness and coverage;
+- missing/uncertainty states;
+- next action.
 
-### 10.2 Advanced layer
+### Advanced `技术详情`
 
-Collapsible `技术详情` may show:
-
-- UUIDs;
-- revision numbers;
-- exact rule/version identifiers;
-- input and plan fingerprints;
-- raw closed enum value;
+- UUIDs and revision numbers;
+- rule/version IDs;
+- fingerprints;
+- raw enums;
 - as-of boundaries;
 - owner service;
 - structured failure code.
 
-Technical metadata is copyable but is never a required ordinary input.
+Advanced metadata is copyable but never required input.
 
-## 11. User-visible state system
+## 12. User-visible states
 
-Use one consistent state vocabulary across Phase 1 pages.
-
-| System condition | Primary UI behavior |
+| Condition | Behavior |
 | --- | --- |
-| Initial loading | Skeleton/placeholder plus `正在读取本地研究数据` |
-| Synchronous write | Disable duplicate submit; show exact operation label |
-| No sessions | Friendly first-research empty state |
-| No candidates | Explain missing exact local sources; do not fall back |
-| Partial coverage | Persistent amber notice; prohibit exhaustive wording |
-| Unknown coverage | Neutral/amber notice; prohibit exhaustive wording |
-| Ambiguous identity | Row-level block; require exact user selection |
-| Incomplete review | Show undecided count and focus first undecided row |
-| Revision conflict | Preserve unsaved choices; explicit reload/review path |
-| Historical not visible | Explain requested boundary; no latest fallback |
-| Missing downstream research | `尚无相关研究记录`, not zero/neutral |
+| Initial loading | Skeleton plus `正在读取本地研究数据` |
+| Synchronous write | Disable duplicate submit and name the operation |
+| No sessions | First-research empty state |
+| No candidates | Explain missing exact sources; no fallback |
+| Partial/unknown coverage | Persistent notice; no exhaustive wording |
+| Ambiguous identity | Row-level block requiring explicit selection |
+| Incomplete review | Undecided count and focus first undecided row |
+| Revision conflict | Keep unsaved choices; explicit reload/review |
+| Historical not visible | Explain boundary; no latest fallback |
+| Missing downstream research | `尚无相关研究记录`, never zero/neutral |
 | Database unavailable | 503 panel with local configuration guidance |
-| Future module | Disabled navigation with `后续阶段` |
-| Unsupported AI/network | Never call; show feature not enabled only where relevant |
+| Future module | Disabled with `后续阶段` |
 
-Error messages have two layers:
+Errors show a Chinese explanation/next action and collapsible exact code/details.
 
-- Chinese user-facing explanation and next action;
-- collapsible exact failure code/details.
+## 13. Visual, responsive and accessibility rules
 
-## 12. Visual direction
+### Visual
 
-### 12.1 Palette and tokens
+- restrained deep blue/blue-gray primary palette;
+- red/green reserved for market/risk semantics;
+- amber for unresolved;
+- purple for AI draft;
+- blue for deterministic calculations;
+- gray for source metadata;
+- red for risk/falsification;
+- no excessive glass, flashing colors or decorative charts;
+- system Chinese font stack; no bundled proprietary fonts.
 
-Use restrained semantic tokens rather than hard-coded page-specific colors:
+### Responsive
 
-- primary: deep blue / blue-gray;
-- surface: neutral light/dark layers;
-- market up/down: user-configurable red/green convention;
-- unresolved: amber/orange;
-- AI draft: purple;
-- deterministic calculation: blue;
-- risk/falsification: red;
-- source metadata: gray.
+Desktop:
 
-Avoid large gradients, excessive glass effects, flashing market colors and decorative charts without data meaning.
+- visible left navigation;
+- table-first candidate review;
+- bounded right drawer.
 
-### 12.2 Density
+Tablet/narrow:
 
-- default desktop content width supports dense research tables;
-- summary first;
-- row expansion or drawer second;
-- technical details third;
-- no more than one dominant primary action per section;
-- long rationale text is clamped with explicit expansion.
-
-### 12.3 Typography
-
-Use system Chinese fonts and existing project-compatible font stacks. No bundled proprietary font files.
-
-## 13. Responsive and accessibility requirements
-
-### Desktop
-
-- left navigation remains visible;
-- candidate table is primary;
-- evidence drawer overlays or occupies a bounded right column.
-
-### Tablet/narrow desktop
-
-- left navigation collapses to a labelled menu;
-- candidate table switches to cards below the defined breakpoint;
-- evidence drawer becomes a full-height overlay.
+- labelled collapsible navigation;
+- candidate cards;
+- full-height drawer overlay.
 
 ### Accessibility
 
-- valid `lang="zh-CN"`;
-- skip link;
-- semantic headings and landmarks;
-- form labels and descriptions;
-- visible keyboard focus;
-- status updates through polite `aria-live`;
+- `lang="zh-CN"`;
+- skip link and semantic landmarks;
+- labelled forms and accessible descriptions;
+- visible focus;
+- polite `aria-live` status;
 - errors linked with `aria-describedby`;
-- review decision controls usable by keyboard;
-- no status conveyed by color alone;
-- dialogs/drawers trap focus and restore focus on close;
-- tables use scoped headers;
-- reduced-motion preference respected.
+- keyboard-operable decisions;
+- non-color-only status cues;
+- drawer focus trap and focus restoration;
+- scoped table headers;
+- reduced-motion support.
 
 ## 14. Local security and write safety
 
-Phase 1 remains a single-user local application and adds no authentication system.
+Phase 1 remains single-user/local and adds no authentication system.
 
-Write safety rules:
-
-- same-origin JSON fetch only;
+- same-origin JSON fetch;
 - no CORS middleware;
 - strict content type and body limit;
-- no write on page load;
-- no write through links or GET;
-- explicit user action for every append-only write;
-- disable duplicate button activation while a request is in flight;
-- no automatic network retry;
-- no secrets in browser storage, source, logs or errors;
-- no remote assets required for normal page rendering.
+- no writes on page load or through GET;
+- explicit action for every append-only write;
+- duplicate activation disabled while in flight;
+- no automatic retry;
+- no secrets in browser storage/source/logs/errors;
+- no remote assets required.
 
-An ambiguous transport failure instructs the user to reopen research history and verify whether the operation committed before retrying.
+After an ambiguous transport failure, instruct the user to reopen history and verify whether the operation committed before retrying.
 
-## 15. Performance and bounded-query decisions
+## 15. Performance and bounded queries
 
-Phase 1 is local and prioritizes predictability over live streaming.
-
-- Research history defaults to 20 sessions per page.
+- History defaults to 20 sessions per page.
 - Company option search returns at most 20 records.
-- Candidate review initially renders the exact complete universe; when over 100 rows, use client-side windowing/pagination only if every row remains included in decision completeness checks.
+- Candidate review initially renders the complete exact universe.
+- For more than 100 rows, client windowing/pagination is allowed only if completeness checks still include every row.
 - Evidence details load on demand.
 - No polling, websocket, scheduler or background refresh.
-- Page bootstrap may make bounded parallel reads, but one failed optional downstream panel must not erase the core thesis/candidate result.
-- Database engines remain lazily created at request boundaries, consistent with current APIs.
+- Optional downstream panel failure must not erase the core thesis/candidate result.
+- Database engines remain lazy at request boundaries.
 
-## 16. Production-realistic offline golden path
+## 16. Offline golden path
 
-The implementation must demonstrate through production routes and services:
+The later implementation must demonstrate through production routes/services:
 
 1. open `/industry-analysis/new`;
 2. enter `AI 数据中心扩张带动电子特气需求`;
-3. explicitly confirm A-share scope, `demand_expansion`, medium-term horizon, cutoff and reviewed local coverage;
+3. confirm A-share scope, demand expansion, medium-term horizon, cutoff and reviewed local coverage;
 4. select exact local source records producing three candidates;
-5. create the session and build candidate revisions;
-6. open the review page;
-7. select one exact company with `direct` exposure;
-8. reject one company with an explicit rationale;
-9. leave one candidate unresolved with an explicit uncertainty state;
+5. create session and build candidates;
+6. open the exact revision review URL;
+7. select one exact direct beneficiary;
+8. reject one with rationale;
+9. leave one unresolved with uncertainty;
 10. dry-run and commit the complete review;
-11. open the result page;
-12. show all three candidates, exact coverage, source kinds and the reviewed-plan fingerprint in advanced details;
-13. return to history and reopen the same exact result;
-14. perform no AI or external network call;
+11. open the exact reviewed-revision result URL;
+12. show all three candidates, coverage, source kinds and fingerprint;
+13. reopen the same exact result from history;
+14. perform no AI/network call;
 15. create no Industry Map, Stage 1, output-link, Investment Candidate or portfolio owner write.
 
 ## 17. Primary failure path
 
-The required failure demonstration is one atomic review refusal where:
+One candidate has ambiguous identity or stale expected-latest revision while other decisions are valid.
 
-- one candidate has ambiguous identity or stale expected-latest revision;
-- the other rows contain valid user decisions.
+Expected:
 
-Expected result:
-
-- no reviewed session or candidate revision is appended;
-- the page retains all unsaved choices;
-- the affected row receives the exact reason;
-- the user is offered a controlled latest-state reload;
+- no reviewed session/candidate revision appended;
+- unsaved choices retained;
+- affected row identified;
+- controlled reload offered;
 - no candidate disappears;
-- no silent overwrite, deduplication, inference or fallback occurs.
+- no overwrite, deduplication, inference or fallback.
 
-## 18. Validation plan for the later implementation
+## 18. Validation plan for later implementation
 
 ### Backend/API
 
-- strict request model and extra-field rejection;
-- body-size and content-type boundary;
+- strict models and extra-field rejection;
+- body-size/content-type boundary;
 - exact service delegation;
-- session-history ordering and boundaries;
-- local option search limits and explicit identity selection;
+- exact session/revision route ownership checks;
+- history ordering/boundaries;
+- local search/option limits and explicit selection;
 - expected-latest conflict mapping;
 - database-unavailable mapping;
 - no CORS/network/AI side effect.
 
-### UI/static pages
+### UI/static contracts
 
-- all canonical routes return the intended static page;
-- shell contains five labelled modules and honest disabled states;
-- forms have labels, descriptions and accessible errors;
-- candidate completeness count cannot exclude filtered rows;
-- result page preserves selected/rejected/unresolved candidates;
-- technical details are hidden by default and available on demand;
-- no raw UUID input is present in ordinary forms;
-- no fake market, tracking or portfolio data.
+- all canonical routes return intended pages;
+- shell shows five modules and honest disabled states;
+- top search stays local and presentation-only;
+- forms are labelled and errors accessible;
+- filters cannot exclude rows from completeness;
+- result preserves all review states;
+- exact route revisions survive reload/deep link;
+- technical details hidden by default;
+- no raw UUID ordinary input;
+- no fake market/tracking/portfolio data.
 
 ### Regression
 
 - full repository tests;
-- current existing page routes remain available;
-- current exact-ID APIs remain unchanged;
-- standard local fixture demo remains no-network;
+- existing pages/APIs remain available;
+- exact-ID APIs unchanged;
+- local fixture demo remains offline;
 - new three-candidate browser/API fixture uses production boundaries.
 
-No new front-end test dependency is required in the first implementation unless existing test tools cannot prove the required behavior.
+No new front-end test dependency is required unless existing tools cannot prove the contract.
 
-## 19. Proposed bounded implementation slice after approval
+## 19. Proposed bounded implementation slice
 
-A later Strict implementation Issue may authorize these file families:
+After approval, one later Strict implementation Issue may authorize:
 
-- `backend/main.py` for static mount and page routes;
-- `backend/api/industry_analysis.py` for the bounded web adapter;
+- `backend/main.py` for mounts/page routes;
+- `backend/api/industry_analysis.py` for bounded web adapters;
 - `industry_alpha/industry_thesis_query.py` for session-history read only;
-- one bounded `industry_alpha/industry_thesis_workbench.py` view-model/proposal-composition module;
-- `research_workbench/static/**` for HTML/CSS/JavaScript assets;
-- focused `tests/test_industry_analysis_api.py` and UI route/static-contract tests;
-- the existing offline demo or one dedicated no-network workbench demo.
+- one bounded `industry_alpha/industry_thesis_workbench.py` module for view models, local search and proposal composition;
+- `research_workbench/static/**` for HTML/CSS/JavaScript;
+- focused API/static-route tests;
+- existing or dedicated offline workbench demo.
 
-The implementation must make no migration and must not modify existing accepted owner semantics.
+No migration and no accepted-owner semantic change.
 
-## 20. Explicitly deferred phases
+## 20. Deferred phases
 
-### Today Market
-
-Requires an authorized market-data/sector Provider and refresh contract. No implementation in Phase 1.
-
-### Daily Industry Radar
-
-Requires authorized news/announcement acquisition, immutable capture, deduplication, theme grouping and scheduler architecture. No implementation in Phase 1.
-
-### Follow and Track
-
-Requires followed-entity persistence, change rules, scheduler and notification contracts. No implementation in Phase 1.
-
-### Research Portfolio
-
-Observation portfolio requires price-history and benchmark semantics. Simulated portfolio additionally requires an append-only virtual ledger, transaction costs and corporate-action handling. No implementation in Phase 1.
-
-### Model and Provider settings
-
-Requires credential security, explicit model roles and Provider authorization. Phase 1 settings are browser-local display preferences only.
+- **Today Market**: requires authorized market/sector data and refresh contract.
+- **Daily Industry Radar**: requires authorized news/announcement ingestion, immutable capture, grouping and scheduler.
+- **Follow and Track**: requires followed-entity persistence, change rules and notifications.
+- **Research Portfolio**: observation portfolio needs price/benchmark semantics; simulated portfolio additionally needs an append-only virtual ledger and corporate-action handling.
+- **Model/Provider settings**: requires credential security, explicit roles and Provider authorization.
+- **Owner acceptance/output links**: separate orchestration implementation after explicit architecture/owner authorization.
 
 ## 21. Stop conditions
 
-Return to Issue #198 rather than implement when:
+Return to Issue #198 when:
 
-- a page field lacks an authoritative owner;
-- the ordinary flow requires manual UUID/revision entry;
+- a visible field lacks an authoritative owner;
+- ordinary flow requires manual technical-ID entry;
 - fuzzy text must establish company identity;
-- free-text-only input is represented as full-market discovery;
-- the complete candidate universe cannot be preserved;
-- a result requires automatic accepted Industry Map, beneficiary or Investment Candidate writes;
-- the implementation requires a Provider, scheduler, notification system, AI call or portfolio ledger;
-- a new front-end framework/build system is proposed without concrete necessity;
-- static pages cannot share the shell without a cross-project refactor;
-- an error path requires latest-record fallback or history mutation.
+- free text is represented as full-market discovery;
+- the complete universe cannot be preserved;
+- a result requires automatic owner or Investment Candidate writes;
+- implementation needs Provider, scheduler, notification, AI or portfolio ledger;
+- a new front-end framework is proposed without concrete necessity;
+- an error requires latest fallback or history mutation.
 
-## 22. Architecture Definition of Ready
+## 22. Definition of Ready
 
-The Phase 1 implementation may be opened only after this architecture is fixed-head approved and separately authorized by the owner.
-
-The implementation Issue must freeze:
+A Phase 1 implementation Issue may open only after exact-head architecture approval and separate owner authorization. It must freeze:
 
 - exact main base SHA;
-- the page and API routes in this document;
+- page/API routes in this document;
 - authorized file families;
-- no-migration decision;
-- session-history, local-option and proposal-composer contracts;
+- no-migration/no-new-framework decisions;
+- history, local-option, local-search and proposal-composer contracts;
+- exact revision deep links;
 - complete-universe review behavior;
-- evidence drawer and user-visible state behavior;
+- evidence drawer and visible states;
 - offline golden and atomic failure paths;
-- no Provider, scheduler, AI, portfolio or trading scope;
+- locked Provider/scheduler/AI/portfolio/trading exclusions;
 - exact CI and fixed-head implementation review gates.
 
-## 23. Required architecture approval phrase
+## 23. Required approval phrase
 
 ```text
 AUTHORIZED PERSONAL RESEARCH WORKBENCH UI PHASE 1 PREFLIGHT APPROVED at fixed head <FULL_HEAD_SHA>
