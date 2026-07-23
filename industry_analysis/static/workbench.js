@@ -298,6 +298,7 @@ function setupHistory() {
   const now = new Date();
   document.querySelector("#as-of-cutoff").value = dateInputValue(now);
   document.querySelector("#as-of-recorded-at").value = dateTimeInputValue(now);
+  document.querySelector("#history-limit").value = "20";
   document.querySelector("#history-form").addEventListener("submit", (event) => {
     event.preventDefault();
     loadHistory();
@@ -528,12 +529,13 @@ function setFormBusy(busy, label = "") {
 
 function commandRequest(payload, dryRun) {
   if (editContext) {
+    const { revision_note: revisionNote, ...changes } = payload;
     return {
       path: `/industry-analysis/api/sessions/${encodeURIComponent(editContext.sessionId)}/revisions?dry_run=${dryRun ? "true" : "false"}`,
       body: {
         expected_latest_revision_number: editContext.revisionNumber,
-        changes: payload,
-        revision_note: payload.revision_note,
+        changes,
+        revision_note: revisionNote,
       },
     };
   }
@@ -607,10 +609,13 @@ async function submitScope(dryRun) {
     success.appendChild(details);
     setStatus(status, "保存完成。不会自动构建候选或接受任何公司。", "success");
   } catch (error) {
-    const conflict = error.status === 409
-      ? " 页面已保留你的输入；请返回历史重新读取精确版本后再确认。"
-      : " 页面已保留你的输入。";
-    setStatus(status, `${error.message || "研究范围处理失败。"}${conflict}`, "error");
+    let guidance = " 页面已保留你的输入。";
+    if (error.status === 409) {
+      guidance = " 页面已保留你的输入；请返回历史重新读取精确版本后再确认。";
+    } else if (!error.status || error.status >= 500) {
+      guidance = " 页面已保留你的输入；请先返回研究历史确认是否已写入，再重试。";
+    }
+    setStatus(status, `${error.message || "研究范围处理失败。"}${guidance}`, "error");
   } finally {
     setFormBusy(false);
   }
