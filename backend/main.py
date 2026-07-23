@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.beneficiary_semantics import router as beneficiary_semantics_router
@@ -10,6 +10,7 @@ from backend.api.company_comparison import router as company_comparison_router
 from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
 from backend.api.industry_alpha import router as industry_alpha_router
+from backend.api.industry_analysis import router as industry_analysis_router
 from backend.api.industry_research import router as industry_research_router
 from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
@@ -29,6 +30,9 @@ EVIDENCE_INTELLIGENCE_STATIC_DIR = (
 )
 INDUSTRY_RESEARCH_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "industry_research" / "static"
+)
+INDUSTRY_ANALYSIS_STATIC_DIR = (
+    Path(__file__).resolve().parents[1] / "industry_analysis" / "static"
 )
 COMPANY_RESEARCH_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "company_research" / "static"
@@ -56,6 +60,11 @@ app.mount(
     name="industry-research-static",
 )
 app.mount(
+    "/industry-analysis/static",
+    StaticFiles(directory=INDUSTRY_ANALYSIS_STATIC_DIR),
+    name="industry-analysis-static",
+)
+app.mount(
     "/company-research/static",
     StaticFiles(directory=COMPANY_RESEARCH_STATIC_DIR),
     name="company-research-static",
@@ -75,6 +84,7 @@ app.include_router(industry_alpha_router)
 app.include_router(beneficiary_semantics_router)
 app.include_router(evidence_intelligence_router)
 app.include_router(industry_research_router)
+app.include_router(industry_analysis_router)
 app.include_router(company_research_router)
 app.include_router(company_comparison_router)
 app.include_router(canonical_price_router)
@@ -95,6 +105,25 @@ def read_root() -> dict[str, str]:
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/workbench", include_in_schema=False)
+def personal_research_workbench_root() -> RedirectResponse:
+    """Enter the personal workbench through its first active module."""
+
+    return RedirectResponse(url="/industry-analysis", status_code=307)
+
+
+@app.get("/industry-analysis", include_in_schema=False)
+@app.get("/industry-analysis/new", include_in_schema=False)
+@app.get("/workbench/settings", include_in_schema=False)
+def personal_research_workbench_page() -> FileResponse:
+    """Serve the Chinese-first Personal Research Workbench shell."""
+
+    return FileResponse(
+        INDUSTRY_ANALYSIS_STATIC_DIR / "workbench.html",
+        media_type="text/html",
+    )
 
 
 @app.get("/dashboard", include_in_schema=False)
