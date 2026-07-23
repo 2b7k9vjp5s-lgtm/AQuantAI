@@ -38,8 +38,20 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -q -e ".[dev]"
 
-      - name: Run focused Today Market tests
-        run: python -m pytest -q tests/test_today_market.py --tb=short
+      - name: Run Today Market input and database tests
+        run: python -m pytest -q tests/test_today_market.py -k "boundaries_fail or database_configuration" --tb=short
+
+      - name: Run Today Market catalog tests
+        run: python -m pytest -q tests/test_today_market.py -k "empty_catalog or catalog_lists" --tb=short
+
+      - name: Run Today Market chronology tests
+        run: python -m pytest -q tests/test_today_market.py -k "recorded_boundary or legacy_repository" --tb=short
+
+      - name: Run Today Market snapshot tests
+        run: python -m pytest -q tests/test_today_market.py -k "snapshot_golden" --tb=short
+
+      - name: Run Today Market page tests
+        run: python -m pytest -q tests/test_today_market.py -k "today_market_page or static_assets" --tb=short
 
       - name: Run tests
         run: python -m pytest -q --tb=short
