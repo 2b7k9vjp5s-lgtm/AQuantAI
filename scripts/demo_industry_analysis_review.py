@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, timedelta, timezone
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
@@ -109,8 +109,6 @@ def _json(response, expected_status: int = 200) -> dict:
 
 
 def _exact_query(*, session_id: str, boundary: datetime, dry_run: bool | None = None) -> str:
-    from urllib.parse import urlencode
-
     values = {
         "session_id": session_id,
         "as_of_cutoff": CUTOFF.isoformat(),
@@ -310,12 +308,15 @@ def run_demo() -> dict:
                 "acceptance_plan_fingerprint_sha256"
             ]
 
+            history_query = urlencode(
+                {
+                    "as_of_cutoff": CUTOFF.isoformat(),
+                    "as_of_recorded_at_utc": result_boundary.isoformat(),
+                    "limit": 20,
+                }
+            )
             history = _json(
-                http.get(
-                    "/industry-analysis/api/sessions?"
-                    f"as_of_cutoff={CUTOFF.isoformat()}&"
-                    f"as_of_recorded_at_utc={result_boundary.isoformat()}&limit=20"
-                )
+                http.get(f"/industry-analysis/api/sessions?{history_query}")
             )
             assert history["sessions"][0]["next_surface"] == "result"
             assert history["sessions"][0]["visible_latest_revision_id"] == committed[
