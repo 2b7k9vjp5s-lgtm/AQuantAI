@@ -28,6 +28,21 @@ content_sha256 = b19b6841c9255c18b4d29b58c57029ef25dacef340d41d8f69875f0477ae64d
 
 The SHA-256 identifies the canonical secret-free evidence excerpt used for this review. Source identity is additionally pinned by upstream commit and file blob identifiers.
 
+### 2.1 Canonical evidence excerpt bytes
+
+Compute `content_sha256` over the UTF-8 contents inside the following code block, using LF line endings and one terminal newline. The Markdown fences are excluded.
+
+```text
+source_repository=HiThink-Tech/Financial-API
+source_commit=f8cdea908469b1b3b8bfb88dbb4d4a3959b1905c
+README.md: official service maintained by Tonghuashun for AI Agents, quantitative researchers and application developers; supports Python research programs, scheduled acquisition, Market Dumps, local DuckDB, long-term historical storage, full initialization, incremental updates, SQL research and file export.
+python/toolkit/marketdb/README.md: local A-share market database for reading, updating and analyzing local OHLCV and adjusted data; auto-sync selects FULL or INCREMENTAL, stores a local DuckDB database and removes temporary Parquet after application.
+hithink-finance-cli/src/infrastructure/fuyao/retry.ts: Retry-After has precedence; exponential delay base 1s, 2s, 4s capped at 8s plus jitter; retryable business codes 4001,5001,5002,5003.
+hithink-finance-cli/src/infrastructure/fuyao/client.ts: default timeout 30000ms; default maxAttempts 3; authentication and validation errors are non-retryable.
+```
+
+This excerpt contains only deterministic interpretations of the pinned sources. The source paths, commit and Git blob SHAs remain the primary provenance anchors.
+
 ## 3. Reviewed source inventory
 
 | Source path | Git blob SHA | Accepted role |
