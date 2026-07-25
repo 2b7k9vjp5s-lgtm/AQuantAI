@@ -50,6 +50,9 @@ FORBIDDEN_MODULE_PREFIXES = (
     "subprocess",
     "sqlalchemy",
     "fastapi",
+    "os",
+    "sqlite3",
+    "psycopg",
 )
 
 
@@ -177,7 +180,7 @@ def test_synthetic_success_and_error_fixtures_are_strict() -> None:
     assert [row.date_ms for row in success.data.item] == [1000, 2000]
     assert len(index_history_schema_fingerprint()) == 64
     error = validate_error_envelope(load_synthetic_fixture(FIXTURES / "standard_error.synthetic.json"))
-    assert error.code == 1003 and error.request_id is None and error.data is None
+    assert error.code == 987654321 and error.request_id is None and error.data is None
 
 
 def test_schema_rejects_marker_unknown_fields_wrong_types_and_order() -> None:
@@ -224,17 +227,33 @@ def test_import_and_demo_do_not_touch_network_subprocess_or_secrets(monkeypatch:
     import subprocess
     import urllib.request
 
+    import httpx
+
     def denied(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise AssertionError("Stage C0 attempted a prohibited side effect")
 
     monkeypatch.setattr(socket, "socket", denied)
     monkeypatch.setattr(socket, "create_connection", denied)
+    monkeypatch.setattr(socket, "getaddrinfo", denied)
+    monkeypatch.setattr(httpx.Client, "request", denied)
+    monkeypatch.setattr(httpx.AsyncClient, "request", denied)
     monkeypatch.setattr(urllib.request, "urlopen", denied)
     monkeypatch.setattr(subprocess, "run", denied)
     monkeypatch.setattr(subprocess, "Popen", denied)
     monkeypatch.setattr(os, "getenv", denied)
 
-    package = importlib.import_module("datasource.ths_structured_provider")
+    module_names = (
+        "datasource.ths_structured_provider.fingerprint",
+        "datasource.ths_structured_provider.contracts",
+        "datasource.ths_structured_provider.readiness",
+        "datasource.ths_structured_provider.selectors",
+        "datasource.ths_structured_provider.redaction",
+        "datasource.ths_structured_provider.schemas",
+        "datasource.ths_structured_provider.planner",
+    )
+    for module_name in module_names:
+        importlib.reload(importlib.import_module(module_name))
+    package = importlib.reload(importlib.import_module("datasource.ths_structured_provider"))
     plan = package.build_index_history_plan(package.IndexHistorySelector("SYNTH.IDX.C0", 1000, 2000), package.CapabilityReadiness())
     assert plan.remote_executable is False
     demo = importlib.import_module("scripts.demo_ths_stage_c0_offline")
