@@ -19,6 +19,14 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 _TABLE = "industry_thesis_output_link_revisions"
+_NEW_COLUMNS = {
+    "accepted_session_revision_id",
+    "reviewed_session_revision_id",
+    "research_case_id",
+    "output_contract_version",
+    "reviewed_plan_fingerprint_sha256",
+    "ordered_owner_output_bindings_json",
+}
 
 
 def _has_rows(bind: sa.Connection) -> bool:
@@ -29,6 +37,13 @@ def _has_rows(bind: sa.Connection) -> bool:
     )
 
 
+def _column_names(bind: sa.Connection) -> set[str]:
+    return {
+        item["name"]
+        for item in sa.inspect(bind).get_columns(_TABLE)
+    }
+
+
 def _batch() -> object:
     bind = op.get_bind()
     recreate = "always" if bind.dialect.name == "sqlite" else "auto"
@@ -36,7 +51,7 @@ def _batch() -> object:
 
 
 def upgrade() -> None:
-    """Upgrade only an empty legacy output-link table; never guess history."""
+    """Upgrade only an empty deterministic schema; never guess history."""
 
     bind = op.get_bind()
     if _has_rows(bind):
@@ -46,6 +61,20 @@ def upgrade() -> None:
             "cannot be derived without guessing. Preserve the database and perform a "
             "separately reviewed deterministic migration first."
         )
+
+    present = _column_names(bind) & _NEW_COLUMNS
+    if present:
+        if present != _NEW_COLUMNS:
+            missing = ", ".join(sorted(_NEW_COLUMNS - present))
+            raise RuntimeError(
+                "Cannot upgrade a partially materialized Industry Thesis owner-acceptance "
+                f"schema. Missing exact columns: {missing}."
+            )
+        # Migration 0016 historically imports the current ORM table objects. On a fresh
+        # install it can therefore materialize the complete 0017 table shape before this
+        # revision runs. The table is empty and complete, so stamping 0017 is safe and
+        # preserves the same final schema without rewriting the accepted 0016 migration.
+        return
 
     with _batch() as batch:
         batch.alter_column(
