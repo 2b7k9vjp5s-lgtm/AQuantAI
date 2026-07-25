@@ -1,0 +1,29 @@
+{
+  "_aquantai_fixture_kind": "synthetic",
+  "code": 0,
+  "message": "synthetic-success",
+  "data": {
+    "timestamp": 2000,
+    "adjust": null,
+    "item": [
+      {
+        "date_ms": 1000,
+        "open_price": 101.25,
+        "high_price": 103.5,
+        "low_price": 100.75,
+        "close_price": 102.5,
+        "volume": 12345,
+        "turnover": 67890
+      },
+      {
+        "date_ms": 2000,
+        "open_price": 102.5,
+        "high_price": 104.0,
+        "low_price": 101.0,
+        "close_price": 103.25,
+        "volume": 23456,
+        "turnover": 78901
+      }
+    ]
+  }
+}
