@@ -23,10 +23,9 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
     engine = module.build_engine(database_url)
     try:
         factory = module.build_session_factory(engine)
-        raw, recorded = module._reviewed_fixture(factory)
-        assert raw["reviewed_session_revision_id"]
-        assert raw["industry_map_revision_id"]
-        assert recorded is not None
+        fixture = module.build_stage1_beneficiary_fixture(factory)
+        assert fixture.direct_beneficiary_id is not None
+        assert fixture.candidate_pool_id is not None
     finally:
         engine.dispose()
     return True
