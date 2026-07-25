@@ -197,12 +197,14 @@ def get_workbench_bootstrap() -> dict:
     return {
         "product": "AQuantAI",
         "surface": "personal_research_workbench",
-        "phase": "ui_phase_1d",
+        "phase": "ui_phase_2c",
         "active_slices": {
             "scope_creation": "ui_phase_1b",
             "candidate_universe": "ui_phase_1c",
             "candidate_review": "ui_phase_1d",
             "exact_review_result": "ui_phase_1d",
+            "owner_acceptance": "ui_phase_2c",
+            "exact_accepted_result": "ui_phase_2c",
         },
         "language": "zh-CN",
         "database_available": _database_available(),
@@ -219,7 +221,8 @@ def get_workbench_bootstrap() -> dict:
             "candidate_universe_read": True,
             "candidate_review": True,
             "reviewed_plan_read": True,
-            "accepted_output_write": False,
+            "accepted_output_write": True,
+            "accepted_output_read": True,
             "network_acquisition": False,
             "ai_assistance": False,
             "portfolio": False,
@@ -321,8 +324,18 @@ def _exact_continuation(item: dict[str, Any]) -> dict[str, str | None]:
             "path": f"/industry-analysis/sessions/{session_id}/revisions/{revision_id}/result?{query}",
             "reason_code": "exact_reviewed_plan_ready",
         }
+    if workflow_state == "accepted_outputs_linked":
+        query = urlencode(boundary_query)
+        return {
+            "kind": "accepted_result",
+            "label": "查看已接受成果",
+            "path": (
+                f"/industry-analysis/sessions/{session_id}/revisions/"
+                f"{revision_id}/accepted-result?{query}"
+            ),
+            "reason_code": "exact_accepted_outputs_linked",
+        }
     reason_codes = {
-        "accepted_outputs_linked": "accepted_outputs_not_supported_in_phase2b",
         "superseded": "superseded_record",
         "abandoned": "abandoned_record",
     }
