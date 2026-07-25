@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQuantAI 已接受研究成果</title>
+  <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
+  <link rel="stylesheet" href="/industry-analysis/static/review_result.css">
+  <link rel="stylesheet" href="/industry-analysis/static/workbench_phase2b.css">
+  <link rel="stylesheet" href="/industry-analysis/static/owner_acceptance.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="/industry-analysis" aria-label="AQuantAI 产业研究首页">
+        <span class="brand-mark">AQ</span>
+        <span><strong>AQuantAI</strong><small>个人研究工作台</small></span>
+      </a>
+      <nav class="primary-nav">
+        <a class="nav-item" href="/today-market"><span>今日市场</span><small>本地快照</small></a>
+        <a class="nav-item nav-active" href="/industry-analysis" aria-current="page"><span>产业研究</span><small>本地研究</small></a>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
+        <a class="nav-item" href="/workbench/settings"><span>系统设置</span><small>显示偏好</small></a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>已接受成果</strong>
+        <p>本页固定展示一次精确接受事务的完整成员、supported 后续研究池和准备度，不会移动到最新版本。</p>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">EXACT ACCEPTED OUTPUT · REPRODUCIBLE</p>
+          <p class="page-context">已接受研究成果</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="page-state" class="status-pill">正在验证精确成果</span>
+          <a class="button button-primary" href="/industry-analysis">返回研究历史</a>
+        </div>
+      </header>
+
+      <main id="main-content" tabindex="-1" class="accepted-result-page">
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow">ACCEPTED OUTPUT LINKS</p>
+            <h1 id="accepted-title">已接受研究成果</h1>
+            <p id="accepted-scope">正在读取精确成果范围。</p>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="workflow-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="workflow-title">研究流程</h2>
+              <p>本页固定在已接受结果，不会自动切换到其他修订。</p>
+            </div>
+          </div>
+          <div id="phase2b-workflow" class="phase2b-workflow"></div>
+          <div id="phase2b-state" class="phase2b-state"></div>
+        </section>
+
+        <section id="error-summary" class="error-summary" tabindex="-1" role="alert" hidden>
+          <strong>精确成果不可用</strong>
+          <ul id="error-list"></ul>
+        </section>
+
+        <section class="panel" aria-labelledby="facts-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="facts-title">本次接受结论</h2>
+              <p>结论只描述本次研究接受状态和后续准备度，不包含买卖建议、目标价或预期收益。</p>
+            </div>
+          </div>
+          <div id="accepted-facts" class="fact-grid"></div>
+          <div id="zero-supported" class="zero-supported-box" hidden></div>
+        </section>
+
+        <section class="panel" aria-labelledby="complete-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="complete-title">完整接受成员</h2>
+              <p>保留全部冻结成员及其顺序，包括 draft 和 disputed；不会因未进入 supported 后续研究池而消失。</p>
+            </div>
+            <span id="complete-count" class="group-count">0</span>
+          </div>
+          <div id="complete-members" class="accepted-member-list"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="handoff-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="handoff-title">supported 后续研究池</h2>
+              <p>该列表与完整接受成员含义不同，只包含最终 Stage 1 状态为 supported 的精确成员。</p>
+            </div>
+            <span id="handoff-count" class="group-count">0</span>
+          </div>
+          <div id="handoff-members" class="accepted-member-list"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="technical-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="technical-title">来源与技术详情</h2>
+              <p>用于复现和审计；普通使用不需要复制 UUID、事务 ID 或指纹。</p>
+            </div>
+          </div>
+          <details>
+            <summary>查看精确输出链接、指纹和双时间边界</summary>
+            <pre id="accepted-technical" class="json-block"></pre>
+          </details>
+        </section>
+
+        <p id="accepted-status" class="status-message" role="status" aria-live="polite"></p>
+      </main>
+    </div>
+  </div>
+  <script src="/industry-analysis/static/workbench_phase2b.js" defer></script>
+  <script src="/industry-analysis/static/accepted_result.js" defer></script>
+</body>
+</html>
