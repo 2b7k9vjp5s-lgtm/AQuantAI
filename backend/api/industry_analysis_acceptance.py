@@ -31,10 +31,7 @@ from industry_alpha.industry_thesis_owner_acceptance_workbench import (
 from industry_alpha.industry_thesis_rules import IndustryThesisError
 
 
-api_router = APIRouter(
-    prefix="/industry-analysis/api",
-    tags=["industry-analysis-owner-acceptance"],
-)
+api_router = APIRouter(tags=["industry-analysis-owner-acceptance"])
 page_router = APIRouter(tags=["industry-analysis-pages"])
 _STATIC_DIR = Path(__file__).resolve().parents[2] / "industry_analysis" / "static"
 
