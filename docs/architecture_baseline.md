@@ -643,3 +643,21 @@ That future preflight must reuse the existing Industry Map, Stage 1, typed-seman
 Issue #225 continues independently as the sole THS live-contract evidence gate. No Stage C1 implementation Issue, credential boundary, HTTP client, source activation or live request may be created until that gate reaches an accepted implementation-ready outcome and the project owner separately authorizes the implementation slice.
 
 Roadmap Issue #137 records the owner-approved execution order. A materially different feature instruction must be identified as a plan deviation and confirmed before creating its Issue, branch, PR or code. Necessary fixes and validation within an already authorized slice are not roadmap deviations.
+
+## Industry Thesis owner-acceptance accepted-state synchronization
+
+This section is the authoritative Issue #236 synchronization for the state produced by architecture PR #235 and implementation PR #237. Once PR #237 is merged, it supersedes earlier P0-0 statements in this document that describe owner acceptance and exact output links as future, missing, deferred or unauthorized.
+
+- The deterministic Industry Thesis workflow can advance an exact `reviewed_plan_ready` revision to one append-only `accepted_outputs_linked` revision only through an explicit strict owner-acceptance plan.
+- Preview and commit use the same normalized owner plan and SHA-256 fingerprint; commit requires the exact matching preview fingerprint.
+- One outer transaction coordinates session-bound Stage 1 and Typed Beneficiary Semantics owner ports. The coordinator does not open nested owner transactions and does not duplicate owner validation.
+- Exact existing Research Case, Industry Map, reviewed session, reviewed candidates and owner revisions remain explicit. No free text, company label, draft graph, Provider field or AI result is promoted by inference.
+- The frozen complete accepted result remains separate from the supported-only Stage 1 candidate-pool handoff. Draft and disputed members remain visible in the complete result; rejected members are blocked.
+- A valid zero-supported acceptance freezes the complete accepted members, stores a null candidate-pool revision and creates no empty or fabricated pool.
+- The accepted session revision and output-link revision freeze the exact reviewed revision, accepted revision, Research Case, Industry Map revision, optional candidate-pool revision, ordered owner bindings, reviewed-plan fingerprint, owner-plan fingerprint, transaction ID, information cutoff and recorded-UTC boundary.
+- Identical replay is deterministic and idempotent; conflicting replay, stale expected-latest state, incomplete owner bindings and graph corruption fail closed.
+- Exact JSON-only output, complete-result and readiness reads require explicit information-cutoff and recorded-UTC visibility and never fall back to a newer or substitute record.
+- Migration `20260725_0017` changes only the Industry Thesis output-link schema, supports nullable zero-supported handoff, refuses ambiguous populated legacy upgrade and refuses lossy populated downgrade.
+- The core is local and offline. It adds no HTTP/API/UI surface, Provider access, credential path, scheduler, retry loop, background worker, notification, AI call, Company Research automation, Investment Candidate scoring, recommendation, target price, expected return, portfolio, broker, order or trading behavior.
+- The separately governed `P0-1 Ordinary-User Completion Slice` remains the next Industry Thesis product gate. Issue #225 continues independently as the sole live THS contract-evidence gate.
+- This capability synchronization does not change released version `0.2.0` and does not itself authorize release, merge, Issue closure or any later slice.
