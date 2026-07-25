@@ -38,16 +38,132 @@ def _has_rows(bind: sa.Connection) -> bool:
 
 
 def _column_names(bind: sa.Connection) -> set[str]:
-    return {
-        item["name"]
-        for item in sa.inspect(bind).get_columns(_TABLE)
-    }
+    return {item["name"] for item in sa.inspect(bind).get_columns(_TABLE)}
 
 
 def _batch() -> object:
     bind = op.get_bind()
     recreate = "always" if bind.dialect.name == "sqlite" else "auto"
     return op.batch_alter_table(_TABLE, recreate=recreate)
+
+
+def _legacy_output_table() -> sa.Table:
+    """Return the exact empty 0016 output-revision table definition.
+
+    Migration 0016 imports current ORM metadata, so a fresh installation can
+    materialize the v1 shape before 0017 runs. Downgrade is allowed only while
+    this table is empty; rebuilding that empty table from a frozen local schema
+    avoids dialect-dependent batch reflection of constraints on removed columns.
+    """
+
+    metadata = sa.MetaData()
+    for table_name in (
+        "industry_thesis_output_link_identities",
+        "industry_thesis_session_revisions",
+        "industry_maps",
+        "industry_map_revisions",
+        "stage1_candidate_pool_revisions",
+    ):
+        sa.Table(
+            table_name,
+            metadata,
+            sa.Column("id", sa.Uuid(), primary_key=True),
+        )
+
+    return sa.Table(
+        _TABLE,
+        metadata,
+        sa.Column("id", sa.Uuid(), primary_key=True),
+        sa.Column(
+            "output_link_id",
+            sa.Uuid(),
+            sa.ForeignKey(
+                "industry_thesis_output_link_identities.id",
+                ondelete="RESTRICT",
+            ),
+            nullable=False,
+        ),
+        sa.Column("revision_number", sa.Integer(), nullable=False),
+        sa.Column(
+            "session_revision_id",
+            sa.Uuid(),
+            sa.ForeignKey(
+                "industry_thesis_session_revisions.id",
+                ondelete="RESTRICT",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "accepted_industry_map_identity_id",
+            sa.Uuid(),
+            sa.ForeignKey("industry_maps.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+        sa.Column(
+            "accepted_industry_map_revision_id",
+            sa.Uuid(),
+            sa.ForeignKey("industry_map_revisions.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+        sa.Column(
+            "accepted_candidate_pool_revision_id",
+            sa.Uuid(),
+            sa.ForeignKey(
+                "stage1_candidate_pool_revisions.id",
+                ondelete="RESTRICT",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "ordered_beneficiary_revision_ids_json",
+            sa.Text(),
+            nullable=False,
+        ),
+        sa.Column("coverage_state", sa.String(length=32), nullable=False),
+        sa.Column(
+            "acceptance_plan_fingerprint_sha256",
+            sa.String(length=64),
+            nullable=False,
+        ),
+        sa.Column("owner_transaction_id", sa.String(length=128), nullable=False),
+        sa.Column("information_cutoff_date", sa.Date(), nullable=False),
+        sa.Column(
+            "recorded_at_utc",
+            sa.DateTime(timezone=True),
+            nullable=False,
+        ),
+        sa.Column(
+            "supersedes_output_link_revision_id",
+            sa.Uuid(),
+            sa.ForeignKey(
+                f"{_TABLE}.id",
+                ondelete="RESTRICT",
+            ),
+        ),
+        sa.UniqueConstraint(
+            "output_link_id",
+            "revision_number",
+            name="uq_industry_thesis_output_link_revision_number",
+        ),
+        sa.CheckConstraint(
+            "revision_number > 0",
+            name="ck_industry_thesis_output_revision_positive",
+        ),
+        sa.CheckConstraint(
+            "coverage_state IN "
+            "('reviewed_local_scope','partial_local_coverage','coverage_unknown')",
+            name="ck_industry_thesis_output_coverage",
+        ),
+        sa.CheckConstraint(
+            "length(acceptance_plan_fingerprint_sha256) = 64",
+            name="ck_industry_thesis_output_plan_fingerprint",
+        ),
+        sa.Index(
+            "ix_industry_thesis_output_revision",
+            "output_link_id",
+            "revision_number",
+        ),
+    )
 
 
 def upgrade() -> None:
@@ -151,7 +267,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Refuse before any lossy operation when v1 output-link rows exist."""
+    """Refuse populated history, otherwise rebuild the exact empty 0016 table."""
 
     bind = op.get_bind()
     if _has_rows(bind):
@@ -160,35 +276,5 @@ def downgrade() -> None:
             "history exists. The nullable handoff and exact owner bindings would be lost."
         )
 
-    with _batch() as batch:
-        batch.drop_index("ix_industry_thesis_output_reviewed_session")
-        batch.drop_constraint(
-            "ck_industry_thesis_output_owner_bindings",
-            type_="check",
-        )
-        batch.drop_constraint(
-            "ck_industry_thesis_output_contract_version",
-            type_="check",
-        )
-        batch.drop_constraint(
-            "ck_industry_thesis_output_reviewed_plan_fingerprint",
-            type_="check",
-        )
-        batch.drop_constraint(
-            "uq_industry_thesis_output_accepted_session",
-            type_="unique",
-        )
-        # Dropping each new column removes its dependent foreign key. This avoids
-        # assuming a physical FK name when fresh 0016 installs materialize the current
-        # ORM table and let SQLite/PostgreSQL assign the constraint name.
-        batch.drop_column("ordered_owner_output_bindings_json")
-        batch.drop_column("reviewed_plan_fingerprint_sha256")
-        batch.drop_column("output_contract_version")
-        batch.drop_column("research_case_id")
-        batch.drop_column("reviewed_session_revision_id")
-        batch.drop_column("accepted_session_revision_id")
-        batch.alter_column(
-            "accepted_candidate_pool_revision_id",
-            existing_type=sa.Uuid(),
-            nullable=False,
-        )
+    op.drop_table(_TABLE)
+    _legacy_output_table().create(bind=bind, checkfirst=False)
