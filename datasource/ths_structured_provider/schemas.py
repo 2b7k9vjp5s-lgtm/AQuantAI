@@ -9,13 +9,23 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .fingerprint import canonical_sha256
+from .readiness import BLOCKED_REASON_MESSAGES_ZH, BlockedReasonCode
 
 _FIXTURE_MARKER = "_aquantai_fixture_kind"
 _EXPECTED_FIXTURE_KIND = "synthetic"
 
 
 class SchemaValidationError(ValueError):
-    """Raised when a synthetic response does not match the frozen schema."""
+    """Raised with a stable blocked reason for response/fixture schema failures."""
+
+    def __init__(
+        self,
+        message: str,
+        reason_code: BlockedReasonCode = BlockedReasonCode.SCHEMA_MISMATCH,
+    ) -> None:
+        self.reason_code = reason_code
+        self.message_zh = BLOCKED_REASON_MESSAGES_ZH[reason_code]
+        super().__init__(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +75,10 @@ def _require_exact_keys(value: Mapping[str, Any], required: set[str], optional: 
     if missing:
         raise SchemaValidationError(f"{name} missing required fields: {sorted(missing)}")
     if unknown:
-        raise SchemaValidationError(f"{name} has unknown fields: {sorted(unknown)}")
+        raise SchemaValidationError(
+            f"{name} has unknown fields: {sorted(unknown)}",
+            BlockedReasonCode.UNREACHABLE_FIXTURE_FIELD,
+        )
 
 
 def _require_int(value: Any, name: str) -> int:
@@ -87,7 +100,10 @@ def _require_number(value: Any, name: str, *, non_negative: bool = True) -> int 
 def strip_synthetic_fixture_marker(value: Mapping[str, Any]) -> dict[str, Any]:
     fixture = dict(value)
     if fixture.pop(_FIXTURE_MARKER, None) != _EXPECTED_FIXTURE_KIND:
-        raise SchemaValidationError("fixture must carry the synthetic marker")
+        raise SchemaValidationError(
+            "fixture must carry the synthetic marker",
+            BlockedReasonCode.UNREACHABLE_FIXTURE_FIELD,
+        )
     return fixture
 
 

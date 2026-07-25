@@ -10,7 +10,7 @@ from .contracts import (
     get_contract,
 )
 from .fingerprint import canonical_json_bytes, canonical_sha256
-from .planner import DryRunRequestPlan, build_index_history_plan
+from .planner import DryRunRequestPlan, PlanValidationError, build_index_history_plan
 from .readiness import (
     BLOCKED_REASON_MESSAGES_ZH,
     BlockedReasonCode,
@@ -39,6 +39,7 @@ __all__ = [
     "INDEX_HISTORY_CAPABILITY",
     "IndexHistoryEnvelope",
     "IndexHistorySelector",
+    "PlanValidationError",
     "PublicEndpointContract",
     "SOURCE_KEY",
     "BlockedReasonCode",

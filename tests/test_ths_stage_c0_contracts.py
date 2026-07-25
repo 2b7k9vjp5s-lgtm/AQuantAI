@@ -16,7 +16,7 @@ from datasource.ths_structured_provider.contracts import (
     get_contract,
 )
 from datasource.ths_structured_provider.fingerprint import canonical_json_bytes, canonical_sha256
-from datasource.ths_structured_provider.planner import build_index_history_plan
+from datasource.ths_structured_provider.planner import PlanValidationError, build_index_history_plan
 from datasource.ths_structured_provider.readiness import (
     BLOCKED_REASON_MESSAGES_ZH,
     BlockedReasonCode,
@@ -130,8 +130,10 @@ def test_confirmed_hypothetical_readiness_still_cannot_execute() -> None:
 
 
 def test_selector_and_contract_mutation_fail_closed() -> None:
-    with pytest.raises(SelectorValidationError, match="reserved"):
+    with pytest.raises(SelectorValidationError, match="reserved") as invalid_selector:
         IndexHistorySelector("LIVE.IDX.NOT_ALLOWED", 1000, 2000)
+    assert invalid_selector.value.reason_code is BlockedReasonCode.SELECTOR_INVALID
+    assert invalid_selector.value.message_zh == BLOCKED_REASON_MESSAGES_ZH[BlockedReasonCode.SELECTOR_INVALID]
     with pytest.raises(SelectorValidationError, match="less than or equal"):
         IndexHistorySelector("SYNTH.IDX.C0", 2000, 1000)
     with pytest.raises(SelectorValidationError, match="integer"):
@@ -139,11 +141,13 @@ def test_selector_and_contract_mutation_fail_closed() -> None:
     zone = ZoneInfo("Asia/Shanghai")
     start = int(datetime(2020, 1, 1, tzinfo=zone).timestamp() * 1000)
     too_late = int(datetime(2030, 1, 2, tzinfo=zone).timestamp() * 1000)
-    with pytest.raises(SelectorValidationError, match="ten calendar years"):
+    with pytest.raises(SelectorValidationError, match="ten calendar years") as out_of_bounds:
         IndexHistorySelector("SYNTH.IDX.C0", start, too_late)
+    assert out_of_bounds.value.reason_code is BlockedReasonCode.SELECTOR_OUT_OF_BOUNDS
     mutated = replace(INDEX_DAILY_HISTORY_CONTRACT, https_host="example.invalid")
-    with pytest.raises(ValueError, match="frozen"):
+    with pytest.raises(PlanValidationError, match="frozen") as contract_error:
         build_index_history_plan(IndexHistorySelector("SYNTH.IDX.C0", 1000, 2000), CapabilityReadiness(), contract=mutated)
+    assert contract_error.value.reason_code is BlockedReasonCode.CONTRACT_NOT_REVIEWED
 
 
 def test_canonical_fingerprints_ignore_mapping_order_but_preserve_list_order() -> None:
@@ -193,13 +197,16 @@ def test_schema_rejects_marker_unknown_fields_wrong_types_and_order() -> None:
 
     unknown = load_synthetic_fixture(FIXTURES / "index_history_success.synthetic.json")
     unknown["data"]["item"][0]["unreviewed_field"] = "synthetic"  # type: ignore[index]
-    with pytest.raises(SchemaValidationError, match="unknown fields"):
+    with pytest.raises(SchemaValidationError, match="unknown fields") as unknown_error:
         validate_index_history_envelope(unknown)
+    assert unknown_error.value.reason_code is BlockedReasonCode.UNREACHABLE_FIXTURE_FIELD
 
     wrong_type = load_synthetic_fixture(FIXTURES / "index_history_success.synthetic.json")
     wrong_type["data"]["item"][0]["date_ms"] = "1000"  # type: ignore[index]
-    with pytest.raises(SchemaValidationError, match="must be an integer"):
+    with pytest.raises(SchemaValidationError, match="must be an integer") as type_error:
         validate_index_history_envelope(wrong_type)
+    assert type_error.value.reason_code is BlockedReasonCode.SCHEMA_MISMATCH
+    assert type_error.value.message_zh == BLOCKED_REASON_MESSAGES_ZH[BlockedReasonCode.SCHEMA_MISMATCH]
 
     bad_order = load_synthetic_fixture(FIXTURES / "index_history_success.synthetic.json")
     bad_order["data"]["item"].reverse()  # type: ignore[index]

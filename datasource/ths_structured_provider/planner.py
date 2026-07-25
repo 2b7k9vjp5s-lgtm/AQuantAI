@@ -15,6 +15,19 @@ RECORD_CEILING = 2000
 RAW_BYTE_CEILING = 10 * 1024 * 1024
 
 
+class PlanValidationError(ValueError):
+    """Raised with a stable blocked reason when planning cannot use a contract."""
+
+    def __init__(
+        self,
+        message: str,
+        reason_code: BlockedReasonCode = BlockedReasonCode.CONTRACT_NOT_REVIEWED,
+    ) -> None:
+        self.reason_code = reason_code
+        self.message_zh = BLOCKED_REASON_MESSAGES_ZH[reason_code]
+        super().__init__(message)
+
+
 @dataclass(frozen=True, slots=True)
 class DryRunRequestPlan:
     source_key: str
@@ -93,9 +106,9 @@ def build_index_history_plan(
     contract: PublicEndpointContract = INDEX_DAILY_HISTORY_CONTRACT,
 ) -> DryRunRequestPlan:
     if contract != INDEX_DAILY_HISTORY_CONTRACT:
-        raise ValueError("Stage C0 accepts only the frozen index-history contract")
+        raise PlanValidationError("Stage C0 accepts only the frozen index-history contract")
     if readiness.source_key != contract.source_key or readiness.capability_key != contract.capability_key:
-        raise ValueError("Readiness does not match the frozen contract")
+        raise PlanValidationError("Readiness does not match the frozen contract")
 
     reason_codes: tuple[BlockedReasonCode, ...] = readiness.blocked_reason_codes()
     return DryRunRequestPlan(

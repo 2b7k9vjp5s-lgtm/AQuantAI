@@ -8,20 +8,33 @@ import re
 from zoneinfo import ZoneInfo
 
 from .fingerprint import canonical_sha256
+from .readiness import BLOCKED_REASON_MESSAGES_ZH, BlockedReasonCode
 
 _SYNTHETIC_THSCODE_RE = re.compile(r"^SYNTH\.IDX\.[A-Z0-9_]{1,32}$")
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
 class SelectorValidationError(ValueError):
-    """Raised when a Stage C0 selector violates the reviewed contract."""
+    """Raised with a stable blocked reason when a selector is invalid."""
+
+    def __init__(
+        self,
+        message: str,
+        reason_code: BlockedReasonCode = BlockedReasonCode.SELECTOR_INVALID,
+    ) -> None:
+        self.reason_code = reason_code
+        self.message_zh = BLOCKED_REASON_MESSAGES_ZH[reason_code]
+        super().__init__(message)
 
 
 def _as_datetime(timestamp_ms: int) -> datetime:
     try:
         return datetime.fromtimestamp(timestamp_ms / 1000, tz=_SHANGHAI)
     except (OverflowError, OSError, ValueError) as exc:
-        raise SelectorValidationError("timestamp is outside the supported datetime range") from exc
+        raise SelectorValidationError(
+            "timestamp is outside the supported datetime range",
+            BlockedReasonCode.SELECTOR_OUT_OF_BOUNDS,
+        ) from exc
 
 
 def _ten_year_anniversary(start: datetime) -> datetime:
@@ -44,14 +57,23 @@ class IndexHistorySelector:
         if any(isinstance(value, bool) or not isinstance(value, int) for value in (self.start_ms, self.end_ms)):
             raise SelectorValidationError("start_ms and end_ms must be integer millisecond timestamps")
         if self.start_ms < 0 or self.end_ms < 0:
-            raise SelectorValidationError("timestamps must be non-negative")
+            raise SelectorValidationError(
+                "timestamps must be non-negative",
+                BlockedReasonCode.SELECTOR_OUT_OF_BOUNDS,
+            )
         if self.start_ms > self.end_ms:
-            raise SelectorValidationError("start_ms must be less than or equal to end_ms")
+            raise SelectorValidationError(
+                "start_ms must be less than or equal to end_ms",
+                BlockedReasonCode.SELECTOR_OUT_OF_BOUNDS,
+            )
 
         start = _as_datetime(self.start_ms)
         end = _as_datetime(self.end_ms)
         if end > _ten_year_anniversary(start):
-            raise SelectorValidationError("index-history window exceeds ten calendar years")
+            raise SelectorValidationError(
+                "index-history window exceeds ten calendar years",
+                BlockedReasonCode.SELECTOR_OUT_OF_BOUNDS,
+            )
 
     @property
     def synthetic_only(self) -> bool:
