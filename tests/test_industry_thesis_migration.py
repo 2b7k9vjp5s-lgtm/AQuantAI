@@ -95,7 +95,8 @@ def test_legacy_output_rows_refuse_upgrade_before_schema_mutation(tmp_path) -> N
     database = tmp_path / "industry-thesis-legacy-output.db"
     config = config_for(database)
     prepare_prior_head(config)
-    command.upgrade(config, "20260722_0016")
+    command.upgrade(config, "head")
+    command.downgrade(config, "20260722_0016")
     engine = create_engine(f"sqlite:///{database}")
     values = _legacy_output_values()
     try:
