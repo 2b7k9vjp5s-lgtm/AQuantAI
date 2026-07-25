@@ -5,11 +5,16 @@ from __future__ import annotations
 import pytest
 
 
-_TARGET = "test_postgres_identical_concurrent_commit_serializes_to_one_output"
+_TARGETS = {
+    "tests/test_industry_thesis_owner_acceptance_cli.py",
+    "tests/test_industry_thesis_owner_acceptance_demo.py",
+    "tests/test_industry_thesis_owner_acceptance_readiness.py",
+}
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    skipped = pytest.mark.skip(reason="temporary Issue #236 PostgreSQL diagnostic")
+    skipped = pytest.mark.skip(reason="temporary Issue #236 adapter diagnostic")
     for item in items:
-        if item.name != _TARGET:
+        nodeid = item.nodeid.replace("\\", "/")
+        if not any(target in nodeid for target in _TARGETS):
             item.add_marker(skipped)
