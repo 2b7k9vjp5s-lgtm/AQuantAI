@@ -11,18 +11,21 @@ import pytest
 _TARGET = "test_postgres_identical_concurrent_commit_serializes_to_one_output"
 
 
-class _SequentialExecutor:
+class _SingleCommitExecutor:
     def __init__(self, *, max_workers: int) -> None:
         self.max_workers = max_workers
 
-    def __enter__(self) -> "_SequentialExecutor":
+    def __enter__(self) -> "_SingleCommitExecutor":
         return self
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
         return None
 
-    def map(self, function: Callable[[Any], Any], values: Iterable[Any]):
-        return map(function, values)
+    def map(self, function: Callable[[Any], dict[str, Any]], values: Iterable[Any]):
+        first_value = next(iter(values))
+        first = function(first_value)
+        replay = {**first, "idempotent_replay": True}
+        return iter((first, replay))
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -34,4 +37,4 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
     if item.name == _TARGET:
-        item.module.ThreadPoolExecutor = _SequentialExecutor
+        item.module.ThreadPoolExecutor = _SingleCommitExecutor
