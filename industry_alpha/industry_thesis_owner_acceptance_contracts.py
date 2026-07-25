@@ -154,6 +154,11 @@ def normalize_owner_acceptance_plan(
     bindings.sort(
         key=lambda item: (item["sequence"], item["reviewed_candidate_revision_id"])
     )
+    if [item["sequence"] for item in bindings] != list(range(len(bindings))):
+        raise IndustryThesisOwnerAcceptanceError(
+            "INDUSTRY_THESIS_ACCEPTANCE_BINDINGS_INCOMPLETE",
+            "candidate owner binding sequence must be dense from zero",
+        )
     canonical = {
         "reviewed_session_revision_id": str(
             parse_uuid(
