@@ -23,7 +23,7 @@ def config_for(path) -> Config:
 
 
 def prepare_prior_head(config: Config) -> None:
-    """Test the 0015 -> 0016 delta without replaying legacy SQLite-incompatible DDL."""
+    """Test the 0015 -> current Industry Thesis delta without legacy SQLite DDL."""
     command.stamp(config, "20260722_0015")
 
 
@@ -35,8 +35,26 @@ def test_migration_creates_exact_six_tables_and_empty_round_trip(tmp_path) -> No
     engine = create_engine(f"sqlite:///{database}")
     try:
         assert EXPECTED_TABLES.issubset(inspect(engine).get_table_names())
+        columns = {
+            item["name"]: item
+            for item in inspect(engine).get_columns(
+                "industry_thesis_output_link_revisions"
+            )
+        }
+        assert columns["accepted_candidate_pool_revision_id"]["nullable"] is True
+        assert {
+            "accepted_session_revision_id",
+            "reviewed_session_revision_id",
+            "research_case_id",
+            "output_contract_version",
+            "reviewed_plan_fingerprint_sha256",
+            "ordered_owner_output_bindings_json",
+        }.issubset(columns)
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0016"
+            assert (
+                connection.scalar(text("SELECT version_num FROM alembic_version"))
+                == "20260725_0017"
+            )
     finally:
         engine.dispose()
 
