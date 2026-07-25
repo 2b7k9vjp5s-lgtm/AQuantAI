@@ -109,7 +109,7 @@ def _input(*, workflow_state: str = "draft") -> dict:
     }
 
 
-def test_postgres_0015_to_0016_and_empty_round_trip(
+def test_postgres_0015_to_0017_and_empty_round_trip(
     postgres_database_url: str,
 ) -> None:
     config = _config(postgres_database_url)
@@ -122,7 +122,7 @@ def test_postgres_0015_to_0016_and_empty_round_trip(
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version_num FROM alembic_version")
-            ) == "20260722_0016"
+            ) == "20260725_0017"
     finally:
         engine.dispose()
 
@@ -196,6 +196,6 @@ def test_postgres_populated_downgrade_refuses_before_any_drop(
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version_num FROM alembic_version")
-            ) == "20260722_0016"
+            ) == "20260725_0017"
     finally:
         engine.dispose()
