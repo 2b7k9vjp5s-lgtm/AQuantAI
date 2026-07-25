@@ -7,7 +7,7 @@ import pytest
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     skipped = pytest.mark.skip(reason="temporary Issue #236 migration diagnostic")
-    target = "test_issue236_v1_guard_fixture_insert"
+    target = "test_v1_output_rows_refuse_downgrade_before_any_loss"
     for item in items:
         if target not in item.nodeid:
             item.add_marker(skipped)
