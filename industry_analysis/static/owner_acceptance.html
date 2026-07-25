@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQuantAI 检查并接受研究成果</title>
+  <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
+  <link rel="stylesheet" href="/industry-analysis/static/review_result.css">
+  <link rel="stylesheet" href="/industry-analysis/static/workbench_phase2b.css">
+  <link rel="stylesheet" href="/industry-analysis/static/owner_acceptance.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="/industry-analysis" aria-label="AQuantAI 产业研究首页">
+        <span class="brand-mark">AQ</span>
+        <span><strong>AQuantAI</strong><small>个人研究工作台</small></span>
+      </a>
+      <nav class="primary-nav">
+        <a class="nav-item" href="/today-market"><span>今日市场</span><small>本地快照</small></a>
+        <a class="nav-item nav-active" href="/industry-analysis" aria-current="page"><span>产业研究</span><small>本地研究</small></a>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
+        <a class="nav-item" href="/workbench/settings"><span>系统设置</span><small>显示偏好</small></a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>成果接受</strong>
+        <p>只确认本地冻结的正式记录和明确选择，不会自动推断受益类型、证据状态或投资结论。</p>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">EXACT OWNER ACCEPTANCE · LOCAL ONLY</p>
+          <p class="page-context">检查并接受研究成果</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="page-state" class="status-pill">正在读取精确准备状态</span>
+          <a id="back-result-link" class="button" href="/industry-analysis">返回研究结果</a>
+        </div>
+      </header>
+
+      <main id="main-content" tabindex="-1" class="acceptance-page">
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow">REVIEW INPUTS BEFORE COMMIT</p>
+            <h1 id="acceptance-title">检查并接受研究成果</h1>
+            <p id="acceptance-thesis">正在读取本地研究内容。</p>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="workflow-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="workflow-title">研究流程</h2>
+              <p>当前固定在“研究结果”步骤；预览不会写入，提交必须由你再次明确确认。</p>
+            </div>
+          </div>
+          <div id="phase2b-workflow" class="phase2b-workflow"></div>
+          <div id="phase2b-state" class="phase2b-state"></div>
+        </section>
+
+        <section id="error-summary" class="error-summary" tabindex="-1" role="alert" hidden>
+          <strong>当前无法继续</strong>
+          <ul id="error-list"></ul>
+        </section>
+
+        <form id="acceptance-form" class="acceptance-form" novalidate>
+          <section class="panel" aria-labelledby="members-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="members-title">逐家公司确认正式归属</h2>
+                <p>每家公司只能使用审核结果冻结的唯一正式股票记录。技术标识仅在详情中展示。</p>
+              </div>
+              <span id="member-count" class="group-count">0</span>
+            </div>
+            <div id="acceptance-members" class="acceptance-member-list"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="pool-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="pool-title">选择一次全局后续研究池操作</h2>
+                <p>进入后续研究池的成员由最终 Stage 1 状态自动派生，不能逐家公司勾选。</p>
+              </div>
+            </div>
+            <div class="acceptance-fields">
+              <label class="form-field">
+                <span>后续研究池操作</span>
+                <select id="pool-mode" required>
+                  <option value="">请选择</option>
+                </select>
+              </label>
+              <label id="pool-option-field" class="form-field" hidden>
+                <span>精确候选池版本</span>
+                <select id="pool-option"></select>
+              </label>
+              <label id="pool-title-field" class="form-field" hidden>
+                <span>候选池标题</span>
+                <input id="pool-title-input" maxlength="300">
+              </label>
+              <label id="pool-scope-field" class="form-field" hidden>
+                <span>候选池范围</span>
+                <textarea id="pool-scope-input" maxlength="4000"></textarea>
+              </label>
+            </div>
+            <p id="pool-help" class="muted-copy"></p>
+          </section>
+
+          <section class="panel" aria-labelledby="output-title-heading">
+            <div class="panel-heading">
+              <div>
+                <h2 id="output-title-heading">确认成果说明</h2>
+                <p>这些文字会进入现有成果接受事务，不会产生第二套草稿或工作流状态。</p>
+              </div>
+            </div>
+            <div class="acceptance-fields">
+              <label class="form-field">
+                <span>成果标题</span>
+                <input id="output-title" maxlength="300" required>
+              </label>
+              <label class="form-field">
+                <span>成果范围</span>
+                <textarea id="output-scope" maxlength="4000" required></textarea>
+              </label>
+              <label class="form-field">
+                <span>本次接受说明</span>
+                <textarea id="revision-note" maxlength="1000" required placeholder="说明为什么按当前正式记录接受本次研究成果"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section id="preview-section" class="panel" aria-labelledby="preview-title" hidden>
+            <div class="preview-header">
+              <div>
+                <h2 id="preview-title">确定性变更预览</h2>
+                <p>该预览尚未写入。任何表单修改都会使预览失效。</p>
+              </div>
+              <span id="preview-state" class="status-pill">尚未生成</span>
+            </div>
+            <div id="preview-summary" class="preview-grid"></div>
+            <div id="preview-operations" class="preview-operation-list"></div>
+            <details class="technical-details">
+              <summary>查看预览指纹和技术详情</summary>
+              <pre id="preview-technical" class="json-block"></pre>
+            </details>
+          </section>
+
+          <section class="panel" aria-label="提交操作">
+            <p class="muted-copy">研究用途，不构成投资建议。页面不会自动提交、自动重试或移动到最新版本。</p>
+            <div class="action-row">
+              <button id="preview-button" class="button button-primary" type="submit">生成变更预览</button>
+              <button id="commit-button" class="button button-primary" type="button" hidden>确认接受研究成果</button>
+            </div>
+          </section>
+        </form>
+
+        <section class="panel" aria-labelledby="technical-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="technical-title">来源与技术详情</h2>
+              <p>用于复现和审计；完成普通流程不需要复制任何 UUID 或指纹。</p>
+            </div>
+          </div>
+          <details>
+            <summary>查看精确修订、时间边界和合同版本</summary>
+            <pre id="acceptance-technical" class="json-block"></pre>
+          </details>
+        </section>
+
+        <p id="acceptance-status" class="status-message" role="status" aria-live="polite"></p>
+      </main>
+    </div>
+  </div>
+  <script src="/industry-analysis/static/workbench_phase2b.js" defer></script>
+  <script src="/industry-analysis/static/owner_acceptance.js" defer></script>
+</body>
+</html>
