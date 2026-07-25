@@ -5,7 +5,7 @@
 This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls Standard or Strict scope.
 
 - Released software version: `0.2.0`.
-- Current accepted `main` merge commit: `d899115e571d393ec45ff9740df4d21cd5c7133f` through implementation PR #231.
+- THS Stage C0 capability merge commit: `d899115e571d393ec45ff9740df4d21cd5c7133f` through implementation PR #231.
 - Latest merged product capability: Personal Research Workbench UI Phase 2B through architecture PR #216 and implementation PR #218.
 - Personal Research Workbench UI Phase 2A Today Market remains accepted through architecture PR #209 and implementation PR #212.
 - Personal Research Workbench UI Phase 1A–1D remains accepted through architecture PR #199 and implementation PRs #201, #203, #205 and #207.
@@ -18,7 +18,7 @@ This document is the authoritative architecture and current-state baseline. `.co
 - Canonical Price and Comparison Eligibility v1 remains the authoritative price owner through PRs #176/#178.
 - Issue #225 remains the sole live THS contract gate. Live Stage C1 is blocked by unresolved account quota, completion, correction/revision/late-data and API-key lifecycle facts.
 - Issues #227 and #230 remain open until separately authorized for closure; their architecture and implementation PRs are merged.
-- Current P0-0 work is Light project-state housekeeping only. It does not start the next product architecture phase.
+- Issue #232 / PR #233 is a Light project-state synchronization only; its merge does not start the next product architecture phase.
 - The next planned mainline gate is reviewed-plan owner acceptance and exact output links; THS contract evidence continues in parallel under Issue #225.
 - CNINFO automated acquisition remains implementation-blocked pending a separately accepted source/access contract.
 - Earlier Evidence Ingestion Issue #154 / PR #155 remains closed-unmerged and reference only.
@@ -570,7 +570,7 @@ Completed:
 37. THS Stage C0 offline foundation architecture — PR #229;
 38. THS Stage C0 offline foundation implementation — PR #231.
 
-No product architecture or implementation phase is currently active. Issue #232 is Light baseline housekeeping only.
+No product architecture or implementation phase is active after this P0-0 synchronization.
 
 Owner-approved planned order, each requiring its own governed authorization:
 
@@ -600,7 +600,7 @@ Deferred:
 
 ## Current authorization state
 
-- Current accepted `main` is merge commit `d899115e571d393ec45ff9740df4d21cd5c7133f` from PR #231.
+- THS Stage C0 capability merge commit is `d899115e571d393ec45ff9740df4d21cd5c7133f` from PR #231.
 - Personal Research Workbench UI Phase 2B is merged through PR #218; Phase 2A Today Market remains merged through PR #212.
 - THS Stage C0 architecture and implementation are merged through PRs #229 and #231.
 - Stage C0 remains structurally offline:
@@ -622,18 +622,16 @@ production_live_network_authorized = false
 ```
 
 - Issues #227 and #230 remain open until separately authorized for completion closure.
-- Issue #232 authorizes only this Light one-file project-state synchronization.
-- No product architecture or implementation phase is active under Issue #232.
+- Issue #232 / PR #233 synchronizes this baseline only and does not authorize product work.
+- No product architecture or implementation phase is active.
 - No live Provider, news, announcement, browser acquisition, scheduler, notification, new AI call or portfolio ledger is authorized.
-- No remote refresh, full-market claim, anomaly/cause engine, accepted evidence, Industry Map, Stage 1, typed-semantics, Company Research, Investment Candidate or portfolio owner write is authorized by current housekeeping.
+- No remote refresh, full-market claim, anomaly/cause engine, accepted evidence, Industry Map, Stage 1, typed-semantics, Company Research, Investment Candidate or portfolio owner write is authorized by this synchronization.
 - No recommendation, target price, expected return, position size, broker, order or automated trading behavior is authorized.
 - No release, tag or version change is authorized.
 
 ## Next governed gate
 
-The current merge gate is the Light housekeeping PR linked to Issue #232. It requires applicable checks, author verification and separate explicit project-owner authorization before merge.
-
-After P0-0 is merged and completed, the next planned mainline action is a separate Strict Architecture Preflight for:
+After this P0-0 synchronization, the next planned mainline action is a separate Strict Architecture Preflight for:
 
 ```text
 Industry Thesis Reviewed-Plan Owner Acceptance
