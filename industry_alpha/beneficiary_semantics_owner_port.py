@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from types import TracebackType
+from typing import Self
 from uuid import UUID
 
 from sqlalchemy import select
@@ -14,7 +16,6 @@ from industry_alpha.beneficiary_semantics_commands import (
     _normalize_input,
     _stored_utc,
 )
-from industry_alpha.beneficiary_semantics_contracts import TAXONOMY_VERSION
 from industry_alpha.beneficiary_semantics_models import (
     Stage1BeneficiarySemanticAssertion,
     Stage1BeneficiarySemanticAssertionClaimLink,
@@ -37,11 +38,46 @@ class BeneficiarySemanticOwnerResult:
     verification_item_count: int
 
 
+class _ExistingSessionScope:
+    """Yield one caller-owned session without ending its transaction."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def __enter__(self) -> Session:
+        return self._session
+
+    def __exit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _traceback: TracebackType | None,
+    ) -> bool:
+        return False
+
+
+class _ExistingSessionFactory:
+    """Adapt a caller-owned session to the public command's transaction scope.
+
+    ``begin`` intentionally returns a no-op context over the existing session.
+    The outer Industry Thesis coordinator remains the only transaction owner;
+    this adapter performs no commit, rollback, close, or nested transaction.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def begin(self) -> _ExistingSessionScope:
+        return _ExistingSessionScope(self._session)
+
+
 class BeneficiarySemanticOwnerWritePort:
     """Apply semantic owner operations inside a caller-owned transaction."""
 
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
-        self._owner = BeneficiarySemanticCommandService(session_factory)
+    def __init__(self, _session_factory: sessionmaker[Session]) -> None:
+        # The public constructor shape remains aligned with other owner ports.
+        # Application writes always receive the explicit caller-owned session.
+        pass
 
     @staticmethod
     def normalize(raw: dict[str, object]) -> dict[str, object]:
@@ -153,83 +189,33 @@ class BeneficiarySemanticOwnerWritePort:
         session: Session,
         raw: dict[str, object],
     ) -> BeneficiarySemanticOwnerResult:
-        normalized = _normalize_input(raw)
-        context = self._owner._validate_database(session, normalized, lock=True)
-        profile = context["profile"]
-        latest = context["latest_revision"]
-        recorded = normalized["recorded_at_utc"]
-        if profile is None:
-            profile = Stage1BeneficiarySemanticProfile(
-                beneficiary_id=normalized["beneficiary_id"],
-                created_at_utc=recorded,
-            )
-            session.add(profile)
-            session.flush()
-        revision = Stage1BeneficiarySemanticProfileRevision(
-            profile_id=profile.id,
-            revision_no=1 if latest is None else latest.revision_no + 1,
-            beneficiary_revision_id=normalized["beneficiary_revision_id"],
-            selected_map_revision_id=normalized["selected_map_revision_id"],
-            taxonomy_version=TAXONOMY_VERSION,
-            overall_status=normalized["overall_status"],
-            summary=normalized["summary"],
-            recorded_by=normalized["recorded_by"],
-            information_cutoff_date=normalized["information_cutoff_date"],
-            recorded_at_utc=recorded,
-            supersedes_revision_id=None if latest is None else latest.id,
+        """Reuse the public owner's exact normalize/validate/apply path.
+
+        The adapter supplies the existing SQLAlchemy session and deliberately
+        performs no transaction-finalization behavior. This keeps public command
+        behavior and cross-owner application logic identical while preserving
+        one outer atomic Industry Thesis transaction.
+        """
+
+        result = BeneficiarySemanticCommandService(
+            _ExistingSessionFactory(session)  # type: ignore[arg-type]
+        ).record(raw)
+        profile = session.get(
+            Stage1BeneficiarySemanticProfile,
+            UUID(result["profile_id"]),
         )
-        session.add(revision)
-        session.flush()
-
-        assertion_by_key: dict[str, Stage1BeneficiarySemanticAssertion] = {}
-        claim_link_count = 0
-        for item in normalized["assertions"]:
-            assertion = Stage1BeneficiarySemanticAssertion(
-                profile_revision_id=revision.id,
-                assertion_key=item["assertion_key"],
-                field_kind=item["field_kind"],
-                state_code=item["state_code"],
-                evidence_state=item["evidence_state"],
-                subject_text=item["subject_text"],
-                rationale=item["rationale"],
-                map_observation_revision_id=item["map_observation_revision_id"],
-                position=item["position"],
+        revision = session.get(
+            Stage1BeneficiarySemanticProfileRevision,
+            UUID(result["profile_revision_id"]),
+        )
+        if profile is None or revision is None or revision.profile_id != profile.id:
+            raise EvidenceLedgerValidationError(
+                "typed semantic owner result is incomplete after application"
             )
-            session.add(assertion)
-            session.flush()
-            assertion_by_key[item["assertion_key"]] = assertion
-            for claim_link in item["claim_links"]:
-                session.add(
-                    Stage1BeneficiarySemanticAssertionClaimLink(
-                        assertion_id=assertion.id,
-                        claim_revision_id=claim_link["claim_revision_id"],
-                        relation=claim_link["relation"],
-                        recorded_at_utc=recorded,
-                    )
-                )
-                claim_link_count += 1
-
-        for item in normalized["verification_items"]:
-            assertion = (
-                None
-                if item["assertion_key"] is None
-                else assertion_by_key[item["assertion_key"]]
-            )
-            session.add(
-                Stage1BeneficiarySemanticVerificationItem(
-                    profile_revision_id=revision.id,
-                    assertion_id=None if assertion is None else assertion.id,
-                    verification_question=item["verification_question"],
-                    expected_evidence_type=item["expected_evidence_type"],
-                    status="open",
-                    recorded_at_utc=recorded,
-                )
-            )
-        session.flush()
         return BeneficiarySemanticOwnerResult(
             profile=profile,
             revision=revision,
-            assertion_count=len(normalized["assertions"]),
-            claim_link_count=claim_link_count,
-            verification_item_count=len(normalized["verification_items"]),
+            assertion_count=result["assertion_count"],
+            claim_link_count=result["claim_link_count"],
+            verification_item_count=result["verification_item_count"],
         )
