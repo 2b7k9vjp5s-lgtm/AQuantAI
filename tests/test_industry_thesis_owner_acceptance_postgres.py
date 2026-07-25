@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import os
+from threading import RLock
 from uuid import uuid4
 
 from alembic import command
@@ -14,6 +15,7 @@ from sqlalchemy.engine import make_url
 
 from backend.database import build_engine, build_session_factory
 from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
+import industry_alpha.industry_thesis_owner_acceptance as acceptance_module
 from industry_alpha.industry_thesis_models import (
     IndustryThesisCandidateIdentity,
     IndustryThesisCandidateRevision,
@@ -109,7 +111,70 @@ def _reviewed_fixture(factory):
         session.add(candidate_identity)
         session.flush()
         reviewed_revision_id = uuid4()
+        candidate_revision_id = uuid4()
+        reviewed_plan_base = {
+            "acceptance_plan_version": "aquantai.industry-thesis-acceptance-plan.v1",
+            "reviewed_session_revision_id": str(reviewed_revision_id),
+            "selected_candidates": [
+                {
+                    "candidate_revision_id": str(candidate_revision_id),
+                    "proposed_stock_basic_record_id": (
+                        beneficiary_revision.stock_basic_record_id
+                    ),
+                }
+            ],
+            "rejected_candidates": [],
+            "unresolved_candidates": [],
+        }
+        reviewed_plan = {
+            **reviewed_plan_base,
+            "acceptance_plan_fingerprint_sha256": fingerprint(reviewed_plan_base),
+        }
+        reviewed = IndustryThesisSessionRevision(
+            id=reviewed_revision_id,
+            session_id=session_identity.id,
+            revision_number=1,
+            thesis_text_original="PostgreSQL owner acceptance exact fixture",
+            thesis_title_reviewed="PostgreSQL owner acceptance",
+            driver_type="demand_expansion",
+            analysis_horizon_kind="medium_term",
+            analysis_start_date=None,
+            analysis_end_date=None,
+            market_scope_json=canonical_json_text(
+                [
+                    {
+                        "market_namespace": "CN_A",
+                        "exchange_namespace": None,
+                        "security_type": "common_equity",
+                        "include_status": "active",
+                        "listed_instrument_ids": [],
+                    }
+                ],
+                "market scope",
+            ),
+            chain_boundary_json=canonical_json_text({}, "chain boundary"),
+            exclusions_json=canonical_json_text([], "exclusions"),
+            seed_companies_json=canonical_json_text([], "seed companies"),
+            seed_products_json=canonical_json_text([], "seed products"),
+            seed_technologies_json=canonical_json_text([], "seed technologies"),
+            seed_bottlenecks_json=canonical_json_text([], "seed bottlenecks"),
+            draft_graph_json=canonical_json_text(
+                {
+                    "base_draft_graph": {},
+                    "acceptance_plan_preview": reviewed_plan,
+                },
+                "reviewed draft graph",
+            ),
+            coverage_state="partial_local_coverage",
+            workflow_state="reviewed_plan_ready",
+            information_cutoff_date=beneficiary_revision.information_cutoff_date,
+            recorded_at_utc=recorded,
+            input_fingerprint_sha256="e" * 64,
+            supersedes_revision_id=None,
+            revision_note="Exact PostgreSQL reviewed-plan fixture.",
+        )
         candidate_revision = IndustryThesisCandidateRevision(
+            id=candidate_revision_id,
             candidate_id=candidate_identity.id,
             session_revision_id=reviewed_revision_id,
             revision_number=1,
@@ -141,62 +206,7 @@ def _reviewed_fixture(factory):
             recorded_at_utc=recorded,
             supersedes_revision_id=None,
         )
-        session.add(candidate_revision)
-        session.flush()
-        reviewed_plan_base = {
-            "acceptance_plan_version": "aquantai.industry-thesis-acceptance-plan.v1",
-            "reviewed_session_revision_id": str(reviewed_revision_id),
-            "selected_candidates": [
-                {
-                    "candidate_revision_id": str(candidate_revision.id),
-                    "proposed_stock_basic_record_id": (
-                        beneficiary_revision.stock_basic_record_id
-                    ),
-                }
-            ],
-            "rejected_candidates": [],
-            "unresolved_candidates": [],
-        }
-        reviewed_plan = {
-            **reviewed_plan_base,
-            "acceptance_plan_fingerprint_sha256": fingerprint(reviewed_plan_base),
-        }
-        reviewed = IndustryThesisSessionRevision(
-            id=reviewed_revision_id,
-            session_id=session_identity.id,
-            revision_number=1,
-            thesis_text_original="PostgreSQL owner acceptance exact fixture",
-            thesis_title_reviewed="PostgreSQL owner acceptance",
-            driver_type="demand_expansion",
-            analysis_horizon_kind="medium_term",
-            analysis_start_date=None,
-            analysis_end_date=None,
-            market_scope_json=canonical_json_text(
-                [{"market_namespace": "CN_A"}],
-                "market scope",
-            ),
-            chain_boundary_json=canonical_json_text({}, "chain boundary"),
-            exclusions_json=canonical_json_text([], "exclusions"),
-            seed_companies_json=canonical_json_text([], "seed companies"),
-            seed_products_json=canonical_json_text([], "seed products"),
-            seed_technologies_json=canonical_json_text([], "seed technologies"),
-            seed_bottlenecks_json=canonical_json_text([], "seed bottlenecks"),
-            draft_graph_json=canonical_json_text(
-                {
-                    "base_draft_graph": {},
-                    "acceptance_plan_preview": reviewed_plan,
-                },
-                "reviewed draft graph",
-            ),
-            coverage_state="partial_local_coverage",
-            workflow_state="reviewed_plan_ready",
-            information_cutoff_date=beneficiary_revision.information_cutoff_date,
-            recorded_at_utc=recorded,
-            input_fingerprint_sha256="e" * 64,
-            supersedes_revision_id=None,
-            revision_note="Exact PostgreSQL reviewed-plan fixture.",
-        )
-        session.add(reviewed)
+        session.add_all((reviewed, candidate_revision))
         session.flush()
         raw = {
             "reviewed_session_revision_id": str(reviewed.id),
@@ -244,6 +254,7 @@ def _reviewed_fixture(factory):
 
 def test_postgres_identical_concurrent_commit_serializes_to_one_output(
     postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     engine = build_engine(postgres_database_url)
     factory = build_session_factory(engine)
@@ -262,6 +273,10 @@ def test_postgres_identical_concurrent_commit_serializes_to_one_output(
         before_pools = session.scalar(
             select(func.count()).select_from(Stage1CandidatePool)
         )
+
+    # Each commit receives an independent in-process lock. Correctness must come
+    # from PostgreSQL row locks and uniqueness constraints, not Python serialization.
+    monkeypatch.setattr(acceptance_module, "_lock", lambda _key: RLock())
 
     def commit(_: int):
         return IndustryThesisOwnerAcceptanceService(
