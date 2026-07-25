@@ -6,9 +6,10 @@ import pytest
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Run only migration-named tests to isolate the inherited CI failure."""
+    """Run only the Industry Thesis migration module."""
 
     skipped = pytest.mark.skip(reason="temporary Issue #236 migration diagnostic")
+    target = "tests/test_industry_thesis_migration.py"
     for item in items:
-        if "migration" not in item.nodeid.lower():
+        if target not in item.nodeid.replace("\\", "/"):
             item.add_marker(skipped)
