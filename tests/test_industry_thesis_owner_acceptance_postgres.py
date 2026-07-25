@@ -61,13 +61,19 @@ def clean_owner_acceptance(postgres_database_url: str) -> Iterator[None]:
     try:
         with engine.begin() as connection:
             connection.execute(
-                text("TRUNCATE research_cases, ingestion_runs RESTART IDENTITY CASCADE")
+                text(
+                    "TRUNCATE industry_thesis_session_identities, "
+                    "research_cases, ingestion_runs RESTART IDENTITY CASCADE"
+                )
             )
         yield
     finally:
         with engine.begin() as connection:
             connection.execute(
-                text("TRUNCATE research_cases, ingestion_runs RESTART IDENTITY CASCADE")
+                text(
+                    "TRUNCATE industry_thesis_session_identities, "
+                    "research_cases, ingestion_runs RESTART IDENTITY CASCADE"
+                )
             )
         engine.dispose()
 
