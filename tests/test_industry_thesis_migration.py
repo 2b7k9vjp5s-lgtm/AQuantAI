@@ -175,8 +175,8 @@ def test_v1_output_rows_refuse_downgrade_before_any_loss(tmp_path) -> None:
                     "VALUES (:id, :output_link_id, 1, :accepted_session_id, "
                     ":accepted_session_id, :reviewed_session_id, :research_case_id, "
                     ":map_id, :map_revision_id, NULL, :contract_version, "
-                    ":reviewed_fingerprint, '[\"accepted\"]', "
-                    "'[{\"sequence\":0}]', 'partial_local_coverage', "
+                    ":reviewed_fingerprint, :ordered_beneficiary_ids, "
+                    ":owner_bindings, 'partial_local_coverage', "
                     ":fingerprint, :transaction_id, '2026-07-22', "
                     "'2026-07-22 16:00:00', NULL)"
                 ),
@@ -187,6 +187,8 @@ def test_v1_output_rows_refuse_downgrade_before_any_loss(tmp_path) -> None:
                     "research_case_id": research_case_id,
                     "contract_version": "aquantai.industry-thesis-output-links.v1",
                     "reviewed_fingerprint": "c" * 64,
+                    "ordered_beneficiary_ids": '["accepted"]',
+                    "owner_bindings": '[{"sequence":0}]',
                     "fingerprint": "a" * 64,
                 },
             )
