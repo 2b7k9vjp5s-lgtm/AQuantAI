@@ -36,6 +36,10 @@ def test_exact_continuation_mapping_uses_response_owned_identity_and_boundaries(
             "/industry-analysis/sessions/",
         ),
         "reviewed_plan_ready": ("result", "/industry-analysis/sessions/"),
+        "accepted_outputs_linked": (
+            "accepted_result",
+            "/industry-analysis/sessions/",
+        ),
     }
 
     for workflow_state, (kind, path_prefix) in expected.items():
@@ -52,11 +56,12 @@ def test_exact_continuation_mapping_uses_response_owned_identity_and_boundaries(
         assert item["visible_latest_revision_id"] in continuation["path"]
         if workflow_state == "draft":
             assert query["revision_number"] == ["3"]
+        if workflow_state == "accepted_outputs_linked":
+            assert parsed.path.endswith("/accepted-result")
 
 
 def test_non_continuable_unknown_and_malformed_states_fail_closed() -> None:
     for workflow_state in (
-        "accepted_outputs_linked",
         "superseded",
         "abandoned",
         "future_unknown_state",
