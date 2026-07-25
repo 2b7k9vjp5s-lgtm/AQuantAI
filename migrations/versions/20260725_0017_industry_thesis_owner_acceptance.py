@@ -178,18 +178,9 @@ def downgrade() -> None:
             "uq_industry_thesis_output_accepted_session",
             type_="unique",
         )
-        batch.drop_constraint(
-            "fk_industry_thesis_output_research_case",
-            type_="foreignkey",
-        )
-        batch.drop_constraint(
-            "fk_industry_thesis_output_reviewed_session",
-            type_="foreignkey",
-        )
-        batch.drop_constraint(
-            "fk_industry_thesis_output_accepted_session",
-            type_="foreignkey",
-        )
+        # Dropping each new column removes its dependent foreign key. This avoids
+        # assuming a physical FK name when fresh 0016 installs materialize the current
+        # ORM table and let SQLite/PostgreSQL assign the constraint name.
         batch.drop_column("ordered_owner_output_bindings_json")
         batch.drop_column("reviewed_plan_fingerprint_sha256")
         batch.drop_column("output_contract_version")
