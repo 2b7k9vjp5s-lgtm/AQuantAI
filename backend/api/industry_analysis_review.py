@@ -335,3 +335,16 @@ def get_reviewed_plan_result(
         raise _review_http_error(exc) from exc
     except SQLAlchemyError as exc:
         raise _database_failure("精确审阅结果读取失败，请检查本地数据库。", exc) from exc
+
+
+# Register the separately implemented owner-acceptance routes through the existing
+# authorized review router family, without expanding backend/main.py.
+from backend.api.industry_analysis_acceptance import (  # noqa: E402
+    api_router as owner_acceptance_api_router,
+)
+from backend.api.industry_analysis_acceptance import (  # noqa: E402
+    page_router as owner_acceptance_page_router,
+)
+
+api_router.include_router(owner_acceptance_api_router)
+page_router.include_router(owner_acceptance_page_router)
