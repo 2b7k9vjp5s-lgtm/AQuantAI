@@ -131,7 +131,7 @@ def test_confirmed_hypothetical_readiness_still_cannot_execute() -> None:
 
 def test_selector_and_contract_mutation_fail_closed() -> None:
     with pytest.raises(SelectorValidationError, match="reserved"):
-        IndexHistorySelector("000001.SH", 1000, 2000)
+        IndexHistorySelector("LIVE.IDX.NOT_ALLOWED", 1000, 2000)
     with pytest.raises(SelectorValidationError, match="less than or equal"):
         IndexHistorySelector("SYNTH.IDX.C0", 2000, 1000)
     with pytest.raises(SelectorValidationError, match="integer"):
