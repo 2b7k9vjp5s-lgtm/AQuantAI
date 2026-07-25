@@ -58,3 +58,6 @@ jobs:
 
       - name: Run Phase 2B ordinary-user usability demo
         run: python -m scripts.demo_industry_analysis_phase2b
+
+      - name: Run THS Stage C0 offline contract demo
+        run: python -m scripts.demo_ths_stage_c0_offline
