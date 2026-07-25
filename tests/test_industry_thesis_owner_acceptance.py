@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import inspect
+import re
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -37,8 +39,14 @@ from industry_alpha.industry_thesis_rules import BUILDER_VERSION
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
+    Stage1BeneficiaryAssertionLink,
+    Stage1BeneficiaryClaimLink,
     Stage1BeneficiaryRevision,
     Stage1CandidatePool,
+)
+from industry_alpha.stage1_owner_port import Stage1OwnerWritePort
+from industry_alpha.beneficiary_semantics_owner_port import (
+    BeneficiarySemanticOwnerWritePort,
 )
 
 UTC = timezone.utc
@@ -61,7 +69,7 @@ def database():
         engine.dispose()
 
 
-def _session_input() -> dict:
+def _session_input():
     return {
         "thesis_text_original": "合成材料需求扩张与工艺瓶颈",
         "thesis_title_reviewed": "合成材料产业研究",
@@ -92,8 +100,10 @@ def _session_input() -> dict:
 
 def _stage1_rows(database, beneficiary_ids: tuple[UUID, ...]):
     with database() as session:
-        first = session.get(Stage1Beneficiary, beneficiary_ids[0])
-        industry_map = session.get(IndustryMap, first.map_id)
+        industry_map = session.get(
+            IndustryMap,
+            session.get(Stage1Beneficiary, beneficiary_ids[0]).map_id,
+        )
         map_revision = session.scalar(
             select(IndustryMapRevision)
             .where(IndustryMapRevision.map_id == industry_map.id)
@@ -112,7 +122,11 @@ def _stage1_rows(database, beneficiary_ids: tuple[UUID, ...]):
         return industry_map, map_revision, rows
 
 
-def _build_reviewed(database, *, beneficiary_ids: tuple[UUID, ...]):
+def _build_reviewed(
+    database,
+    *,
+    beneficiary_ids: tuple[UUID, ...],
+) -> tuple[dict, IndustryMap, IndustryMapRevision, list[tuple]]:
     industry_map, map_revision, owner_rows = _stage1_rows(database, beneficiary_ids)
     commands = IndustryThesisCommandService(database, clock=lambda: BASE_TIME)
     created = commands.create_session(_session_input())
@@ -127,9 +141,7 @@ def _build_reviewed(database, *, beneficiary_ids: tuple[UUID, ...]):
                 "product_or_service_fit": "Synthetic fixture product fit.",
                 "industry_position": "Synthetic fixture chain position.",
                 "benefit_path_text": "Synthetic fixture evidence-backed benefit path.",
-                "proposed_exposure_type": ("direct", "conditional", "indirect")[
-                    index % 3
-                ],
+                "proposed_exposure_type": ("direct", "conditional", "indirect")[index % 3],
                 "proposal_confidence": "medium",
                 "identity_state": "exact_accepted_identity",
                 "review_state": "proposed",
@@ -162,9 +174,7 @@ def _build_reviewed(database, *, beneficiary_ids: tuple[UUID, ...]):
                     "candidate_revision_id": item["candidate_revision_id"],
                     "expected_latest_revision_number": 1,
                     "decision": "selected_for_acceptance",
-                    "final_proposed_exposure_type": item[
-                        "proposed_exposure_type"
-                    ],
+                    "final_proposed_exposure_type": item["proposed_exposure_type"],
                     "rationale": {"reason": "explicit owner-acceptance fixture"},
                     "uncertainty": {"state": "reviewed_local_scope"},
                 }
@@ -334,10 +344,7 @@ def test_three_member_golden_path_preview_commit_exact_reads_and_replay(database
     assert result["ranking_applied"] is False
     statuses = [item["assessment_status"] for item in result["members"]]
     assert statuses == ["supported", "draft", "supported"]
-    assert all(
-        item["typed_semantics"]["state"] == "missing"
-        for item in readiness["items"]
-    )
+    assert all(item["typed_semantics"]["state"] == "missing" for item in readiness["items"])
     assert readiness["creates_owner_state"] is False
     assert readiness["computes_score"] is False
 
@@ -563,3 +570,95 @@ def test_contract_rejects_unknown_nested_fields_and_rejected_stage1_status():
     with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
         normalize_owner_acceptance_plan(rejected)
     assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_STATUS_REJECTED"
+
+
+def test_owner_ports_never_open_commit_or_rollback_transactions():
+    for port in (Stage1OwnerWritePort, BeneficiarySemanticOwnerWritePort):
+        source = inspect.getsource(port)
+        assert "session_factory.begin" not in source
+        assert re.search(r"\.commit\s*\(", source) is None
+        assert re.search(r"\.rollback\s*\(", source) is None
+
+
+def test_late_pool_conflict_rolls_back_appended_stage1_and_thesis_rows(database):
+    fixture = build_stage1_beneficiary_fixture(database)
+    review, industry_map, map_revision, rows = _build_reviewed(
+        database,
+        beneficiary_ids=(fixture.direct_beneficiary_id,),
+    )
+    raw = _acceptance_input(
+        review,
+        industry_map,
+        map_revision,
+        rows,
+        pool_mode="create_supported_handoff",
+    )
+    beneficiary, revision, _stock = rows[0]
+    with database() as session:
+        assertion_links = list(
+            session.scalars(
+                select(Stage1BeneficiaryAssertionLink).where(
+                    Stage1BeneficiaryAssertionLink.beneficiary_revision_id
+                    == revision.id
+                )
+            )
+        )
+        claim_ids = list(
+            session.scalars(
+                select(Stage1BeneficiaryClaimLink.claim_revision_id).where(
+                    Stage1BeneficiaryClaimLink.beneficiary_revision_id
+                    == revision.id
+                )
+            )
+        )
+        existing_pool = session.get(Stage1CandidatePool, fixture.candidate_pool_id)
+        before_stage1 = session.scalar(
+            select(func.count()).select_from(Stage1BeneficiaryRevision)
+        )
+    assertions = []
+    for link in assertion_links:
+        for kind in ("node", "relationship", "observation"):
+            revision_id = getattr(link, f"{kind}_revision_id")
+            if revision_id is not None:
+                assertions.append(
+                    {
+                        "assertion_kind": kind,
+                        "assertion_revision_id": str(revision_id),
+                    }
+                )
+    raw["candidate_owner_bindings"][0]["stage1_operation"] = (
+        "append_beneficiary_revision"
+    )
+    raw["candidate_owner_bindings"][0]["stage1"] = {
+        "beneficiary_id": str(beneficiary.id),
+        "expected_latest_revision_id": str(revision.id),
+        "stock_basic_record_id": revision.stock_basic_record_id,
+        "source": beneficiary.source,
+        "stock_code": beneficiary.stock_code,
+        "legacy_beneficiary_kind": revision.beneficiary_kind,
+        "assessment_status": "supported",
+        "rationale_summary": "This append must roll back after the later pool conflict.",
+        "map_assertion_revisions": assertions,
+        "claim_revision_ids": [str(value) for value in claim_ids],
+    }
+    raw["candidate_pool_operation"]["pool_key"] = existing_pool.pool_key
+    normalized = normalize_owner_acceptance_plan(raw)
+    before = _counts(database)
+    with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
+        IndustryThesisOwnerAcceptanceService(
+            database,
+            clock=lambda: BASE_TIME + timedelta(seconds=3),
+        ).commit(
+            {
+                **raw,
+                "preview_fingerprint_sha256": normalized[
+                    "owner_acceptance_plan_fingerprint_sha256"
+                ],
+            }
+        )
+    assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_OWNER_REVISION_CONFLICT"
+    assert _counts(database) == before
+    with database() as session:
+        assert session.scalar(
+            select(func.count()).select_from(Stage1BeneficiaryRevision)
+        ) == before_stage1
