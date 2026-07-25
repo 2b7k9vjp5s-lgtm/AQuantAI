@@ -94,7 +94,9 @@ class IndustryThesisSessionIdentity(Base):
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    created_recorded_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_recorded_utc: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     created_by_kind: Mapped[str] = mapped_column(String(24), nullable=False)
     state: Mapped[str] = mapped_column(String(24), nullable=False)
     latest_revision_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -219,7 +221,9 @@ class IndustryThesisCandidateIdentity(Base):
         nullable=False,
     )
     candidate_key: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_recorded_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_recorded_utc: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     latest_revision_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
@@ -361,6 +365,10 @@ class IndustryThesisOutputLinkRevision(Base):
             "revision_number",
             name="uq_industry_thesis_output_link_revision_number",
         ),
+        UniqueConstraint(
+            "accepted_session_revision_id",
+            name="uq_industry_thesis_output_accepted_session",
+        ),
         CheckConstraint(
             "revision_number > 0",
             name="ck_industry_thesis_output_revision_positive",
@@ -373,10 +381,26 @@ class IndustryThesisOutputLinkRevision(Base):
             "length(acceptance_plan_fingerprint_sha256) = 64",
             name="ck_industry_thesis_output_plan_fingerprint",
         ),
+        CheckConstraint(
+            "length(reviewed_plan_fingerprint_sha256) = 64",
+            name="ck_industry_thesis_output_reviewed_plan_fingerprint",
+        ),
+        CheckConstraint(
+            "length(trim(output_contract_version)) > 0",
+            name="ck_industry_thesis_output_contract_version",
+        ),
+        CheckConstraint(
+            "length(ordered_owner_output_bindings_json) > 2",
+            name="ck_industry_thesis_output_owner_bindings",
+        ),
         Index(
             "ix_industry_thesis_output_revision",
             "output_link_id",
             "revision_number",
+        ),
+        Index(
+            "ix_industry_thesis_output_reviewed_session",
+            "reviewed_session_revision_id",
         ),
     )
 
@@ -390,6 +414,18 @@ class IndustryThesisOutputLinkRevision(Base):
         ForeignKey("industry_thesis_session_revisions.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    accepted_session_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("industry_thesis_session_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    reviewed_session_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("industry_thesis_session_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    research_case_id: Mapped[UUID] = mapped_column(
+        ForeignKey("research_cases.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     accepted_industry_map_identity_id: Mapped[UUID] = mapped_column(
         ForeignKey("industry_maps.id", ondelete="RESTRICT"),
         nullable=False,
@@ -398,11 +434,14 @@ class IndustryThesisOutputLinkRevision(Base):
         ForeignKey("industry_map_revisions.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    accepted_candidate_pool_revision_id: Mapped[UUID] = mapped_column(
+    accepted_candidate_pool_revision_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("stage1_candidate_pool_revisions.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
     )
+    output_contract_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    reviewed_plan_fingerprint_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     ordered_beneficiary_revision_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    ordered_owner_output_bindings_json: Mapped[str] = mapped_column(Text, nullable=False)
     coverage_state: Mapped[str] = mapped_column(String(32), nullable=False)
     acceptance_plan_fingerprint_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     owner_transaction_id: Mapped[str] = mapped_column(String(128), nullable=False)
