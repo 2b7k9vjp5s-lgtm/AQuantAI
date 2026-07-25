@@ -56,6 +56,7 @@ from industry_alpha.models import ResearchCase
 from industry_alpha.stage1_commands import MapAssertionRevisionInput
 from industry_alpha.stage1_models import (
     Stage1BeneficiaryRevision,
+    Stage1CandidatePoolMembership,
     Stage1CandidatePoolRevision,
 )
 from industry_alpha.stage1_owner_port import (
@@ -177,7 +178,7 @@ class IndustryThesisOwnerAcceptanceService:
         *,
         dry_run: bool,
     ) -> dict[str, Any]:
-        reviewed, identity, reviewed_plan = self._lock_and_validate_reviewed(
+        reviewed, identity, latest, reviewed_plan = self._lock_and_validate_reviewed(
             session,
             normalized,
         )
@@ -196,6 +197,14 @@ class IndustryThesisOwnerAcceptanceService:
                 existing_output,
                 normalized,
                 dry_run=dry_run,
+            )
+        if (
+            latest.id != reviewed.id
+            or identity.latest_revision_number
+            != normalized["expected_session_latest_revision_number"]
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE"
             )
 
         reviewed_candidates = self._validate_candidate_bindings(
@@ -359,6 +368,7 @@ class IndustryThesisOwnerAcceptanceService:
     ) -> tuple[
         IndustryThesisSessionRevision,
         IndustryThesisSessionIdentity,
+        IndustryThesisSessionRevision,
         dict[str, Any],
     ]:
         reviewed_id = UUID(normalized["reviewed_session_revision_id"])
@@ -394,9 +404,14 @@ class IndustryThesisOwnerAcceptanceService:
         if (
             reviewed is None
             or latest is None
-            or identity.latest_revision_number != expected
             or reviewed.revision_number != expected
-            or latest.id != reviewed.id
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE"
+            )
+        if latest.id != reviewed.id and not (
+            latest.workflow_state == "accepted_outputs_linked"
+            and latest.supersedes_revision_id == reviewed.id
         ):
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE"
@@ -431,7 +446,7 @@ class IndustryThesisOwnerAcceptanceService:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_FINGERPRINT_MISMATCH"
             )
-        return reviewed, identity, reviewed_plan
+        return reviewed, identity, latest, reviewed_plan
 
     @staticmethod
     def _validate_case_and_map(
@@ -538,17 +553,12 @@ class IndustryThesisOwnerAcceptanceService:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
             )
-        try:
-            selected_ids = {
-                UUID(item["candidate_revision_id"])
-                for item in selected
-                if isinstance(item, dict)
-                and isinstance(item.get("candidate_revision_id"), str)
-            }
-        except (KeyError, TypeError, ValueError) as exc:
-            raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
-            ) from exc
+        selected_ids = {
+            UUID(item["candidate_revision_id"])
+            for item in selected
+            if isinstance(item, dict)
+            and isinstance(item.get("candidate_revision_id"), str)
+        }
         binding_ids = {
             UUID(item["reviewed_candidate_revision_id"])
             for item in normalized["candidate_owner_bindings"]
