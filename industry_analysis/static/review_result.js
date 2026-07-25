@@ -165,6 +165,21 @@ function renderResult(result) {
     result.rejected_candidates,
     "本次审阅没有暂不纳入的候选路径。",
   );
+
+  const acceptance = document.querySelector("#acceptance-action");
+  if (result.workflow_state === "reviewed_plan_ready" && result.selected_count > 0) {
+    const acceptanceQuery = new URLSearchParams({
+      as_of_cutoff: result.information_cutoff_date,
+      as_of_recorded_at_utc: result.complete_result_recorded_at_utc,
+    });
+    acceptance.href =
+      `/industry-analysis/sessions/${encodeURIComponent(result.session_id)}/revisions/` +
+      `${encodeURIComponent(result.reviewed_session_revision_id)}/acceptance?${acceptanceQuery.toString()}`;
+    acceptance.hidden = false;
+  } else {
+    acceptance.hidden = true;
+  }
+
   document.querySelector("#result-technical").textContent = JSON.stringify({
     session_id: result.session_id,
     reviewed_session_revision_id: result.reviewed_session_revision_id,
@@ -203,7 +218,7 @@ async function initialize() {
     renderResult(result);
     document.querySelector("#page-state").textContent = "精确计划已验证";
     document.querySelector("#page-state").classList.add("is-ready");
-    setStatus("精确审阅结果读取完成；没有执行正式 owner 写入。", "success");
+    setStatus("精确审阅结果读取完成；需要你明确进入检查与接受页面后才可能写入。", "success");
   } catch (error) {
     document.querySelector("#page-state").textContent = "精确计划不可用";
     document.querySelector("#page-state").classList.add("is-unavailable");
