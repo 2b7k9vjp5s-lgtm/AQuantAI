@@ -15,6 +15,13 @@
 批准，基于规划进去下一步开发
 ```
 
+- Remediation authorization on 2026-07-25:
+
+```text
+修复阻断项
+```
+
+- Blocking review: PR #239 Review `4779124457` at old HEAD `dd8e7331cbe2fb18cf77b97aca647d21c03df0f3`.
 - Exact architecture base: `a6da9bc8483606a67b7ca5f1329e46232d5b47be`.
 - Branch: `docs/industry-thesis-ordinary-user-completion-preflight`.
 - Workflow authority: `.codex/WORKFLOW.md`.
@@ -41,7 +48,7 @@ Define the smallest production-reachable ordinary-user slice that completes the 
 reviewed_plan_ready
   -> 查看研究结果
   -> 检查并接受研究成果
-  -> exact owner-binding review in ordinary Chinese
+  -> confirm frozen owner bindings in ordinary Chinese
   -> deterministic dry-run preview
   -> explicit confirmation
   -> accepted_outputs_linked
@@ -60,6 +67,103 @@ The architecture must reuse the accepted owner-acceptance core and make no accep
 5. Readiness is an exact read of existing accepted owners and missing states; it creates no Company Research or Investment Candidate state.
 6. Accepted research is not a recommendation, target price, expected return, position instruction or trading action.
 
+## Review-blocker resolutions
+
+### 1. Frozen `stock_basic` identity only
+
+Owner acceptance does not choose among compatible identities.
+
+For every selected reviewed candidate:
+
+- the exact `proposed_stock_basic_record_id` frozen on the reviewed candidate is the only eligible Stage 1 stock binding;
+- the page displays its ordinary label and technical ID;
+- the user explicitly confirms that frozen record;
+- a missing frozen record or listed-instrument-only candidate is blocked;
+- any alternate identity resolution returns to a separately explicit pre-acceptance review/revision flow.
+
+No `stock_basic_options[]`, fuzzy identity lookup or identity replacement is permitted in this slice.
+
+### 2. Exact flat core request contract
+
+Preview and commit use the exact flat payload accepted by `normalize_owner_acceptance_plan`.
+
+Preview body contains exactly:
+
+```text
+reviewed_session_revision_id
+expected_session_latest_revision_number
+reviewed_plan_fingerprint_sha256
+research_case_id
+map_mode
+industry_map_id
+industry_map_revision_id
+candidate_owner_bindings[]
+candidate_pool_operation
+output_title
+output_scope
+information_cutoff_date
+revision_note
+owner_acceptance_plan_version
+```
+
+Commit uses the same body plus:
+
+```text
+preview_fingerprint_sha256
+```
+
+Rules:
+
+- no `owner_acceptance_plan` wrapper;
+- no duplicated expected-latest or revision-note authority;
+- route revision ID must equal body `reviewed_session_revision_id`;
+- field names and meanings are preserved exactly;
+- write DTOs reject unknown fields;
+- the adapter may add only safe navigation links to responses, never rename away core result fields.
+
+### 3. One global candidate-pool operation
+
+Supported-handoff membership is derived from resulting exact Stage 1 `assessment_status == supported`; it is not editable per member.
+
+The form includes one top-level `candidate_pool_operation` with exactly one accepted-core mode:
+
+```text
+create_supported_handoff
+append_supported_handoff
+reuse_exact_supported_handoff
+none_no_supported_members
+```
+
+Mode contracts:
+
+- create: deterministic technical `pool_key` from exact reviewed revision and contract version; explicit user-confirmed `title` and `scope`;
+- append: exact cutoff-visible compatible pool identity and exact latest revision plus explicit `title` and `scope`;
+- reuse: exact cutoff-visible pool/revision whose frozen membership already equals the supported reused Stage 1 revisions; unavailable when new Stage 1 revisions would be created/appended;
+- none: available only when the resulting accepted universe has zero supported members.
+
+The server and core remain authoritative for final membership and mismatch rejection.
+
+### 4. Mandatory field ownership
+
+All strict core fields have one source.
+
+Top-level:
+
+- `reviewed_session_revision_id`, reviewed fingerprint, expected latest, Research Case, map identity/revision and cutoff come from the exact reviewed acceptance view;
+- `map_mode` is the fixed accepted constant `reuse_exact_existing_map_revision`;
+- `owner_acceptance_plan_version` is the exact server-returned accepted version;
+- `output_title` and `output_scope` are explicit user-confirmed form fields, optionally prefilled only from exact reviewed title/scope text;
+- `revision_note` is one explicit user-entered field.
+
+Per member:
+
+- frozen stock record comes from `proposed_stock_basic_record_id`;
+- reuse fields come from one exact compatible persisted beneficiary revision;
+- create `source` and `stock_code` are exact server-returned values bound to the frozen stock record and explicitly confirmed;
+- append uses the existing beneficiary identity and exact expected latest revision; `source`/`stock_code` remain identity-owned and are not resubmitted because the accepted core append payload does not contain them;
+- legacy kind, assessment status, rationale, assertion revisions and claim revisions remain explicit accepted-core fields;
+- semantic operation is limited to `none` or exact compatible reuse in this slice.
+
 ## Required architecture decisions
 
 ### 1. Exact routes and state mapping
@@ -73,48 +177,47 @@ Define deterministic local routes for:
 - exact readiness read;
 - exact history reopening.
 
-Every route and request must use response-owned exact IDs and both as-of boundaries. No latest fallback, fuzzy lookup or browser-local identity reconstruction.
+Every route and request uses response-owned exact IDs and both as-of boundaries. No latest fallback, fuzzy lookup or browser-local identity reconstruction.
 
-### 2. Ordinary-language selectors over exact owners
+### 2. Ordinary-language confirmation over exact owners
 
-For each selected reviewed candidate, define an ordinary-language representation of:
+For each selected reviewed candidate, display:
 
-- exact company/instrument identity and `stock_basic` readiness;
+- the one frozen formal company/stock binding;
 - Stage 1 reuse/create/append operation;
 - legacy beneficiary kind and assessment status;
 - assertion/claim prerequisites;
-- typed-semantics none/reuse/append operation;
-- supported-handoff inclusion/exclusion and reason;
+- typed-semantics none/reuse operation;
+- derived supported-handoff result;
 - missing and blocking states.
 
-Selectors may expose only exact persisted compatible options or explicit owner payload fields already accepted by the core. Internal IDs remain progressive technical details.
-
-No automatic mapping among reviewed exposure, legacy Stage 1 kind and typed semantics.
+Internal IDs remain progressive technical details. No automatic mapping among reviewed exposure, legacy Stage 1 kind and typed semantics.
 
 ### 3. API/application adapter boundary
 
-Define the minimum future local adapter for:
+The future local adapter provides:
 
-- one bounded prerequisite/selector response;
-- deterministic preview;
-- explicit commit with matching fingerprint and expected-latest values;
-- exact accepted output/result/readiness response.
+- one bounded acceptance view;
+- one exact flat preview request;
+- one exact flat commit request with matching preview fingerprint;
+- one exact accepted output/result/readiness response.
 
-The adapter must reuse existing application services and must not duplicate owner validation or directly create ORM rows.
+The adapter reuses existing application services and does not duplicate owner validation or directly create ORM rows.
 
 ### 4. Preview and commit
 
-Preview must disclose:
+Preview discloses:
 
 - complete frozen member ordering;
 - owner reuse/create/append operations;
 - semantic operations or explicit absence;
-- supported handoff membership;
+- the one global candidate-pool operation;
+- derived supported handoff membership;
 - zero-supported state;
 - blocking and readiness gaps;
 - cutoff and visible data date.
 
-Commit occurs only after explicit confirmation and only with the exact preview fingerprint. Page load, navigation, preview and retry never commit automatically.
+Commit occurs only after explicit confirmation and only with the exact `preview_fingerprint_sha256`. Page load, navigation, preview and retry never commit automatically.
 
 ### 5. Conflict behavior
 
@@ -123,12 +226,12 @@ For stale expected-latest, moved owner boundaries, duplicate submit, conflicting
 - no silent retry or rebase;
 - preserve selections, rationale and revision note in page memory;
 - require explicit reload/re-preview;
-- identical replay resolves to the same output;
+- idempotent replay resolves to the same output;
 - conflicting replay never overwrites the original accepted result.
 
 ### 6. Accepted-result presentation
 
-Define first-render ordering:
+First-render ordering:
 
 1. concise accepted-state summary;
 2. complete frozen member list;
@@ -150,11 +253,11 @@ Use Chinese-first copy, keyboard navigation, explicit text states, focus managem
 
 ### 8. Query and response budget
 
-Define deterministic ceilings:
+Deterministic ceilings:
 
 - no per-row HTTP request;
 - no N+1 database access;
-- one bounded acceptance-prerequisite response per page load;
+- one bounded acceptance response including frozen identities, exact Stage 1/semantic options and top-level candidate-pool options;
 - one preview request;
 - one explicit commit request;
 - one exact accepted-result response for first render.
@@ -162,8 +265,6 @@ Define deterministic ceilings:
 Complete-universe meaning must not be lost through convenience pagination or first-record skipping.
 
 ### 9. Migration and persistence
-
-Preferred architecture decision:
 
 ```text
 schema migration = none
@@ -185,41 +286,72 @@ Temporary unsaved form state may remain in page memory only. If a new persistent
 
 Use one exact `reviewed_plan_ready` session with three selected companies:
 
-- A reuses a supported Stage 1 revision and compatible semantic revision and enters supported handoff;
-- B reuses/appends a draft or disputed Stage 1 revision, remains in complete result and is excluded from handoff;
-- C produces/reuses a supported Stage 1 revision, enters handoff and retains readiness gaps.
+- A confirms its frozen stock binding, reuses a supported Stage 1 revision and compatible semantic revision;
+- B confirms its frozen stock binding and reuses/appends a draft or disputed Stage 1 revision;
+- C confirms its frozen stock binding and creates/appends a supported Stage 1 revision with exact `source`, `stock_code`, assertion and claim inputs, while choosing no semantic binding.
 
-The user reviews ordinary-language bindings, generates preview, explicitly confirms, receives one exact `accepted_outputs_linked` result and reopens all three in frozen order under both as-of boundaries.
+Top-level handoff:
+
+- user chooses `create_supported_handoff`;
+- technical `pool_key` is deterministically generated from the reviewed revision and plan version;
+- user explicitly confirms pool title and scope;
+- membership is derived as A and C only after owner preview validates their resulting supported revisions.
+
+The user generates preview, explicitly confirms, receives one exact `accepted_outputs_linked` result and reopens all three in frozen order under both as-of boundaries.
 
 No Company Research, Investment Candidate, recommendation, portfolio or trading state is automatically created.
 
-Also define one valid zero-supported ordinary-user path.
+Zero-supported path:
 
-## Primary blocked path
+- every resulting Stage 1 revision is draft/disputed;
+- only `none_no_supported_members` is valid;
+- accepted result preserves all members and creates no fake pool.
 
-One selected candidate lacks an exact compatible `stock_basic` or Stage 1 assertion/claim binding.
+## Primary blocked paths
+
+### Frozen identity missing
+
+One selected candidate lacks `proposed_stock_basic_record_id` or is listed-instrument-only.
 
 Required behavior:
 
-- identify the exact candidate and missing prerequisite;
+- identify the exact candidate and missing frozen prerequisite;
+- expose no alternate identity choices;
 - return no commit-ready fingerprint;
-- expose one explicit corrective/review action;
-- perform zero owner/session/output writes;
-- preserve the reviewed plan;
-- do not fill the gap from free text, name, ticker, Provider or AI inference.
+- route to explicit pre-acceptance correction;
+- perform zero writes.
+
+### Candidate-pool operation invalid
+
+Supported members exist but no valid create/append/reuse operation is complete, or zero supported members are paired with a non-none mode.
+
+Required behavior:
+
+- show the top-level handoff error;
+- keep member inputs;
+- return no commit-ready fingerprint;
+- perform zero writes.
+
+No free text, name, ticker, Provider or AI inference fills either gap.
 
 ## Future implementation validation contract
 
-The architecture must require zero-network fixture-backed coverage for:
+Require zero-network fixture-backed coverage for:
 
 - route/state mapping and exact-ID construction;
-- selector compatibility and no hidden inference;
+- frozen stock binding display and explicit confirmation;
+- missing/listed-only identity blocking;
+- exact flat preview and commit DTOs;
+- unknown-field rejection and route/body ID mismatch;
+- every mandatory field source;
+- Stage 1 reuse/create/append inputs including create `source`/`stock_code`;
+- candidate-pool create/append/reuse/none modes;
+- derived, non-editable handoff membership;
 - three-company golden path;
 - zero-supported path;
-- blocked missing-owner path;
 - preview/commit fingerprint match;
 - conflict and form preservation;
-- identical/conflicting replay behavior;
+- idempotent/conflicting replay behavior;
 - exact result/readiness rendering;
 - dual-as-of negative visibility;
 - graph-integrity failure presentation;
@@ -231,29 +363,30 @@ The architecture must require zero-network fixture-backed coverage for:
 
 ## Locked exclusions
 
-No production API/UI, Provider/THS/CNINFO/iFinD/Tushare/AKShare access, credentials, automatic refresh, scheduler, background worker, retry loop, notification, external network, AI call, new Industry Map facts, draft-graph promotion, fuzzy identity bridge, automatic legacy/typed classification mapping, automatic Company Research, automatic Investment Candidate snapshot, recommendation, target price, expected return, position sizing, research holdings, portfolio, broker, order, trading, release, tag or version change.
+No production API/UI, Provider/THS/CNINFO/iFinD/Tushare/AKShare access, credentials, automatic refresh, scheduler, background worker, retry loop, notification, external network, AI call, new Industry Map facts, draft-graph promotion, fuzzy identity bridge, identity replacement during acceptance, automatic legacy/typed classification mapping, automatic Company Research, automatic Investment Candidate snapshot, recommendation, target price, expected return, position sizing, research holdings, portfolio, broker, order, trading, release, tag or version change.
 
 ## Stop conditions
 
 Stop and return for project-owner review if:
 
 - the success path requires hidden inference;
+- owner acceptance must change the frozen stock identity;
 - raw IDs must become mandatory primary inputs;
-- selector options cannot come from exact persisted owners or explicit allowed payloads;
+- a candidate-pool operation cannot be produced from exact owner records and explicit fields;
 - a second workflow owner or new persistence is required;
 - the adapter must duplicate validation or directly write ORM rows;
 - a migration is required;
 - exact reopening requires latest fallback;
-- the scope expands into Today Market source activation, announcements, Follow/Track or Research Portfolio;
+- scope expands into Today Market source activation, announcements, Follow/Track or Research Portfolio;
 - any Provider, network, AI, recommendation, portfolio or trading behavior appears.
 
 ## Delivery gates
 
 1. Keep one architecture branch from exact base `a6da9bc8483606a67b7ca5f1329e46232d5b47be`.
 2. Change only the two authorized documentation files.
-3. Open one Draft architecture PR linked to #238, #137, #234/#235, #236/#237 and #215–#218.
-4. Run repository checks on one exact immutable HEAD.
-5. Obtain a process-independent fixed-head architecture review containing exactly:
+3. Keep Draft PR #239 linked to #238, #137, #234/#235, #236/#237 and #215–#218.
+4. Run repository checks on one new exact immutable HEAD.
+5. Obtain a new process-independent fixed-head architecture review containing exactly:
 
 ```text
 AUTHORIZED INDUSTRY THESIS ORDINARY-USER COMPLETION PREFLIGHT APPROVED at fixed head <FULL_HEAD_SHA>
