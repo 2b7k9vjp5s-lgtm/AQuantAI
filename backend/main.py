@@ -30,6 +30,7 @@ from backend.api.industry_analysis_review import (
     page_router as industry_analysis_review_page_router,
 )
 from backend.api.industry_research import router as industry_research_router
+from backend.api.industry_research_result import router as industry_research_result_router
 from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
 from backend.api.normalized_valuation import router as normalized_valuation_router
@@ -117,6 +118,7 @@ app.include_router(industry_analysis_review_api_router)
 app.include_router(industry_analysis_review_page_router)
 app.include_router(industry_analysis_acceptance_api_router)
 app.include_router(industry_analysis_acceptance_page_router)
+app.include_router(industry_research_result_router)
 app.include_router(company_research_router)
 app.include_router(company_comparison_router)
 app.include_router(canonical_price_router)
