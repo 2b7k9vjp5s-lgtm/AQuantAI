@@ -14,7 +14,7 @@ import backend.api.industry_analysis as industry_api
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun, StockBasicRecord
 from backend.main import app
-from industry_alpha.chain_map_models import IndustryMap
+from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 from industry_alpha.industry_thesis_models import (
     IndustryThesisCandidateIdentity,
     IndustryThesisCandidateRevision,
@@ -22,8 +22,8 @@ from industry_alpha.industry_thesis_models import (
     IndustryThesisSessionRevision,
 )
 from industry_alpha.industry_thesis_review import ACCEPTANCE_PLAN_VERSION
+from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import Stage1Beneficiary
-import industry_alpha.stage1_models  # noqa: F401 - register exact FK targets
 
 UTC = timezone.utc
 BASE = datetime(2026, 7, 23, 7, 0, tzinfo=UTC)
@@ -134,6 +134,16 @@ def run_demo() -> dict:
         lambda: factory
     )
     try:
+        owner_fixture = build_stage1_beneficiary_fixture(factory)
+        with factory() as session:
+            owner_map_revision = session.scalar(
+                select(IndustryMapRevision)
+                .where(IndustryMapRevision.map_id == owner_fixture.map_id)
+                .order_by(IndustryMapRevision.revision_no.desc())
+            )
+            assert owner_map_revision is not None
+            owner_map_revision_id = owner_map_revision.id
+
         with factory.begin() as session:
             run = _ingestion()
             session.add(run)
@@ -239,6 +249,9 @@ def run_demo() -> dict:
             review_payload = {
                 "expected_session_latest_revision_number": 1,
                 "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+                "owner_context": {
+                    "industry_map_revision_id": str(owner_map_revision_id),
+                },
                 "decisions": decisions,
                 "revision_note": "完成三条精确候选路径审阅",
             }
@@ -349,8 +362,8 @@ def run_demo() -> dict:
             "candidate_identities": 3,
             "candidate_revisions": 6,
             "output_links": 0,
-            "industry_maps": 0,
-            "stage1_beneficiaries": 0,
+            "industry_maps": 1,
+            "stage1_beneficiaries": 4,
         }
         return {
             "session_id": session_id,

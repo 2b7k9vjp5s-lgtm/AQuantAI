@@ -42,6 +42,12 @@ from industry_alpha.industry_thesis_owner_acceptance_contracts import (
     owner_transaction_id,
     reason_payload,
 )
+from industry_alpha.industry_thesis_review import (
+    ACCEPTANCE_PLAN_VERSION,
+    HISTORICAL_ACCEPTANCE_PLAN_VERSION,
+    OWNER_CONTEXT_VERSION,
+    OWNER_MAP_MODE,
+)
 from industry_alpha.industry_thesis_rules import (
     IndustryThesisError,
     canonical_json_text,
@@ -182,22 +188,31 @@ class IndustryThesisOwnerAcceptanceService:
             session,
             normalized,
         )
-        research_case, industry_map, map_revision = self._validate_case_and_map(
-            session,
-            normalized,
-            reviewed,
-        )
         existing_output = self._lock_existing_output(
             session,
             identity=identity,
             normalized=normalized,
         )
         if existing_output is not None:
+            self._validate_existing_output_replay(
+                existing_output,
+                normalized,
+                reviewed_plan,
+            )
             return self._idempotent_result(
                 existing_output,
                 normalized,
                 dry_run=dry_run,
             )
+
+        owner_context = self._validate_reviewed_owner_context(reviewed_plan)
+        self._validate_submitted_owner_context(normalized, owner_context)
+        research_case, industry_map, map_revision = self._validate_case_and_map(
+            session,
+            normalized,
+            reviewed,
+            owner_context,
+        )
         if (
             latest.id != reviewed.id
             or identity.latest_revision_number
@@ -449,14 +464,127 @@ class IndustryThesisOwnerAcceptanceService:
         return reviewed, identity, latest, reviewed_plan
 
     @staticmethod
+    def _validate_reviewed_owner_context(
+        reviewed_plan: dict[str, Any],
+    ) -> dict[str, str]:
+        version = reviewed_plan.get("acceptance_plan_version")
+        if version == HISTORICAL_ACCEPTANCE_PLAN_VERSION:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY",
+                "reviewed Owner Context is required; explicitly re-review the v1 plan",
+            )
+        if version != ACCEPTANCE_PLAN_VERSION:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "reviewed acceptance-plan version is unsupported",
+            )
+        raw = reviewed_plan.get("owner_context")
+        allowed = {
+            "owner_context_contract_version",
+            "map_mode",
+            "research_case_id",
+            "industry_map_id",
+            "industry_map_revision_id",
+        }
+        if not isinstance(raw, dict) or set(raw) != allowed:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "reviewed Owner Context shape is invalid",
+            )
+        if (
+            raw.get("owner_context_contract_version") != OWNER_CONTEXT_VERSION
+            or raw.get("map_mode") != OWNER_MAP_MODE
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "reviewed Owner Context contract is unsupported",
+            )
+        try:
+            case_id = UUID(str(raw["research_case_id"]))
+            map_id = UUID(str(raw["industry_map_id"]))
+            map_revision_id = UUID(str(raw["industry_map_revision_id"]))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "reviewed Owner Context identifiers are invalid",
+            ) from exc
+        return {
+            "owner_context_contract_version": OWNER_CONTEXT_VERSION,
+            "map_mode": OWNER_MAP_MODE,
+            "research_case_id": str(case_id),
+            "industry_map_id": str(map_id),
+            "industry_map_revision_id": str(map_revision_id),
+        }
+
+    @staticmethod
+    def _validate_submitted_owner_context(
+        normalized: dict[str, Any],
+        owner_context: dict[str, str],
+    ) -> None:
+        if (
+            normalized["map_mode"] != owner_context["map_mode"]
+            or normalized["research_case_id"]
+            != owner_context["research_case_id"]
+            or normalized["industry_map_id"] != owner_context["industry_map_id"]
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
+                "submitted Case, Map or map mode does not match reviewed authority",
+            )
+        if (
+            normalized["industry_map_revision_id"]
+            != owner_context["industry_map_revision_id"]
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_MAP_REVISION_MISMATCH",
+                "submitted Map Revision does not match reviewed authority",
+            )
+
+    @classmethod
+    def _validate_existing_output_replay(
+        cls,
+        output: IndustryThesisOutputLinkRevision,
+        normalized: dict[str, Any],
+        reviewed_plan: dict[str, Any],
+    ) -> None:
+        if (
+            output.reviewed_plan_fingerprint_sha256
+            != normalized["reviewed_plan_fingerprint_sha256"]
+            or output.research_case_id != UUID(normalized["research_case_id"])
+            or output.accepted_industry_map_identity_id
+            != UUID(normalized["industry_map_id"])
+            or output.accepted_industry_map_revision_id
+            != UUID(normalized["industry_map_revision_id"])
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_CONFLICT"
+            )
+        version = reviewed_plan.get("acceptance_plan_version")
+        if version == HISTORICAL_ACCEPTANCE_PLAN_VERSION:
+            return
+        owner_context = cls._validate_reviewed_owner_context(reviewed_plan)
+        cls._validate_submitted_owner_context(normalized, owner_context)
+        if (
+            output.research_case_id != UUID(owner_context["research_case_id"])
+            or output.accepted_industry_map_identity_id
+            != UUID(owner_context["industry_map_id"])
+            or output.accepted_industry_map_revision_id
+            != UUID(owner_context["industry_map_revision_id"])
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_CONFLICT"
+            )
+
+    @staticmethod
     def _validate_case_and_map(
         session: Session,
         normalized: dict[str, Any],
         reviewed: IndustryThesisSessionRevision,
+        owner_context: dict[str, str],
     ) -> tuple[ResearchCase, IndustryMap, IndustryMapRevision]:
-        case_id = UUID(normalized["research_case_id"])
-        map_id = UUID(normalized["industry_map_id"])
-        map_revision_id = UUID(normalized["industry_map_revision_id"])
+        case_id = UUID(owner_context["research_case_id"])
+        map_id = UUID(owner_context["industry_map_id"])
+        map_revision_id = UUID(owner_context["industry_map_revision_id"])
         research_case = session.get(ResearchCase, case_id)
         industry_map = session.get(IndustryMap, map_id)
         map_revision = session.get(IndustryMapRevision, map_revision_id)

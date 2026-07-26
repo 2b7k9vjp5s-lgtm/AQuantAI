@@ -4,13 +4,13 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.pool import StaticPool
 
 from backend.database.canonical_price_models import ListedInstrument
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun, StockBasicRecord
-import industry_alpha.stage1_models  # noqa: F401 - register output-link FK targets
+from industry_alpha.chain_map_models import IndustryMapRevision
 from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
 from industry_alpha.industry_thesis_review import (
     ACCEPTANCE_PLAN_VERSION,
@@ -22,6 +22,7 @@ from industry_alpha.industry_thesis_rules import (
     IndustryThesisError,
     IndustryThesisNotFound,
 )
+from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 
 UTC = timezone.utc
 BASE_TIME = datetime(2026, 7, 22, 23, 0, tzinfo=UTC)
@@ -72,7 +73,20 @@ def _session_input() -> dict:
     }
 
 
+def _owner_map_revision_id(database) -> UUID:
+    fixture = build_stage1_beneficiary_fixture(database)
+    with database() as session:
+        map_revision = session.scalar(
+            select(IndustryMapRevision)
+            .where(IndustryMapRevision.map_id == fixture.map_id)
+            .order_by(IndustryMapRevision.revision_no.desc())
+        )
+        assert map_revision is not None
+        return map_revision.id
+
+
 def _seed_single_exact(database):
+    map_revision_id = _owner_map_revision_id(database)
     with database.begin() as session:
         instrument = ListedInstrument(
             instrument_key="review-regression-instrument",
@@ -115,6 +129,9 @@ def _seed_single_exact(database):
         "session_revision_id": created["session_revision_id"],
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+        "owner_context": {
+            "industry_map_revision_id": str(map_revision_id),
+        },
         "decisions": [
             {
                 "candidate_revision_id": built["candidates"][0][
@@ -172,6 +189,7 @@ def test_intermediate_recorded_boundary_returns_not_visible(database) -> None:
 
 
 def test_selected_candidate_rejects_two_unbound_identity_authorities(database) -> None:
+    map_revision_id = _owner_map_revision_id(database)
     with database.begin() as session:
         instrument = ListedInstrument(
             instrument_key="review-regression-dual-identity",
@@ -249,6 +267,9 @@ def test_selected_candidate_rejects_two_unbound_identity_authorities(database) -
         "session_revision_id": created["session_revision_id"],
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+        "owner_context": {
+            "industry_map_revision_id": str(map_revision_id),
+        },
         "decisions": [
             {
                 "candidate_revision_id": built["candidates"][0][

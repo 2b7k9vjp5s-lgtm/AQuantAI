@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQuantAI 检查并接受研究成果</title>
+  <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
+  <link rel="stylesheet" href="/industry-analysis/static/review_result.css">
+  <link rel="stylesheet" href="/industry-analysis/static/owner_acceptance.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="/industry-analysis" aria-label="AQuantAI 产业研究首页">
+        <span class="brand-mark">AQ</span>
+        <span><strong>AQuantAI</strong><small>个人研究工作台</small></span>
+      </a>
+      <nav class="primary-nav">
+        <a class="nav-item" href="/today-market"><span>今日市场</span><small>本地快照</small></a>
+        <a class="nav-item nav-active" href="/industry-analysis" aria-current="page"><span>产业研究</span><small>本地研究</small></a>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
+        <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
+      </nav>
+      <div class="sidebar-note">
+        <strong>精确成果接受</strong>
+        <p>研究归属来自已审核计划，不按股票、名称或唯一可达路径推断。</p>
+      </div>
+    </aside>
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">OWNER CONTEXT V2 · LOCAL ONLY</p>
+          <p class="page-context">检查并接受研究成果</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="page-state" class="status-pill">正在读取精确准备状态</span>
+          <a id="back-result-link" class="button" href="/industry-analysis">返回审阅结果</a>
+        </div>
+      </header>
+      <main id="main-content" tabindex="-1" class="acceptance-page">
+        <section class="page-heading">
+          <div>
+            <p class="eyebrow">EXPLICIT AUTHORING · PREVIEW BEFORE COMMIT</p>
+            <h1 id="acceptance-title">检查并接受研究成果</h1>
+            <p id="acceptance-thesis">正在读取本地审核计划。</p>
+          </div>
+        </section>
+        <section class="context-lock" aria-labelledby="context-title">
+          <strong id="context-title">研究归属已由审核计划冻结</strong>
+          <p id="context-summary">页面不会自动替换 Research Case、Industry Map 或 Map Revision。</p>
+        </section>
+        <section class="notice-panel" aria-labelledby="authoring-boundary-title">
+          <strong id="authoring-boundary-title">新建与追加必须显式作者化</strong>
+          <p>每家公司可选择复用精确版本、追加新修订或新建身份。新建/追加必须明确选择受益类型、assessment 状态、Map assertion、Case Claim 并填写理由；页面不会自动推断或代填结论。</p>
+        </section>
+        <section id="error-summary" class="error-summary" tabindex="-1" role="alert" hidden>
+          <strong>当前无法继续</strong>
+          <ul id="error-list"></ul>
+        </section>
+        <form id="acceptance-form" class="acceptance-form" novalidate>
+          <section class="panel" aria-labelledby="members-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="members-title">逐家公司确认 Stage 1 操作与正式归属</h2>
+                <p>复用只读取精确版本；追加和新建只使用当前 reviewed Owner Context 提供的作者化材料。</p>
+              </div>
+              <span id="member-count" class="group-count">0</span>
+            </div>
+            <div id="acceptance-members" class="acceptance-grid"></div>
+          </section>
+          <section class="panel" aria-labelledby="pool-title">
+            <div class="panel-heading"><div><h2 id="pool-title">后续研究池</h2><p>supported 成员由最终 Stage 1 状态确定，不能手工逐家公司勾选。</p></div></div>
+            <div class="form-grid">
+              <label class="form-field"><span>候选池操作</span><select id="pool-mode" required></select></label>
+              <label id="pool-option-field" class="form-field" hidden><span>精确候选池</span><select id="pool-option"></select></label>
+              <label id="pool-title-field" class="form-field" hidden><span>候选池标题</span><input id="pool-title-input" maxlength="300"></label>
+              <label id="pool-scope-field" class="form-field" hidden><span>候选池范围</span><textarea id="pool-scope-input" maxlength="4000"></textarea></label>
+            </div>
+            <p id="pool-help" class="muted-copy"></p>
+          </section>
+          <section class="panel" aria-labelledby="output-heading">
+            <div class="panel-heading"><div><h2 id="output-heading">成果说明</h2><p>预览零写入；提交前必须再次明确确认。</p></div></div>
+            <div class="form-grid">
+              <label class="form-field"><span>成果标题</span><input id="output-title" maxlength="300" required></label>
+              <label class="form-field"><span>成果范围</span><textarea id="output-scope" maxlength="4000" required></textarea></label>
+              <label class="form-field"><span>本次接受说明</span><textarea id="revision-note" maxlength="1000" required placeholder="说明为什么按当前精确记录接受本次成果"></textarea></label>
+            </div>
+          </section>
+          <section id="preview-section" class="panel" hidden aria-labelledby="preview-title">
+            <div class="panel-heading"><div><h2 id="preview-title">确定性变更预览</h2><p>任何操作、作者化材料或成果说明修改都会使预览失效。</p></div><span id="preview-state" class="status-pill">尚未生成</span></div>
+            <div id="preview-summary" class="preview-grid"></div>
+            <details class="technical-details"><summary>查看预览指纹和技术详情</summary><pre id="preview-technical" class="json-block"></pre></details>
+          </section>
+          <section class="panel" aria-label="提交操作">
+            <p class="muted-copy">研究用途，不构成投资建议。页面不会自动提交、自动重试、自动撤销或移动到最新版本。</p>
+            <div class="action-row">
+              <button id="preview-button" class="button button-primary" type="submit">生成变更预览</button>
+              <button id="commit-button" class="button button-primary" type="button" hidden>确认接受研究成果</button>
+            </div>
+          </section>
+        </form>
+        <section class="panel"><details class="technical-details"><summary>查看精确 Context、作者化材料数量、合同版本和时间边界</summary><pre id="acceptance-technical" class="json-block"></pre></details></section>
+        <p id="acceptance-status" class="status-message" role="status" aria-live="polite"></p>
+      </main>
+    </div>
+  </div>
+  <script src="/industry-analysis/static/owner_acceptance.js" defer></script>
+  <script src="/industry-analysis/static/owner_acceptance_pool.js" defer></script>
+</body>
+</html>
