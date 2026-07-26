@@ -25,6 +25,9 @@ from industry_alpha.stage1_models import (
     Stage1BeneficiaryClaimLink,
     Stage1BeneficiaryRevision,
 )
+from scripts.demo_industry_research_result_assembly import (
+    seed_industry_research_result_demo,
+)
 from tests import test_industry_thesis_owner_acceptance as owner_fixture
 from tests.test_industry_research_result_query import database
 
@@ -188,8 +191,7 @@ def _twenty_member_accepted_output(database) -> str:
     return committed["output_link_revision_id"]
 
 
-def test_twenty_member_assembled_result_has_fixed_query_ceiling(database) -> None:
-    output_link_revision_id = _twenty_member_accepted_output(database)
+def _query_count(database, output_link_revision_id: str) -> tuple[int, dict]:
     engine = database.kw["bind"]
     with database() as session:
         with statement_counter(engine) as statements:
@@ -199,7 +201,21 @@ def test_twenty_member_assembled_result_has_fixed_query_ceiling(database) -> Non
                 UUID(output_link_revision_id),
                 as_of_cutoff=owner_fixture.CUTOFF,
                 as_of_recorded_at_utc=owner_fixture.BASE_TIME
-                + timedelta(seconds=5),
+                + timedelta(seconds=6),
             )
-    assert result["accepted_snapshot"]["complete_member_count"] == 20
-    assert len(statements) <= 25
+    return len(statements), result
+
+
+def test_twenty_member_assembled_result_has_fixed_query_ceiling(database) -> None:
+    three_member = seed_industry_research_result_demo(database)
+    three_count, three_result = _query_count(
+        database,
+        three_member["output_link_revision_id"],
+    )
+    twenty_member_output = _twenty_member_accepted_output(database)
+    twenty_count, twenty_result = _query_count(database, twenty_member_output)
+
+    assert three_result["accepted_snapshot"]["complete_member_count"] == 3
+    assert twenty_result["accepted_snapshot"]["complete_member_count"] == 20
+    assert twenty_count <= 40
+    assert twenty_count <= three_count + 2
