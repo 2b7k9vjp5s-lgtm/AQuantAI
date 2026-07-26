@@ -169,6 +169,9 @@ def _build_reviewed(
             "session_revision_id": created["session_revision_id"],
             "expected_session_latest_revision_number": 1,
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+            "owner_context": {
+                "industry_map_revision_id": str(map_revision.id),
+            },
             "decisions": [
                 {
                     "candidate_revision_id": item["candidate_revision_id"],
@@ -446,6 +449,9 @@ def test_listed_instrument_only_preview_blocks_before_any_owner_write(database):
             "session_revision_id": created["session_revision_id"],
             "expected_session_latest_revision_number": 1,
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+            "owner_context": {
+                "industry_map_revision_id": str(map_revision.id),
+            },
             "decisions": [
                 {
                     "candidate_revision_id": built["candidates"][0][
