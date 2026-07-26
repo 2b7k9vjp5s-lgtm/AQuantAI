@@ -48,15 +48,7 @@ jobs:
         run: node --test tests/js/owner_acceptance_pool.test.js
 
       - name: Run tests
-        run: python -m pytest -q --tb=short --junitxml=pytest-results.xml
-
-      - name: Upload direct pytest failure report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-failure-report
-          path: pytest-results.xml
-          retention-days: 1
+        run: python -m pytest -q --tb=short
 
       - name: Run local fixture demo
         run: python -m scripts.demo_research_flow
