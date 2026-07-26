@@ -22,6 +22,7 @@ BOUNDARY = datetime(2026, 7, 23, 8, 0, tzinfo=UTC)
 SESSION_ID = uuid4()
 SOURCE_REVISION_ID = uuid4()
 REVIEWED_REVISION_ID = uuid4()
+MAP_REVISION_ID = uuid4()
 CANDIDATE_A = uuid4()
 CANDIDATE_B = uuid4()
 
@@ -87,6 +88,9 @@ def _review_payload() -> dict:
     return {
         "expected_session_latest_revision_number": 2,
         "acceptance_plan_version": review_api.ACCEPTANCE_PLAN_VERSION,
+        "owner_context": {
+            "industry_map_revision_id": str(MAP_REVISION_ID),
+        },
         "decisions": [
             {
                 "candidate_revision_id": str(CANDIDATE_A),
@@ -218,6 +222,9 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
         json={
             "expected_session_latest_revision_number": 2,
             "acceptance_plan_version": review_api.ACCEPTANCE_PLAN_VERSION,
+            "owner_context": {
+                "industry_map_revision_id": str(MAP_REVISION_ID),
+            },
             "decisions": [],
             "revision_note": "完整审阅",
             "automatic_acceptance": True,
@@ -286,6 +293,9 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
     assert captured[0][1] is False
     command = captured[0][0]
     assert command["session_revision_id"] == str(SOURCE_REVISION_ID)
+    assert command["owner_context"] == {
+        "industry_map_revision_id": str(MAP_REVISION_ID),
+    }
     assert command["decisions"][0]["rationale"] == {
         "user_review_rationale": "产品和认证路径直接对应需求扩张。"
     }
@@ -317,7 +327,6 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
 def test_reviewed_plan_adapter_preserves_exact_result_route(client) -> None:
     http, monkeypatch = client
     expected = {
-        "session_id": str(SESSION_ID),
         "reviewed_session_revision_id": str(REVIEWED_REVISION_ID),
         "candidate_count": 3,
         "selected_candidates": [{"candidate_revision_id": "a"}],
