@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import inspect
-from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from datetime import timedelta
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import create_engine, func, select
@@ -29,8 +29,6 @@ from industry_alpha.stage1_models import (
     Stage1CandidatePoolRevision,
 )
 from tests import test_industry_thesis_owner_acceptance as owner_fixture
-
-UTC = timezone.utc
 
 
 @pytest.fixture()
@@ -140,8 +138,8 @@ def test_workbench_uses_reviewed_context_and_excludes_same_stock_elsewhere(datab
         view = IndustryThesisOwnerAcceptanceWorkbenchQueryService(
             session
         ).get_acceptance_view(
-            session_id=review["acceptance_plan"]["session_id"],
-            reviewed_session_revision_id=review["reviewed_session_revision_id"],
+            session_id=UUID(review["acceptance_plan"]["session_id"]),
+            reviewed_session_revision_id=UUID(review["reviewed_session_revision_id"]),
             as_of_cutoff=owner_fixture.CUTOFF,
             as_of_recorded_at_utc=owner_fixture.BASE_TIME + timedelta(seconds=3),
         )
@@ -227,8 +225,10 @@ def test_unaccepted_v1_fails_closed_even_when_one_stock_context_is_reachable(
             IndustryThesisOwnerAcceptanceWorkbenchQueryService(
                 session
             ).get_acceptance_view(
-                session_id=review["acceptance_plan"]["session_id"],
-                reviewed_session_revision_id=review["reviewed_session_revision_id"],
+                session_id=UUID(review["acceptance_plan"]["session_id"]),
+                reviewed_session_revision_id=UUID(
+                    review["reviewed_session_revision_id"]
+                ),
                 as_of_cutoff=owner_fixture.CUTOFF,
                 as_of_recorded_at_utc=owner_fixture.BASE_TIME
                 + timedelta(seconds=3),
