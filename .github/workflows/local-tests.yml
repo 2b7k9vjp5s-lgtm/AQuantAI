@@ -30,8 +30,10 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai_test
 
     steps:
-      - name: Check out repository
+      - name: Check out exact PR head branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Apply one-time Workbench patch helper
         if: github.event_name == 'pull_request'
