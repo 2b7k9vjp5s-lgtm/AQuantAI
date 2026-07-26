@@ -24,6 +24,13 @@ def test_owner_acceptance_and_result_pages_are_active() -> None:
     assert "生成变更预览" in acceptance.text
     assert "确认接受研究成果" in acceptance.text
     assert "页面不会自动提交、自动重试、自动撤销" in acceptance.text
+    main_script = acceptance.text.index(
+        '/industry-analysis/static/owner_acceptance.js'
+    )
+    pool_script = acceptance.text.index(
+        '/industry-analysis/static/owner_acceptance_pool.js'
+    )
+    assert main_script < pool_script
 
     result = client.get(
         f"/industry-analysis/sessions/{session_id}/revisions/{accepted_id}/accepted-result"
@@ -38,6 +45,9 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     root = Path(__file__).resolve().parents[1]
     acceptance = (
         root / "industry_analysis" / "static" / "owner_acceptance.js"
+    ).read_text(encoding="utf-8")
+    pool = (
+        root / "industry_analysis" / "static" / "owner_acceptance_pool.js"
     ).read_text(encoding="utf-8")
     result = (
         root / "industry_analysis" / "static" / "accepted_result.js"
@@ -64,7 +74,7 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     )
     assert all(
         token not in script
-        for script in (acceptance, result, history_guard)
+        for script in (acceptance, pool, result, history_guard)
         for token in forbidden
     )
     assert "window.confirm" in acceptance
@@ -84,6 +94,17 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     assert "selectedOptions" in acceptance
     assert "页面不会根据股票、名称或唯一可达路径自动决定" in acceptance
     assert "ranking_applied" not in acceptance
+
+    assert 'const MODE_REUSE = "reuse_exact_supported_handoff"' in pool
+    assert "beneficiary_revision_ids" in pool
+    assert "exactIdSetEqual" in pool
+    assert "eligibleReuseOptions" in pool
+    assert "exactSupportedRevisionIds" in pool
+    assert "selection.option.revision_number" in pool
+    assert "已从所选候选池" in pool
+    assert "精确预填标题和范围" in pool
+    assert "复用不会写入新的候选池 Revision" in pool
+    assert "invalid_candidate_pool_selection" in pool
 
     assert "accepted-result-view" in result
     assert "supported_handoff_members" in result
