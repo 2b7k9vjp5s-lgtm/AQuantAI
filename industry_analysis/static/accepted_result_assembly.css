@@ -1,0 +1,152 @@
+.layer-explainer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.layer-explainer article {
+  padding: 18px;
+  border: 1px solid var(--border, #d9dee8);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+
+.layer-explainer h2,
+.map-columns h3 {
+  margin: 10px 0 6px;
+}
+
+.layer-explainer p,
+.map-item p {
+  margin: 0;
+}
+
+.layer-label {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.layer-label.is-accepted {
+  background: #eaf3ff;
+  color: #194f90;
+}
+
+.layer-label.is-overlay {
+  background: #f2edff;
+  color: #5d3f9d;
+}
+
+.fact-card small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted, #687386);
+  font-size: 11px;
+}
+
+.map-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.map-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.map-list {
+  display: grid;
+  gap: 10px;
+}
+
+.map-item {
+  padding: 12px;
+  border: 1px solid var(--border, #d9dee8);
+  border-radius: 10px;
+  background: var(--surface-subtle, #f8fafc);
+}
+
+.map-item strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.snapshot-picker {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.snapshot-picker label {
+  grid-column: 1 / -1;
+  font-weight: 700;
+}
+
+.snapshot-picker select {
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #cbd3df);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+
+.button-secondary {
+  background: transparent;
+}
+
+.candidate-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.candidate-highlight,
+.candidate-detail {
+  padding: 14px;
+  border: 1px solid var(--border, #d9dee8);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+
+.candidate-detail + .candidate-detail {
+  margin-top: 10px;
+}
+
+.candidate-status {
+  display: inline-flex;
+  margin: 6px 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f1f4f8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.overlay-blocked {
+  padding: 14px;
+  border: 1px solid #e4b7b7;
+  border-radius: 10px;
+  background: #fff5f5;
+}
+
+@media (max-width: 960px) {
+  .layer-explainer,
+  .map-columns,
+  .candidate-highlights {
+    grid-template-columns: 1fr;
+  }
+
+  .snapshot-picker {
+    grid-template-columns: 1fr;
+  }
+}
