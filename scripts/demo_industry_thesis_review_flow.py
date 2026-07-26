@@ -6,13 +6,13 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.pool import StaticPool
 
 from backend.database.canonical_price_models import ListedInstrument
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
-import industry_alpha.stage1_models  # noqa: F401 - register output-link FK targets
+from industry_alpha.chain_map_models import IndustryMapRevision
 from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
 from industry_alpha.industry_thesis_review import (
     ACCEPTANCE_PLAN_VERSION,
@@ -20,6 +20,7 @@ from industry_alpha.industry_thesis_review import (
     IndustryThesisReviewedPlanQueryService,
 )
 from industry_alpha.industry_thesis_rules import BUILDER_VERSION
+from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 
 UTC = timezone.utc
 BASE_TIME = datetime(2026, 7, 22, 23, 0, tzinfo=UTC)
@@ -99,6 +100,16 @@ def build_industry_thesis_review_demo_payload() -> dict[str, Any]:
     Base.metadata.create_all(engine)
     factory = build_session_factory(engine)
     try:
+        owner_fixture = build_stage1_beneficiary_fixture(factory)
+        with factory() as session:
+            owner_map_revision = session.scalar(
+                select(IndustryMapRevision)
+                .where(IndustryMapRevision.map_id == owner_fixture.map_id)
+                .order_by(IndustryMapRevision.revision_no.desc())
+            )
+            assert owner_map_revision is not None
+            owner_map_revision_id = owner_map_revision.id
+
         with factory.begin() as session:
             instrument = ListedInstrument(
                 instrument_key="fixture-review-company-a",
@@ -153,6 +164,9 @@ def build_industry_thesis_review_demo_payload() -> dict[str, Any]:
                 "session_revision_id": created["session_revision_id"],
                 "expected_session_latest_revision_number": 1,
                 "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+                "owner_context": {
+                    "industry_map_revision_id": str(owner_map_revision_id),
+                },
                 "decisions": [
                     {
                         "candidate_revision_id": rows["Company A"][
