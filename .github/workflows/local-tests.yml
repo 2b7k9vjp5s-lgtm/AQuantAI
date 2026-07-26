@@ -46,7 +46,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pytest-diagnostics
-          path: pytest-results.xml
+          path: |
+            pytest-results.xml
+            industry_alpha/industry_thesis_owner_acceptance_workbench.py
           if-no-files-found: error
           retention-days: 1
 
