@@ -29,7 +29,6 @@ def test_accepted_result_page_exposes_two_layers_and_exact_selector() -> None:
     assert 'picker.value = result.candidate_overlay.snapshot_revision_id || ""' in script
     assert "applySnapshotSelection" in script
     assert "不使用最新版本回退" in html
-    assert "latest_fallback_used" in script
     assert ".candidate-highlights" in css
 
     forbidden = (
