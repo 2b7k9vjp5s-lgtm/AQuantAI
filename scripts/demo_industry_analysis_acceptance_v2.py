@@ -35,17 +35,18 @@ def run_demo() -> dict:
     assert acceptance.status_code == 200
     assert accepted.status_code == 200
     assert "研究归属已由审核计划冻结" in acceptance.text
+    assert "新建与追加必须显式作者化" in acceptance.text
+    assert "Map assertion、Case Claim" in acceptance.text
     assert "完整已接受成员" in accepted.text
 
     root = Path(__file__).resolve().parents[1]
-    scripts = [
-        (root / "industry_analysis" / "static" / "owner_acceptance.js").read_text(
-            encoding="utf-8"
-        ),
-        (root / "industry_analysis" / "static" / "accepted_result.js").read_text(
-            encoding="utf-8"
-        ),
-    ]
+    acceptance_script = (
+        root / "industry_analysis" / "static" / "owner_acceptance.js"
+    ).read_text(encoding="utf-8")
+    accepted_script = (
+        root / "industry_analysis" / "static" / "accepted_result.js"
+    ).read_text(encoding="utf-8")
+    scripts = [acceptance_script, accepted_script]
     forbidden = (
         'fetch("http',
         "fetch('http",
@@ -56,6 +57,14 @@ def run_demo() -> dict:
         "expected return",
     )
     assert all(token not in script for script in scripts for token in forbidden)
+    assert 'const OP_APPEND = "append_beneficiary_revision"' in acceptance_script
+    assert (
+        'const OP_CREATE = "create_beneficiary_identity_and_revision"'
+        in acceptance_script
+    )
+    assert "map_assertion_revisions" in acceptance_script
+    assert "claim_revision_ids" in acceptance_script
+    assert 'semantic_operation: "none"' in acceptance_script
 
     return {
         "core_golden_path": core,
@@ -64,12 +73,17 @@ def run_demo() -> dict:
             "accepted_result_page": "active",
             "explicit_preview_required": True,
             "explicit_commit_confirmation_required": True,
+            "explicit_stage1_reuse": True,
+            "explicit_stage1_append": True,
+            "explicit_stage1_create": True,
+            "context_bound_assertion_and_claim_authoring": True,
             "exact_history_reopening": True,
         },
         "boundaries": {
             "external_network": False,
             "automatic_retry": False,
             "automatic_context_inference": False,
+            "cross_revision_semantic_reuse": False,
             "ranking_or_scoring": False,
             "not_investment_advice": True,
         },
