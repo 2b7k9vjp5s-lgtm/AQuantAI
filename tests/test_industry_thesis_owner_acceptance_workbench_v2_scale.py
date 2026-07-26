@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import date, timedelta
+from uuid import UUID
 
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.pool import StaticPool
@@ -177,10 +178,10 @@ def test_twenty_member_context_bound_view_has_fixed_query_ceiling() -> None:
                 view = IndustryThesisOwnerAcceptanceWorkbenchQueryService(
                     session
                 ).get_acceptance_view(
-                    session_id=review["acceptance_plan"]["session_id"],
-                    reviewed_session_revision_id=review[
-                        "reviewed_session_revision_id"
-                    ],
+                    session_id=UUID(review["acceptance_plan"]["session_id"]),
+                    reviewed_session_revision_id=UUID(
+                        review["reviewed_session_revision_id"]
+                    ),
                     as_of_cutoff=owner_fixture.CUTOFF,
                     as_of_recorded_at_utc=(
                         owner_fixture.BASE_TIME + timedelta(seconds=3)
