@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from uuid import uuid4
+from typing import Any, Callable
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -29,8 +30,9 @@ def _owner_context() -> dict[str, str]:
     }
 
 
-def _normalized(context: dict[str, str]) -> dict[str, str]:
+def _normalized(context: dict[str, str]) -> dict[str, Any]:
     return {
+        "reviewed_session_revision_id": str(uuid4()),
         "reviewed_plan_fingerprint_sha256": "a" * 64,
         "map_mode": context["map_mode"],
         "research_case_id": context["research_case_id"],
@@ -42,14 +44,37 @@ def _normalized(context: dict[str, str]) -> dict[str, str]:
 def _output(context: dict[str, str]) -> SimpleNamespace:
     return SimpleNamespace(
         reviewed_plan_fingerprint_sha256="a" * 64,
-        research_case_id=__import__("uuid").UUID(context["research_case_id"]),
-        accepted_industry_map_identity_id=__import__("uuid").UUID(
-            context["industry_map_id"]
-        ),
-        accepted_industry_map_revision_id=__import__("uuid").UUID(
+        research_case_id=UUID(context["research_case_id"]),
+        accepted_industry_map_identity_id=UUID(context["industry_map_id"]),
+        accepted_industry_map_revision_id=UUID(
             context["industry_map_revision_id"]
         ),
     )
+
+
+class _OrderGuardService(IndustryThesisOwnerAcceptanceService):
+    """Expose whether core execution reached graph/owner work."""
+
+    def __init__(self, reviewed_plan: dict[str, Any]) -> None:
+        self.reviewed_plan = reviewed_plan
+        self.graph_or_owner_work_reached = False
+
+    def _lock_and_validate_reviewed(self, session, normalized):
+        del session, normalized
+        reviewed = SimpleNamespace(id=uuid4())
+        identity = SimpleNamespace()
+        latest = reviewed
+        return reviewed, identity, latest, self.reviewed_plan
+
+    @staticmethod
+    def _lock_existing_output(session, *, identity, normalized):
+        del session, identity, normalized
+        return None
+
+    def _validate_case_and_map(self, *args, **kwargs):
+        del args, kwargs
+        self.graph_or_owner_work_reached = True
+        raise AssertionError("context failure must occur before graph/owner work")
 
 
 def test_unaccepted_historical_v1_plan_fails_closed() -> None:
@@ -111,7 +136,7 @@ def test_v2_owner_context_requires_exact_contract_shape() -> None:
 )
 def test_submitted_owner_context_substitution_is_rejected(
     field: str,
-    replacement: str | object,
+    replacement: str | Callable[[], str],
     expected_code: str,
 ) -> None:
     context = _owner_context()
@@ -124,6 +149,37 @@ def test_submitted_owner_context_substitution_is_rejected(
             context,
         )
     assert caught.value.code == expected_code
+
+
+def test_v1_missing_context_stops_before_graph_or_owner_work() -> None:
+    service = _OrderGuardService(
+        {"acceptance_plan_version": HISTORICAL_ACCEPTANCE_PLAN_VERSION}
+    )
+    context = _owner_context()
+
+    with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
+        service._run(object(), _normalized(context), dry_run=True)
+
+    assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY"
+    assert service.graph_or_owner_work_reached is False
+
+
+def test_v2_substitution_stops_before_graph_or_owner_work() -> None:
+    context = _owner_context()
+    service = _OrderGuardService(
+        {
+            "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+            "owner_context": context,
+        }
+    )
+    submitted = _normalized(context)
+    submitted["industry_map_revision_id"] = str(uuid4())
+
+    with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
+        service._run(object(), submitted, dry_run=True)
+
+    assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_MAP_REVISION_MISMATCH"
+    assert service.graph_or_owner_work_reached is False
 
 
 def test_exact_accepted_v1_output_replay_remains_valid() -> None:
