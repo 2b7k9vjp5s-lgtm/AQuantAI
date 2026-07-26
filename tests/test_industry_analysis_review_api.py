@@ -24,11 +24,47 @@ UTC = timezone.utc
 CUTOFF = date(2026, 7, 23)
 BOUNDARY = datetime(2026, 7, 23, 8, 0, tzinfo=UTC)
 SESSION_ID = uuid4()
+PRIOR_REVISION_ID = uuid4()
 SOURCE_REVISION_ID = uuid4()
 REVIEWED_REVISION_ID = uuid4()
 MAP_REVISION_ID = uuid4()
 CANDIDATE_A = uuid4()
 CANDIDATE_B = uuid4()
+
+
+def _route_revision(
+    *,
+    revision_id,
+    revision_number: int,
+    recorded_at: datetime,
+    supersedes_revision_id,
+) -> IndustryThesisSessionRevision:
+    return IndustryThesisSessionRevision(
+        id=revision_id,
+        session_id=SESSION_ID,
+        revision_number=revision_number,
+        thesis_text_original="AI 数据中心扩张带动电子特气需求",
+        thesis_title_reviewed="电子特气需求",
+        driver_type="demand_expansion",
+        analysis_horizon_kind="medium_term",
+        analysis_start_date=None,
+        analysis_end_date=None,
+        market_scope_json='[{"market_namespace":"CN_A"}]',
+        chain_boundary_json="{}",
+        exclusions_json="[]",
+        seed_companies_json="[]",
+        seed_products_json="[]",
+        seed_technologies_json="[]",
+        seed_bottlenecks_json="[]",
+        draft_graph_json="{}",
+        coverage_state="partial_local_coverage",
+        workflow_state="candidate_build_ready",
+        information_cutoff_date=CUTOFF,
+        recorded_at_utc=recorded_at,
+        input_fingerprint_sha256=str(revision_number) * 64,
+        supersedes_revision_id=supersedes_revision_id,
+        revision_note=f"exact review API route fixture revision {revision_number}",
+    )
 
 
 @pytest.fixture()
@@ -44,38 +80,27 @@ def client(monkeypatch):
         session.add(
             IndustryThesisSessionIdentity(
                 id=SESSION_ID,
-                created_recorded_utc=BOUNDARY - timedelta(seconds=2),
+                created_recorded_utc=BOUNDARY - timedelta(seconds=3),
                 created_by_kind="local_user",
                 state="active",
                 latest_revision_number=2,
             )
         )
         session.add(
-            IndustryThesisSessionRevision(
-                id=SOURCE_REVISION_ID,
-                session_id=SESSION_ID,
-                revision_number=2,
-                thesis_text_original="AI 数据中心扩张带动电子特气需求",
-                thesis_title_reviewed="电子特气需求",
-                driver_type="demand_expansion",
-                analysis_horizon_kind="medium_term",
-                analysis_start_date=None,
-                analysis_end_date=None,
-                market_scope_json='[{"market_namespace":"CN_A"}]',
-                chain_boundary_json="{}",
-                exclusions_json="[]",
-                seed_companies_json="[]",
-                seed_products_json="[]",
-                seed_technologies_json="[]",
-                seed_bottlenecks_json="[]",
-                draft_graph_json="{}",
-                coverage_state="partial_local_coverage",
-                workflow_state="candidate_build_ready",
-                information_cutoff_date=CUTOFF,
-                recorded_at_utc=BOUNDARY - timedelta(seconds=1),
-                input_fingerprint_sha256="0" * 64,
+            _route_revision(
+                revision_id=PRIOR_REVISION_ID,
+                revision_number=1,
+                recorded_at=BOUNDARY - timedelta(seconds=2),
                 supersedes_revision_id=None,
-                revision_note="exact review API route fixture",
+            )
+        )
+        session.flush()
+        session.add(
+            _route_revision(
+                revision_id=SOURCE_REVISION_ID,
+                revision_number=2,
+                recorded_at=BOUNDARY - timedelta(seconds=1),
+                supersedes_revision_id=PRIOR_REVISION_ID,
             )
         )
     app.dependency_overrides[
