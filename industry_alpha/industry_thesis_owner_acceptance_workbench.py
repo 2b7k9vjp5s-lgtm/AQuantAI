@@ -251,16 +251,13 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
                 "no exact persisted Stage 1 context is reachable for the frozen identities",
             )
-        best_size = max(len(values) for values in context_coverage.values())
-        best_contexts = [
-            key for key, values in context_coverage.items() if len(values) == best_size
-        ]
-        if len(best_contexts) != 1:
+        if len(context_coverage) != 1:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
-                "multiple exact case/map contexts are equally compatible",
+                "multiple exact case/map contexts are reachable for the frozen identities",
             )
-        case_id, map_id, map_revision_id = best_contexts[0]
+        selected_context, compatible_stock_ids = next(iter(context_coverage.items()))
+        case_id, map_id, map_revision_id = selected_context
 
         header = self._session.execute(
             select(ResearchCase, IndustryMap, IndustryMapRevision)
@@ -295,7 +292,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 beneficiary.map_id,
                 revision.selected_map_revision_id,
             )
-            == best_contexts[0]
+            == selected_context
         ]
         context_revision_ids = [revision.id for _, revision in context_pairs]
 
@@ -728,7 +725,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                     "research_case_id": str(case_id),
                     "industry_map_id": str(map_id),
                     "industry_map_revision_id": str(map_revision_id),
-                    "compatible_frozen_stock_count": best_size,
+                    "compatible_frozen_stock_count": len(compatible_stock_ids),
                 },
             },
         }
@@ -974,25 +971,49 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 )
             )
 
-        research_rows = list(
-            self._session.execute(
-                select(Stage2CompanyResearch, Stage2CompanyResearchRevision)
-                .join(
-                    Stage2CompanyResearchRevision,
-                    Stage2CompanyResearchRevision.company_research_id
-                    == Stage2CompanyResearch.id,
-                )
-                .where(
-                    Stage2CompanyResearch.beneficiary_revision_id.in_(revision_ids),
-                    Stage2CompanyResearchRevision.information_cutoff_date <= as_of_cutoff,
-                    Stage2CompanyResearchRevision.recorded_at_utc <= recorded_boundary,
-                )
-                .order_by(
-                    Stage2CompanyResearch.id,
-                    Stage2CompanyResearchRevision.revision_no,
+        research_rows: list[
+            tuple[Stage2CompanyResearch, Stage2CompanyResearchRevision]
+        ] = []
+        if pool is not None and pool_revision is not None:
+            research_rows = list(
+                self._session.execute(
+                    select(Stage2CompanyResearch, Stage2CompanyResearchRevision)
+                    .join(
+                        Stage2CompanyResearchRevision,
+                        Stage2CompanyResearchRevision.company_research_id
+                        == Stage2CompanyResearch.id,
+                    )
+                    .join(
+                        Stage1CandidatePoolMembership,
+                        Stage1CandidatePoolMembership.id
+                        == Stage2CompanyResearch.candidate_pool_membership_id,
+                    )
+                    .where(
+                        Stage2CompanyResearch.candidate_pool_id == pool.id,
+                        Stage2CompanyResearch.candidate_pool_revision_id
+                        == pool_revision.id,
+                        Stage1CandidatePoolMembership.candidate_pool_revision_id
+                        == pool_revision.id,
+                        Stage1CandidatePoolMembership.beneficiary_id
+                        == Stage2CompanyResearch.beneficiary_id,
+                        Stage1CandidatePoolMembership.beneficiary_revision_id
+                        == Stage2CompanyResearch.beneficiary_revision_id,
+                        Stage2CompanyResearch.case_id == research_case.id,
+                        Stage2CompanyResearch.map_id == industry_map.id,
+                        Stage2CompanyResearch.selected_map_revision_id
+                        == map_revision.id,
+                        Stage2CompanyResearch.beneficiary_revision_id.in_(revision_ids),
+                        Stage2CompanyResearchRevision.information_cutoff_date
+                        <= as_of_cutoff,
+                        Stage2CompanyResearchRevision.recorded_at_utc
+                        <= recorded_boundary,
+                    )
+                    .order_by(
+                        Stage2CompanyResearch.id,
+                        Stage2CompanyResearchRevision.revision_no,
+                    )
                 )
             )
-        )
         latest_research: dict[UUID, tuple[Stage2CompanyResearch, Stage2CompanyResearchRevision]] = {}
         for research, revision in research_rows:
             current = latest_research.get(research.beneficiary_revision_id)
@@ -1075,6 +1096,18 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 }
 
             company_pair = latest_research.get(revision.id)
+            if company_pair is not None and (
+                company_pair[0].beneficiary_id != beneficiary.id
+                or company_pair[0].beneficiary_revision_id != revision.id
+                or company_pair[0].stock_basic_record_id
+                != revision.stock_basic_record_id
+                or company_pair[0].case_id != research_case.id
+                or company_pair[0].map_id != industry_map.id
+                or company_pair[0].selected_map_revision_id != map_revision.id
+            ):
+                raise IndustryThesisOwnerAcceptanceError(
+                    "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
+                )
             company_state = (
                 {
                     "state": "missing",
