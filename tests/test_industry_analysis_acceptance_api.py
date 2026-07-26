@@ -219,6 +219,11 @@ def test_acceptance_view_adapter_preserves_exact_route_and_boundaries(
         "IndustryThesisOwnerAcceptanceWorkbenchQueryService",
         FakeWorkbench,
     )
+    monkeypatch.setattr(
+        acceptance_api,
+        "_require_single_exact_owner_context",
+        lambda *_args, **_kwargs: None,
+    )
     response = client.get(
         f"/industry-analysis/api/session-revisions/{REVIEWED_REVISION_ID}/"
         "owner-acceptance-view",
@@ -288,6 +293,11 @@ def test_preview_and_commit_use_exact_flat_dto_and_matching_fingerprint(
         acceptance_api,
         "IndustryThesisOwnerAcceptanceService",
         FakeService,
+    )
+    monkeypatch.setattr(
+        acceptance_api,
+        "_require_single_exact_owner_context",
+        lambda *_args, **_kwargs: None,
     )
     plan = _plan()
     preview = client.post(
@@ -365,6 +375,11 @@ def test_accepted_result_adapter_and_history_continuation_are_exact(
         acceptance_api,
         "IndustryThesisOwnerAcceptanceWorkbenchQueryService",
         FakeWorkbench,
+    )
+    monkeypatch.setattr(
+        acceptance_api,
+        "_apply_exact_company_research_readiness",
+        lambda _session, result, **_kwargs: result,
     )
     response = client.get(
         f"/industry-analysis/api/session-revisions/{ACCEPTED_REVISION_ID}/"
