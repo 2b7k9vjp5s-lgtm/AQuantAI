@@ -54,11 +54,12 @@ def client(database):
 
 def _query(session_id: str, *, recorded_at=None) -> str:
     boundary = recorded_at or owner_fixture.BASE_TIME + timedelta(seconds=3)
+    recorded_value = boundary if isinstance(boundary, str) else boundary.isoformat()
     return urlencode(
         {
             "session_id": session_id,
             "as_of_cutoff": owner_fixture.CUTOFF.isoformat(),
-            "as_of_recorded_at_utc": boundary.isoformat(),
+            "as_of_recorded_at_utc": recorded_value,
         }
     )
 
