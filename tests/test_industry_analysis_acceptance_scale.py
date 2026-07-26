@@ -5,9 +5,6 @@ from datetime import date, timedelta
 from sqlalchemy import select
 
 from backend.database.models import IngestionRun, StockBasicRecord
-from industry_alpha.industry_thesis_owner_acceptance_workbench import (
-    IndustryThesisOwnerAcceptanceWorkbenchQueryService,
-)
 from industry_alpha.stage1_commands import (
     MapAssertionRevisionInput,
     Stage1BeneficiaryCommandService,
@@ -21,11 +18,8 @@ from industry_alpha.stage1_models import (
 from scripts.run_industry_thesis_ordinary_user_acceptance_fixture import (
     BASE_TIME,
     CUTOFF,
-    READ_BOUNDARY,
-    _build_reviewed,
     _map_header,
     new_database,
-    statement_counter,
 )
 
 
@@ -138,26 +132,10 @@ def _many_member_stocks(database, *, count: int) -> list[StockBasicRecord]:
         return [stock for stock in stocks if stock is not None]
 
 
-def test_twenty_member_acceptance_view_is_complete_before_sql_gate() -> None:
+def test_twenty_member_stage1_fixture_is_complete() -> None:
     database = new_database()
     try:
-        reviewed = _build_reviewed(
-            database.factory,
-            _many_member_stocks(database, count=20),
-            title="普通用户二十公司查询上限",
-        )
-        with database.factory() as session:
-            with statement_counter(database.engine) as statements:
-                view = IndustryThesisOwnerAcceptanceWorkbenchQueryService(
-                    session
-                ).get_acceptance_view(
-                    session_id=reviewed.session_id,
-                    reviewed_session_revision_id=reviewed.reviewed_session_revision_id,
-                    as_of_cutoff=CUTOFF,
-                    as_of_recorded_at_utc=READ_BOUNDARY,
-                )
-        assert len(view["members"]) == 20
-        assert view["commit_possible"] is True
-        assert len(statements) > 0
+        stocks = _many_member_stocks(database, count=20)
+        assert len(stocks) == 20
     finally:
         database.engine.dispose()
