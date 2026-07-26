@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 from uuid import uuid4
@@ -14,6 +14,10 @@ import backend.api.industry_analysis_review as review_api
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
 from backend.main import app
+from industry_alpha.industry_thesis_models import (
+    IndustryThesisSessionIdentity,
+    IndustryThesisSessionRevision,
+)
 import industry_alpha.stage1_models  # noqa: F401 - register exact FK targets
 
 UTC = timezone.utc
@@ -36,6 +40,44 @@ def client(monkeypatch):
     )
     Base.metadata.create_all(engine)
     factory = build_session_factory(engine)
+    with factory.begin() as session:
+        session.add(
+            IndustryThesisSessionIdentity(
+                id=SESSION_ID,
+                created_recorded_utc=BOUNDARY - timedelta(seconds=2),
+                created_by_kind="local_user",
+                state="active",
+                latest_revision_number=2,
+            )
+        )
+        session.add(
+            IndustryThesisSessionRevision(
+                id=SOURCE_REVISION_ID,
+                session_id=SESSION_ID,
+                revision_number=2,
+                thesis_text_original="AI 数据中心扩张带动电子特气需求",
+                thesis_title_reviewed="电子特气需求",
+                driver_type="demand_expansion",
+                analysis_horizon_kind="medium_term",
+                analysis_start_date=None,
+                analysis_end_date=None,
+                market_scope_json='[{"market_namespace":"CN_A"}]',
+                chain_boundary_json="{}",
+                exclusions_json="[]",
+                seed_companies_json="[]",
+                seed_products_json="[]",
+                seed_technologies_json="[]",
+                seed_bottlenecks_json="[]",
+                draft_graph_json="{}",
+                coverage_state="partial_local_coverage",
+                workflow_state="candidate_build_ready",
+                information_cutoff_date=CUTOFF,
+                recorded_at_utc=BOUNDARY - timedelta(seconds=1),
+                input_fingerprint_sha256="0" * 64,
+                supersedes_revision_id=None,
+                revision_note="exact review API route fixture",
+            )
+        )
     app.dependency_overrides[
         review_api.get_industry_analysis_session_factory
     ] = lambda: factory
