@@ -174,6 +174,32 @@ def test_workbench_uses_reviewed_context_and_excludes_same_stock_elsewhere(datab
     assert str(other[3]) not in option_beneficiary_ids
     assert str(other[4]) not in option_revision_ids
     assert {str(row[0].id) for row in owner_rows}.issubset(option_beneficiary_ids)
+
+    material_counts = view["technical_details"]["authoring_material_counts"]
+    assert material_counts["map_assertions"] >= 3
+    assert material_counts["claim_revisions"] >= 3
+    for member in view["members"]:
+        contract = member["stage1_authoring_contract"]
+        assert contract["map_assertion_options"]
+        assert contract["claim_revision_options"]
+        assert {item["value"] for item in contract["legacy_beneficiary_kind_options"]} == {
+            "direct",
+            "secondary",
+            "potential",
+        }
+        assert {item["value"] for item in contract["assessment_status_options"]} == {
+            "draft",
+            "supported",
+            "disputed",
+        }
+        assert all(
+            option["assertion_kind"] in {"node", "relationship", "observation"}
+            for option in contract["map_assertion_options"]
+        )
+        assert all(
+            option["claim_status"] != "rejected"
+            for option in contract["claim_revision_options"]
+        )
     assert _read_counts(database) == counts_before
 
 
