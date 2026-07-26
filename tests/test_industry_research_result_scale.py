@@ -25,9 +25,6 @@ from industry_alpha.stage1_models import (
     Stage1BeneficiaryClaimLink,
     Stage1BeneficiaryRevision,
 )
-from scripts.demo_industry_research_result_assembly import (
-    seed_industry_research_result_demo,
-)
 from tests import test_industry_thesis_owner_acceptance as owner_fixture
 from tests.test_industry_research_result_query import database
 
@@ -48,7 +45,44 @@ def statement_counter(engine):
         event.remove(engine, "before_cursor_execute", before_cursor_execute)
 
 
-def _twenty_member_accepted_output(database) -> str:
+def _accept_exact_members(database, beneficiary_ids: tuple[UUID, ...], suffix: str) -> str:
+    reviewed, reviewed_map, reviewed_map_revision, owner_rows = (
+        owner_fixture._build_reviewed(
+            database,
+            beneficiary_ids=beneficiary_ids,
+        )
+    )
+    payload = owner_fixture._acceptance_input(
+        reviewed,
+        reviewed_map,
+        reviewed_map_revision,
+        owner_rows,
+        pool_mode="create_supported_handoff",
+    )
+    payload["candidate_pool_operation"] = {
+        **payload["candidate_pool_operation"],
+        "pool_key": f"industry-result-scale-{suffix}",
+        "title": f"Industry result scale {suffix}",
+        "scope": f"Exact {suffix} member scale comparison.",
+    }
+    service = IndustryThesisOwnerAcceptanceService(
+        database,
+        clock=lambda: owner_fixture.BASE_TIME + timedelta(seconds=4),
+    )
+    preview = service.preview(payload)
+    assert preview["commit_ready"] is True
+    committed = service.commit(
+        {
+            **payload,
+            "preview_fingerprint_sha256": preview[
+                "preview_fingerprint_sha256"
+            ],
+        }
+    )
+    return committed["output_link_revision_id"]
+
+
+def _scale_accepted_outputs(database) -> tuple[str, str]:
     fixture = build_stage1_beneficiary_fixture(database)
     with database() as session:
         reference = session.scalar(
@@ -161,34 +195,17 @@ def _twenty_member_accepted_output(database) -> str:
         )
         beneficiary_ids.append(created.id)
 
-    reviewed, reviewed_map, reviewed_map_revision, owner_rows = (
-        owner_fixture._build_reviewed(
-            database,
-            beneficiary_ids=tuple(beneficiary_ids),
-        )
-    )
-    payload = owner_fixture._acceptance_input(
-        reviewed,
-        reviewed_map,
-        reviewed_map_revision,
-        owner_rows,
-        pool_mode="create_supported_handoff",
-    )
-    service = IndustryThesisOwnerAcceptanceService(
+    three_output = _accept_exact_members(
         database,
-        clock=lambda: owner_fixture.BASE_TIME + timedelta(seconds=4),
+        tuple(beneficiary_ids[:3]),
+        "three",
     )
-    preview = service.preview(payload)
-    assert preview["commit_ready"] is True
-    committed = service.commit(
-        {
-            **payload,
-            "preview_fingerprint_sha256": preview[
-                "preview_fingerprint_sha256"
-            ],
-        }
+    twenty_output = _accept_exact_members(
+        database,
+        tuple(beneficiary_ids),
+        "twenty",
     )
-    return committed["output_link_revision_id"]
+    return three_output, twenty_output
 
 
 def _query_count(database, output_link_revision_id: str) -> tuple[int, dict]:
@@ -207,12 +224,8 @@ def _query_count(database, output_link_revision_id: str) -> tuple[int, dict]:
 
 
 def test_twenty_member_assembled_result_has_fixed_query_ceiling(database) -> None:
-    three_member = seed_industry_research_result_demo(database)
-    three_count, three_result = _query_count(
-        database,
-        three_member["output_link_revision_id"],
-    )
-    twenty_member_output = _twenty_member_accepted_output(database)
+    three_member_output, twenty_member_output = _scale_accepted_outputs(database)
+    three_count, three_result = _query_count(database, three_member_output)
     twenty_count, twenty_result = _query_count(database, twenty_member_output)
 
     assert three_result["accepted_snapshot"]["complete_member_count"] == 3
