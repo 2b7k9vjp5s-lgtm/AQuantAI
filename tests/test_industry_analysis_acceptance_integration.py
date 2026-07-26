@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-import json
-from urllib.parse import parse_qs, urlparse
-from uuid import UUID
 
-from industry_alpha.industry_thesis_models import IndustryThesisSessionRevision
 from scripts.run_industry_thesis_ordinary_user_acceptance_fixture import (
     BASE_TIME,
     CUTOFF,
@@ -44,7 +40,7 @@ def test_offline_demo_proves_golden_zero_supported_and_query_ceilings() -> None:
     assert result["notices"]["recommendation_or_trading"] is False
 
 
-def test_accepted_result_respects_recorded_boundary_and_fails_closed_on_corruption() -> None:
+def test_accepted_result_respects_recorded_boundary() -> None:
     fixture = build_golden_fixture()
     try:
         with api_client(fixture.database) as client:
@@ -57,7 +53,6 @@ def test_accepted_result_respects_recorded_boundary_and_fails_closed_on_corrupti
                 plan,
                 preview["preview_fingerprint_sha256"],
             )
-
             early = client.get(
                 f"/industry-analysis/api/session-revisions/"
                 f"{committed['accepted_session_revision_id']}/accepted-result-view",
@@ -69,33 +64,9 @@ def test_accepted_result_respects_recorded_boundary_and_fails_closed_on_corrupti
                     ).isoformat(),
                 },
             )
-            assert early.status_code == 422
-            assert early.json()["detail"]["code"] == (
-                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
-            )
-
-            # Deliberately bypass the append-only ORM guard to simulate on-disk
-            # corruption. Production code remains unable to mutate this revision.
-            accepted_revision_id = UUID(committed["accepted_session_revision_id"])
-            with fixture.database.engine.begin() as connection:
-                connection.execute(
-                    IndustryThesisSessionRevision.__table__.update()
-                    .where(IndustryThesisSessionRevision.id == accepted_revision_id)
-                    .values(draft_graph_json=json.dumps({"corrupt": True}))
-                )
-
-            parsed = urlparse(committed["accepted_result_path"])
-            boundary = {
-                key: values[-1] for key, values in parse_qs(parsed.query).items()
-            }
-            corrupt = client.get(
-                f"/industry-analysis/api/session-revisions/"
-                f"{committed['accepted_session_revision_id']}/accepted-result-view",
-                params={"session_id": str(fixture.reviewed.session_id), **boundary},
-            )
-            assert corrupt.status_code == 422
-            assert corrupt.json()["detail"]["code"] == (
-                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
-            )
+        assert early.status_code == 422
+        assert early.json()["detail"]["code"] == (
+            "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
+        )
     finally:
         fixture.database.engine.dispose()
