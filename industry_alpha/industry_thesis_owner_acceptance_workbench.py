@@ -154,21 +154,36 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 "reviewed Owner Context identifiers are invalid",
             ) from exc
 
-        reviewed = self._session.get(
-            IndustryThesisSessionRevision,
-            reviewed_session_revision_id,
-        )
-        identity = self._session.get(IndustryThesisSessionIdentity, session_id)
-        research_case = self._session.get(ResearchCase, case_id)
-        industry_map = self._session.get(IndustryMap, map_id)
-        map_revision = self._session.get(IndustryMapRevision, map_revision_id)
+        header = self._session.execute(
+            select(
+                IndustryThesisSessionRevision,
+                IndustryThesisSessionIdentity,
+                ResearchCase,
+                IndustryMap,
+                IndustryMapRevision,
+            )
+            .join(
+                IndustryThesisSessionIdentity,
+                IndustryThesisSessionIdentity.id
+                == IndustryThesisSessionRevision.session_id,
+            )
+            .join(IndustryMap, IndustryMap.case_id == ResearchCase.id)
+            .join(IndustryMapRevision, IndustryMapRevision.map_id == IndustryMap.id)
+            .where(
+                IndustryThesisSessionRevision.id == reviewed_session_revision_id,
+                IndustryThesisSessionIdentity.id == session_id,
+                ResearchCase.id == case_id,
+                IndustryMap.id == map_id,
+                IndustryMapRevision.id == map_revision_id,
+            )
+        ).one_or_none()
+        if header is None:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY"
+            )
+        reviewed, identity, research_case, industry_map, map_revision = header
         if (
-            reviewed is None
-            or identity is None
-            or research_case is None
-            or industry_map is None
-            or map_revision is None
-            or reviewed.session_id != session_id
+            reviewed.session_id != session_id
             or reviewed.workflow_state != "reviewed_plan_ready"
             or industry_map.case_id != research_case.id
             or map_revision.map_id != industry_map.id
@@ -202,27 +217,26 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
             ) from exc
 
-        candidates = {
-            candidate_id: self._session.get(
-                IndustryThesisCandidateRevision,
-                candidate_id,
+        candidate_rows = list(
+            self._session.scalars(
+                select(IndustryThesisCandidateRevision).where(
+                    IndustryThesisCandidateRevision.id.in_(selected_ids),
+                    IndustryThesisCandidateRevision.session_revision_id == reviewed.id,
+                    IndustryThesisCandidateRevision.review_state
+                    == "selected_for_acceptance",
+                )
             )
-            for candidate_id in selected_ids
-        }
-        if any(
-            row is None
-            or row.session_revision_id != reviewed.id
-            or row.review_state != "selected_for_acceptance"
-            for row in candidates.values()
-        ):
+        )
+        candidates = {row.id: row for row in candidate_rows}
+        if set(candidates) != set(selected_ids):
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_BINDINGS_INCOMPLETE"
             )
 
         stock_ids = {
             row.proposed_stock_basic_record_id
-            for row in candidates.values()
-            if row is not None and row.proposed_stock_basic_record_id is not None
+            for row in candidate_rows
+            if row.proposed_stock_basic_record_id is not None
         }
         stocks = (
             {
@@ -533,7 +547,6 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
         for sequence, entry in enumerate(selected_entries):
             candidate_id = UUID(entry["candidate_revision_id"])
             candidate = candidates[candidate_id]
-            assert candidate is not None
             stock_id = candidate.proposed_stock_basic_record_id
             stock = stocks.get(stock_id) if stock_id is not None else None
             member_blocking: list[dict[str, str]] = []
