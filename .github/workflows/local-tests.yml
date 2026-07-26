@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -q -e ".[dev]"
 
+      - name: Check Owner Acceptance JavaScript syntax
+        run: node --check industry_analysis/static/owner_acceptance.js
+
       - name: Run tests
         run: python -m pytest -q --tb=short
 
