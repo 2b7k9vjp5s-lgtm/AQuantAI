@@ -44,10 +44,7 @@ api_router = APIRouter(
 )
 page_router = APIRouter(tags=["industry-analysis-pages"])
 _STATIC_DIR = Path(__file__).resolve().parents[2] / "industry_analysis" / "static"
-_ALLOWED_ORDINARY_SEMANTIC_OPERATIONS = {
-    "none",
-    "reuse_exact_semantic_revision",
-}
+_ALLOWED_SEMANTIC_OPERATIONS = {"none", "reuse_exact_semantic_revision"}
 
 
 class _StrictModel(BaseModel):
@@ -75,7 +72,7 @@ class OwnerAcceptanceCommitRequest(OwnerAcceptancePlanRequest):
     preview_fingerprint_sha256: str = Field(min_length=64, max_length=64)
 
 
-def _acceptance_http_error(exc: IndustryThesisError) -> HTTPException:
+def _http_error(exc: IndustryThesisError) -> HTTPException:
     code = exc.code
     not_found = {
         "industry_thesis_session_not_found",
@@ -114,7 +111,7 @@ def _acceptance_http_error(exc: IndustryThesisError) -> HTTPException:
     )
 
 
-def _database_failure(message: str, _exc: Exception) -> HTTPException:
+def _database_failure(message: str) -> HTTPException:
     return HTTPException(
         status_code=503,
         detail={
@@ -131,33 +128,7 @@ def _raw_plan(payload: OwnerAcceptancePlanRequest) -> dict[str, Any]:
     return payload.model_dump(mode="json")
 
 
-def _validate_route_body(
-    route_revision_id: UUID,
-    payload: OwnerAcceptancePlanRequest,
-) -> None:
-    if payload.reviewed_session_revision_id != route_revision_id:
-        raise IndustryThesisOwnerAcceptanceError(
-            "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE",
-            "route reviewed revision does not equal body reviewed revision",
-        )
-
-
-def _validate_ordinary_semantic_modes(payload: OwnerAcceptancePlanRequest) -> None:
-    for index, binding in enumerate(payload.candidate_owner_bindings):
-        if not isinstance(binding, dict):
-            raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_BINDINGS_INCOMPLETE",
-                f"candidate_owner_bindings[{index}] must be an object",
-            )
-        operation = binding.get("semantic_operation")
-        if operation not in _ALLOWED_ORDINARY_SEMANTIC_OPERATIONS:
-            raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_SEMANTIC_PAYLOAD_INCOMPLETE",
-                "ordinary-user acceptance only permits none or exact semantic reuse",
-            )
-
-
-def _load_acceptance_view(
+def _load_view(
     session: Session,
     *,
     session_id: UUID,
@@ -165,7 +136,7 @@ def _load_acceptance_view(
     as_of_cutoff: date,
     as_of_recorded_at_utc: datetime,
 ) -> dict[str, Any]:
-    return IndustryThesisOwnerAcceptanceWorkbenchQueryService(
+    view = IndustryThesisOwnerAcceptanceWorkbenchQueryService(
         session
     ).get_acceptance_view(
         session_id=session_id,
@@ -173,12 +144,32 @@ def _load_acceptance_view(
         as_of_cutoff=as_of_cutoff,
         as_of_recorded_at_utc=as_of_recorded_at_utc,
     )
+    view["information_cutoff_date"] = as_of_cutoff.isoformat()
+    view["as_of_cutoff"] = as_of_cutoff.isoformat()
+    view["as_of_recorded_at_utc"] = as_of_recorded_at_utc.isoformat()
+    view["output_metadata_defaults"] = {
+        "output_title": view["thesis_title"],
+        "output_scope": view["industry_map"]["scope"],
+    }
+    view["candidate_pool_operation_contract"]["create_contract"] = {
+        "mode": "create_supported_handoff",
+        "pool_key": f"industry-thesis-acceptance-v2:{reviewed_session_revision_id}",
+        "title_default": f"{view['thesis_title']} · supported 后续研究",
+        "scope_default": "仅包含本次接受后 Stage 1 状态为 supported 的精确成员。",
+    }
+    return view
 
 
-def _validate_payload_against_view(
+def _validate_route_and_snapshot(
+    route_revision_id: UUID,
     payload: OwnerAcceptancePlanRequest,
     view: dict[str, Any],
 ) -> None:
+    if payload.reviewed_session_revision_id != route_revision_id:
+        raise IndustryThesisOwnerAcceptanceError(
+            "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE",
+            "route reviewed revision does not equal body reviewed revision",
+        )
     expected = {
         "reviewed_session_revision_id": view.get("reviewed_session_revision_id"),
         "expected_session_latest_revision_number": view.get(
@@ -187,20 +178,14 @@ def _validate_payload_against_view(
         "reviewed_plan_fingerprint_sha256": view.get(
             "reviewed_plan_fingerprint_sha256"
         ),
-        "research_case_id": (view.get("owner_context") or {}).get(
-            "research_case_id"
-        ),
-        "map_mode": (view.get("owner_context") or {}).get("map_mode"),
-        "industry_map_id": (view.get("owner_context") or {}).get(
-            "industry_map_id"
-        ),
-        "industry_map_revision_id": (view.get("owner_context") or {}).get(
+        "research_case_id": view["owner_context"]["research_case_id"],
+        "map_mode": view["owner_context"]["map_mode"],
+        "industry_map_id": view["owner_context"]["industry_map_id"],
+        "industry_map_revision_id": view["owner_context"][
             "industry_map_revision_id"
-        ),
-        "information_cutoff_date": view.get("information_cutoff_date"),
-        "owner_acceptance_plan_version": view.get(
-            "owner_acceptance_plan_version"
-        ),
+        ],
+        "information_cutoff_date": view["information_cutoff_date"],
+        "owner_acceptance_plan_version": view["owner_acceptance_plan_version"],
     }
     actual = {
         "reviewed_session_revision_id": str(payload.reviewed_session_revision_id),
@@ -218,81 +203,71 @@ def _validate_payload_against_view(
         "owner_acceptance_plan_version": payload.owner_acceptance_plan_version,
     }
     mismatched = [key for key in expected if expected[key] != actual[key]]
-    if mismatched:
-        context_keys = {
-            "research_case_id",
-            "map_mode",
-            "industry_map_id",
-            "industry_map_revision_id",
-        }
-        code = (
-            "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED"
-            if context_keys.intersection(mismatched)
-            else "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE"
-        )
-        if mismatched == ["industry_map_revision_id"]:
-            code = "INDUSTRY_THESIS_ACCEPTANCE_MAP_REVISION_MISMATCH"
-        raise IndustryThesisOwnerAcceptanceError(
-            code,
-            "request differs from the exact acceptance view: "
-            + ", ".join(sorted(mismatched)),
-        )
+    if not mismatched:
+        return
+    if mismatched == ["industry_map_revision_id"]:
+        code = "INDUSTRY_THESIS_ACCEPTANCE_MAP_REVISION_MISMATCH"
+    elif {
+        "research_case_id",
+        "map_mode",
+        "industry_map_id",
+        "industry_map_revision_id",
+    }.intersection(mismatched):
+        code = "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED"
+    else:
+        code = "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE"
+    raise IndustryThesisOwnerAcceptanceError(
+        code,
+        "request differs from the exact acceptance view: "
+        + ", ".join(sorted(mismatched)),
+    )
 
 
-def _validate_bindings_against_view(
+def _validate_bindings(
     payload: OwnerAcceptancePlanRequest,
     view: dict[str, Any],
 ) -> None:
     members = {
-        member.get("reviewed_candidate_revision_id"): member
+        member["reviewed_candidate_revision_id"]: member
         for member in view.get("members", [])
-        if isinstance(member, dict)
     }
-    if set(members) != {
+    submitted = {
         str(binding.get("reviewed_candidate_revision_id"))
         for binding in payload.candidate_owner_bindings
-    }:
+    }
+    if set(members) != submitted:
         raise IndustryThesisOwnerAcceptanceError(
             "INDUSTRY_THESIS_ACCEPTANCE_BINDINGS_INCOMPLETE",
             "candidate bindings must cover the exact reviewed member set",
         )
     for binding in payload.candidate_owner_bindings:
-        candidate_id = str(binding.get("reviewed_candidate_revision_id"))
-        member = members[candidate_id]
-        stage1_operation = binding.get("stage1_operation")
+        member = members[str(binding.get("reviewed_candidate_revision_id"))]
         stage1 = binding.get("stage1")
         if not isinstance(stage1, dict):
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_BINDINGS_INCOMPLETE"
             )
-        if stage1_operation == "reuse_exact_beneficiary_revision":
-            matches = [
-                option
-                for option in member.get("stage1_reuse_options", [])
-                if option.get("beneficiary_id") == stage1.get("beneficiary_id")
-                and option.get("beneficiary_revision_id")
-                == stage1.get("beneficiary_revision_id")
-                and option.get("stock_basic_record_id")
-                == stage1.get("stock_basic_record_id")
-            ]
-            if len(matches) != 1:
+        operation = binding.get("stage1_operation")
+        matched_reuse = None
+        if operation == "reuse_exact_beneficiary_revision":
+            matched_reuse = next(
+                (
+                    option
+                    for option in member.get("stage1_reuse_options", [])
+                    if option.get("beneficiary_id") == stage1.get("beneficiary_id")
+                    and option.get("beneficiary_revision_id")
+                    == stage1.get("beneficiary_revision_id")
+                    and option.get("stock_basic_record_id")
+                    == stage1.get("stock_basic_record_id")
+                ),
+                None,
+            )
+            if matched_reuse is None:
                 raise IndustryThesisOwnerAcceptanceError(
                     "INDUSTRY_THESIS_ACCEPTANCE_OWNER_REVISION_CONFLICT",
                     "reused Stage 1 revision is outside the exact reviewed context",
                 )
-            if binding.get("semantic_operation") == "reuse_exact_semantic_revision":
-                semantic = binding.get("semantic") or {}
-                semantic_options = matches[0].get("semantic_reuse_options", [])
-                if not any(
-                    item.get("profile_id") == semantic.get("profile_id")
-                    and item.get("profile_revision_id")
-                    == semantic.get("profile_revision_id")
-                    for item in semantic_options
-                ):
-                    raise IndustryThesisOwnerAcceptanceError(
-                        "INDUSTRY_THESIS_ACCEPTANCE_SEMANTIC_REVISION_MISMATCH"
-                    )
-        elif stage1_operation == "append_beneficiary_revision":
+        elif operation == "append_beneficiary_revision":
             if not any(
                 option.get("beneficiary_id") == stage1.get("beneficiary_id")
                 and option.get("expected_latest_revision_id")
@@ -305,14 +280,14 @@ def _validate_bindings_against_view(
                     "INDUSTRY_THESIS_ACCEPTANCE_OWNER_REVISION_CONFLICT",
                     "append target is outside the exact reviewed context",
                 )
-        elif stage1_operation == "create_beneficiary_identity_and_revision":
-            create_contract = member.get("stage1_create_contract") or {}
+        elif operation == "create_beneficiary_identity_and_revision":
+            contract = member.get("stage1_create_contract") or {}
             if (
-                create_contract.get("available") is not True
-                or create_contract.get("stock_basic_record_id")
+                contract.get("available") is not True
+                or contract.get("stock_basic_record_id")
                 != stage1.get("stock_basic_record_id")
-                or create_contract.get("source") != stage1.get("source")
-                or create_contract.get("stock_code") != stage1.get("stock_code")
+                or contract.get("source") != stage1.get("source")
+                or contract.get("stock_code") != stage1.get("stock_code")
             ):
                 raise IndustryThesisOwnerAcceptanceError(
                     "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
@@ -324,41 +299,58 @@ def _validate_bindings_against_view(
                 "unsupported Stage 1 operation",
             )
 
+        semantic_operation = binding.get("semantic_operation")
+        if semantic_operation not in _ALLOWED_SEMANTIC_OPERATIONS:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_SEMANTIC_PAYLOAD_INCOMPLETE",
+                "ordinary-user acceptance only permits none or exact semantic reuse",
+            )
+        if semantic_operation == "reuse_exact_semantic_revision":
+            if matched_reuse is None:
+                raise IndustryThesisOwnerAcceptanceError(
+                    "INDUSTRY_THESIS_ACCEPTANCE_SEMANTIC_REVISION_MISMATCH"
+                )
+            semantic = binding.get("semantic") or {}
+            if not any(
+                item.get("profile_id") == semantic.get("profile_id")
+                and item.get("profile_revision_id")
+                == semantic.get("profile_revision_id")
+                for item in matched_reuse.get("semantic_reuse_options", [])
+            ):
+                raise IndustryThesisOwnerAcceptanceError(
+                    "INDUSTRY_THESIS_ACCEPTANCE_SEMANTIC_REVISION_MISMATCH"
+                )
+
     pool = payload.candidate_pool_operation
     mode = pool.get("mode")
-    contract = view.get("candidate_pool_operation_contract") or {}
+    contract = view["candidate_pool_operation_contract"]
     if mode == "append_supported_handoff":
-        if not any(
+        valid = any(
             option.get("candidate_pool_id") == pool.get("candidate_pool_id")
             and option.get("expected_latest_revision_id")
             == pool.get("expected_latest_revision_id")
             for option in contract.get("append_options", [])
-        ):
-            raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_OWNER_REVISION_CONFLICT",
-                "candidate-pool append target is outside the exact reviewed context",
-            )
+        )
     elif mode == "reuse_exact_supported_handoff":
-        if not any(
+        valid = any(
             option.get("candidate_pool_id") == pool.get("candidate_pool_id")
             and option.get("candidate_pool_revision_id")
             == pool.get("candidate_pool_revision_id")
             for option in contract.get("reuse_options", [])
-        ):
-            raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_SUPPORTED_HANDOFF_MISMATCH",
-                "candidate-pool reuse target is outside the exact reviewed context",
-            )
-    elif mode not in {
-        "create_supported_handoff",
-        "none_no_supported_members",
-    }:
+        )
+    else:
+        valid = mode in {
+            "create_supported_handoff",
+            "none_no_supported_members",
+        }
+    if not valid:
         raise IndustryThesisOwnerAcceptanceError(
-            "INDUSTRY_THESIS_ACCEPTANCE_SUPPORTED_HANDOFF_MISMATCH"
+            "INDUSTRY_THESIS_ACCEPTANCE_SUPPORTED_HANDOFF_MISMATCH",
+            "candidate-pool operation is outside the exact reviewed context",
         )
 
 
-def _accepted_result_path(
+def _result_path(
     *,
     session_id: str,
     accepted_session_revision_id: str,
@@ -409,10 +401,11 @@ def _resolve_output_revision_id(
         ) from exc
 
 
-def _compose_accepted_result(
+def _compose_result(
     service: IndustryThesisAcceptedOutputQueryService,
     output_revision_id: UUID,
     *,
+    session_id: UUID,
     as_of_cutoff: date,
     as_of_recorded_at_utc: datetime,
 ) -> dict[str, Any]:
@@ -437,19 +430,19 @@ def _compose_accepted_result(
     for member in result["members"]:
         member["readiness"] = readiness_by_revision[member["beneficiary_revision_id"]]
     supported = [
-        item for item in result["members"] if item["included_in_supported_handoff"]
+        member for member in result["members"] if member["included_in_supported_handoff"]
     ]
     semantic_count = sum(
-        item["readiness"]["typed_semantics"]["state"] != "missing"
-        for item in result["members"]
+        member["readiness"]["typed_semantics"]["state"] != "missing"
+        for member in result["members"]
     )
     company_count = sum(
-        item["readiness"]["company_research"]["state"] != "missing"
-        for item in result["members"]
+        member["readiness"]["company_research"]["state"] != "missing"
+        for member in result["members"]
     )
     result.update(
         {
-            "session_id": output["accepted_session_revision_id"],
+            "session_id": str(session_id),
             "reviewed_session_revision_id": output["reviewed_session_revision_id"],
             "accepted_session_revision_id": output["accepted_session_revision_id"],
             "research_case_id": output["research_case_id"],
@@ -468,14 +461,8 @@ def _compose_accepted_result(
             "facts": [
                 {"label": "完整成员", "value": len(result["members"])},
                 {"label": "supported 后续研究", "value": len(supported)},
-                {
-                    "label": "类型化语义覆盖",
-                    "value": f"{semantic_count}/{len(result['members'])}",
-                },
-                {
-                    "label": "Company Research 已存在",
-                    "value": f"{company_count}/{len(result['members'])}",
-                },
+                {"label": "类型化语义覆盖", "value": f"{semantic_count}/{len(result['members'])}"},
+                {"label": "Company Research 已存在", "value": f"{company_count}/{len(result['members'])}"},
                 {"label": "研究用途", "value": "不构成投资建议"},
             ],
             "technical_details": output,
@@ -524,7 +511,7 @@ def get_owner_acceptance_view(
 ) -> dict[str, Any]:
     try:
         with session_factory() as session:
-            return _load_acceptance_view(
+            return _load_view(
                 session,
                 session_id=session_id,
                 reviewed_session_revision_id=reviewed_session_revision_id,
@@ -532,9 +519,63 @@ def get_owner_acceptance_view(
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
             )
     except IndustryThesisError as exc:
-        raise _acceptance_http_error(exc) from exc
+        raise _http_error(exc) from exc
     except SQLAlchemyError as exc:
-        raise _database_failure("研究成果接受准备读取失败。", exc) from exc
+        raise _database_failure("研究成果接受准备读取失败。") from exc
+
+
+async def _preview_or_commit(
+    *,
+    reviewed_session_revision_id: UUID,
+    request: Request,
+    session_id: UUID,
+    as_of_cutoff: date,
+    as_of_recorded_at_utc: datetime,
+    read_factory: sessionmaker[Session],
+    write_factory: sessionmaker[Session],
+    commit: bool,
+) -> dict[str, Any]:
+    model = OwnerAcceptanceCommitRequest if commit else OwnerAcceptancePlanRequest
+    payload = await _validated_json_body(request, model)
+    try:
+        with read_factory() as session:
+            view = _load_view(
+                session,
+                session_id=session_id,
+                reviewed_session_revision_id=reviewed_session_revision_id,
+                as_of_cutoff=as_of_cutoff,
+                as_of_recorded_at_utc=as_of_recorded_at_utc,
+            )
+        _validate_route_and_snapshot(reviewed_session_revision_id, payload, view)
+        _validate_bindings(payload, view)
+        service = IndustryThesisOwnerAcceptanceService(write_factory)
+        result = service.commit(_raw_plan(payload)) if commit else service.preview(_raw_plan(payload))
+        if not commit:
+            result["primary_action"] = (
+                {"kind": "commit", "label": "确认接受研究成果"}
+                if result.get("commit_ready")
+                else {"kind": "correct", "label": "检查并修正接受字段"}
+            )
+            return result
+        accepted_id = result.get("accepted_session_revision_id")
+        if not accepted_id:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "commit did not return an accepted session revision",
+            )
+        result["accepted_result_path"] = _result_path(
+            session_id=str(session_id),
+            accepted_session_revision_id=accepted_id,
+            information_cutoff_date=payload.information_cutoff_date.isoformat(),
+            recorded_at_utc=result["recorded_at_utc"],
+        )
+        result["history_path"] = "/industry-analysis"
+        return result
+    except IndustryThesisError as exc:
+        raise _http_error(exc) from exc
+    except SQLAlchemyError as exc:
+        message = "研究成果提交失败，请重新打开精确结果确认是否已经写入。" if commit else "研究成果预览失败。"
+        raise _database_failure(message) from exc
 
 
 @api_router.post(
@@ -553,33 +594,16 @@ async def preview_owner_acceptance(
         get_industry_analysis_write_factory
     ),
 ) -> dict[str, Any]:
-    payload = await _validated_json_body(request, OwnerAcceptancePlanRequest)
-    try:
-        _validate_route_body(reviewed_session_revision_id, payload)
-        _validate_ordinary_semantic_modes(payload)
-        with read_factory() as session:
-            view = _load_acceptance_view(
-                session,
-                session_id=session_id,
-                reviewed_session_revision_id=reviewed_session_revision_id,
-                as_of_cutoff=as_of_cutoff,
-                as_of_recorded_at_utc=as_of_recorded_at_utc,
-            )
-        _validate_payload_against_view(payload, view)
-        _validate_bindings_against_view(payload, view)
-        result = IndustryThesisOwnerAcceptanceService(write_factory).preview(
-            _raw_plan(payload)
-        )
-        result["primary_action"] = (
-            {"kind": "commit", "label": "确认接受研究成果"}
-            if result.get("commit_ready")
-            else {"kind": "correct", "label": "检查并修正接受字段"}
-        )
-        return result
-    except IndustryThesisError as exc:
-        raise _acceptance_http_error(exc) from exc
-    except SQLAlchemyError as exc:
-        raise _database_failure("研究成果预览失败。", exc) from exc
+    return await _preview_or_commit(
+        reviewed_session_revision_id=reviewed_session_revision_id,
+        request=request,
+        session_id=session_id,
+        as_of_cutoff=as_of_cutoff,
+        as_of_recorded_at_utc=as_of_recorded_at_utc,
+        read_factory=read_factory,
+        write_factory=write_factory,
+        commit=False,
+    )
 
 
 @api_router.post(
@@ -598,44 +622,16 @@ async def commit_owner_acceptance(
         get_industry_analysis_write_factory
     ),
 ) -> dict[str, Any]:
-    payload = await _validated_json_body(request, OwnerAcceptanceCommitRequest)
-    try:
-        _validate_route_body(reviewed_session_revision_id, payload)
-        _validate_ordinary_semantic_modes(payload)
-        with read_factory() as session:
-            view = _load_acceptance_view(
-                session,
-                session_id=session_id,
-                reviewed_session_revision_id=reviewed_session_revision_id,
-                as_of_cutoff=as_of_cutoff,
-                as_of_recorded_at_utc=as_of_recorded_at_utc,
-            )
-        _validate_payload_against_view(payload, view)
-        _validate_bindings_against_view(payload, view)
-        result = IndustryThesisOwnerAcceptanceService(write_factory).commit(
-            _raw_plan(payload)
-        )
-        accepted_session_revision_id = result.get("accepted_session_revision_id")
-        if not accepted_session_revision_id:
-            raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
-                "commit did not return an accepted session revision",
-            )
-        result["accepted_result_path"] = _accepted_result_path(
-            session_id=str(session_id),
-            accepted_session_revision_id=accepted_session_revision_id,
-            information_cutoff_date=payload.information_cutoff_date.isoformat(),
-            recorded_at_utc=result["recorded_at_utc"],
-        )
-        result["history_path"] = "/industry-analysis"
-        return result
-    except IndustryThesisError as exc:
-        raise _acceptance_http_error(exc) from exc
-    except SQLAlchemyError as exc:
-        raise _database_failure(
-            "研究成果提交失败，请重新打开精确结果确认是否已经写入。",
-            exc,
-        ) from exc
+    return await _preview_or_commit(
+        reviewed_session_revision_id=reviewed_session_revision_id,
+        request=request,
+        session_id=session_id,
+        as_of_cutoff=as_of_cutoff,
+        as_of_recorded_at_utc=as_of_recorded_at_utc,
+        read_factory=read_factory,
+        write_factory=write_factory,
+        commit=True,
+    )
 
 
 @api_router.get(
@@ -659,13 +655,14 @@ def get_accepted_result_view(
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
             )
-            return _compose_accepted_result(
+            return _compose_result(
                 IndustryThesisAcceptedOutputQueryService(session),
                 output_revision_id,
+                session_id=session_id,
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
             )
     except IndustryThesisError as exc:
-        raise _acceptance_http_error(exc) from exc
+        raise _http_error(exc) from exc
     except SQLAlchemyError as exc:
-        raise _database_failure("已接受研究成果读取失败。", exc) from exc
+        raise _database_failure("已接受研究成果读取失败。") from exc
