@@ -13,6 +13,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.engine import make_url
 
 from backend.database import build_engine, build_session_factory
+from industry_alpha.chain_map_models import IndustryMapRevision
 from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
 from industry_alpha.industry_thesis_models import (
     IndustryThesisCandidateIdentity,
@@ -25,6 +26,7 @@ from industry_alpha.industry_thesis_review import (
     IndustryThesisProposalReviewService,
 )
 from industry_alpha.industry_thesis_rules import BUILDER_VERSION, IndustryThesisError
+from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 
 UTC = timezone.utc
 BASE_TIME = datetime(2026, 7, 22, 23, 30, tzinfo=UTC)
@@ -105,6 +107,16 @@ def test_postgres_concurrent_proposal_review_is_expected_latest_protected(
     engine = build_engine(postgres_database_url)
     factory = build_session_factory(engine)
     try:
+        owner_fixture = build_stage1_beneficiary_fixture(factory)
+        with factory() as session:
+            owner_map_revision = session.scalar(
+                select(IndustryMapRevision)
+                .where(IndustryMapRevision.map_id == owner_fixture.map_id)
+                .order_by(IndustryMapRevision.revision_no.desc())
+            )
+            assert owner_map_revision is not None
+            owner_map_revision_id = owner_map_revision.id
+
         created = IndustryThesisCommandService(
             factory,
             clock=lambda: BASE_TIME,
@@ -139,6 +151,9 @@ def test_postgres_concurrent_proposal_review_is_expected_latest_protected(
             "session_revision_id": created["session_revision_id"],
             "expected_session_latest_revision_number": 1,
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+            "owner_context": {
+                "industry_map_revision_id": str(owner_map_revision_id),
+            },
             "decisions": [
                 {
                     "candidate_revision_id": candidate_revision_id,
