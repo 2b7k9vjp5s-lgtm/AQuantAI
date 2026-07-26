@@ -127,11 +127,12 @@ def test_twenty_member_context_bound_view_has_fixed_query_ceiling() -> None:
             )
             session.add(run)
             session.flush()
-            stock_rows = []
+            stock_refs: list[tuple[int, str]] = []
             for index in range(20):
+                stock_code = f"9{index:05d}"
                 stock = StockBasicRecord(
                     ingestion_run_id=run.id,
-                    stock_code=f"9{index:05d}",
+                    stock_code=stock_code,
                     stock_name=f"Fixture Scale Co {index + 1}",
                     exchange="SZSE",
                     industry="Fixture scale industry",
@@ -141,18 +142,18 @@ def test_twenty_member_context_bound_view_has_fixed_query_ceiling() -> None:
                 )
                 session.add(stock)
                 session.flush()
-                stock_rows.append(stock)
+                stock_refs.append((stock.id, stock_code))
 
         commands = Stage1BeneficiaryCommandService(database)
         beneficiary_ids = []
-        for index, stock in enumerate(stock_rows):
+        for index, (stock_id, stock_code) in enumerate(stock_refs):
             created = commands.create_beneficiary(
                 industry_map.case_id,
                 industry_map.id,
                 source="fixture-scale",
-                stock_code=stock.stock_code,
+                stock_code=stock_code,
                 selected_map_revision_id=map_revision.id,
-                stock_basic_record_id=stock.id,
+                stock_basic_record_id=stock_id,
                 beneficiary_kind="direct" if index % 2 == 0 else "secondary",
                 assessment_status="supported" if index % 3 else "draft",
                 rationale_summary="Exact scale fixture for bounded query verification.",
