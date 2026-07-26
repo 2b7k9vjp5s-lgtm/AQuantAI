@@ -5,8 +5,6 @@ import json
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
-from sqlalchemy import update
-
 from industry_alpha.industry_thesis_models import IndustryThesisSessionRevision
 from scripts.run_industry_thesis_ordinary_user_acceptance_fixture import (
     BASE_TIME,
@@ -76,13 +74,13 @@ def test_accepted_result_respects_recorded_boundary_and_fails_closed_on_corrupti
                 "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
             )
 
-            with fixture.database.factory.begin() as session:
-                session.execute(
-                    update(IndustryThesisSessionRevision)
-                    .where(
-                        IndustryThesisSessionRevision.id
-                        == UUID(committed["accepted_session_revision_id"])
-                    )
+            # Deliberately bypass the append-only ORM guard to simulate on-disk
+            # corruption. Production code remains unable to mutate this revision.
+            accepted_revision_id = UUID(committed["accepted_session_revision_id"])
+            with fixture.database.engine.begin() as connection:
+                connection.execute(
+                    IndustryThesisSessionRevision.__table__.update()
+                    .where(IndustryThesisSessionRevision.id == accepted_revision_id)
                     .values(draft_graph_json=json.dumps({"corrupt": True}))
                 )
 
