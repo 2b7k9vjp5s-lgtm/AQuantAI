@@ -80,4 +80,14 @@ jobs:
         run: python -m pip install -q -e ".[dev]"
 
       - name: Run short failure diagnostic
-        run: python -m pytest -q --tb=short --maxfail=20
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q --tb=short --maxfail=20 > /tmp/pytest-diagnostic.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            tail -n 180 /tmp/pytest-diagnostic.log
+          else
+            cat /tmp/pytest-diagnostic.log
+          fi
+          exit "$status"
