@@ -25,7 +25,9 @@ def test_accepted_result_page_exposes_two_layers_and_exact_selector() -> None:
     assert "output-link-revisions" in script
     assert "investment_candidate_snapshot_revision_id" in script
     assert "window.location.assign" in script
-    assert "auto_selected" in script
+    assert 'picker.firstElementChild.value = ""' in script
+    assert 'picker.value = result.candidate_overlay.snapshot_revision_id || ""' in script
+    assert "applySnapshotSelection" in script
     assert "latest 回退" in html
     assert ".candidate-highlights" in css
 
