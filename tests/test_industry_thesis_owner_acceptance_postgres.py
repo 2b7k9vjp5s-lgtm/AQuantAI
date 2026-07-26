@@ -191,6 +191,9 @@ def _reviewed_fixture(factory):
             "session_revision_id": created["session_revision_id"],
             "expected_session_latest_revision_number": 1,
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+            "owner_context": {
+                "industry_map_revision_id": str(map_revision.id),
+            },
             "decisions": [
                 {
                     "candidate_revision_id": candidate["candidate_revision_id"],
