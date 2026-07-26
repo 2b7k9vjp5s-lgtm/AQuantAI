@@ -38,15 +38,23 @@ def run_demo() -> dict:
     assert "新建与追加必须显式作者化" in acceptance.text
     assert "Map assertion、Case Claim" in acceptance.text
     assert "完整已接受成员" in accepted.text
+    assert acceptance.text.index(
+        "/industry-analysis/static/owner_acceptance.js"
+    ) < acceptance.text.index(
+        "/industry-analysis/static/owner_acceptance_pool.js"
+    )
 
     root = Path(__file__).resolve().parents[1]
     acceptance_script = (
         root / "industry_analysis" / "static" / "owner_acceptance.js"
     ).read_text(encoding="utf-8")
+    pool_script = (
+        root / "industry_analysis" / "static" / "owner_acceptance_pool.js"
+    ).read_text(encoding="utf-8")
     accepted_script = (
         root / "industry_analysis" / "static" / "accepted_result.js"
     ).read_text(encoding="utf-8")
-    scripts = [acceptance_script, accepted_script]
+    scripts = [acceptance_script, pool_script, accepted_script]
     forbidden = (
         'fetch("http',
         "fetch('http",
@@ -65,6 +73,12 @@ def run_demo() -> dict:
     assert "map_assertion_revisions" in acceptance_script
     assert "claim_revision_ids" in acceptance_script
     assert 'semantic_operation: "none"' in acceptance_script
+    assert 'const MODE_REUSE = "reuse_exact_supported_handoff"' in pool_script
+    assert "beneficiary_revision_ids" in pool_script
+    assert "exactIdSetEqual" in pool_script
+    assert "eligibleReuseOptions" in pool_script
+    assert "精确预填标题和范围" in pool_script
+    assert "复用不会写入新的候选池 Revision" in pool_script
 
     return {
         "core_golden_path": core,
@@ -77,12 +91,15 @@ def run_demo() -> dict:
             "explicit_stage1_append": True,
             "explicit_stage1_create": True,
             "context_bound_assertion_and_claim_authoring": True,
+            "candidate_pool_append_metadata_confirmation": True,
+            "candidate_pool_exact_membership_reuse": True,
             "exact_history_reopening": True,
         },
         "boundaries": {
             "external_network": False,
             "automatic_retry": False,
             "automatic_context_inference": False,
+            "approximate_pool_membership_matching": False,
             "cross_revision_semantic_reuse": False,
             "ranking_or_scoring": False,
             "not_investment_advice": True,
