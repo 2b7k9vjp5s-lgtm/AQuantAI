@@ -39,7 +39,12 @@ jobs:
         run: python -m pip install -q -e ".[dev]"
 
       - name: Check Owner Acceptance JavaScript syntax
-        run: node --check industry_analysis/static/owner_acceptance.js
+        run: |
+          node --check industry_analysis/static/owner_acceptance.js
+          node --check industry_analysis/static/owner_acceptance_pool.js
+
+      - name: Test exact candidate pool controls
+        run: node --test tests/js/owner_acceptance_pool.test.js
 
       - name: Run tests
         run: python -m pytest -q --tb=short
