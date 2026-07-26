@@ -1,4 +1,4 @@
-"""Offline proposal review and deterministic acceptance-plan preview for Industry Thesis v1."""
+"""Offline proposal review and deterministic acceptance-plan preview for Industry Thesis."""
 
 from __future__ import annotations
 
@@ -13,10 +13,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.canonical_price_models import ListedInstrument
 from backend.database.models import StockBasicRecord
+from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 from industry_alpha.industry_thesis_models import (
     PROPOSED_EXPOSURE_TYPES,
     IndustryThesisCandidateIdentity,
     IndustryThesisCandidateRevision,
+    IndustryThesisOutputLinkRevision,
     IndustryThesisSessionIdentity,
     IndustryThesisSessionRevision,
 )
@@ -36,14 +38,22 @@ from industry_alpha.industry_thesis_rules import (
     stored_utc,
     utc_now,
 )
+from industry_alpha.models import ResearchCase
 
-ACCEPTANCE_PLAN_VERSION = "aquantai.industry-thesis-acceptance-plan.v1"
+HISTORICAL_ACCEPTANCE_PLAN_VERSION = "aquantai.industry-thesis-acceptance-plan.v1"
+ACCEPTANCE_PLAN_VERSION = "aquantai.industry-thesis-acceptance-plan.v2"
+OWNER_CONTEXT_VERSION = "aquantai.industry-thesis-owner-context.v1"
+OWNER_MAP_MODE = "reuse_exact_existing_map_revision"
 REVIEW_DECISIONS = (
     "selected_for_acceptance",
     "rejected_by_user",
     "unresolved",
 )
-_REVIEWABLE_WORKFLOW_STATES = ("candidate_build_ready", "awaiting_review")
+_REVIEWABLE_WORKFLOW_STATES = (
+    "candidate_build_ready",
+    "awaiting_review",
+    "reviewed_plan_ready",
+)
 _LOCK_GUARD = Lock()
 _LOCKS: dict[str, RLock] = {}
 
@@ -66,11 +76,27 @@ def _validate_recorded_boundary(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _normalize_owner_context_input(raw: Any) -> dict[str, UUID]:
+    require_keys(
+        raw,
+        {"industry_map_revision_id"},
+        {"industry_map_revision_id"},
+        field="owner_context",
+    )
+    return {
+        "industry_map_revision_id": parse_uuid(
+            raw["industry_map_revision_id"],
+            "owner_context.industry_map_revision_id",
+        )
+    }
+
+
 def _normalize_review(raw: dict[str, Any]) -> dict[str, Any]:
     allowed = {
         "session_revision_id",
         "expected_session_latest_revision_number",
         "acceptance_plan_version",
+        "owner_context",
         "decisions",
         "revision_note",
     }
@@ -79,7 +105,7 @@ def _normalize_review(raw: dict[str, Any]) -> dict[str, Any]:
     if version != ACCEPTANCE_PLAN_VERSION:
         raise IndustryThesisError(
             "industry_thesis_input_invalid",
-            "unsupported acceptance-plan version",
+            "new proposal reviews require the active acceptance-plan version",
         )
     decisions_raw = raw["decisions"]
     if not isinstance(decisions_raw, list) or not decisions_raw:
@@ -102,6 +128,7 @@ def _normalize_review(raw: dict[str, Any]) -> dict[str, Any]:
             minimum=1,
         ),
         "acceptance_plan_version": version,
+        "owner_context": _normalize_owner_context_input(raw["owner_context"]),
         "decisions": decisions,
         "revision_note": bounded_text(raw["revision_note"], "revision_note", 1000),
     }
@@ -248,6 +275,15 @@ class IndustryThesisProposalReviewService:
                 "industry_thesis_review_invalid",
                 "session workflow is not ready for proposal review",
             )
+        self._validate_legacy_rereview(session, source_revision)
+
+        clock_value = stored_utc(self._clock())
+        owner_context, map_revision = self._resolve_owner_context(
+            session,
+            command["owner_context"]["industry_map_revision_id"],
+            source_revision=source_revision,
+            review_recorded_at=clock_value,
+        )
 
         identities = list(
             session.scalars(
@@ -347,6 +383,7 @@ class IndustryThesisProposalReviewService:
 
         decision_seed = {
             "acceptance_plan_version": command["acceptance_plan_version"],
+            "owner_context": owner_context,
             "session_id": str(session_identity.id),
             "source_session_revision_id": str(source_revision.id),
             "next_session_revision_number": expected_session + 1,
@@ -371,10 +408,10 @@ class IndustryThesisProposalReviewService:
                 ),
             )
 
-        clock_value = stored_utc(self._clock())
         session_recorded_at = max(
             clock_value,
             _next_utc(source_revision.recorded_at_utc),
+            stored_utc(map_revision.recorded_at_utc),
         )
         latest_candidate_recorded = max(
             stored_utc(item["latest"].recorded_at_utc) for item in prepared
@@ -386,6 +423,7 @@ class IndustryThesisProposalReviewService:
         source_recorded_boundary = max(
             stored_utc(source_revision.recorded_at_utc),
             latest_candidate_recorded,
+            stored_utc(map_revision.recorded_at_utc),
         )
         if source_revision.information_cutoff_date > session_recorded_at.date():
             raise IndustryThesisError(
@@ -397,6 +435,7 @@ class IndustryThesisProposalReviewService:
             source_revision=source_revision,
             reviewed_session_revision_id=reviewed_session_revision_id,
             source_recorded_boundary=source_recorded_boundary,
+            owner_context=owner_context,
             prepared=prepared,
         )
         session_payload = session_revision_to_input(source_revision)
@@ -419,6 +458,7 @@ class IndustryThesisProposalReviewService:
             "session_recorded_at_utc": session_recorded_at.isoformat(),
             "candidate_recorded_at_utc": candidate_recorded_at.isoformat(),
             "candidate_count": len(prepared),
+            "owner_context": owner_context,
             "acceptance_plan": plan,
             "acceptance_plan_fingerprint_sha256": plan[
                 "acceptance_plan_fingerprint_sha256"
@@ -499,6 +539,82 @@ class IndustryThesisProposalReviewService:
         return result
 
     @staticmethod
+    def _validate_legacy_rereview(
+        session: Session,
+        source_revision: IndustryThesisSessionRevision,
+    ) -> None:
+        if source_revision.workflow_state != "reviewed_plan_ready":
+            return
+        graph = json_value(source_revision.draft_graph_json, "draft_graph")
+        plan = graph.get("acceptance_plan_preview") if isinstance(graph, dict) else None
+        if (
+            not isinstance(plan, dict)
+            or plan.get("acceptance_plan_version") != HISTORICAL_ACCEPTANCE_PLAN_VERSION
+        ):
+            raise IndustryThesisError(
+                "industry_thesis_review_invalid",
+                "only an exact historical v1 reviewed plan may use the re-review path",
+            )
+        existing_output = session.scalar(
+            select(IndustryThesisOutputLinkRevision.id).where(
+                IndustryThesisOutputLinkRevision.reviewed_session_revision_id
+                == source_revision.id
+            )
+        )
+        if existing_output is not None:
+            raise IndustryThesisError(
+                "industry_thesis_review_invalid",
+                "an already accepted reviewed plan cannot be re-reviewed",
+            )
+
+    @staticmethod
+    def _resolve_owner_context(
+        session: Session,
+        map_revision_id: UUID,
+        *,
+        source_revision: IndustryThesisSessionRevision,
+        review_recorded_at: datetime,
+    ) -> tuple[dict[str, str], IndustryMapRevision]:
+        map_revision = session.get(IndustryMapRevision, map_revision_id)
+        if map_revision is None:
+            raise IndustryThesisError(
+                "industry_thesis_owner_context_invalid",
+                "exact Industry Map revision was not found",
+            )
+        industry_map = session.get(IndustryMap, map_revision.map_id)
+        if industry_map is None:
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "Industry Map graph is incomplete",
+            )
+        research_case = session.get(ResearchCase, industry_map.case_id)
+        if research_case is None:
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "Research Case graph is incomplete",
+            )
+        if map_revision.information_cutoff_date > source_revision.information_cutoff_date:
+            raise IndustryThesisError(
+                "industry_thesis_chronology_invalid",
+                "Owner Context Map Revision exceeds the thesis information cutoff",
+            )
+        if stored_utc(map_revision.recorded_at_utc) > review_recorded_at:
+            raise IndustryThesisError(
+                "industry_thesis_chronology_invalid",
+                "Owner Context Map Revision exceeds the review recorded boundary",
+            )
+        return (
+            {
+                "owner_context_contract_version": OWNER_CONTEXT_VERSION,
+                "map_mode": OWNER_MAP_MODE,
+                "research_case_id": str(research_case.id),
+                "industry_map_id": str(industry_map.id),
+                "industry_map_revision_id": str(map_revision.id),
+            },
+            map_revision,
+        )
+
+    @staticmethod
     def _validate_selected_identity(
         session: Session,
         latest: IndustryThesisCandidateRevision,
@@ -540,6 +656,7 @@ class IndustryThesisProposalReviewService:
         source_revision: IndustryThesisSessionRevision,
         reviewed_session_revision_id: UUID,
         source_recorded_boundary: datetime,
+        owner_context: dict[str, str],
         prepared: list[dict[str, Any]],
     ) -> dict[str, Any]:
         selected: list[dict[str, Any]] = []
@@ -594,6 +711,7 @@ class IndustryThesisProposalReviewService:
         candidate_sources.sort(key=lambda item: item["candidate_revision_id"])
         base = {
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+            "owner_context": owner_context,
             "session_id": str(source_revision.session_id),
             "source_session_revision_id": str(source_revision.id),
             "reviewed_session_revision_id": str(reviewed_session_revision_id),
@@ -674,6 +792,12 @@ class IndustryThesisReviewedPlanQueryService:
                 "industry_thesis_graph_incomplete",
                 "stored acceptance-plan fingerprint or revision binding is invalid",
             )
+        version = plan.get("acceptance_plan_version")
+        if version not in (HISTORICAL_ACCEPTANCE_PLAN_VERSION, ACCEPTANCE_PLAN_VERSION):
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored acceptance-plan version is unsupported",
+            )
         try:
             plan_boundary = datetime.fromisoformat(plan["recorded_at_utc_boundary"])
             plan_boundary = _validate_recorded_boundary(plan_boundary)
@@ -695,7 +819,8 @@ class IndustryThesisReviewedPlanQueryService:
                 "stored acceptance-plan identifiers or boundary are invalid",
             ) from exc
         if (
-            plan.get("information_cutoff_date") != revision.information_cutoff_date.isoformat()
+            plan.get("information_cutoff_date")
+            != revision.information_cutoff_date.isoformat()
             or plan_boundary > recorded_boundary
         ):
             raise IndustryThesisNotFound(
@@ -781,12 +906,97 @@ class IndustryThesisReviewedPlanQueryService:
                     "industry_thesis_graph_incomplete",
                     "stored acceptance-plan candidate binding is invalid",
                 )
+
+        owner_context = None
+        capability = {
+            "state": "legacy_owner_context_missing",
+            "reason_code": "industry_thesis_owner_context_required",
+        }
+        if version == ACCEPTANCE_PLAN_VERSION:
+            owner_context = self._verify_owner_context(
+                plan,
+                revision=revision,
+                plan_boundary=plan_boundary,
+                as_of_cutoff=as_of_cutoff,
+                recorded_boundary=recorded_boundary,
+            )
+            capability = {"state": "ready", "reason_code": None}
+
         return {
             "session_revision_id": str(revision.id),
             "session_id": str(revision.session_id),
             "workflow_state": revision.workflow_state,
             "information_cutoff_date": revision.information_cutoff_date.isoformat(),
             "recorded_at_utc": stored_utc(revision.recorded_at_utc).isoformat(),
+            "acceptance_plan_version": version,
+            "owner_context": owner_context,
+            "acceptance_capability": capability,
             "acceptance_plan": plan,
             "acceptance_plan_fingerprint_sha256": stored_fingerprint,
+        }
+
+    def _verify_owner_context(
+        self,
+        plan: dict[str, Any],
+        *,
+        revision: IndustryThesisSessionRevision,
+        plan_boundary: datetime,
+        as_of_cutoff: date,
+        recorded_boundary: datetime,
+    ) -> dict[str, str]:
+        raw = plan.get("owner_context")
+        allowed = {
+            "owner_context_contract_version",
+            "map_mode",
+            "research_case_id",
+            "industry_map_id",
+            "industry_map_revision_id",
+        }
+        require_keys(raw, allowed, allowed, field="acceptance_plan.owner_context")
+        if (
+            raw["owner_context_contract_version"] != OWNER_CONTEXT_VERSION
+            or raw["map_mode"] != OWNER_MAP_MODE
+        ):
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored Owner Context contract is unsupported",
+            )
+        try:
+            case_id = UUID(raw["research_case_id"])
+            map_id = UUID(raw["industry_map_id"])
+            map_revision_id = UUID(raw["industry_map_revision_id"])
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored Owner Context identifiers are invalid",
+            ) from exc
+        research_case = self._session.get(ResearchCase, case_id)
+        industry_map = self._session.get(IndustryMap, map_id)
+        map_revision = self._session.get(IndustryMapRevision, map_revision_id)
+        if research_case is None or industry_map is None or map_revision is None:
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored Owner Context graph is incomplete",
+            )
+        if industry_map.case_id != research_case.id or map_revision.map_id != industry_map.id:
+            raise IndustryThesisError(
+                "industry_thesis_graph_incomplete",
+                "stored Owner Context graph is inconsistent",
+            )
+        if (
+            map_revision.information_cutoff_date > revision.information_cutoff_date
+            or map_revision.information_cutoff_date > as_of_cutoff
+            or stored_utc(map_revision.recorded_at_utc) > plan_boundary
+            or stored_utc(map_revision.recorded_at_utc) > recorded_boundary
+        ):
+            raise IndustryThesisNotFound(
+                "industry_thesis_not_visible",
+                "Owner Context is outside the requested as-of boundaries",
+            )
+        return {
+            "owner_context_contract_version": OWNER_CONTEXT_VERSION,
+            "map_mode": OWNER_MAP_MODE,
+            "research_case_id": str(research_case.id),
+            "industry_map_id": str(industry_map.id),
+            "industry_map_revision_id": str(map_revision.id),
         }
