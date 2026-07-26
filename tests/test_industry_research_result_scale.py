@@ -14,9 +14,6 @@ from industry_alpha.industry_research_result_query import (
 from industry_alpha.industry_thesis_owner_acceptance import (
     IndustryThesisOwnerAcceptanceService,
 )
-from industry_alpha.industry_thesis_owner_acceptance_workbench import (
-    IndustryThesisOwnerAcceptanceWorkbenchQueryService,
-)
 from industry_alpha.stage1_commands import (
     MapAssertionRevisionInput,
     Stage1BeneficiaryCommandService,
@@ -29,7 +26,6 @@ from industry_alpha.stage1_models import (
     Stage1BeneficiaryRevision,
 )
 from tests import test_industry_thesis_owner_acceptance as owner_fixture
-from tests.test_industry_analysis_acceptance_v2_api import _payload_from_view
 from tests.test_industry_research_result_query import database
 
 
@@ -162,22 +158,19 @@ def _twenty_member_accepted_output(database) -> str:
         )
         beneficiary_ids.append(created.id)
 
-    reviewed, _map, _revision, _rows = owner_fixture._build_reviewed(
-        database,
-        beneficiary_ids=tuple(beneficiary_ids),
-    )
-    with database() as session:
-        view = IndustryThesisOwnerAcceptanceWorkbenchQueryService(
-            session
-        ).get_acceptance_view(
-            session_id=UUID(reviewed["acceptance_plan"]["session_id"]),
-            reviewed_session_revision_id=UUID(
-                reviewed["reviewed_session_revision_id"]
-            ),
-            as_of_cutoff=owner_fixture.CUTOFF,
-            as_of_recorded_at_utc=owner_fixture.BASE_TIME + timedelta(seconds=3),
+    reviewed, reviewed_map, reviewed_map_revision, owner_rows = (
+        owner_fixture._build_reviewed(
+            database,
+            beneficiary_ids=tuple(beneficiary_ids),
         )
-    payload = _payload_from_view(view)
+    )
+    payload = owner_fixture._acceptance_input(
+        reviewed,
+        reviewed_map,
+        reviewed_map_revision,
+        owner_rows,
+        pool_mode="create_supported_handoff",
+    )
     service = IndustryThesisOwnerAcceptanceService(
         database,
         clock=lambda: owner_fixture.BASE_TIME + timedelta(seconds=4),
