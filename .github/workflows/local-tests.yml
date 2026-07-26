@@ -80,14 +80,25 @@ jobs:
         run: python -m pip install -q -e ".[dev]"
 
       - name: Run short failure diagnostic
+        id: pytest_diagnostic
         shell: bash
         run: |
           set +e
-          python -m pytest -q --tb=short --maxfail=20 > /tmp/pytest-diagnostic.log 2>&1
+          python -m pytest -q --tb=short --maxfail=20 > pytest-diagnostic.log 2>&1
           status=$?
-          if [ "$status" -ne 0 ]; then
-            tail -n 180 /tmp/pytest-diagnostic.log
-          else
-            cat /tmp/pytest-diagnostic.log
-          fi
-          exit "$status"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-diagnostic-log
+          path: pytest-diagnostic.log
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Preserve diagnostic result
+        if: always()
+        shell: bash
+        run: exit "${{ steps.pytest_diagnostic.outputs.status }}"
