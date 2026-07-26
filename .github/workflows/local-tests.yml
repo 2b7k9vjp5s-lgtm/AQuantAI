@@ -53,6 +53,9 @@ jobs:
       - name: Run candidate review and exact result fixture demo
         run: python -m scripts.demo_industry_analysis_review
 
+      - name: Run Owner Context v2 acceptance fixture demo
+        run: python -m scripts.demo_industry_analysis_acceptance_v2
+
       - name: Run Today Market local snapshot fixture demo
         run: python -m scripts.demo_today_market
 
