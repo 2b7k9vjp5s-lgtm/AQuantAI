@@ -19,9 +19,11 @@ def test_owner_acceptance_and_result_pages_are_active() -> None:
     )
     assert acceptance.status_code == 200
     assert "研究归属已由审核计划冻结" in acceptance.text
+    assert "新建与追加必须显式作者化" in acceptance.text
+    assert "受益类型、assessment 状态、Map assertion、Case Claim" in acceptance.text
     assert "生成变更预览" in acceptance.text
     assert "确认接受研究成果" in acceptance.text
-    assert "页面不会自动提交、自动重试" in acceptance.text
+    assert "页面不会自动提交、自动重试、自动撤销" in acceptance.text
 
     result = client.get(
         f"/industry-analysis/sessions/{session_id}/revisions/{accepted_id}/accepted-result"
@@ -70,7 +72,17 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     assert "owner_context.research_case_id" in acceptance
     assert "owner_context.industry_map_id" in acceptance
     assert "owner_context.industry_map_revision_id" in acceptance
-    assert "页面不会自动新建或推断" in acceptance
+    assert 'const OP_REUSE = "reuse_exact_beneficiary_revision"' in acceptance
+    assert 'const OP_APPEND = "append_beneficiary_revision"' in acceptance
+    assert 'const OP_CREATE = "create_beneficiary_identity_and_revision"' in acceptance
+    assert "expected_latest_revision_id" in acceptance
+    assert "map_assertion_revisions" in acceptance
+    assert "claim_revision_ids" in acceptance
+    assert "legacy_beneficiary_kind" in acceptance
+    assert "assessment_status" in acceptance
+    assert 'semantic_operation: "none"' in acceptance
+    assert "selectedOptions" in acceptance
+    assert "页面不会根据股票、名称或唯一可达路径自动决定" in acceptance
     assert "ranking_applied" not in acceptance
 
     assert "accepted-result-view" in result
