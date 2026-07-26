@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun, StockBasicRecord
+from industry_alpha.chain_map_models import IndustryMapRevision
 from industry_alpha.industry_thesis_candidate_workbench import (
     IndustryThesisCandidateWorkbenchService,
     IndustryThesisWorkbenchCandidateCommandService,
@@ -29,7 +30,7 @@ from industry_alpha.industry_thesis_review_workbench import (
 )
 from industry_alpha.industry_thesis_rules import IndustryThesisError, IndustryThesisNotFound
 from industry_alpha.industry_thesis_workbench import IndustryThesisWorkbenchQueryService
-import industry_alpha.stage1_models  # noqa: F401 - register exact FK targets
+from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 
 UTC = timezone.utc
 BASE = datetime(2026, 7, 23, 6, 0, tzinfo=UTC)
@@ -153,7 +154,17 @@ def _session_payload(rows: list[StockBasicRecord]) -> dict:
     }
 
 
-def _built_universe(database) -> tuple[dict, dict]:
+def _built_universe(database) -> tuple[dict, dict, UUID]:
+    owner_fixture = build_stage1_beneficiary_fixture(database)
+    with database() as session:
+        owner_map_revision = session.scalar(
+            select(IndustryMapRevision)
+            .where(IndustryMapRevision.map_id == owner_fixture.map_id)
+            .order_by(IndustryMapRevision.revision_no.desc())
+        )
+        assert owner_map_revision is not None
+        owner_map_revision_id = owner_map_revision.id
+
     rows = _seed_stock_records(database)
     created = IndustryThesisCommandService(
         database,
@@ -177,7 +188,7 @@ def _built_universe(database) -> tuple[dict, dict]:
         clock=FixedClock(BASE + timedelta(minutes=3)),
     ).build_candidates(command)
     assert built["candidate_count"] == 3
-    return created, built
+    return created, built, owner_map_revision_id
 
 
 def _decision_payload(view: dict) -> list[dict]:
@@ -206,7 +217,7 @@ def _decision_payload(view: dict) -> list[dict]:
 
 
 def test_exact_review_projection_dry_run_commit_and_result_reopen(database) -> None:
-    created, built = _built_universe(database)
+    created, built, owner_map_revision_id = _built_universe(database)
     session_id = UUID(created["session_id"])
     source_revision_id = UUID(created["session_revision_id"])
     boundary = datetime.fromisoformat(built["recorded_at_utc"])
@@ -228,6 +239,9 @@ def test_exact_review_projection_dry_run_commit_and_result_reopen(database) -> N
         "session_revision_id": str(source_revision_id),
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+        "owner_context": {
+            "industry_map_revision_id": str(owner_map_revision_id),
+        },
         "decisions": list(reversed(decisions)),
         "revision_note": "完成三条精确候选路径审阅",
     }
