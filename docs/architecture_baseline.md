@@ -5,11 +5,12 @@
 This document is the authoritative architecture and current-state baseline. `.codex/WORKFLOW.md` controls execution gates, and a linked GitHub Issue controls Standard or Strict scope.
 
 - Released software version: `0.2.0`.
+- Latest merged product capability: Owner Context v2 and ordinary-user acceptance replacement through architecture PR #244 and implementation PR #246, merge commit `2c432d1676146d5dd168907419fe2160f447e50c`.
 - THS Stage C0 capability merge commit: `d899115e571d393ec45ff9740df4d21cd5c7133f` through implementation PR #231.
-- Latest merged product capability: Personal Research Workbench UI Phase 2B through architecture PR #216 and implementation PR #218.
+- Personal Research Workbench UI Phase 2B remains accepted through architecture PR #216 and implementation PR #218.
 - Personal Research Workbench UI Phase 2A Today Market remains accepted through architecture PR #209 and implementation PR #212.
 - Personal Research Workbench UI Phase 1A–1D remains accepted through architecture PR #199 and implementation PRs #201, #203, #205 and #207.
-- Industry Thesis orchestration foundation and proposal review remain accepted through PRs #193, #195 and #197; the implemented state still stops at `reviewed_plan_ready`.
+- Industry Thesis intake, proposal review, exact Owner Context v2, owner acceptance and exact output links are accepted through PRs #193, #195, #197, #235, #237, #239, #244 and #246.
 - Normalized Valuation and Expectation Metrics v1 remains accepted through architecture PR #184 and implementation PR #186.
 - Account-Authorized THS Structured Financial Data v1 architecture remains accepted through PR #191; Today Market source selection and contract evidence were narrowed through PRs #220, #222, #224 and #226.
 - THS Stage C0 offline contract and request-planning foundation is accepted through architecture PR #229 and implementation PR #231.
@@ -17,9 +18,9 @@ This document is the authoritative architecture and current-state baseline. `.co
 - Review-identity governance is merged through PR #187.
 - Canonical Price and Comparison Eligibility v1 remains the authoritative price owner through PRs #176/#178.
 - Issue #225 remains the sole live THS contract gate. Live Stage C1 is blocked by unresolved account quota, completion, correction/revision/late-data and API-key lifecycle facts.
-- Issues #227 and #230 remain open until separately authorized for closure; their architecture and implementation PRs are merged.
-- Issue #232 / PR #233 is a Light project-state synchronization only; its merge does not start the next product architecture phase.
-- The next planned mainline gate is reviewed-plan owner acceptance and exact output links; THS contract evidence continues in parallel under Issue #225.
+- Issues #227, #230, #242 and #245 remain open until separately authorized for closure; their linked architecture or implementation PRs are merged.
+- Frozen superseded Draft PR #241 remains open and read-only at `3116a67ec472131eea3bf3d1bd9daee884c69ee9`.
+- Issue #247 is the active Strict Architecture Preflight for readable accepted industry-research result assembly and an optional explicitly selected exact Investment Candidate snapshot overlay.
 - CNINFO automated acquisition remains implementation-blocked pending a separately accepted source/access contract.
 - Earlier Evidence Ingestion Issue #154 / PR #155 remains closed-unmerged and reference only.
 
@@ -75,14 +76,19 @@ market-data persistence
        -> Today Market
   -> optional company-scoped Guarded AI D3 draft assistance
 
-accepted Industry Thesis orchestration foundation
+accepted Industry Thesis orchestration and owner-acceptance flow
   -> explicit industry/thesis intake session and append-only revisions
   -> deterministic exact local candidate proposals
   -> explicit selected / rejected / unresolved review
-  -> deterministic reviewed-plan preview and fingerprint
+  -> explicit exact Map Revision selection
+  -> server-resolved Research Case and Industry Map
+  -> fingerprinted reviewed-plan v2 and Owner Context
   -> reviewed_plan_ready session revision
-  -> future existing-owner acceptance transaction and exact output links
-  -> future readiness and Investment Candidate handoff
+  -> exact context-bound acceptance preview
+  -> explicit matching-fingerprint atomic commit
+  -> accepted_outputs_linked session revision and exact output links
+  -> complete accepted result and readiness reads
+  -> optional later explicit Investment Candidate handoff under its existing owner
 
 merged Personal Research Workbench UI Phase 1
   -> Chinese-first five-module shell
@@ -150,13 +156,14 @@ When the configured database and local assets are available, the reviewed runtim
 10. Investment Candidate Intelligence v1 APIs, commands and Chinese-first `/investment-candidates` workspace;
 11. exact-ID normalized financial, valuation, comparison and expectation-gap APIs;
 12. Chinese-first read-only `/company-research/valuation-context` requiring explicit revision IDs and both as-of boundaries;
-13. local JSON-only Industry Thesis session/candidate commands, exact dual-as-of reads, proposal review and reviewed-plan reads;
-14. Chinese-first `/industry-analysis` Personal Research Workbench with scope creation/revision, complete candidate construction, complete three-state review, exact reviewed-plan result, history reopening and Phase 2B continuation/usability projections;
-15. browser-local `/workbench/settings` for presentation-only preferences;
-16. Chinese-first local-only `/today-market`, exact local-series catalog and snapshot API requiring explicit information-cutoff and recorded-UTC boundaries;
-17. source-specific `datasource.ths_structured_provider` Stage C0 contract/readiness/planning/validation package, structurally offline and non-executable.
+13. local JSON-only Industry Thesis session/candidate commands, exact dual-as-of reads, proposal review, reviewed-plan v1/v2 reads, Owner Context validation, owner-acceptance preview/commit and exact accepted-output reads;
+14. Chinese-first `/industry-analysis` Personal Research Workbench with scope creation/revision, complete candidate construction, complete three-state review, explicit exact Owner Context selection, exact acceptance authoring, preview/commit, accepted-result and history reopening;
+15. exact context-bound Stage 1 reuse/append/create and candidate-pool create/append/reuse/zero-supported ordinary-user controls;
+16. browser-local `/workbench/settings` for presentation-only preferences;
+17. Chinese-first local-only `/today-market`, exact local-series catalog and snapshot API requiring explicit information-cutoff and recorded-UTC boundaries;
+18. source-specific `datasource.ths_structured_provider` Stage C0 contract/readiness/planning/validation package, structurally offline and non-executable.
 
-No current runtime provides the thesis owner-acceptance transaction or output links, daily news/announcement radar, followed-entity alerts, observation/simulated portfolio, fair value, target price, expected return, buy/sell/hold output, position sizing, broker execution, automated trading or live external Provider/disclosure acquisition.
+No current runtime provides the Issue #247 assembled conclusion/chain/current-candidate-overlay result, daily news/announcement radar, followed-entity alerts, observation/simulated portfolio, fair value, target price, expected return, buy/sell/hold output, position sizing, broker execution, automated trading or live external Provider/disclosure acquisition.
 
 The existing `/market-cockpit` remains a separate read-only technical surface. `/today-market` is the ordinary-user workbench surface for explicit persisted local equity, optional benchmark/sector context and dual-as-of visibility. Neither surface performs remote refresh or upgrades an exact selected series into full-market coverage.
 
@@ -295,9 +302,9 @@ PR #229 defines and PR #231 implements the accepted source-specific offline foun
 - Stage C0 owns no transport, credential reference, raw capture, persistence, API, UI, Today Market publication or downstream accepted-state write.
 - Live Stage C1 remains blocked by Issue #225 under `blocked_quota_contract`.
 
-### Industry Thesis Intake and Research Orchestration foundation
+### Industry Thesis Intake, Review and Owner Acceptance
 
-PRs #193, #195 and #197 define and implement the accepted offline orchestration foundation.
+PRs #193, #195 and #197 define and implement the accepted offline intake, persistence, candidate and proposal-review foundation. PRs #235/#237 add reviewed-plan owner acceptance and exact output links. PR #239 defines the ordinary-user completion contract. PRs #244/#246 replace same-stock context inference with explicit reviewed-plan v2 Owner Context and complete the ordinary-user acceptance/result path.
 
 - One append-only session identity and revision history owns the exact user thesis, explicit market scope, driver/horizon, chain boundary, exclusions, seeds, coverage and both as-of boundaries.
 - Candidate proposals are non-accepted orchestration state sourced only from exact accepted local mappings, exact existing Industry Map revisions or explicit user seeds in the current implementation.
@@ -305,17 +312,21 @@ PRs #193, #195 and #197 define and implement the accepted offline orchestration 
 - Candidate identities and revisions preserve exact source references, identity state, exposure proposal, rationale, uncertainty and review state.
 - Proposal review requires the complete exact latest candidate universe and explicit selected/rejected/unresolved decisions.
 - Selected candidates require exactly one authoritative persisted identity and explicit non-unknown exposure.
-- The reviewed plan is deterministic, input-order-independent, fingerprinted and dual-as-of readable.
-- Dry-run/commit plan parity is independent of invocation time.
-- Normal historical invisibility returns not-visible rather than false graph corruption.
-- The implemented state stops at `reviewed_plan_ready`.
-- No Industry Map, Stage 1, typed-semantics, output-link, Company Research, price, valuation or Investment Candidate owner write occurs.
-- Migration `20260722_0016` owns six additive append-only orchestration table families and refuses populated downgrade.
-- Full tests and a production-boundary three-candidate offline demo are merged.
+- Active reviewed writes use `aquantai.industry-thesis-acceptance-plan.v2` with one `aquantai.industry-thesis-owner-context.v1` exact Map Revision selected by the user and Case/Map resolved by the server.
+- Owner Context participates in deterministic reviewed IDs, plan fingerprints and chronology. Candidate provenance and key semantics remain unchanged.
+- Unaccepted v1 reviewed plans fail closed and require explicit v2 re-review; already accepted v1 exact reads and idempotent replay remain supported.
+- Owner-acceptance preview is zero-write. Commit requires the exact matching preview fingerprint and one atomic existing-owner transaction.
+- HTTP and core both reject submitted Case/Map/Revision/mode substitution before owner writes.
+- Exact Stage 1 reuse/append/create, semantic none/exact reuse and candidate-pool create/append/reuse/zero-supported are explicit ordinary-user operations.
+- The frozen complete accepted result remains separate from the supported-only candidate-pool handoff.
+- Exact result, output and readiness reads require information-cutoff and recorded-UTC boundaries and never fall back to newer records.
+- Migrations `20260722_0016` and `20260725_0017` own additive orchestration/output-link persistence and refuse unsafe populated downgrade. Owner Context v2 requires no new table, column, migration, backfill or history rewrite.
+- Full tests, production-boundary offline demos, query ceilings and zero-network guards are merged.
+- Acceptance creates no automatic Company Research, Investment Candidate, valuation, recommendation, portfolio or trading state.
 
 ### Personal Research Workbench UI Phase 1
 
-PR #199 defines the architecture; PRs #201, #203, #205 and #207 implement the accepted offline workbench slices.
+PR #199 defines the architecture; PRs #201, #203, #205 and #207 implement the accepted offline workbench slices. PR #246 extends the same product flow through explicit Owner Context acceptance and exact accepted-result reopening.
 
 - Chinese-first five-module shell using FastAPI and static HTML/CSS/vanilla JavaScript.
 - `/workbench` enters 产业研究; `/industry-analysis` provides history and ordinary-language intake.
@@ -326,11 +337,11 @@ PR #199 defines the architecture; PRs #201, #203, #205 and #207 implement the ac
 - Review requires explicit selected/rejected/unresolved decisions for every exact latest candidate.
 - Dry-run and commit use the same deterministic reviewed plan and fingerprint.
 - Exact result/history reopening uses explicit dual-as-of boundaries and no hidden latest fallback.
+- Reviewed-plan v2 acceptance requires explicit exact Map Revision and explicit per-member owner operations.
 - Browser conflicts preserve unsaved decisions and never silently retry or rebase.
 - Technical IDs and fingerprints are progressive details, not ordinary inputs.
-- `reviewed_plan_ready` is orchestration state, not accepted Industry Map, Stage 1, typed-semantics, output-link or Investment Candidate state.
 - Browser-local settings contain presentation preferences only.
-- No Provider, scheduler, notification, AI call, portfolio ledger or trading behavior is included.
+- No Provider, scheduler, notification, hidden AI call, portfolio ledger or trading behavior is included.
 
 ### Personal Research Workbench UI Phase 2B — Ordinary-User Usability Consolidation
 
@@ -344,7 +355,7 @@ PR #216 defines and PR #218 implements the accepted presentation-only consolidat
 - Uses one visually dominant primary action and stable Chinese `发生了什么 / 为什么重要 / 现在可以做什么` explanations.
 - Shows a truthful first-use guide only when the database is available and no exact history is visible.
 - Preserves unsaved candidate-review decisions after conflicts; no silent retry, rebase or record substitution.
-- Adds no schema, migration, Provider, network, accepted-state write, notification, portfolio or trading behavior.
+- Adds no schema, migration, Provider, network, notification, portfolio or trading behavior.
 
 ### Personal Research Workbench UI Phase 2A — Today Market
 
@@ -381,7 +392,7 @@ The detailed route/API contracts remain recorded in `docs/personal_research_work
 | Catalyst and risk assessments | v0.6C | Not monitors, alerts or timing engines |
 | Industry/company quality judgment | v0.6D | Does not generate price or recommendation state |
 | Component-only company comparison | `company_comparison` | Complete universe, neutral ordering, no price arithmetic |
-| Investment Candidate state and snapshots | `industry_alpha.investment_candidate_*` | Exact membership and deterministic rule results |
+| Investment Candidate state and snapshots | `industry_alpha.investment_candidate_*` | Exact membership and deterministic rule results; no second scoring owner |
 | Structured financial observations | `industry_alpha.normalized_financial_*` | Append-only values with exact provenance and period semantics |
 | Normalized valuation arithmetic | `industry_alpha.normalized_valuation_*` | Exact price/financial revisions and versioned Decimal formulas |
 | Historical/peer context | `industry_alpha.normalized_comparison_*` | Frozen membership; peer selection remains D3 |
@@ -391,10 +402,11 @@ The detailed route/API contracts remain recorded in `docs/personal_research_work
 | Future accepted disclosure evidence | Existing Evidence Ledger | Explicit human acceptance transaction only |
 | THS reviewed public contract, readiness, synthetic selectors and dry-run planning | `datasource.ths_structured_provider` Stage C0 | Offline-only; no transport, credential, persistence or Provider-valued fixture |
 | THS live source authorization, raw capture and source normalization | Future source-specific Stage C1 under accepted PR #191 architecture | Issue #225 contract-gated, disabled and unauthorized |
-| Thesis session, proposal and reviewed-plan audit state | `industry_alpha.industry_thesis_*` | Non-accepted append-only coordination state |
-| Accepted thesis-derived map and beneficiary state | Existing Industry Map / Stage 1 / typed-semantics owners | Future explicit user plan and owner transaction only |
-| Thesis-derived research priority | Existing Investment Candidate owner | Existing exact rule version; no second scoring owner |
-| UI page labels, grouping and navigation | Non-persistent workbench adapters | Presentation only; cannot create product meaning |
+| Thesis session, proposal and reviewed-plan audit state | `industry_alpha.industry_thesis_*` | Append-only coordination state; v2 freezes exact Owner Context |
+| Accepted thesis output identity, exact bindings and readiness | `industry_alpha.industry_thesis_owner_acceptance*` | Exact accepted output links, complete universe and dual-as-of reads |
+| Accepted thesis-derived map and beneficiary state | Existing Industry Map / Stage 1 / typed-semantics owners | Explicit context-bound user plan and atomic owner transaction only |
+| Thesis-derived research priority | Existing Investment Candidate owner | Existing exact rule version; no result-assembler score or status calculation |
+| UI page labels, grouping, navigation and optional exact overlay selection | Non-persistent workbench adapters | Presentation/URL state only; cannot create product meaning or rewrite accepted history |
 | Browser-local appearance/density preferences | Browser local storage | No credentials or research state |
 
 ## Shared architecture invariants
@@ -453,6 +465,9 @@ The detailed route/API contracts remain recorded in `docs/personal_research_work
 52. Market, benchmark and sector series are never auto-selected or treated as compatible from names, recency or Provider equality.
 53. A Today Market page cannot claim historical reproducibility unless information-cutoff and recorded-UTC visibility are both enforced.
 54. Unsupported breadth, anomaly, event and refresh capabilities remain explicit unavailable states rather than fabricated values.
+55. Accepted Industry Thesis history and an optional current candidate overlay are separate meanings and must remain visibly separate.
+56. An optional candidate overlay requires one explicitly selected exact snapshot revision and never auto-selects latest, first or uniquely reachable state.
+57. Candidate overlays join accepted results only by exact beneficiary revision and exact candidate-pool revision, never by stock/name overlap.
 
 ## Semantic and derivation levels
 
@@ -486,13 +501,13 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 | Typed Beneficiary Semantics | Append-only exposure/execution profiles | No automatic extraction or ranking |
 | Company Research v0.6A-v0.6D | Hypotheses, narratives, catalysts, risks and quality | No automatic acceptance |
 | Company Comparison | Complete-universe component comparison | No automatic peer selection |
-| Investment Candidates | Transparent components, status and bounded priority | No automatic component scoring |
+| Investment Candidates | Transparent components, status and bounded priority | No automatic component scoring or hidden snapshot selection |
 | Normalized Valuation / Expectation | Structured observations, formulas, comparisons and gaps | No fair value, target return, FX or hidden consensus acquisition |
 | Guarded AI | Explicit ephemeral company-scoped drafts | No persisted accepted AI state, tools or retrieval |
 | CNINFO Disclosure Acquisition | Architecture accepted through PR #189 | Production acquisition remains separately gated |
 | THS Structured Provider | Architecture/source-contract evidence accepted through PRs #191/#220/#222/#224/#226; offline Stage C0 merged through PRs #229/#231 | Live Stage C1 remains blocked by Issue #225; no credential, transport, persistence or source activation authorized |
-| Industry Thesis Orchestration | Session/candidate/reviewed-plan foundation merged through PR #197 | No owner-acceptance transaction or exact output links |
-| Personal Research Workbench UI Phase 1/2B | Scope intake, complete candidate review, exact result/history and ordinary-user usability merged through PRs #207/#218 | No accepted owner handoff, Provider, alerts or portfolio |
+| Industry Thesis Orchestration and Acceptance | Reviewed-plan v2, explicit Owner Context, atomic owner acceptance, exact output links, complete accepted result and readiness merged through PR #246 | Issue #247 readable conclusion/chain/exact current-candidate overlay architecture; no automatic downstream creation |
+| Personal Research Workbench UI Phase 1/2B | Scope intake, complete candidate review, explicit Owner Context acceptance, exact accepted result/history and ordinary-user usability merged through PRs #207/#218/#246 | No Provider, alerts or portfolio; richer assembled result remains under Issue #247 preflight |
 | Today Market UI Phase 2A | Local-series catalog, dual-as-of snapshot and ordinary-user page merged through PR #212 | No Provider refresh, full-market breadth, anomaly/cause engine, event feed or market-attention data |
 | Market Attention / Daily Radar | Source observations remain isolated candidates | Separate Provider, ingestion and product authorization required |
 | Follow / Track | No accepted followed-entity or alert state | Separate persistence, change-rule and notification architecture required |
@@ -500,7 +515,7 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 
 ## Architecture debt register
 
-- **D1 Current-state documentation drift — synchronized through Issue #232 after PR #231.**
+- **D1 Current-state documentation drift — corrected through merged PR #246 state in Issue #247 preflight.**
 - **D2 Repeated Stage 2 structure — bounded:** generic graph loading remains unjustified.
 - **D3 Read utilities — bounded:** serializers, notices and failures remain domain-local.
 - **D4 Command lifecycle/concurrency — partially shared:** semantic validation remains domain-local.
@@ -520,12 +535,13 @@ D3 does not automatically enter accepted identity, evidence, map membership, buy
 - **D18 Account-authorized THS architecture — source contract and Stage C0 are resolved; applicable live account facts remain blocked under Issue #225.**
 - **D19 Provider taxonomy chronology — active:** current snapshots must not masquerade as historical membership.
 - **D20 Market-attention isolation — active:** attention remains separate from beneficiary and candidate quality.
-- **D21 Industry-thesis entry/orchestration — offline browser workflow resolved through PR #218; owner acceptance and exact output links are the next main product gap.**
+- **D21 Industry-thesis entry/orchestration/acceptance — resolved through PR #246; readable assembled conclusion and exact current-candidate overlay are active under Issue #247.**
 - **D22 Industry-level AI assistance — deferred:** optional proposal-only extension after the deterministic product loop is complete.
-- **D23 Personal workbench composition — Phase 1 resolved through PR #207, Phase 2B usability through PR #218 and Phase 2A Today Market through PR #212.**
+- **D23 Personal workbench composition — Phase 1 resolved through PR #207, Phase 2B usability through PR #218, Phase 2A Today Market through PR #212 and acceptance completion through PR #246.**
 - **D24 Free-text discovery gap — explicit:** automatic fuzzy discovery remains later governed assistance.
 - **D25 Local market series discoverability — resolved through PR #212 with a bounded exact catalog and no auto-selection.**
 - **D26 Market snapshot bitemporality — resolved through PR #212 using recorded-UTC visibility without changing calculation ownership.**
+- **D27 Accepted/current result separation — active:** Issue #247 must prevent a selected current candidate snapshot from rewriting accepted historical meaning.
 
 ## Accepted product sequence
 
@@ -568,21 +584,27 @@ Completed:
 35. Today Market THS source synchronization architecture — PR #224;
 36. THS official local-retention, synthetic-fixture and retry-reference evidence synchronization — PR #226;
 37. THS Stage C0 offline foundation architecture — PR #229;
-38. THS Stage C0 offline foundation implementation — PR #231.
+38. THS Stage C0 offline foundation implementation — PR #231;
+39. Industry Thesis reviewed-plan owner-acceptance and exact-output-link architecture — PR #235;
+40. Industry Thesis owner-acceptance core implementation — PR #237;
+41. Industry Thesis ordinary-user completion architecture — PR #239;
+42. exact Owner Context reviewed-plan contract architecture — PR #244;
+43. Owner Context v2 replacement and ordinary-user acceptance/result implementation — PR #246.
 
-No product architecture or implementation phase is active after this P0-0 synchronization.
+Active governed architecture:
 
-Owner-approved planned order, each requiring its own governed authorization:
+44. Industry Research Result Assembly and Exact Candidate Overlay v1 — Issue #247 / branch `arch/industry-research-result-assembly-v1`.
 
-39. Industry Thesis reviewed-plan owner-acceptance and exact-output-link architecture;
-40. bounded implementation and ordinary-user complete industry-research result closure;
-41. parallel closure of applicable THS live-account facts under Issue #225;
-42. THS Stage C1 source-specific live foundation only after Issue #225 reaches an implementation-ready outcome;
-43. index/industry/concept strength and Today Market bounded automatic refresh;
-44. current full-market snapshot and breadth only under an accepted completion/quota contract;
-45. manual official-PDF import and explicit Evidence Ledger review;
-46. announcement evidence packs and later authorized enrichment;
-47. historical full-market, corporate-action and advanced anomaly work only after their separate contracts exist.
+Owner-approved planned order after this preflight, each requiring its own governed authorization:
+
+45. bounded Standard read-only result-assembly implementation only after Issue #247 architecture merge and separate authorization;
+46. parallel closure of applicable THS live-account facts under Issue #225;
+47. THS Stage C1 source-specific live foundation only after Issue #225 reaches an implementation-ready outcome;
+48. index/industry/concept strength and Today Market bounded automatic refresh;
+49. current full-market snapshot and breadth only under an accepted completion/quota contract;
+50. manual official-PDF import and explicit Evidence Ledger review;
+51. announcement evidence packs and later authorized enrichment;
+52. historical full-market, corporate-action and advanced anomaly work only after their separate contracts exist.
 
 Deferred:
 
@@ -594,15 +616,17 @@ Deferred:
 - OCR and automatic accepted evidence drafting;
 - FX and accepted corporate-action normalization;
 - industry-level guarded AI drafting until a separately accepted proposal-only slice;
-- owner acceptance/output links until their next Strict architecture and implementation slices are separately authorized;
 - followed-entity alerts and portfolio ledgers;
 - full-market breadth, stock anomaly/cause and live refresh beyond accepted source contracts.
 
 ## Current authorization state
 
+- Main contains Owner Context v2 replacement merge commit `2c432d1676146d5dd168907419fe2160f447e50c` from PR #246.
+- PR #246 was validated at exact head `eefa47212195e117f9cf159c0f96d21ce5479383` by Local Tests #893 and fixed-head review `4781714011` before owner-authorized merge.
+- Issue #247 authorizes exactly one Strict documentation-only architecture preflight branch and Draft PR for result assembly.
+- PR #241 remains frozen, Draft and unmerged at `3116a67ec472131eea3bf3d1bd9daee884c69ee9`.
 - THS Stage C0 capability merge commit is `d899115e571d393ec45ff9740df4d21cd5c7133f` from PR #231.
 - Personal Research Workbench UI Phase 2B is merged through PR #218; Phase 2A Today Market remains merged through PR #212.
-- THS Stage C0 architecture and implementation are merged through PRs #229 and #231.
 - Stage C0 remains structurally offline:
 
 ```text
@@ -617,28 +641,29 @@ provider_valued_fixtures = prohibited
 - Issue #225 remains open and controls the live THS gate:
 
 ```text
-live_stage_c1_gate = blocked_quota_contract
+live_stage_c1_gate = blocked_pending_provider_response
 production_live_network_authorized = false
 ```
 
-- Issues #227 and #230 remain open until separately authorized for completion closure.
-- Issue #232 / PR #233 synchronizes this baseline only and does not authorize product work.
-- No product architecture or implementation phase is active.
+- Issues #227, #230, #242 and #245 remain open until separately authorized for completion closure.
+- No production implementation is authorized by Issue #247.
 - No live Provider, news, announcement, browser acquisition, scheduler, notification, new AI call or portfolio ledger is authorized.
-- No remote refresh, full-market claim, anomaly/cause engine, accepted evidence, Industry Map, Stage 1, typed-semantics, Company Research, Investment Candidate or portfolio owner write is authorized by this synchronization.
+- No automatic Company Research, Investment Candidate, valuation or portfolio owner write is authorized by the result-assembly preflight.
 - No recommendation, target price, expected return, position size, broker, order or automated trading behavior is authorized.
 - No release, tag or version change is authorized.
 
 ## Next governed gate
 
-After this P0-0 synchronization, the next planned mainline action is a separate Strict Architecture Preflight for:
+The active mainline gate is the Strict documentation-only Architecture Preflight in Issue #247:
 
 ```text
-Industry Thesis Reviewed-Plan Owner Acceptance
-and Exact Output Links v1
+Industry Research Result Assembly
+and Exact Candidate Overlay v1
 ```
 
-That future preflight must reuse the existing Industry Map, Stage 1, typed-semantics, Company Research and Investment Candidate owners; define one atomic reviewed-plan acceptance transaction and exact output links; preserve the complete reviewed candidate universe; and avoid a second ownership or scoring system.
+The preflight must prove that one immutable accepted Industry Thesis output can be composed with exact Industry Map context, complete accepted beneficiaries and readiness, plus an optional explicitly selected exact Investment Candidate snapshot for the same candidate-pool revision. Accepted historical meaning and the selected current overlay must remain separate. No latest/default snapshot, score recomputation, owner write, schema or migration is permitted.
+
+If the architecture is accepted and separately authorized for implementation, the expected implementation tier is Standard read-only work over existing accepted models. Any need for persistence, accepted-contract change, hidden selector, candidate recomputation, Provider/network or AI returns the work to Strict architecture.
 
 Issue #225 continues independently as the sole THS live-contract evidence gate. No Stage C1 implementation Issue, credential boundary, HTTP client, source activation or live request may be created until that gate reaches an accepted implementation-ready outcome and the project owner separately authorizes the implementation slice.
 
@@ -646,18 +671,25 @@ Roadmap Issue #137 records the owner-approved execution order. A materially diff
 
 ## Industry Thesis owner-acceptance accepted-state synchronization
 
-This section is the authoritative Issue #236 synchronization for the state produced by architecture PR #235 and implementation PR #237. Once PR #237 is merged, it supersedes earlier P0-0 statements in this document that describe owner acceptance and exact output links as future, missing, deferred or unauthorized.
+This section records the accepted owner-acceptance state produced by architecture PR #235 and implementation PR #237 and refined by Owner Context architecture PR #244 and replacement implementation PR #246. It supersedes older statements that describe owner acceptance, exact output links or ordinary-user acceptance as future, missing, deferred or unauthorized.
 
 - The deterministic Industry Thesis workflow can advance an exact `reviewed_plan_ready` revision to one append-only `accepted_outputs_linked` revision only through an explicit strict owner-acceptance plan.
+- Active reviewed writes use `aquantai.industry-thesis-acceptance-plan.v2` with one exact `aquantai.industry-thesis-owner-context.v1` frozen in the reviewed plan.
+- Review submits only exact `industry_map_revision_id`; the server resolves exact Industry Map and Research Case.
+- Owner Context participates in deterministic reviewed IDs, plan fingerprints and chronology.
 - Preview and commit use the same normalized owner plan and SHA-256 fingerprint; commit requires the exact matching preview fingerprint.
 - One outer transaction coordinates session-bound Stage 1 and Typed Beneficiary Semantics owner ports. The coordinator does not open nested owner transactions and does not duplicate owner validation.
+- HTTP and core both reject Case/Map/Map Revision/mode substitution before owner work.
 - Exact existing Research Case, Industry Map, reviewed session, reviewed candidates and owner revisions remain explicit. No free text, company label, draft graph, Provider field or AI result is promoted by inference.
 - The frozen complete accepted result remains separate from the supported-only Stage 1 candidate-pool handoff. Draft and disputed members remain visible in the complete result; rejected members are blocked.
 - A valid zero-supported acceptance freezes the complete accepted members, stores a null candidate-pool revision and creates no empty or fabricated pool.
+- Candidate-pool exact reuse is available only when the final supported Stage 1 Revision UUID set exactly equals a frozen pool Revision membership set.
+- Candidate-pool append explicitly exposes and confirms the selected pool Revision title and scope; it does not submit hidden create defaults.
 - The accepted session revision and output-link revision freeze the exact reviewed revision, accepted revision, Research Case, Industry Map revision, optional candidate-pool revision, ordered owner bindings, reviewed-plan fingerprint, owner-plan fingerprint, transaction ID, information cutoff and recorded-UTC boundary.
 - Identical replay is deterministic and idempotent; conflicting replay, stale expected-latest state, incomplete owner bindings and graph corruption fail closed.
 - Exact JSON-only output, complete-result and readiness reads require explicit information-cutoff and recorded-UTC visibility and never fall back to a newer or substitute record.
-- Migration `20260725_0017` changes only the Industry Thesis output-link schema, supports nullable zero-supported handoff, refuses ambiguous populated legacy upgrade and refuses lossy populated downgrade.
-- The core is local and offline. It adds no HTTP/API/UI surface, Provider access, credential path, scheduler, retry loop, background worker, notification, AI call, Company Research automation, Investment Candidate scoring, recommendation, target price, expected return, portfolio, broker, order or trading behavior.
-- The separately governed `P0-1 Ordinary-User Completion Slice` remains the next Industry Thesis product gate. Issue #225 continues independently as the sole live THS contract-evidence gate.
-- This capability synchronization does not change released version `0.2.0` and does not itself authorize release, merge, Issue closure or any later slice.
+- Unaccepted reviewed-plan v1 records fail closed and require explicit v2 re-review. Existing accepted v1 exact reads and idempotent replay remain supported when all frozen identities/fingerprints match.
+- Migration `20260725_0017` changes only the Industry Thesis output-link schema, supports nullable zero-supported handoff, refuses ambiguous populated legacy upgrade and refuses lossy populated downgrade. Owner Context v2 adds no migration, table, column, backfill or history rewrite.
+- The core and ordinary-user surface are local and offline. They add no Provider access, credential path, scheduler, retry loop, background worker, notification, hidden AI call, automatic Company Research creation, Investment Candidate scoring, recommendation, target price, expected return, portfolio, broker, order or trading behavior.
+- Issue #247 is the next separately governed product gate for a readable accepted result and optional explicit exact candidate snapshot overlay.
+- This capability synchronization does not change released version `0.2.0` and does not itself authorize release, Issue closure or any later slice.
