@@ -122,6 +122,21 @@ function renderGroup(selector, countSelector, candidates, emptyText) {
   candidates.forEach((candidate, index) => container.append(resultCard(candidate, index)));
 }
 
+function renderAcceptanceAction(result) {
+  const existing = document.querySelector("#owner-acceptance-link");
+  if (existing) existing.remove();
+  if (
+    result.acceptance_plan_version !== "aquantai.industry-thesis-acceptance-plan.v2"
+    || result.selected_count < 1
+  ) return;
+  const link = node("a", "检查并接受研究成果", "button button-primary");
+  link.id = "owner-acceptance-link";
+  link.href =
+    `/industry-analysis/sessions/${encodeURIComponent(route.sessionId)}/revisions/`
+    + `${encodeURIComponent(route.reviewedSessionRevisionId)}/acceptance?${query}`;
+  document.querySelector(".topbar-actions").prepend(link);
+}
+
 function renderResult(result) {
   document.querySelector("#result-title").textContent = result.thesis_title;
   document.querySelector("#result-thesis").textContent = result.thesis_text_original;
@@ -179,6 +194,7 @@ function renderResult(result) {
     candidate_sources: result.candidate_sources,
     notices: result.notices,
   }, null, 2);
+  renderAcceptanceAction(result);
 }
 
 async function initialize() {
