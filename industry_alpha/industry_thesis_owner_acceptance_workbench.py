@@ -55,6 +55,7 @@ from industry_alpha.stage1_models import (
     Stage1BeneficiaryClaimLink,
     Stage1BeneficiaryRevision,
     Stage1CandidatePool,
+    Stage1CandidatePoolMembership,
     Stage1CandidatePoolRevision,
 )
 
@@ -499,13 +500,22 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
             if current is None or revision.revision_no > current.revision_no:
                 latest_by_beneficiary[beneficiary.id] = revision
 
-        pool_pairs = list(
+        pool_rows = list(
             self._session.execute(
-                select(Stage1CandidatePool, Stage1CandidatePoolRevision)
+                select(
+                    Stage1CandidatePool,
+                    Stage1CandidatePoolRevision,
+                    Stage1CandidatePoolMembership.beneficiary_revision_id,
+                )
                 .join(
                     Stage1CandidatePoolRevision,
                     Stage1CandidatePoolRevision.candidate_pool_id
                     == Stage1CandidatePool.id,
+                )
+                .outerjoin(
+                    Stage1CandidatePoolMembership,
+                    Stage1CandidatePoolMembership.candidate_pool_revision_id
+                    == Stage1CandidatePoolRevision.id,
                 )
                 .where(
                     Stage1CandidatePool.case_id == case_id,
@@ -518,8 +528,21 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 .order_by(
                     Stage1CandidatePool.id,
                     Stage1CandidatePoolRevision.revision_no,
+                    Stage1CandidatePoolMembership.beneficiary_revision_id,
                 )
             )
+        )
+        pool_pair_by_revision: dict[
+            UUID, tuple[Stage1CandidatePool, Stage1CandidatePoolRevision]
+        ] = {}
+        pool_members_by_revision: dict[UUID, list[UUID]] = defaultdict(list)
+        for pool, revision, beneficiary_revision_id in pool_rows:
+            pool_pair_by_revision[revision.id] = (pool, revision)
+            if beneficiary_revision_id is not None:
+                pool_members_by_revision[revision.id].append(beneficiary_revision_id)
+        pool_pairs = sorted(
+            pool_pair_by_revision.values(),
+            key=lambda item: (str(item[0].id), item[1].revision_no, str(item[1].id)),
         )
         latest_pool_by_id: dict[
             UUID, tuple[Stage1CandidatePool, Stage1CandidatePoolRevision]
@@ -741,6 +764,13 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                         "revision_number": revision.revision_no,
                         "title": revision.title,
                         "scope": revision.scope,
+                        "beneficiary_revision_ids": [
+                            str(value)
+                            for value in sorted(
+                                pool_members_by_revision.get(revision.id, []),
+                                key=str,
+                            )
+                        ],
                     }
                     for pool, revision in pool_pairs
                 ],
