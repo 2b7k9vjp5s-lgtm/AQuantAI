@@ -12,6 +12,9 @@ const boundary = {
   recordedAtUtc: query.get("as_of_recorded_at_utc"),
 };
 
+const OP_REUSE = "reuse_exact_beneficiary_revision";
+const OP_APPEND = "append_beneficiary_revision";
+const OP_CREATE = "create_beneficiary_identity_and_revision";
 const state = { view: null, preview: null };
 
 function node(tag, text, className) {
@@ -70,21 +73,64 @@ function invalidatePreview() {
   document.querySelector("#preview-state").textContent = "表单已修改";
 }
 
+function memberControl(attribute, member) {
+  return document.querySelector(
+    `[${attribute}="${member.reviewed_candidate_revision_id}"]`,
+  );
+}
+
 function latestReuse(member) {
   const options = member.stage1_reuse_options || [];
   return [...options].sort((a, b) => b.revision_number - a.revision_number)[0] || null;
 }
 
+function selectedOperation(member) {
+  const select = memberControl("data-operation-for", member);
+  return select ? select.value : "";
+}
+
 function selectedReuse(member) {
-  const select = document.querySelector(`[data-reuse-for="${member.reviewed_candidate_revision_id}"]`);
+  const select = memberControl("data-reuse-for", member);
   if (!select || !select.value) return null;
   return (member.stage1_reuse_options || []).find(
     (item) => item.beneficiary_revision_id === select.value,
   ) || null;
 }
 
-function renderSemanticSelect(member, reuse) {
-  const select = document.querySelector(`[data-semantic-for="${member.reviewed_candidate_revision_id}"]`);
+function selectedAppend(member) {
+  const select = memberControl("data-append-for", member);
+  if (!select || !select.value) return null;
+  return (member.stage1_append_options || []).find(
+    (item) => item.expected_latest_revision_id === select.value,
+  ) || null;
+}
+
+function authoringContract(member) {
+  return member.stage1_authoring_contract || {
+    legacy_beneficiary_kind_options: [],
+    assessment_status_options: [],
+    map_assertion_options: [],
+    claim_revision_options: [],
+  };
+}
+
+function canAuthor(member) {
+  const contract = authoringContract(member);
+  return Boolean(
+    (contract.map_assertion_options || []).length
+    && (contract.claim_revision_options || []).length,
+  );
+}
+
+function bindMutable(element, { affectsPool = false } = {}) {
+  const eventName = ["INPUT", "TEXTAREA"].includes(element.tagName) ? "input" : "change";
+  element.addEventListener(eventName, () => {
+    if (affectsPool) renderPoolOptions();
+    invalidatePreview();
+  });
+}
+
+function renderSemanticSelect(select, reuse) {
   select.replaceChildren(new Option("暂不绑定类型化语义", "none"));
   for (const item of (reuse && reuse.semantic_reuse_options) || []) {
     const option = new Option(
@@ -96,21 +142,36 @@ function renderSemanticSelect(member, reuse) {
   }
 }
 
-function renderMember(member) {
-  const card = node("article", null, "acceptance-card");
-  const header = node("header");
-  const heading = node("div");
-  heading.append(
-    node("h3", member.ordinary_identity_label),
-    node("p", member.frozen_stock_binding.ordinary_label, "muted-copy"),
-  );
-  const meta = node("div", null, "member-meta");
-  meta.append(
-    node("span", member.reviewed_proposal_exposure, "meta-chip"),
-    node("span", `顺序 ${member.sequence + 1}`, "meta-chip"),
-  );
-  header.append(heading, meta);
+function labeledField(label, control, className = "form-field") {
+  const wrapper = node("label", null, className);
+  wrapper.append(node("span", label), control);
+  return wrapper;
+}
 
+function buildChoiceSelect(options, placeholder, valueKey, labelKey) {
+  const select = document.createElement("select");
+  select.append(new Option(placeholder, ""));
+  for (const item of options || []) {
+    select.add(new Option(item[labelKey], item[valueKey]));
+  }
+  return select;
+}
+
+function buildMultiSelect(options, valueKey, labelBuilder) {
+  const select = document.createElement("select");
+  select.multiple = true;
+  select.size = Math.min(Math.max((options || []).length, 3), 7);
+  for (const item of options || []) {
+    const option = new Option(labelBuilder(item), item[valueKey]);
+    for (const [key, value] of Object.entries(item)) {
+      option.dataset[key] = String(value);
+    }
+    select.add(option);
+  }
+  return select;
+}
+
+function renderReuseFields(member, container) {
   const reuse = document.createElement("select");
   reuse.dataset.reuseFor = member.reviewed_candidate_revision_id;
   reuse.required = true;
@@ -128,43 +189,206 @@ function renderMember(member) {
 
   const semantic = document.createElement("select");
   semantic.dataset.semanticFor = member.reviewed_candidate_revision_id;
-  renderSemanticSelectPlaceholder(semantic);
+  renderSemanticSelect(semantic, defaultReuse);
 
   const grid = node("div", null, "form-grid");
-  const reuseLabel = node("label", null, "form-field");
-  reuseLabel.append(node("span", "精确 Stage 1 版本"), reuse);
-  const semanticLabel = node("label", null, "form-field");
-  semanticLabel.append(node("span", "类型化语义"), semantic);
-  grid.append(reuseLabel, semanticLabel);
+  grid.append(
+    labeledField("精确 Stage 1 版本", reuse),
+    labeledField("类型化语义", semantic),
+  );
+  const notice = node(
+    "p",
+    "复用不会创建新的 Stage 1 修订；类型化语义只能复用该精确 Beneficiary Revision 已有的版本。",
+    "operation-note",
+  );
+  container.append(grid, notice);
 
-  const blocking = member.blocking_reasons || [];
-  if (!(member.stage1_reuse_options || []).length) {
-    blocking.push({ message: "当前精确 Context 中没有可复用 Stage 1 版本；页面不会自动新建或推断。" });
-  }
-  const notices = node("div");
-  for (const item of blocking) notices.append(node("p", item.message, "is-error"));
-
-  card.append(header, grid, notices);
   reuse.addEventListener("change", () => {
-    renderSemanticSelect(member, selectedReuse(member));
+    renderSemanticSelect(semantic, selectedReuse(member));
     renderPoolOptions();
     invalidatePreview();
   });
-  semantic.addEventListener("change", invalidatePreview);
-  queueMicrotask(() => renderSemanticSelect(member, defaultReuse));
-  return card;
+  bindMutable(semantic);
 }
 
-function renderSemanticSelectPlaceholder(select) {
-  select.replaceChildren(new Option("暂不绑定类型化语义", "none"));
+function renderAuthoringFields(member, container, operation) {
+  const contract = authoringContract(member);
+  const grid = node("div", null, "form-grid authoring-grid");
+
+  if (operation === OP_APPEND) {
+    const target = document.createElement("select");
+    target.dataset.appendFor = member.reviewed_candidate_revision_id;
+    target.append(new Option("请选择要追加的精确受益公司身份", ""));
+    for (const item of member.stage1_append_options || []) {
+      target.add(
+        new Option(
+          `现有第 ${item.revision_number} 版 · ${item.current_legacy_beneficiary_kind} · ${item.current_assessment_status}`,
+          item.expected_latest_revision_id,
+        ),
+      );
+    }
+    grid.append(labeledField("追加目标", target));
+    bindMutable(target);
+  } else {
+    const frozen = member.stage1_create_contract || {};
+    const identity = node("div", null, "frozen-authoring-identity");
+    identity.append(
+      node("strong", "将创建新的精确受益公司身份"),
+      node("span", `${frozen.source || "来源不可用"} / ${frozen.stock_code || "代码不可用"}`),
+    );
+    container.append(identity);
+  }
+
+  const kind = buildChoiceSelect(
+    contract.legacy_beneficiary_kind_options,
+    "请选择受益类型",
+    "value",
+    "label",
+  );
+  kind.dataset.kindFor = member.reviewed_candidate_revision_id;
+  const status = buildChoiceSelect(
+    contract.assessment_status_options,
+    "请选择 assessment 状态",
+    "value",
+    "label",
+  );
+  status.dataset.statusFor = member.reviewed_candidate_revision_id;
+  const rationale = document.createElement("textarea");
+  rationale.dataset.rationaleFor = member.reviewed_candidate_revision_id;
+  rationale.maxLength = 4000;
+  rationale.placeholder = "说明该公司在当前精确产业地图中的受益位置、证据状态与限制。";
+
+  const assertions = buildMultiSelect(
+    contract.map_assertion_options,
+    "assertion_revision_id",
+    (item) => `${item.ordinary_label} · ${item.assertion_status}`,
+  );
+  assertions.dataset.assertionsFor = member.reviewed_candidate_revision_id;
+  const claims = buildMultiSelect(
+    contract.claim_revision_options,
+    "claim_revision_id",
+    (item) => `${item.ordinary_label} · ${item.claim_status}`,
+  );
+  claims.dataset.claimsFor = member.reviewed_candidate_revision_id;
+
+  grid.append(
+    labeledField("受益类型", kind),
+    labeledField("assessment 状态", status),
+    labeledField("Stage 1 理由", rationale, "form-field form-field-wide"),
+    labeledField("产业地图断言（至少一项）", assertions),
+    labeledField("研究 Claim（至少一项）", claims),
+  );
+  container.append(
+    grid,
+    node(
+      "p",
+      "按住 Ctrl（Windows）或 Command（macOS）可多选。选项只来自 reviewed Owner Context 的精确 Map 与 Research Case。",
+      "operation-note",
+    ),
+    node(
+      "p",
+      "新建或追加的 Stage 1 Revision 暂不绑定类型化语义；后续必须对新 Revision 另行显式处理。",
+      "operation-note",
+    ),
+  );
+
+  [kind, status].forEach((element) => bindMutable(element, { affectsPool: true }));
+  [rationale, assertions, claims].forEach((element) => bindMutable(element));
+}
+
+function renderOperationFields(member, operation, container) {
+  container.replaceChildren();
+  if (!operation) {
+    container.append(
+      node(
+        "p",
+        "请选择复用、追加或新建。页面不会根据股票、名称或唯一可达路径自动决定。",
+        "operation-empty",
+      ),
+    );
+    return;
+  }
+  if (operation === OP_REUSE) {
+    renderReuseFields(member, container);
+    return;
+  }
+  if (!canAuthor(member)) {
+    container.append(
+      node(
+        "p",
+        "当前精确 Context 缺少可用的 Map assertion 或 Case Claim，不能安全新建或追加。",
+        "is-error",
+      ),
+    );
+    return;
+  }
+  renderAuthoringFields(member, container, operation);
+}
+
+function renderMember(member) {
+  const card = node("article", null, "acceptance-card");
+  const header = node("header");
+  const heading = node("div");
+  heading.append(
+    node("h3", member.ordinary_identity_label),
+    node("p", member.frozen_stock_binding.ordinary_label, "muted-copy"),
+  );
+  const meta = node("div", null, "member-meta");
+  meta.append(
+    node("span", member.reviewed_proposal_exposure, "meta-chip"),
+    node("span", `顺序 ${member.sequence + 1}`, "meta-chip"),
+  );
+  header.append(heading, meta);
+
+  const operation = document.createElement("select");
+  operation.dataset.operationFor = member.reviewed_candidate_revision_id;
+  operation.append(new Option("请选择 Stage 1 操作", ""));
+  if ((member.stage1_reuse_options || []).length) {
+    operation.add(new Option("复用精确 Stage 1 版本", OP_REUSE));
+  }
+  if ((member.stage1_append_options || []).length && canAuthor(member)) {
+    operation.add(new Option("追加新的 Stage 1 修订", OP_APPEND));
+  }
+  if (member.stage1_create_contract && member.stage1_create_contract.available) {
+    operation.add(new Option("新建受益公司身份和首个修订", OP_CREATE));
+  }
+  if ((member.stage1_reuse_options || []).length) operation.value = OP_REUSE;
+
+  const operationField = labeledField("Stage 1 操作", operation);
+  const details = node("div", null, "operation-details");
+  const notices = node("div", null, "member-notices");
+  const blocking = [...(member.blocking_reasons || [])];
+  if (!operation.options.length || operation.options.length === 1) {
+    blocking.push({ message: "当前精确 Context 中没有可完成的 Stage 1 操作。" });
+  }
+  for (const item of blocking) notices.append(node("p", item.message, "is-error"));
+
+  card.append(header, operationField, details, notices);
+  renderOperationFields(member, operation.value, details);
+  operation.addEventListener("change", () => {
+    renderOperationFields(member, operation.value, details);
+    renderPoolOptions();
+    invalidatePreview();
+  });
+  return card;
 }
 
 function selectedStatuses() {
   if (!state.view) return [];
-  return state.view.members
-    .map((member) => selectedReuse(member))
-    .filter(Boolean)
-    .map((item) => item.assessment_status);
+  const statuses = [];
+  for (const member of state.view.members) {
+    const operation = selectedOperation(member);
+    if (operation === OP_REUSE) {
+      const reuse = selectedReuse(member);
+      if (reuse) statuses.push(reuse.assessment_status);
+      continue;
+    }
+    if ([OP_APPEND, OP_CREATE].includes(operation)) {
+      const select = memberControl("data-status-for", member);
+      if (select && select.value) statuses.push(select.value);
+    }
+  }
+  return statuses;
 }
 
 function renderPoolOptions() {
@@ -179,11 +403,12 @@ function renderPoolOptions() {
   } else {
     select.add(new Option("新建 supported 后续研究池", "create_supported_handoff"));
     for (const option of contract.append_options || []) {
-      const element = new Option(
-        `追加到 ${option.title} · 第 ${option.revision_number} 版`,
-        `append:${option.candidate_pool_id}:${option.expected_latest_revision_id}`,
+      select.add(
+        new Option(
+          `追加到 ${option.title} · 第 ${option.revision_number} 版`,
+          `append:${option.candidate_pool_id}:${option.expected_latest_revision_id}`,
+        ),
       );
-      select.add(element);
     }
   }
   if ([...select.options].some((option) => option.value === previous)) select.value = previous;
@@ -206,7 +431,8 @@ function renderPoolFields() {
 function renderView(view) {
   state.view = view;
   document.querySelector("#acceptance-title").textContent = view.thesis_title;
-  document.querySelector("#acceptance-thesis").textContent = `共 ${view.members.length} 家已选公司；请逐家确认正式版本。`;
+  document.querySelector("#acceptance-thesis").textContent =
+    `共 ${view.members.length} 家已选公司；请逐家明确复用、追加或新建。`;
   document.querySelector("#member-count").textContent = String(view.members.length);
   document.querySelector("#context-summary").textContent =
     `${view.research_case.case_key} / ${view.industry_map.map_key} / 第 ${view.industry_map.revision_number} 版`;
@@ -226,6 +452,7 @@ function renderView(view) {
     information_cutoff_date: view.information_cutoff_date,
     as_of_recorded_at_utc: view.as_of_recorded_at_utc,
     owner_acceptance_plan_version: view.owner_acceptance_plan_version,
+    authoring_material_counts: view.technical_details.authoring_material_counts,
   }, null, 2);
   document.querySelector("#page-state").textContent = "精确 Context 已验证";
   document.querySelector("#page-state").classList.add("is-ready");
@@ -253,17 +480,79 @@ function buildPoolOperation() {
   };
 }
 
-function buildPayload() {
-  const errors = [];
-  const bindings = state.view.members.map((member) => {
+function selectedAssertionPayload(member) {
+  const select = memberControl("data-assertions-for", member);
+  if (!select) return [];
+  return [...select.selectedOptions].map((option) => ({
+    assertion_kind: option.dataset.assertion_kind,
+    assertion_revision_id: option.value,
+  }));
+}
+
+function selectedClaimIds(member) {
+  const select = memberControl("data-claims-for", member);
+  return select ? [...select.selectedOptions].map((option) => option.value) : [];
+}
+
+function buildAuthoredStage1(member, operation, errors) {
+  const kind = memberControl("data-kind-for", member);
+  const status = memberControl("data-status-for", member);
+  const rationale = memberControl("data-rationale-for", member);
+  const assertions = selectedAssertionPayload(member);
+  const claims = selectedClaimIds(member);
+  const prefix = member.ordinary_identity_label;
+
+  if (!kind || !kind.value) errors.push(`${prefix}：请选择受益类型。`);
+  if (!status || !status.value) errors.push(`${prefix}：请选择 assessment 状态。`);
+  if (!rationale || !rationale.value.trim()) errors.push(`${prefix}：请填写 Stage 1 理由。`);
+  if (!assertions.length) errors.push(`${prefix}：请至少选择一条产业地图断言。`);
+  if (!claims.length) errors.push(`${prefix}：请至少选择一条研究 Claim。`);
+
+  const authored = {
+    legacy_beneficiary_kind: kind ? kind.value : "",
+    assessment_status: status ? status.value : "",
+    rationale_summary: rationale ? rationale.value.trim() : "",
+    map_assertion_revisions: assertions,
+    claim_revision_ids: claims,
+  };
+  if (operation === OP_APPEND) {
+    const target = selectedAppend(member);
+    if (!target) {
+      errors.push(`${prefix}：请选择要追加的精确受益公司身份。`);
+      return authored;
+    }
+    return {
+      beneficiary_id: target.beneficiary_id,
+      expected_latest_revision_id: target.expected_latest_revision_id,
+      stock_basic_record_id: target.stock_basic_record_id,
+      source: target.source,
+      stock_code: target.stock_code,
+      ...authored,
+    };
+  }
+  const contract = member.stage1_create_contract || {};
+  if (contract.available !== true) errors.push(`${prefix}：当前精确 Context 不允许新建身份。`);
+  return {
+    stock_basic_record_id: contract.stock_basic_record_id,
+    source: contract.source,
+    stock_code: contract.stock_code,
+    ...authored,
+  };
+}
+
+function buildBinding(member, errors) {
+  const operation = selectedOperation(member);
+  if (!operation) {
+    errors.push(`${member.ordinary_identity_label}：请选择 Stage 1 操作。`);
+    return null;
+  }
+  if (operation === OP_REUSE) {
     const reuse = selectedReuse(member);
     if (!reuse) {
-      errors.push(`${member.ordinary_identity_label} 缺少精确 Stage 1 版本。`);
+      errors.push(`${member.ordinary_identity_label}：请选择精确 Stage 1 版本。`);
       return null;
     }
-    const semanticSelect = document.querySelector(
-      `[data-semantic-for="${member.reviewed_candidate_revision_id}"]`,
-    );
+    const semanticSelect = memberControl("data-semantic-for", member);
     const semanticOption = semanticSelect.selectedOptions[0];
     const semanticOperation = semanticSelect.value === "none"
       ? "none"
@@ -271,7 +560,7 @@ function buildPayload() {
     return {
       reviewed_candidate_revision_id: member.reviewed_candidate_revision_id,
       sequence: member.sequence,
-      stage1_operation: "reuse_exact_beneficiary_revision",
+      stage1_operation: operation,
       stage1: {
         beneficiary_id: reuse.beneficiary_id,
         beneficiary_revision_id: reuse.beneficiary_revision_id,
@@ -284,7 +573,23 @@ function buildPayload() {
       },
       readiness_note: "普通用户在精确 Owner Context 中确认复用。",
     };
-  });
+  }
+  return {
+    reviewed_candidate_revision_id: member.reviewed_candidate_revision_id,
+    sequence: member.sequence,
+    stage1_operation: operation,
+    stage1: buildAuthoredStage1(member, operation, errors),
+    semantic_operation: "none",
+    semantic: null,
+    readiness_note: operation === OP_APPEND
+      ? "普通用户显式追加 Context-bound Stage 1 修订；类型化语义待后续处理。"
+      : "普通用户显式创建 Context-bound Stage 1 身份与首个修订；类型化语义待后续处理。",
+  };
+}
+
+function buildPayload() {
+  const errors = [];
+  const bindings = state.view.members.map((member) => buildBinding(member, errors));
   const title = document.querySelector("#output-title").value.trim();
   const scope = document.querySelector("#output-scope").value.trim();
   const note = document.querySelector("#revision-note").value.trim();
@@ -311,6 +616,12 @@ function buildPayload() {
   };
 }
 
+function fact(label, value) {
+  const item = node("div", null, "fact-card");
+  item.append(node("strong", label), node("span", value));
+  return item;
+}
+
 function renderPreview(preview) {
   state.preview = preview;
   document.querySelector("#preview-section").hidden = false;
@@ -323,12 +634,6 @@ function renderPreview(preview) {
   );
   document.querySelector("#preview-technical").textContent = JSON.stringify(preview, null, 2);
   document.querySelector("#commit-button").hidden = !preview.commit_ready;
-}
-
-function fact(label, value) {
-  const item = node("div", null, "fact-card");
-  item.append(node("strong", label), node("span", value));
-  return item;
 }
 
 async function submitPreview(event) {
@@ -358,7 +663,7 @@ async function submitPreview(event) {
 
 async function commit() {
   if (!state.preview || !state.preview.commit_ready) return;
-  if (!window.confirm("确认写入本次研究成果？该操作会追加不可变本地历史。")) return;
+  if (!window.confirm("确认写入本次研究成果？新建或追加会写入不可变 Stage 1 历史，页面不会自动撤销。")) return;
   const payload = buildPayload();
   if (!payload) return;
   document.querySelector("#commit-button").disabled = true;
@@ -387,7 +692,7 @@ async function commit() {
 
 async function initialize() {
   if (!route || !boundary.cutoff || !boundary.recordedAtUtc) {
-    showErrors(["缺少精确 session、reviewed revision 或双时间边界。请从审阅结果重新打开。"]);
+    showErrors(["缺少精确 session、reviewed revision 或双时间边界。请从审阅结果重新打开。"]) ;
     document.querySelector("#page-state").textContent = "精确链接无效";
     return;
   }
