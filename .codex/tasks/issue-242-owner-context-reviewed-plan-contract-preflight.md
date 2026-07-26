@@ -2,49 +2,36 @@
 
 ## Authority
 
-- Authoritative Architecture Preflight Issue: #242.
+- Architecture Issue: #242.
 - Product Roadmap: #137.
-- Accepted Industry Thesis owner-acceptance architecture and implementation: #234/#235 and #236/#237.
-- Accepted ordinary-user completion architecture: #238 / merged PR #239.
-- Paused ordinary-user implementation: Issue #240 / Draft PR #241.
-- Blocked implementation HEAD: `3116a67ec472131eea3bf3d1bd9daee884c69ee9`.
-- Project-owner authorization on 2026-07-26:
+- Accepted predecessors: #234/#235, #236/#237 and #238/#239.
+- Paused implementation: Issue #240 / Draft PR #241.
+- Frozen blocked implementation HEAD: `3116a67ec472131eea3bf3d1bd9daee884c69ee9`.
+- Owner authorization on 2026-07-26:
 
 ```text
 Owner Context 合同架构预检
 ```
 
-- Exact architecture base at branch creation: `41137ee6f017a781367b439f4119f201d05ce9cf`.
+- Exact architecture base: `41137ee6f017a781367b439f4119f201d05ce9cf`.
 - Branch: `arch/owner-context-reviewed-plan-contract`.
-- Workflow authority: `.codex/WORKFLOW.md`.
-- Risk tier: **Strict Architecture Preflight** because this changes a frozen reviewed-plan contract and cross-domain acceptance authority.
+- Workflow: `.codex/WORKFLOW.md`.
+- Risk: **Strict Architecture Preflight**.
 
-## Phase boundary
+## Authorized scope
 
-This task is architecture-only.
-
-Authorized files:
+Only:
 
 ```text
 .codex/tasks/issue-242-owner-context-reviewed-plan-contract-preflight.md
 docs/industry_thesis_owner_context_reviewed_plan_preflight.md
 ```
 
-No production code, schema, migration, fixture, executable test, API, UI, dependency, Provider, credential, network access, AI call, release, tag, version change, merge, Issue closure or resumption of PR #241 is authorized.
+No production code, schema, migration, fixture, executable test, API, UI, Provider, network, credential, AI, release, tag, project-version change, merge, Issue closure or PR #241 resumption is authorized.
 
 ## Audit finding
 
-The existing reviewed acceptance plan freezes:
-
-- session and candidate revisions;
-- selected/rejected/unresolved decisions;
-- exact stock/listed-instrument identity references;
-- candidate source kinds;
-- candidate source-reference fingerprints;
-- information and recorded-time boundaries;
-- one deterministic plan fingerprint.
-
-It does not freeze:
+The current reviewed plan freezes candidates, decisions, exact identities, candidate source kinds, source-reference fingerprints, chronology and one plan fingerprint. It does not freeze:
 
 ```text
 research_case_id
@@ -52,33 +39,29 @@ industry_map_id
 industry_map_revision_id
 ```
 
-The ordinary-user workbench currently derives that context from Stage 1 rows reachable by frozen stock IDs. A unique reachable context remains inference rather than reviewed authority.
+The ordinary-user workbench therefore still derives Owner Context from Stage 1 rows reachable by frozen stock IDs. A unique reachable context is still inference.
 
-The source-only alternatives are invalid:
+Candidate provenance cannot safely carry the missing authority:
 
-1. `existing_industry_map_revision` can carry the exact revision, but multiple companies referencing the same source produce the same candidate key because candidate identity is based on `source_kind + source_reference`.
-2. `accepted_local_mapping` can distinguish companies, but its accepted source contract owns no Case/Map/Map Revision semantics.
-3. Reinterpreting arbitrary source-reference keys would create a hidden unreviewed contract.
+- a shared `existing_industry_map_revision` reference collides under the current `source_kind + source_reference` candidate-key contract;
+- `accepted_local_mapping` owns no accepted Case/Map/Map Revision semantics;
+- arbitrary source-reference reinterpretation would be a hidden contract.
 
-## Objective
+## Locked architecture decision
 
-Define the smallest deterministic reviewed-plan contract that freezes one exact Owner Context at explicit review time and makes it the only authority for later owner acceptance:
+### Reviewed-plan versions
 
 ```text
-exact review context selection
-  -> server resolves Map Revision -> Map -> Research Case
-  -> reviewed plan v2 freezes and fingerprints exact Owner Context
-  -> acceptance workbench queries only that exact context
-  -> core rejects any submitted context substitution
+historical read version = aquantai.industry-thesis-acceptance-plan.v1
+active write version = aquantai.industry-thesis-acceptance-plan.v2
+owner context version = aquantai.industry-thesis-owner-context.v1
 ```
 
-## Locked architecture direction
+Version 2 requires one exact top-level Owner Context.
 
-### 1. Top-level review authority
+### Review input
 
-Owner Context is a top-level reviewed-plan authority, separate from candidate provenance.
-
-Review input carries only:
+The review request submits only:
 
 ```json
 {
@@ -92,187 +75,145 @@ The server resolves and freezes:
 
 ```json
 {
-  "owner_context": {
-    "owner_context_contract_version": "aquantai.industry-thesis-owner-context.v1",
-    "map_mode": "reuse_exact_existing_map_revision",
-    "research_case_id": "<resolved UUID>",
-    "industry_map_id": "<resolved UUID>",
-    "industry_map_revision_id": "<submitted exact UUID>"
-  }
+  "owner_context_contract_version": "aquantai.industry-thesis-owner-context.v1",
+  "map_mode": "reuse_exact_existing_map_revision",
+  "research_case_id": "<resolved UUID>",
+  "industry_map_id": "<resolved UUID>",
+  "industry_map_revision_id": "<submitted UUID>"
 }
 ```
 
-The client does not submit Case or Map identities.
+The client cannot submit Case or Map identities as authority.
 
-### 2. Reviewed-plan version
+### Explicit option projection
 
-The new active write contract is:
+The future review surface returns exact cutoff-visible persisted Case/Map/Map Revision options. Options use stable cursor pagination with:
 
 ```text
-aquantai.industry-thesis-acceptance-plan.v2
+default limit = 25
+maximum limit = 100
+stable order = case_key, map_key, revision_no DESC, revision_id
 ```
 
-Version 2 requires exact `owner_context`.
+Text filtering may narrow already exact persisted options for usability, but never creates identity or context authority.
 
-Version 1 remains historical and readable but is not eligible for a new owner-acceptance write unless it already has an accepted output and the request is an exact idempotent replay.
+Every option requires explicit user selection and confirmation. No single-option hidden default is accepted.
 
-### 3. Deterministic identity and fingerprint binding
+### Fingerprints and deterministic IDs
 
-The normalized resolved Owner Context must participate in:
+The normalized resolved Owner Context participates in:
 
 - review decision seed;
 - deterministic reviewed session revision ID;
 - deterministic reviewed candidate revision IDs;
 - acceptance-plan fingerprint;
-- reviewed session `draft_graph_json` input fingerprint;
-- later reviewed-plan query verification.
+- reviewed session input fingerprint;
+- reviewed-plan query verification.
 
-Two otherwise identical reviews using different Map Revisions must produce different reviewed identities and fingerprints.
+Different exact contexts must produce different IDs and fingerprints.
 
-### 4. Candidate provenance remains unchanged
+### Candidate provenance
 
-Do not change:
+Do not change candidate source kinds, source-reference schemas, candidate-key calculation, duplicate-source protection or stock identity ownership.
 
-- candidate source kinds;
-- candidate source-reference schemas;
-- candidate-key calculation;
-- duplicate-source protection;
-- stock identity ownership.
+Candidate provenance answers why a company was proposed. Owner Context answers where accepted owner operations occur.
 
-Candidate provenance explains why a company was proposed. Owner Context explains where accepted Stage 1 owner operations occur. These meanings remain separate.
+### Acceptance enforcement
 
-### 5. Context options are exact persisted records
+The workbench starts only from fingerprint-verified `reviewed_plan.owner_context` and restricts Stage 1 records to the exact Case/Map/Map Revision.
 
-The future review surface must return bounded exact Owner Context options from persisted visible records:
+Frozen stocks are used only for exact member validation and context-local reuse/create/append options. Stock overlap, maximum coverage and unique reachability never select context.
+
+The owner-acceptance core must reject any flat DTO Case/Map/Map Revision/map-mode value that differs from the frozen reviewed context. HTTP-only validation is insufficient.
+
+The existing flat owner-acceptance DTO and `aquantai.industry-thesis-owner-acceptance-plan.v1` remain unchanged.
+
+## Legacy behavior
+
+### Unaccepted v1 reviewed plan
+
+A v1 `reviewed_plan_ready` record without Owner Context fails closed for acceptance, even when exactly one same-stock Stage 1 context is reachable.
+
+Recovery is locked to a bounded extension of the existing `review_candidates` command, not a second command owner:
+
+- source must be the exact latest `reviewed_plan_ready` v1 revision;
+- no accepted output may exist;
+- complete latest candidate decisions must be explicitly resubmitted;
+- one exact Owner Context must be explicitly selected;
+- command writes one new v2 reviewed session revision and reviewed candidate revisions;
+- old v1 history remains immutable and reopenable;
+- v2-to-v2 context-only upgrade is rejected unless a separately valid review revision changes accepted meaning.
+
+### Already accepted v1 output
+
+Existing v1-sourced `accepted_outputs_linked` results remain exactly readable.
+
+Exact idempotent replay is required to return the original accepted output with zero new writes when reviewed revision, owner-plan fingerprint, reviewed-plan fingerprint and accepted Case/Map/Map Revision all match. Conflicting replay remains blocked.
+
+## Chronology
+
+At review time:
 
 ```text
-ResearchCase
-  -> IndustryMap
-  -> IndustryMapRevision
+map revision cutoff <= exact thesis cutoff
+map revision recorded time <= review operation recorded time
 ```
 
-Eligibility:
+The v2 plan recorded boundary is the maximum visible recorded time across the source thesis revision, reviewed candidate source revisions and selected Map Revision.
 
-- Map Revision exists;
-- Map and Case foreign-key graph is complete;
-- `information_cutoff_date <= exact thesis cutoff`;
-- `recorded_at_utc <= explicit review recorded boundary`;
-- no rejected/deleted/fuzzy/Provider-derived option;
-- every option includes ordinary labels plus technical IDs under progressive details.
+At read time, the reviewed revision, plan boundary and exact context must all be visible under both caller boundaries. No latest fallback is permitted.
 
-No option is selected by company overlap, candidate source, name similarity, ticker, maximum coverage, unique reachability, Provider output or AI.
-
-The ordinary user must explicitly select and confirm one option. No hidden default is accepted.
-
-### 6. Acceptance workbench and core enforcement
-
-The workbench must start from fingerprint-verified `reviewed_plan.owner_context` and restrict every Stage 1 query to:
+## Persistence and downgrade
 
 ```text
-case_id == reviewed owner context case
-map_id == reviewed owner context map
-selected_map_revision_id == reviewed owner context revision
-```
-
-Frozen stock IDs are used only to:
-
-- confirm exact selected member identity;
-- find exact reuse/append options inside the reviewed context;
-- populate exact create source/code;
-- reject duplicate or mismatched owner bindings.
-
-The owner-acceptance core must compare the submitted flat DTO fields against the frozen reviewed context. HTTP validation alone is insufficient.
-
-### 7. Existing flat owner-acceptance DTO remains unchanged
-
-The accepted core DTO continues to contain:
-
-```text
-research_case_id
-map_mode
-industry_map_id
-industry_map_revision_id
-```
-
-The values must come only from the reviewed plan. The UI may not edit them, and every caller is rejected on substitution.
-
-The existing owner-acceptance plan version and output-link schema remain unchanged unless implementation proves a separate version is strictly necessary. No wrapper or parallel DTO is introduced.
-
-### 8. Legacy behavior
-
-#### Unaccepted v1 reviewed plan
-
-A `reviewed_plan_ready` v1 plan without Owner Context fails closed for owner acceptance.
-
-Recovery is an explicit re-review that appends a new v2 reviewed session/candidate revision from the exact latest candidate universe and explicit context selection. No backfill or mutation of old history is allowed.
-
-#### Already accepted v1 output
-
-Existing `accepted_outputs_linked` history remains readable through exact output links.
-
-An exact idempotent replay may return the existing output only when all stored fingerprints and accepted map identities match. It must not create new owner writes or select a new context.
-
-### 9. Migration and persistence
-
-```text
-schema migration = none
+migration = none
 new table = none
 new database column = none
-history rewrite = none
 backfill = none
-new browser-local accepted identity = none
+history rewrite = none
+browser-owned accepted context = none
 ```
 
-The new plan object is persisted inside the existing canonical session revision JSON and included in existing fingerprints.
+The context is stored in the existing canonical reviewed session plan JSON.
 
-### 10. Downgrade boundary
-
-Before any v2 reviewed plan is written, code rollback is safe.
-
-After a v2 reviewed plan exists, running an older adapter that ignores `owner_context` is semantically unsafe because it could re-enable context inference. Required operational rule:
+Before the first v2 write, code rollback is safe. After any v2 reviewed plan exists, pre-v2 acceptance code is semantically unsafe because it may ignore the context and re-enable inference.
 
 ```text
 post-v2 downgrade = prohibited
-safe recovery = forward fix or restore a pre-v2 database snapshot
+safe recovery = forward fix or restore verified pre-v2 database snapshot
 ```
-
-The future implementation and release notes must state this semantic downgrade boundary even though no schema migration exists.
 
 ## Golden path
 
-One production-realistic offline path must prove:
+1. Three candidates retain distinct valid existing provenance references.
+2. Review view returns exact paginated Owner Context options.
+3. User explicitly selects one Map Revision.
+4. Review resolves Case/Map and writes one v2 plan.
+5. All three candidates coexist without candidate-key changes.
+6. Acceptance view reads only the frozen context.
+7. A reuses supported Stage 1 and exact semantic revision.
+8. B reuses/appends draft or disputed Stage 1.
+9. C creates/appends supported Stage 1 using exact frozen stock fields.
+10. Preview returns complete `3`, supported `2`, stable fingerprint and zero writes.
+11. Explicit commit creates one atomic exact output graph.
+12. Exact result reopens all members.
+13. No automatic Company Research, Investment Candidate, recommendation, portfolio or trading state is created.
 
-1. One exact session and candidate universe exist.
-2. Three company candidates retain distinct existing candidate source references.
-3. The review view lists one exact eligible Research Case / Map / Map Revision option.
-4. The user explicitly selects and confirms that Map Revision.
-5. Review appends a v2 reviewed plan containing one resolved Owner Context.
-6. All three selected candidates coexist without candidate-key collision.
-7. Acceptance view reads only Stage 1 records from the frozen context.
-8. Company A reuses supported Stage 1 and exact semantic revision.
-9. Company B reuses/appends draft or disputed Stage 1.
-10. Company C creates/appends supported Stage 1 using the frozen stock source/code.
-11. Preview produces complete count `3`, supported count `2` and a stable fingerprint with zero writes.
-12. Explicit commit creates one atomic exact output graph.
-13. Exact accepted result reopens all three members.
-14. No Company Research, Investment Candidate, recommendation, portfolio or trading state is created.
+A zero-supported path remains valid and still requires explicit context.
 
-A separate zero-supported path remains valid.
+## Decisive blocked path
 
-## Primary failure path
+Given a legacy v1 reviewed plan and one reachable same-stock Stage 1 context:
 
-A legacy v1 reviewed plan has one same-stock Stage 1 context reachable in the database but no frozen reviewed Owner Context.
+```text
+acceptance = blocked
+inferred context = none
+preview fingerprint = none
+writes = zero
+primary action = explicit v2 re-review
+```
 
-Required result:
-
-- acceptance view fails closed;
-- no context is inferred;
-- no preview fingerprint is returned;
-- no owner/session/pool/output write occurs;
-- ordinary recovery returns to explicit re-review and context selection;
-- old reviewed history remains reopenable.
-
-## Required future implementation files
+## Future implementation scope
 
 A separately authorized replacement Strict implementation may include bounded changes to:
 
@@ -280,95 +221,76 @@ A separately authorized replacement Strict implementation may include bounded ch
 industry_alpha/industry_thesis_review.py
 industry_alpha/industry_thesis_owner_acceptance.py
 industry_alpha/industry_thesis_owner_acceptance_workbench.py
-industry_alpha/industry_thesis_rules.py only if a neutral shared constant/normalizer is required
+industry_alpha/industry_thesis_rules.py only for a required neutral shared constant/normalizer
 backend/api/industry_analysis_review.py
 backend/api/industry_analysis_acceptance.py
 industry_analysis/static/review_result.html
 industry_analysis/static/review_result.js
 industry_analysis/static/owner_acceptance.html
 industry_analysis/static/owner_acceptance.js
-bounded review/acceptance tests
-scripts/run_industry_thesis_ordinary_user_acceptance_fixture.py
-.github/workflows/local-tests.yml only when adding the required offline demo without weakening checks
+bounded related tests and fixture demo
+.github/workflows/local-tests.yml only to add the demo without weakening checks
 ```
 
 No model, schema or migration file is expected.
 
-## Implementation-branch decision
+## Replacement implementation decision
 
-PR #241 must remain frozen and unmerged. It must not be resumed on its old exact base because the required reviewed-plan contract and implementation file families were not authorized by Issue #240.
+PR #241 remains frozen, Draft and unmerged. It is not resumed, rebased, force-pushed or silently updated.
 
-After this architecture is merged and the owner separately authorizes implementation:
+After architecture merge and separate owner authorization:
 
 1. create a new Strict implementation Issue;
-2. create a new branch from the then-current exact `main`;
-3. reapply only the still-valid bounded ordinary-user work from PR #241;
-4. add the v2 review/context contract and core enforcement;
+2. create a new branch from then-current exact `main`;
+3. reapply only still-valid bounded PR #241 work;
+4. implement reviewed-plan v2 and core context binding;
 5. open one new Draft replacement implementation PR;
-6. keep PR #241 open or close it only under separate explicit owner authorization.
+6. leave PR #241 open until the owner separately authorizes closure as superseded.
 
-No rebase, force-push, silent base update or direct merge from PR #241 is allowed.
-
-## Required validation for future implementation
+## Required future tests
 
 At minimum:
 
-- exact review-context option query and explicit selection;
-- strict review input unknown-field rejection;
+- exact paginated context options and explicit confirmation;
+- strict input and unknown-field rejection;
 - server-only Case/Map resolution;
-- v2 plan schema and version enforcement;
-- Owner Context in deterministic review ID seed and fingerprints;
+- v2 schema/version enforcement;
+- context included in deterministic IDs and fingerprints;
 - different contexts produce different IDs/fingerprints;
-- candidate source semantics and candidate keys remain unchanged;
-- three candidates using one global context coexist;
-- old v1 unaccepted plan fails closed even with one reachable Stage 1 context;
-- exact v1 accepted-result reopening;
-- exact idempotent v1 replay if preserved;
+- candidate provenance unchanged;
+- three candidates share one global context without collision;
+- legacy v1 unaccepted plan fails closed despite one reachable context;
+- bounded existing-command v1→v2 re-review;
+- exact v1 accepted-result read and idempotent replay;
 - context substitution rejected in core and HTTP layers;
-- Map/Case FK mismatch and missing rows fail closed;
-- information-cutoff and recorded-time violations fail closed;
-- workbench queries only the frozen exact context;
+- missing/corrupt/later Map/Case graph fails closed;
+- workbench excludes same-stock rows outside frozen context;
 - golden and zero-supported paths;
-- preview zero writes and atomic commit;
+- preview zero writes, atomic commit and conflict behavior;
 - query ceilings retained;
-- no migration/new persistence;
-- zero network, Provider, credential and AI paths;
+- no migration, network, Provider, credential or AI path;
 - no recommendation, target price, expected return, portfolio or trading language;
-- complete repository regression and all configured offline demos.
+- complete regression and all configured offline demos.
 
-## Locked exclusions
+## Locked exclusions and stop conditions
 
-No candidate-key redesign, candidate source reinterpretation, schema migration, new table/column, inferred legacy backfill, fuzzy identity bridge, new Industry Map facts, Provider/network access, AI call, automatic Company Research, Investment Candidate, ranking, recommendation, target price, expected return, position sizing, research holdings, portfolio, broker, order, trading, release, tag or version change.
+No candidate-key redesign, source reinterpretation, migration, table/column, inferred backfill, fuzzy identity bridge, new Industry Map facts, Provider/network/AI, automatic Company Research, Investment Candidate, ranking, recommendation, target price, expected return, position sizing, portfolio, broker, order, trading, release, tag or version change.
 
-## Stop conditions
-
-Stop and return for project-owner review if:
-
-- exact context options cannot be produced from persisted records without inference;
-- a migration or new database column is required;
-- candidate provenance semantics must be modified;
-- old reviewed history must be rewritten;
-- the existing flat owner-acceptance DTO must be weakened or duplicated;
-- safe implementation requires resuming or rebasing PR #241;
-- any Provider/network/AI/recommendation/portfolio/trading scope appears.
+Stop if exact options require inference, a database field is required, old history must be rewritten, the flat DTO must be weakened/duplicated, PR #241 must be resumed/rebased, or any prohibited scope appears.
 
 ## Delivery gates
 
-1. Documentation-only diff from exact base `41137ee6f017a781367b439f4119f201d05ce9cf`.
-2. One task snapshot and one focused architecture document.
-3. One Draft architecture PR linked to #242, #137, #238/#239 and #240/#241.
-4. Complete base-to-head inventory limited to the two authorized files.
-5. Documentation/repository CI passes at one exact immutable HEAD.
-6. Fresh process-independent fixed-head architecture review contains exactly:
+- exact base `41137ee6f017a781367b439f4119f201d05ce9cf`;
+- exactly the two authorized documentation files;
+- Draft PR linked to #242, #137, #238/#239 and #240/#241;
+- exact immutable HEAD CI success;
+- zero unresolved threads;
+- process-independent review containing exactly:
 
 ```text
 AUTHORIZED OWNER CONTEXT REVIEWED-PLAN CONTRACT PREFLIGHT APPROVED at fixed head <FULL_HEAD_SHA>
 ```
 
-7. Zero unresolved review threads.
-8. Separate explicit project-owner authorization before merge.
-9. Any new commit invalidates prior exact-head CI and review evidence.
+- separate owner authorization before merge.
 
-## Completion boundary
-
-Architecture approval does not authorize merge, Issue closure, duplicate Issue closure, PR #241 closure, production implementation, resuming PR #241, release, tag, version change or a later roadmap phase.
+Architecture approval does not authorize merge, Issue closure, duplicate Issue closure, PR #241 closure, production implementation, release, tag, version change or a later roadmap phase.
