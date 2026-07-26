@@ -43,6 +43,12 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     reviewed = (
         root / "industry_analysis" / "static" / "review_result.js"
     ).read_text(encoding="utf-8")
+    history_guard = (
+        root
+        / "industry_analysis"
+        / "static"
+        / "workbench_phase2b_history_guard.js"
+    ).read_text(encoding="utf-8")
 
     forbidden = (
         'fetch("http',
@@ -54,7 +60,11 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
         "target price",
         "expected return",
     )
-    assert all(token not in script for script in (acceptance, result) for token in forbidden)
+    assert all(
+        token not in script
+        for script in (acceptance, result, history_guard)
+        for token in forbidden
+    )
     assert "window.confirm" in acceptance
     assert "preview_fingerprint_sha256" in acceptance
     assert "owner_context.research_case_id" in acceptance
@@ -70,3 +80,11 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     assert "aquantai.industry-thesis-acceptance-plan.v2" in reviewed
     assert "owner-acceptance-link" in reviewed
     assert "/acceptance?" in reviewed
+
+    assert 'workflow_state !== "accepted_outputs_linked"' in history_guard
+    assert 'kind: "accepted_result"' in history_guard
+    assert 'label: "查看已接受成果"' in history_guard
+    assert "/accepted-result?" in history_guard
+    assert "as_of_cutoff" in history_guard
+    assert "as_of_recorded_at_utc" in history_guard
+    assert "latest" not in history_guard.lower()
