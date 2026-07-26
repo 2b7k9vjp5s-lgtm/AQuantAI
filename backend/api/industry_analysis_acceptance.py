@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import event
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -50,6 +51,41 @@ _ALLOWED_ORDINARY_SEMANTIC_OPERATIONS = {
     "none",
     "reuse_exact_semantic_revision",
 }
+
+
+@dataclass
+class _LoadedAcceptanceGraph:
+    beneficiaries: dict[UUID, Stage1Beneficiary] = field(default_factory=dict)
+    beneficiary_revisions: dict[UUID, Stage1BeneficiaryRevision] = field(
+        default_factory=dict
+    )
+    candidate_pools: dict[UUID, Stage1CandidatePool] = field(default_factory=dict)
+    candidate_pool_revisions: dict[UUID, Stage1CandidatePoolRevision] = field(
+        default_factory=dict
+    )
+    candidate_pool_memberships: dict[UUID, Stage1CandidatePoolMembership] = field(
+        default_factory=dict
+    )
+    company_research: dict[UUID, Stage2CompanyResearch] = field(default_factory=dict)
+    company_research_revisions: dict[UUID, Stage2CompanyResearchRevision] = field(
+        default_factory=dict
+    )
+
+    def capture(self, instance: object) -> None:
+        if isinstance(instance, Stage1Beneficiary):
+            self.beneficiaries[instance.id] = instance
+        elif isinstance(instance, Stage1BeneficiaryRevision):
+            self.beneficiary_revisions[instance.id] = instance
+        elif isinstance(instance, Stage1CandidatePool):
+            self.candidate_pools[instance.id] = instance
+        elif isinstance(instance, Stage1CandidatePoolRevision):
+            self.candidate_pool_revisions[instance.id] = instance
+        elif isinstance(instance, Stage1CandidatePoolMembership):
+            self.candidate_pool_memberships[instance.id] = instance
+        elif isinstance(instance, Stage2CompanyResearch):
+            self.company_research[instance.id] = instance
+        elif isinstance(instance, Stage2CompanyResearchRevision):
+            self.company_research_revisions[instance.id] = instance
 
 
 class _StrictModel(BaseModel):
@@ -170,8 +206,25 @@ def _validate_ordinary_semantic_modes(
             )
 
 
-def _require_single_exact_owner_context(
+def _capture_workbench_call(
     session: Session,
+    call: Any,
+) -> tuple[dict[str, Any], _LoadedAcceptanceGraph]:
+    graph = _LoadedAcceptanceGraph()
+
+    def loaded(_session: Session, instance: object) -> None:
+        graph.capture(instance)
+
+    event.listen(session, "loaded_as_persistent", loaded)
+    try:
+        result = call()
+    finally:
+        event.remove(session, "loaded_as_persistent", loaded)
+    return result, graph
+
+
+def _require_single_exact_owner_context(
+    graph: _LoadedAcceptanceGraph,
     view: dict[str, Any],
     *,
     as_of_cutoff: date,
@@ -191,28 +244,28 @@ def _require_single_exact_owner_context(
             "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
             "reviewed result does not freeze a reachable owner context",
         )
-    context_rows = session.execute(
-        select(
-            Stage1Beneficiary.case_id,
-            Stage1Beneficiary.map_id,
-            Stage1BeneficiaryRevision.selected_map_revision_id,
+    contexts: set[tuple[UUID, UUID, UUID]] = set()
+    for revision in graph.beneficiary_revisions.values():
+        if (
+            revision.stock_basic_record_id not in stock_ids
+            or revision.assessment_status == "rejected"
+            or revision.information_cutoff_date > as_of_cutoff
+            or stored_utc(revision.recorded_at_utc) > as_of_recorded_at_utc
+        ):
+            continue
+        beneficiary = graph.beneficiaries.get(revision.beneficiary_id)
+        if beneficiary is None:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "loaded Stage 1 revision is missing its exact beneficiary identity",
+            )
+        contexts.add(
+            (
+                beneficiary.case_id,
+                beneficiary.map_id,
+                revision.selected_map_revision_id,
+            )
         )
-        .join(
-            Stage1BeneficiaryRevision,
-            Stage1BeneficiaryRevision.beneficiary_id == Stage1Beneficiary.id,
-        )
-        .where(
-            Stage1BeneficiaryRevision.stock_basic_record_id.in_(stock_ids),
-            Stage1BeneficiaryRevision.assessment_status != "rejected",
-            Stage1BeneficiaryRevision.information_cutoff_date <= as_of_cutoff,
-            Stage1BeneficiaryRevision.recorded_at_utc <= as_of_recorded_at_utc,
-        )
-        .distinct()
-    ).all()
-    contexts = {
-        (row.case_id, row.map_id, row.selected_map_revision_id)
-        for row in context_rows
-    }
     if len(contexts) != 1:
         raise IndustryThesisOwnerAcceptanceError(
             "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
@@ -247,16 +300,18 @@ def _load_exact_acceptance_view(
     as_of_cutoff: date,
     as_of_recorded_at_utc: datetime,
 ) -> dict[str, Any]:
-    view = IndustryThesisOwnerAcceptanceWorkbenchQueryService(
-        session
-    ).get_acceptance_view(
-        session_id=session_id,
-        reviewed_session_revision_id=reviewed_session_revision_id,
-        as_of_cutoff=as_of_cutoff,
-        as_of_recorded_at_utc=as_of_recorded_at_utc,
+    service = IndustryThesisOwnerAcceptanceWorkbenchQueryService(session)
+    view, graph = _capture_workbench_call(
+        session,
+        lambda: service.get_acceptance_view(
+            session_id=session_id,
+            reviewed_session_revision_id=reviewed_session_revision_id,
+            as_of_cutoff=as_of_cutoff,
+            as_of_recorded_at_utc=as_of_recorded_at_utc,
+        ),
     )
     _require_single_exact_owner_context(
-        session,
+        graph,
         view,
         as_of_cutoff=as_of_cutoff,
         as_of_recorded_at_utc=as_of_recorded_at_utc,
@@ -392,7 +447,7 @@ def _validate_reuse_pool_selection(
 
 
 def _apply_exact_company_research_readiness(
-    session: Session,
+    graph: _LoadedAcceptanceGraph,
     result: dict[str, Any],
     *,
     as_of_cutoff: date,
@@ -415,66 +470,61 @@ def _apply_exact_company_research_readiness(
     ] = {}
     if pool_revision_text is not None and supported:
         pool_revision_id = UUID(pool_revision_text)
-        supported_ids = {
-            UUID(member["beneficiary_revision_id"]) for member in supported
+        pool_revision = graph.candidate_pool_revisions.get(pool_revision_id)
+        pool = (
+            None
+            if pool_revision is None
+            else graph.candidate_pools.get(pool_revision.candidate_pool_id)
+        )
+        if pool_revision is None or pool is None:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "accepted pool graph was not loaded with the exact result",
+            )
+        memberships = {
+            membership.beneficiary_revision_id: membership
+            for membership in graph.candidate_pool_memberships.values()
+            if membership.candidate_pool_revision_id == pool_revision_id
         }
-        rows = session.execute(
-            select(
-                Stage2CompanyResearch,
-                Stage2CompanyResearchRevision,
-                Stage1CandidatePoolMembership,
-                Stage1CandidatePoolRevision,
-                Stage1CandidatePool,
-            )
-            .join(
-                Stage2CompanyResearchRevision,
-                Stage2CompanyResearchRevision.company_research_id
-                == Stage2CompanyResearch.id,
-            )
-            .join(
-                Stage1CandidatePoolMembership,
-                Stage1CandidatePoolMembership.id
-                == Stage2CompanyResearch.candidate_pool_membership_id,
-            )
-            .join(
-                Stage1CandidatePoolRevision,
-                Stage1CandidatePoolRevision.id
-                == Stage2CompanyResearch.candidate_pool_revision_id,
-            )
-            .join(
-                Stage1CandidatePool,
-                Stage1CandidatePool.id
-                == Stage2CompanyResearch.candidate_pool_id,
-            )
-            .where(
-                Stage2CompanyResearch.candidate_pool_revision_id
-                == pool_revision_id,
-                Stage2CompanyResearch.beneficiary_revision_id.in_(supported_ids),
-                Stage2CompanyResearchRevision.information_cutoff_date
-                <= as_of_cutoff,
-                Stage2CompanyResearchRevision.recorded_at_utc
-                <= as_of_recorded_at_utc,
-            )
-        ).all()
         member_by_revision = {
             UUID(member["beneficiary_revision_id"]): member for member in supported
         }
+        if set(memberships) != set(member_by_revision):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "accepted pool membership differs from supported output membership",
+            )
         technical = result.get("technical_details") or {}
         expected_case_id = UUID(technical["research_case_id"])
         expected_map_id = UUID(technical["industry_map_id"])
         expected_map_revision_id = UUID(technical["industry_map_revision_id"])
-        for research, revision, membership, pool_revision, pool in rows:
+        revisions_by_research: dict[
+            UUID, list[Stage2CompanyResearchRevision]
+        ] = {}
+        for revision in graph.company_research_revisions.values():
+            if (
+                revision.information_cutoff_date <= as_of_cutoff
+                and stored_utc(revision.recorded_at_utc)
+                <= as_of_recorded_at_utc
+            ):
+                revisions_by_research.setdefault(
+                    revision.company_research_id, []
+                ).append(revision)
+        for research in graph.company_research.values():
             member = member_by_revision.get(research.beneficiary_revision_id)
             if member is None:
-                raise IndustryThesisOwnerAcceptanceError(
-                    "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
-                )
+                continue
+            membership = memberships[research.beneficiary_revision_id]
             if (
-                membership.candidate_pool_revision_id != pool_revision_id
+                research.candidate_pool_revision_id != pool_revision_id
+                or research.candidate_pool_membership_id != membership.id
+                or research.candidate_pool_id != pool.id
+            ):
+                continue
+            if (
+                membership.beneficiary_id != research.beneficiary_id
                 or membership.beneficiary_revision_id
                 != research.beneficiary_revision_id
-                or pool_revision.candidate_pool_id != pool.id
-                or research.candidate_pool_id != pool.id
                 or pool.case_id != expected_case_id
                 or pool.map_id != expected_map_id
                 or pool_revision.selected_map_revision_id
@@ -493,13 +543,17 @@ def _apply_exact_company_research_readiness(
                     "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
                     "Company Research is not attached through the exact accepted pool membership",
                 )
+            revisions = revisions_by_research.get(research.id, [])
+            if not revisions:
+                continue
+            latest_revision = max(revisions, key=lambda item: item.revision_no)
             current = latest_by_beneficiary_revision.get(
                 research.beneficiary_revision_id
             )
-            if current is None or revision.revision_no > current[1].revision_no:
+            if current is None or latest_revision.revision_no > current[1].revision_no:
                 latest_by_beneficiary_revision[
                     research.beneficiary_revision_id
-                ] = (research, revision)
+                ] = (research, latest_revision)
 
     company_ready_count = 0
     semantic_covered_count = 0
@@ -549,6 +603,10 @@ def _apply_exact_company_research_readiness(
             and company_state["state"] != "missing"
         )
 
+    supported_members = [
+        member for member in members if member.get("included_in_supported_handoff")
+    ]
+    result["supported_handoff_members"] = supported_members
     largest_gap = "暂无"
     if company_ready_count < len(members):
         largest_gap = "部分成员尚未建立精确候选池归属的 Company Research"
@@ -559,7 +617,7 @@ def _apply_exact_company_research_readiness(
     result["largest_missing_prerequisite"] = largest_gap
     result["facts"] = [
         {"label": "完整成员", "value": len(members)},
-        {"label": "supported 后续研究", "value": len(supported)},
+        {"label": "supported 后续研究", "value": len(supported_members)},
         {
             "label": "草稿或争议成员",
             "value": result.get("draft_or_disputed_count", 0),
@@ -771,16 +829,18 @@ def get_accepted_result_view(
 ) -> dict[str, Any]:
     try:
         with session_factory() as session:
-            result = IndustryThesisOwnerAcceptanceWorkbenchQueryService(
-                session
-            ).get_accepted_result_view(
-                session_id=session_id,
-                accepted_session_revision_id=accepted_session_revision_id,
-                as_of_cutoff=as_of_cutoff,
-                as_of_recorded_at_utc=as_of_recorded_at_utc,
+            service = IndustryThesisOwnerAcceptanceWorkbenchQueryService(session)
+            result, graph = _capture_workbench_call(
+                session,
+                lambda: service.get_accepted_result_view(
+                    session_id=session_id,
+                    accepted_session_revision_id=accepted_session_revision_id,
+                    as_of_cutoff=as_of_cutoff,
+                    as_of_recorded_at_utc=as_of_recorded_at_utc,
+                ),
             )
             return _apply_exact_company_research_readiness(
-                session,
+                graph,
                 result,
                 as_of_cutoff=as_of_cutoff,
                 as_of_recorded_at_utc=as_of_recorded_at_utc,
