@@ -87,4 +87,5 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     assert "/accepted-result?" in history_guard
     assert "as_of_cutoff" in history_guard
     assert "as_of_recorded_at_utc" in history_guard
-    assert "latest" not in history_guard.lower()
+    assert "window.location.assign" not in history_guard
+    assert "visible_latest_revision_id" in history_guard
