@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/industry-analysis/static/workbench.css">
   <link rel="stylesheet" href="/industry-analysis/static/review_result.css">
   <link rel="stylesheet" href="/industry-analysis/static/owner_acceptance.css">
+  <link rel="stylesheet" href="/industry-analysis/static/accepted_result_assembly.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -19,20 +20,55 @@
         <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
         <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
       </nav>
-      <div class="sidebar-note"><strong>不可变成果</strong><p>本页读取精确 accepted session 和 output link，不会移动到最新版本。</p></div>
+      <div class="sidebar-note"><strong>两层结果</strong><p>已接受研究是不可变历史；候选快照是用户另行选择的只读覆盖层。</p></div>
     </aside>
     <div class="app-main">
       <header class="topbar">
-        <div><p class="eyebrow">EXACT ACCEPTED OUTPUT · READ ONLY</p><p class="page-context">已接受研究成果</p></div>
+        <div><p class="eyebrow">EXACT ACCEPTED OUTPUT · OPTIONAL EXACT OVERLAY</p><p class="page-context">已接受研究成果</p></div>
         <div class="topbar-actions"><span id="page-state" class="status-pill">正在验证精确成果</span><a class="button" href="/industry-analysis">返回研究历史</a></div>
       </header>
       <main id="main-content" tabindex="-1" class="accepted-result-page">
-        <section class="page-heading"><div><p class="eyebrow">COMPLETE UNRANKED RESULT</p><h1 id="result-title">已接受研究成果</h1><p>完整成员与 supported 后续研究集合分开显示，不应用排名或评分。</p></div></section>
+        <section class="page-heading"><div><p class="eyebrow">ACCEPTED HISTORY + USER-SELECTED CURRENT SNAPSHOT</p><h1 id="result-title">已接受研究成果</h1><p>完整已接受研究与当前候选快照分层显示；页面不会自动选择、重算或改写历史。</p></div></section>
+
+        <section class="layer-explainer" aria-label="结果含义说明">
+          <article><span class="layer-label is-accepted">已接受研究快照</span><h2>不可变研究历史</h2><p>来自一个精确 Output Link Revision，包含完整成员、精确产业地图版本和接受时的准备度。</p></article>
+          <article><span class="layer-label is-overlay">当前候选覆盖层</span><h2>显式选择的研究优先级快照</h2><p>仅在用户选择一个精确 Candidate Snapshot Revision 后显示，不属于接受时历史。</p></article>
+        </section>
+
         <section class="notice-panel"><strong>研究用途，不构成投资建议</strong><p id="coverage-notice">正在读取覆盖说明。</p></section>
-        <section class="panel" aria-labelledby="facts-title"><div class="panel-heading"><div><h2 id="facts-title">成果摘要</h2><p>所有数字均来自精确 output graph 与 readiness 查询。</p></div></div><div id="facts-grid" class="facts-grid"></div><p id="largest-gap" class="muted-copy"></p></section>
-        <section class="panel" aria-labelledby="complete-title"><div class="panel-heading"><div><h2 id="complete-title">完整已接受成员</h2><p>draft 和 disputed 成员不会因未进入后续研究池而消失。</p></div><span id="complete-count" class="group-count">0</span></div><div id="complete-members"></div></section>
-        <section class="panel" aria-labelledby="supported-title"><div class="panel-heading"><div><h2 id="supported-title">supported 后续研究</h2><p>仅包含最终 Stage 1 状态为 supported 的精确成员。</p></div><span id="supported-count" class="group-count">0</span></div><div id="supported-members"></div></section>
-        <section class="panel technical-details"><details><summary>查看精确输出、Owner Context 和指纹</summary><pre id="result-technical" class="json-block"></pre></details></section>
+
+        <section class="panel" aria-labelledby="facts-title">
+          <div class="panel-heading"><div><h2 id="facts-title">结论摘要</h2><p>每张卡片标明来源层；候选状态只来自所选精确快照。</p></div></div>
+          <div id="facts-grid" class="facts-grid"></div>
+          <p id="largest-gap" class="muted-copy"></p>
+        </section>
+
+        <section class="panel" aria-labelledby="map-title">
+          <div class="panel-heading"><div><h2 id="map-title">精确产业链上下文</h2><p>只读取已接受 Output Link 冻结的 Map Revision；不使用最新版本回退。</p></div><span id="map-revision-label" class="group-count">—</span></div>
+          <div id="map-summary" class="map-summary"></div>
+          <div class="map-columns">
+            <div><h3>节点</h3><div id="map-nodes" class="map-list"></div></div>
+            <div><h3>关系</h3><div id="map-relationships" class="map-list"></div></div>
+            <div><h3>驱动与瓶颈</h3><div id="map-observations" class="map-list"></div></div>
+          </div>
+        </section>
+
+        <section class="panel candidate-overlay-panel" aria-labelledby="overlay-title">
+          <div class="panel-heading"><div><h2 id="overlay-title">当前候选覆盖层</h2><p>候选快照按精确候选池、用途、规则版本和双时间边界列出；即使只有一个也不会自动选择。</p></div><span id="overlay-state" class="group-count">未选择</span></div>
+          <div class="snapshot-picker">
+            <label for="snapshot-select">选择一个精确候选快照</label>
+            <select id="snapshot-select" disabled><option value="">不显示候选覆盖层</option></select>
+            <button id="apply-snapshot" class="button" type="button" disabled>应用选择</button>
+            <button id="clear-snapshot" class="button button-secondary" type="button" disabled>移除覆盖层</button>
+          </div>
+          <p id="snapshot-help" class="muted-copy">正在读取精确候选快照选项。</p>
+          <div id="candidate-highlights" class="candidate-highlights"></div>
+          <div id="candidate-overlay-details"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="complete-title"><div class="panel-heading"><div><h2 id="complete-title">完整已接受成员</h2><p>这是外层权威集合；draft、disputed、无候选状态或证据不足的成员都不会消失。</p></div><span id="complete-count" class="group-count">0</span></div><div id="complete-members"></div></section>
+        <section class="panel" aria-labelledby="supported-title"><div class="panel-heading"><div><h2 id="supported-title">supported 后续研究</h2><p>仅表示接受时进入精确 Candidate Pool 的成员，不等同于当前候选评级。</p></div><span id="supported-count" class="group-count">0</span></div><div id="supported-members"></div></section>
+        <section class="panel technical-details"><details><summary>查看精确 Output Link、Map Revision、候选快照和双时间边界</summary><pre id="result-technical" class="json-block"></pre></details></section>
         <p id="result-status" class="status-message" role="status" aria-live="polite"></p>
       </main>
     </div>
