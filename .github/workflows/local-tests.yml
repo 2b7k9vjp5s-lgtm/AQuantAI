@@ -42,131 +42,111 @@ jobs:
           from pathlib import Path
 
           path = Path("industry_alpha/industry_thesis_owner_acceptance_workbench.py")
-          text = path.read_text(encoding="utf-8")
-          old_context = '''        best_size = max(len(values) for values in context_coverage.values())
-                  best_contexts = [
-                      key for key, values in context_coverage.items() if len(values) == best_size
-                  ]
-                  if len(best_contexts) != 1:
-                      raise IndustryThesisOwnerAcceptanceError(
-                          "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
-                          "multiple exact case/map contexts are equally compatible",
-                      )
-                  case_id, map_id, map_revision_id = best_contexts[0]
-          '''
-          new_context = '''        if len(context_coverage) != 1:
-                      raise IndustryThesisOwnerAcceptanceError(
-                          "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
-                          "multiple exact case/map contexts are reachable for the frozen identities",
-                      )
-                  selected_context, compatible_stock_ids = next(iter(context_coverage.items()))
-                  case_id, map_id, map_revision_id = selected_context
-          '''
-          old_research = '''        research_rows = list(
-                      self._session.execute(
-                          select(Stage2CompanyResearch, Stage2CompanyResearchRevision)
-                          .join(
-                              Stage2CompanyResearchRevision,
-                              Stage2CompanyResearchRevision.company_research_id
-                              == Stage2CompanyResearch.id,
-                          )
-                          .where(
-                              Stage2CompanyResearch.beneficiary_revision_id.in_(revision_ids),
-                              Stage2CompanyResearchRevision.information_cutoff_date <= as_of_cutoff,
-                              Stage2CompanyResearchRevision.recorded_at_utc <= recorded_boundary,
-                          )
-                          .order_by(
-                              Stage2CompanyResearch.id,
-                              Stage2CompanyResearchRevision.revision_no,
-                          )
-                      )
-                  )
-          '''
-          new_research = '''        research_rows: list[
-                      tuple[Stage2CompanyResearch, Stage2CompanyResearchRevision]
-                  ] = []
-                  if pool is not None and pool_revision is not None:
-                      research_rows = list(
-                          self._session.execute(
-                              select(Stage2CompanyResearch, Stage2CompanyResearchRevision)
-                              .join(
-                                  Stage2CompanyResearchRevision,
-                                  Stage2CompanyResearchRevision.company_research_id
-                                  == Stage2CompanyResearch.id,
-                              )
-                              .join(
-                                  Stage1CandidatePoolMembership,
-                                  Stage1CandidatePoolMembership.id
-                                  == Stage2CompanyResearch.candidate_pool_membership_id,
-                              )
-                              .where(
-                                  Stage2CompanyResearch.candidate_pool_id == pool.id,
-                                  Stage2CompanyResearch.candidate_pool_revision_id
-                                  == pool_revision.id,
-                                  Stage1CandidatePoolMembership.candidate_pool_revision_id
-                                  == pool_revision.id,
-                                  Stage1CandidatePoolMembership.beneficiary_id
-                                  == Stage2CompanyResearch.beneficiary_id,
-                                  Stage1CandidatePoolMembership.beneficiary_revision_id
-                                  == Stage2CompanyResearch.beneficiary_revision_id,
-                                  Stage2CompanyResearch.case_id == research_case.id,
-                                  Stage2CompanyResearch.map_id == industry_map.id,
-                                  Stage2CompanyResearch.selected_map_revision_id
-                                  == map_revision.id,
-                                  Stage2CompanyResearch.beneficiary_revision_id.in_(revision_ids),
-                                  Stage2CompanyResearchRevision.information_cutoff_date
-                                  <= as_of_cutoff,
-                                  Stage2CompanyResearchRevision.recorded_at_utc
-                                  <= recorded_boundary,
-                              )
-                              .order_by(
-                                  Stage2CompanyResearch.id,
-                                  Stage2CompanyResearchRevision.revision_no,
-                              )
-                          )
-                      )
-          '''
-          old_company = '''            company_pair = latest_research.get(revision.id)
-                      company_state = (
-          '''
-          new_company = '''            company_pair = latest_research.get(revision.id)
-                      if company_pair is not None and (
-                          company_pair[0].beneficiary_id != beneficiary.id
-                          or company_pair[0].beneficiary_revision_id != revision.id
-                          or company_pair[0].stock_basic_record_id
-                          != revision.stock_basic_record_id
-                          or company_pair[0].case_id != research_case.id
-                          or company_pair[0].map_id != industry_map.id
-                          or company_pair[0].selected_map_revision_id != map_revision.id
-                      ):
-                          raise IndustryThesisOwnerAcceptanceError(
-                              "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
-                          )
-                      company_state = (
-          '''
+          lines = path.read_text(encoding="utf-8").splitlines()
 
-          if old_context in text:
-              text = text.replace(old_context, new_context, 1)
-              text = text.replace("            == best_contexts[0]\n", "            == selected_context\n", 1)
-              text = text.replace(
-                  '                    "compatible_frozen_stock_count": best_size,\n',
-                  '                    "compatible_frozen_stock_count": len(compatible_stock_ids),\n',
-                  1,
+          if any("best_size = max" in line for line in lines):
+              start = next(i for i, line in enumerate(lines) if "best_size = max" in line)
+              end = next(
+                  i for i in range(start, len(lines))
+                  if "case_id, map_id, map_revision_id = best_contexts[0]" in lines[i]
               )
-          elif "selected_context, compatible_stock_ids" not in text:
+              lines[start : end + 1] = [
+                  "        if len(context_coverage) != 1:",
+                  "            raise IndustryThesisOwnerAcceptanceError(",
+                  '                "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",',
+                  '                "multiple exact case/map contexts are reachable for the frozen identities",',
+                  "            )",
+                  "        selected_context, compatible_stock_ids = next(iter(context_coverage.items()))",
+                  "        case_id, map_id, map_revision_id = selected_context",
+              ]
+              lines = [
+                  line.replace("== best_contexts[0]", "== selected_context")
+                  .replace(
+                      '"compatible_frozen_stock_count": best_size,',
+                      '"compatible_frozen_stock_count": len(compatible_stock_ids),',
+                  )
+                  for line in lines
+              ]
+          elif not any("selected_context, compatible_stock_ids" in line for line in lines):
               raise SystemExit("owner-context source did not match either accepted state")
 
-          if old_research in text:
-              text = text.replace(old_research, new_research, 1)
-          elif "Stage2CompanyResearch.candidate_pool_membership_id" not in text:
+          if any(line == "        research_rows = list(" for line in lines):
+              start = next(i for i, line in enumerate(lines) if line == "        research_rows = list(")
+              end = next(
+                  i for i in range(start, len(lines))
+                  if lines[i].startswith("        latest_research:")
+              )
+              replacement = '''        research_rows: list[
+            tuple[Stage2CompanyResearch, Stage2CompanyResearchRevision]
+        ] = []
+        if pool is not None and pool_revision is not None:
+            research_rows = list(
+                self._session.execute(
+                    select(Stage2CompanyResearch, Stage2CompanyResearchRevision)
+                    .join(
+                        Stage2CompanyResearchRevision,
+                        Stage2CompanyResearchRevision.company_research_id
+                        == Stage2CompanyResearch.id,
+                    )
+                    .join(
+                        Stage1CandidatePoolMembership,
+                        Stage1CandidatePoolMembership.id
+                        == Stage2CompanyResearch.candidate_pool_membership_id,
+                    )
+                    .where(
+                        Stage2CompanyResearch.candidate_pool_id == pool.id,
+                        Stage2CompanyResearch.candidate_pool_revision_id
+                        == pool_revision.id,
+                        Stage1CandidatePoolMembership.candidate_pool_revision_id
+                        == pool_revision.id,
+                        Stage1CandidatePoolMembership.beneficiary_id
+                        == Stage2CompanyResearch.beneficiary_id,
+                        Stage1CandidatePoolMembership.beneficiary_revision_id
+                        == Stage2CompanyResearch.beneficiary_revision_id,
+                        Stage2CompanyResearch.case_id == research_case.id,
+                        Stage2CompanyResearch.map_id == industry_map.id,
+                        Stage2CompanyResearch.selected_map_revision_id
+                        == map_revision.id,
+                        Stage2CompanyResearch.beneficiary_revision_id.in_(revision_ids),
+                        Stage2CompanyResearchRevision.information_cutoff_date
+                        <= as_of_cutoff,
+                        Stage2CompanyResearchRevision.recorded_at_utc
+                        <= recorded_boundary,
+                    )
+                    .order_by(
+                        Stage2CompanyResearch.id,
+                        Stage2CompanyResearchRevision.revision_no,
+                    )
+                )
+            )'''.splitlines()
+              lines[start:end] = replacement
+          elif not any(
+              "Stage2CompanyResearch.candidate_pool_membership_id" in line
+              for line in lines
+          ):
               raise SystemExit("Company Research source did not match either accepted state")
 
-          if old_company in text:
-              text = text.replace(old_company, new_company, 1)
-          elif "company_pair[0].beneficiary_revision_id != revision.id" not in text:
+          marker = "            company_pair = latest_research.get(revision.id)"
+          guard_marker = "                company_pair[0].beneficiary_revision_id != revision.id"
+          if marker in lines and guard_marker not in lines:
+              index = lines.index(marker) + 1
+              guard = '''            if company_pair is not None and (
+                company_pair[0].beneficiary_id != beneficiary.id
+                or company_pair[0].beneficiary_revision_id != revision.id
+                or company_pair[0].stock_basic_record_id
+                != revision.stock_basic_record_id
+                or company_pair[0].case_id != research_case.id
+                or company_pair[0].map_id != industry_map.id
+                or company_pair[0].selected_map_revision_id != map_revision.id
+            ):
+                raise IndustryThesisOwnerAcceptanceError(
+                    "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
+                )'''.splitlines()
+              lines[index:index] = guard
+          elif guard_marker not in lines:
               raise SystemExit("Company Research member guard did not match either accepted state")
 
-          path.write_text(text, encoding="utf-8")
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
           python -m py_compile industry_alpha/industry_thesis_owner_acceptance_workbench.py
           if ! git diff --quiet -- industry_alpha/industry_thesis_owner_acceptance_workbench.py; then
