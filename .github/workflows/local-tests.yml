@@ -78,7 +78,18 @@ jobs:
           retention-days: 7
 
       - name: Run tests
-        run: python -m pytest -q --tb=short
+        run: |
+          set -o pipefail
+          python -m pytest -q --tb=short 2>&1 | tee /tmp/full-pytest.log
+
+      - name: Upload full pytest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-pytest-diagnostics
+          path: /tmp/full-pytest.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run local fixture demo
         run: python -m scripts.demo_research_flow
