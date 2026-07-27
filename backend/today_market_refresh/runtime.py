@@ -81,6 +81,20 @@ _ALLOWED_TRIGGERS = {
     RefreshTrigger.FIRST_TODAY_MARKET_ENTRY,
     RefreshTrigger.EXPLICIT_USER_RETRY,
 }
+_DOMAIN_SNAPSHOT_KEYS = (
+    "provenance",
+    "universe_stock_count",
+    "available_stock_count",
+    "scope_coverage_status",
+    "calculation_status",
+    "completeness_status",
+    "warnings",
+    "price_behavior_context",
+    "liquidity_context",
+    "benchmark_context",
+    "sector_context",
+    "latest_data_diagnostics",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -452,23 +466,9 @@ def build_prior_snapshot_context(
     content_payload = {
         "snapshot_content_version": SNAPSHOT_CONTENT_VERSION,
         "identity_payload": identity_payload,
-        "market_cockpit_domain_snapshot": {
-            key: raw.get(key)
-            for key in (
-                "provenance",
-                "universe_stock_count",
-                "available_stock_count",
-                "scope_coverage_status",
-                "calculation_status",
-                "completeness_status",
-                "warnings",
-                "price_behavior_context",
-                "liquidity_context",
-                "benchmark_context",
-                "sector_context",
-                "latest_data_diagnostics",
-            )
-        },
+        "market_cockpit_domain_snapshot": (
+            _canonical_market_cockpit_domain_snapshot(raw)
+        ),
     }
     effective_session = date.fromisoformat(
         projected["scope_and_freshness"]["effective_equity_session"]
@@ -601,6 +601,44 @@ def today_market_runtime_refresh(
         ) from exc
     finally:
         engine.dispose()
+
+
+def _canonical_market_cockpit_domain_snapshot(
+    raw: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Exclude request-time clocks without mutating the projected snapshot."""
+
+    domain = {key: raw.get(key) for key in _DOMAIN_SNAPSHOT_KEYS}
+    domain["provenance"] = _canonical_domain_provenance(
+        domain.get("provenance")
+    )
+    domain["benchmark_context"] = _canonical_domain_context(
+        domain.get("benchmark_context")
+    )
+    domain["sector_context"] = _canonical_domain_context(
+        domain.get("sector_context")
+    )
+    return domain
+
+
+def _canonical_domain_context(value: Any) -> Any:
+    if not isinstance(value, Mapping):
+        return value
+    context = dict(value)
+    context["provenance"] = _canonical_domain_provenance(
+        context.get("provenance")
+    )
+    return context
+
+
+def _canonical_domain_provenance(value: Any) -> Any:
+    if not isinstance(value, Mapping):
+        return value
+    return {
+        key: item
+        for key, item in value.items()
+        if key != "generated_at_utc"
+    }
 
 
 def _authoritative_component(
