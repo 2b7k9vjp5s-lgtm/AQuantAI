@@ -90,9 +90,15 @@ def test_mock_assumption_is_frozen_synthetic_and_non_production() -> None:
     assert DEFAULT_MOCK_ASSUMPTION.production_eligible is False
     with pytest.raises(FrozenInstanceError):
         DEFAULT_MOCK_ASSUMPTION.mock_qps = 99  # type: ignore[misc]
-    with pytest.raises(ValueError, match="never"):
+    with pytest.raises(ValueError, match="exact reviewed"):
+        MockPlanningAssumption(mock_qps=6)
+    with pytest.raises(ValueError, match="exact reviewed"):
+        MockPlanningAssumption(mock_concurrency=3)
+    with pytest.raises(ValueError, match="exact reviewed"):
+        MockPlanningAssumption(mock_daily_request_budget=50_001)
+    with pytest.raises(ValueError, match="exact reviewed"):
         MockPlanningAssumption(provider_confirmed=True)
-    with pytest.raises(ValueError, match="never"):
+    with pytest.raises(ValueError, match="exact reviewed"):
         MockPlanningAssumption(production_eligible=True)
 
 
