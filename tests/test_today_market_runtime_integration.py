@@ -109,7 +109,11 @@ def test_default_application_is_mock_disabled_and_routes_are_installed() -> None
     configuration = default_app.state.today_market_runtime_configuration
     assert configuration.mock_enabled is False
     assert configuration.mock_scenario_id is None
-    paths = {route.path for route in default_app.routes}
+    paths = {
+        route.path
+        for route in default_app.routes
+        if hasattr(route, "path")
+    }
     assert "/today-market/api/runtime-status" in paths
     assert "/today-market/api/runtime-refresh" in paths
 
