@@ -2,7 +2,7 @@
 
 ## 1. Status, authority and exact base
 
-This document defines the bounded architecture for Issue #259.
+This document defines the bounded architecture for Issue #259 and resolves the five blockers recorded by fixed-head review `4786108502`.
 
 ```text
 repository = 2b7k9vjp5s-lgtm/AQuantAI
@@ -32,75 +32,51 @@ PR #241 remains closed, unmerged and read-only at exact HEAD:
 3116a67ec472131eea3bf3d1bd9daee884c69ee9
 ```
 
-## 2. Architecture outcome
+## 2. Selected v1 outcome
 
-The selected v1 boundary is:
+The selected boundary is:
 
 ```text
-first eligible /today-market interaction
-  -> exact local boundaries and explicit local series are selected
-  -> prior complete local snapshot is read and rendered
-  -> user explicitly enables the synthetic Mock demonstration
-  -> one synchronous, bounded, process-local refresh attempt runs
-  -> one complete synthetic candidate projection is validated
-  -> the candidate is exposed in a separate synthetic runtime panel
-  -> the persisted local snapshot remains authoritative and unchanged
+FastAPI import/startup
+  -> no refresh and no runtime side effect
+raw GET /today-market
+  -> static page only; no acquisition
+explicit dual-as-of boundaries + explicit local series
+  -> server reads one exact prior local snapshot
+  -> page renders the prior snapshot first
+  -> server returns exact runtime scope/status/fingerprint
+Mock demo mode explicitly injected by server-side application factory
+  -> browser automatically submits one first-eligible-scope command
+  -> one synchronous bounded process-local Mock attempt runs
+  -> one complete synthetic candidate is validated
+  -> one separate synthetic runtime projection is exposed
+failure, stale state or shutdown
+  -> no partial publication; prior persisted snapshot remains authoritative
 ```
 
-The following alternatives are rejected for v1:
+Mock is disabled by default. When disabled, runtime status is `mock_not_enabled` and no acquisition occurs. When explicitly enabled for tests or a demo launcher, the first eligible scoped interaction performs exactly one automatic Mock attempt.
+
+Rejected alternatives:
 
 ```text
 FastAPI application-start refresh                  = rejected
-raw route-load refresh before exact scope exists   = rejected
-hidden automatic source selection                  = rejected
-Mock as default source                             = rejected
+raw page-load acquisition before exact scope       = rejected
+hidden local-series selection                      = rejected
+Mock as default production source                  = rejected
 Mock result persisted as local market history      = rejected
-background task / scheduler / continuous polling   = rejected
-live THS adapter                                   = blocked by Issue #225
+background task / scheduler / polling              = rejected
+live THS adapter in v1                              = blocked by Issue #225
 ```
 
-The v1 architecture is therefore a **runtime integration proof over the accepted Mock**, not a claim that ordinary production market data is automatically refreshed.
+## 3. Existing contracts reused
 
-## 3. Why first eligible page interaction is selected
-
-The current application has no accepted startup lifecycle owner for Today Market refresh. `backend/main.py` mounts static pages and routers without a startup refresh hook. Adding hidden application-start work would:
-
-- affect unrelated modules before a Today Market scope exists;
-- require selecting or inferring a local market scope;
-- create new lifecycle and shutdown ownership;
-- risk database or network side effects during import/startup;
-- weaken the current zero-side-effect application startup contract.
-
-The current Today Market surface also requires:
-
-- an explicit information cutoff;
-- an explicit recorded-at boundary;
-- an explicit local equity series;
-- optional explicit benchmark and sector series.
-
-The catalog response explicitly reports `auto_selected = false`. Runtime integration must preserve that meaning.
-
-For v1, “first entry” means the first **eligible scoped interaction** after the current page has successfully loaded one exact prior local snapshot. Merely requesting `/today-market` does not trigger acquisition.
-
-The existing `RefreshTrigger.APPLICATION_START` enum remains reserved for a later separately reviewed architecture. V1 uses:
-
-```text
-RefreshTrigger.FIRST_TODAY_MARKET_ENTRY
-RefreshTrigger.EXPLICIT_USER_RETRY
-RefreshTrigger.EXPLICIT_MANUAL_CATCHUP
-```
-
-`FIRST_TODAY_MARKET_ENTRY` is emitted only after exact scope and prior-snapshot identity are server-validated.
-
-## 4. Existing contracts reused without redefinition
-
-Runtime Integration v1 composes the accepted package:
+V1 composes the accepted package:
 
 ```text
 backend.today_market_refresh
 ```
 
-It reuses, rather than duplicates:
+It reuses without weakening:
 
 - `TodayMarketRefreshIntent`;
 - `TodayMarketRefreshPlan`;
@@ -113,206 +89,161 @@ It reuses, rather than duplicates:
 - `run_mock_refresh`;
 - `validate_publishable_batch` / `build_demo_projection`.
 
-The existing planner already freezes:
+The runtime layer does not create a second planner, a second complete-batch validator or source-specific schema meaning.
 
-- one exact scope revision;
-- one exact prior snapshot identity;
-- requested completed sessions;
-- one closed capability set;
-- one planning policy version;
-- one synthetic assumption profile;
-- canonical plan and attempt fingerprints;
-- a maximum automatic gap of ten completed sessions.
+## 4. Exact authoritative prior-snapshot identity
 
-The existing orchestrator already provides:
+### 4.1 One authoritative read path
 
-- no-refresh-needed;
-- manual-catch-up-required;
-- not-initialized;
-- complete synthetic publication;
-- failure with retained prior snapshot;
-- shutdown cancellation with retained prior snapshot.
+Every eligible runtime scope is created from the same server-side read path used to build the existing Today Market snapshot:
 
-Runtime Integration must not create a second planner, validator or source-specific schema owner.
+1. validate `as_of_cutoff` and `as_of_recorded_at_utc`;
+2. validate exact equity series key and optional benchmark/sector series keys;
+3. use the existing Market Cockpit repositories and service to load the exact visible snapshot;
+4. resolve the exact succeeded/complete `IngestionRun` component selected for each requested family under those same boundaries;
+5. require one unique component identity for each selected family;
+6. build the snapshot identity and content fingerprint from those exact results.
 
-## 5. Product and truth boundary
+The implementation may add a bounded read-only provenance projection to existing repository/service results. It may not create a new persisted owner, select a maximum-coverage context, select a latest-compatible context outside the existing deterministic repository order, or infer identity from browser labels.
 
-Three meanings remain strictly separate.
+If the exact selected component set is not unique, a required component is missing, or repository/service results disagree, runtime scope creation fails closed.
 
-### 5.1 Persisted local market snapshot
+### 4.2 `TodayMarketLocalSnapshotIdentityV1`
+
+Canonical identity payload:
 
 ```text
-owner = existing IngestionRun / market_cockpit repositories
-source = existing explicitly selected local series
-persistence = existing database only
-ordinary meaning = local historical market snapshot
+snapshot_identity_version = aquantai.today-market-local-snapshot-identity.v1
+as_of_cutoff
+as_of_recorded_at_utc
+selected_components = [equity, benchmark, sector]
+market_snapshot_contract_version
 ```
 
-This remains the authoritative content shown by the existing Today Market snapshot page.
-
-### 5.2 Synthetic runtime candidate
+Each family position is fixed; an unselected optional family is explicit `null`. A selected component contains:
 
 ```text
-owner = process-local Today Market runtime coordinator
-source_key = aquantai-synthetic-today-market-v1
-source_mode = synthetic_mock
-is_synthetic = true
-persistence = none
-ordinary meaning = refresh-flow demonstration only
+family_key
+ ingestion_run_id
+ dataset
+ provider
+ series_key
+ information_cutoff_date
+ imported_at_utc
+ completed_at_utc
+ snapshot_mode
+ effective_session
+ canonical_series_identity
 ```
 
-It may be displayed only in a separately labelled section such as:
+Rules:
+
+- dates use ISO `YYYY-MM-DD`;
+- timestamps are normalized to UTC with `Z`;
+- mapping keys are sorted;
+- canonical series identities use their existing validators;
+- tuple/list ordering is explicit and stable;
+- no localized label, UI copy, database connection detail or browser state enters the identity.
+
+Derived identifier:
 
 ```text
-模拟更新演示
+prior_snapshot_id = "today-market-local-v1:" + canonical_sha256(identity_payload)
 ```
 
-It must never be labelled “最新市场数据”, “实时数据”, “今日真实行情” or any equivalent production claim.
+### 4.3 Content fingerprint
 
-### 5.3 Future live Provider candidate
+Canonical content payload:
 
 ```text
-owner = future source-specific application adapter
-source contract owner = datasource.ths_structured_provider
-transport = prohibited in v1
-readiness = blocked by Issue #225
-overall_live_gate = blocked_quota_contract
+snapshot_content_version = aquantai.today-market-local-snapshot-content.v1
+identity_payload
+market_cockpit_domain_snapshot = {
+  provenance,
+  universe_stock_count,
+  available_stock_count,
+  scope_coverage_status,
+  calculation_status,
+  completeness_status,
+  warnings,
+  price_behavior_context,
+  liquidity_context,
+  benchmark_context,
+  sector_context,
+  latest_data_diagnostics
+}
 ```
 
-Runtime Integration v1 includes no live adapter, no credential profile and no network path.
-
-## 6. Exact runtime scope
-
-A runtime attempt requires one immutable `TodayMarketRuntimeScope` projection. It is presentation/application-owned and is not persisted.
-
-Candidate fields:
+The content fingerprint is:
 
 ```text
-runtime_scope_version
-scope_revision_id
+prior_snapshot_content_fingerprint = canonical_sha256(content_payload)
+```
+
+The domain snapshot is taken before Today Market presentation copy is added. Warnings and set-like values are canonically sorted; nulls are preserved; floats and dates use the repository's existing canonical serializer. Raw presentation JSON, HTML, localized prose, `allowed_actions` and progressive disclosure wrappers are excluded.
+
+### 4.4 Moved or stale prior snapshot
+
+GET status and POST command must independently re-run the same authoritative read path. Before planning or acquisition, POST compares the server-rebuilt:
+
+```text
+prior_snapshot_id
+prior_snapshot_content_fingerprint
+runtime_scope_revision_id
+```
+
+against the exact values represented by the submitted status fingerprint. Any mismatch returns `runtime_scope_stale` or `runtime_prior_snapshot_moved` with zero acquisition and no process-local candidate change.
+
+## 5. Runtime scope contract
+
+A `TodayMarketRuntimeScopeV1` is server-owned and not persisted.
+
+```text
+runtime_scope_version = aquantai.today-market-runtime-scope.v1
 as_of_cutoff
 as_of_recorded_at_utc
 equity_series_key
 benchmark_series_key | null
 sector_series_key | null
 prior_snapshot_id
-prior_snapshot_data_through_session
 prior_snapshot_content_fingerprint
+prior_snapshot_data_through_session
 required_capability_set
 planning_policy_version
+planning_recorded_at_utc
+runtime_scope_revision_id
 ```
 
 Rules:
 
-1. All fields are derived from one successful server-side exact local snapshot read.
-2. The browser never constructs `scope_revision_id`, `prior_snapshot_id` or the snapshot fingerprint from labels.
-3. Series keys and both as-of boundaries are revalidated server-side on every runtime request.
-4. Changing any boundary or series invalidates the current runtime scope and any candidate projection.
-5. No latest-compatible, first-visible or fuzzy scope fallback is permitted.
-6. The scope revision fingerprint is canonical over all identity-bearing fields.
+1. All identity-bearing values come from one successful authoritative snapshot read.
+2. The browser never constructs IDs or fingerprints from labels or raw JSON.
+3. Changing either boundary or any series invalidates the scope.
+4. No fuzzy, first-visible, maximum-coverage or latest-compatible fallback is allowed.
+5. `planning_recorded_at_utc` is not a client field. It is exactly the normalized `as_of_recorded_at_utc` already bound into the scope.
+6. `runtime_scope_revision_id` is canonical SHA-256 over every preceding identity-bearing field.
 
-The exact projection mechanism may reuse existing snapshot technical details or add one bounded server-owned runtime-scope projection in a later implementation. If the current snapshot response cannot supply an exact scope without adding a new persisted owner, implementation must stop and return to architecture review.
+This closes the planning-clock ambiguity: one exact scope has exactly one planning clock.
 
-## 7. Explicit Mock enablement
+## 6. Runtime status and optimistic-concurrency fingerprint
 
-Mock execution is disabled by default.
+### 6.1 Closed DTO
 
-A later implementation may expose one explicit ordinary-user action:
-
-```text
-运行模拟更新演示
-```
-
-This action is available only when a non-secret server-side dependency explicitly enables the deterministic Mock port for the current process. The accepted mechanism is dependency injection or an application factory parameter used by tests/demo launchers.
-
-V1 does not authorize:
-
-- an environment-secret lookup;
-- a credential lookup;
-- a persistent user setting;
-- a browser local-storage source mode;
-- an arbitrary adapter name from the client;
-- activation of `SOURCE_SPECIFIC_LIVE`.
-
-The write request may contain only the closed source mode:
+Every status response contains:
 
 ```text
-synthetic_mock
-```
-
-The server rejects every other mode. The future live mode remains absent rather than disabled by a client-visible switch.
-
-## 8. Runtime coordinator ownership
-
-A later implementation may add one bounded process-local coordinator with the following ownership only:
-
-```text
-active single-flight attempt identity
-latest immutable process-local runtime status
-latest successful synthetic candidate projection
-latest typed failure for the same runtime scope
-```
-
-It does not own:
-
-- persisted market history;
-- Provider observations;
-- source readiness;
-- trading calendar truth;
-- accepted research state;
-- recommendation or portfolio state.
-
-The coordinator state is ephemeral:
-
-```text
-schema_migration = none
-database_write = none
-browser_persisted_runtime_state = none
-survives_process_restart = false
-```
-
-Process restart truthfully returns to `runtime_not_started` while the persisted prior local snapshot remains available.
-
-## 9. Single-flight and concurrency contract
-
-The single-flight key is canonical over:
-
-```text
-scope_revision_id
-prior_snapshot_id
-planning_policy_version
-source_mode
-mock_scenario
-```
-
-Rules:
-
-1. At most one active attempt exists for one exact key in one application process.
-2. The attempt itself runs synchronously inside the explicit request boundary; no detached background task is created.
-3. A simultaneous identical request receives the current immutable status or a stable `runtime_attempt_already_active` conflict; it does not start a second acquisition.
-4. An identical completed request may return the same exact process-local outcome and fingerprints.
-5. A changed scope, prior snapshot, scenario or planning time creates a different attempt identity.
-6. A request with a stale prior snapshot fails before acquisition.
-7. Application shutdown is observed through the existing shutdown callback before publication.
-8. No lock or attempt remains authoritative after process restart.
-
-The coordinator must not use a global “latest result” without an exact scope key.
-
-## 10. Runtime state model
-
-The runtime projection composes existing planning/orchestration states instead of replacing them.
-
-A closed `TodayMarketRuntimeStatus` candidate contains:
-
-```text
-runtime_status_version
+runtime_status_version = aquantai.today-market-runtime-status.v1
 runtime_scope
+runtime_scope_fingerprint
+runtime_status_revision
 phase
 prior_snapshot_state
 refresh_state
 source_mode
 source_label
 is_synthetic
+mock_enabled
+automatic_attempt_state
 active_attempt_id | null
 plan_fingerprint | null
 candidate_projection | null
@@ -320,9 +251,208 @@ failure | null
 state_explanation
 allowed_actions
 technical_details
+runtime_status_fingerprint
 ```
 
-Closed `phase` values:
+`runtime_status_revision` is a process-local monotonically increasing integer per coordinator scope. It starts at zero after process restart and increments for every accepted state transition.
+
+### 6.2 Canonical status fingerprint
+
+The server computes:
+
+```text
+runtime_status_fingerprint = canonical_sha256({
+  runtime_status_version,
+  runtime_scope_fingerprint,
+  runtime_status_revision,
+  phase,
+  prior_snapshot_state,
+  refresh_state,
+  source_mode,
+  is_synthetic,
+  mock_enabled,
+  automatic_attempt_state,
+  active_attempt_id,
+  plan_fingerprint,
+  candidate_projection_fingerprint,
+  failure_code,
+  failure_category,
+  retryability,
+  allowed_action_codes
+})
+```
+
+Explicit exclusions:
+
+- localized Chinese prose;
+- presentation ordering;
+- expanded technical details;
+- transient request time;
+- browser state.
+
+GET and POST both return this field. The browser treats it as opaque and never recalculates it.
+
+### 6.3 POST comparison point
+
+`POST /today-market/api/runtime-refresh` requires:
+
+```text
+expected_runtime_status_fingerprint
+```
+
+Under the coordinator lock, before building an intent, plan or calling an acquisition port, the server:
+
+1. re-resolves the exact authoritative prior snapshot;
+2. rebuilds the runtime scope;
+3. reads the current matching process-local state;
+4. rebuilds the current status fingerprint;
+5. compares it byte-for-byte with the expected fingerprint.
+
+Mismatch returns HTTP 409 with stable code `runtime_status_conflict`, the current complete status, and:
+
+```text
+planning_called = false
+acquisition_called = false
+candidate_changed = false
+```
+
+## 7. Trigger and bounded automatic attempt
+
+### 7.1 No startup or raw-load side effect
+
+- importing or starting FastAPI performs no refresh;
+- requesting `/today-market` performs no acquisition;
+- unrelated routes are never blocked by Today Market runtime work.
+
+### 7.2 First eligible scoped interaction
+
+After the user explicitly selects boundaries and series and the page renders one exact prior snapshot:
+
+1. browser calls `GET /today-market/api/runtime-status`;
+2. server returns exact scope, phase and status fingerprint;
+3. if `mock_enabled = true` and `automatic_attempt_state = not_attempted`, the browser automatically submits exactly one POST;
+4. the POST trigger is `FIRST_TODAY_MARKET_ENTRY`;
+5. the request runs synchronously and is bounded by the existing ten-session ceiling;
+6. prior snapshot remains visible during the command;
+7. no second automatic command occurs for the same scope generation.
+
+If Mock is disabled, GET returns `mock_not_enabled`; no POST is sent automatically.
+
+### 7.3 Explicit retry
+
+A failed/cancelled status may expose one explicit action:
+
+```text
+重新运行模拟演示
+```
+
+That command uses `EXPLICIT_USER_RETRY` and the newest server-returned status fingerprint. It is not an automatic retry loop.
+
+`EXPLICIT_MANUAL_CATCHUP` remains a separately named trigger but v1 does not implement historical bulk catch-up.
+
+## 8. Single-flight, command identity and replay
+
+### 8.1 Coordinator scope
+
+```text
+coordinator_scope_key = canonical_sha256({
+  runtime_scope_revision_id,
+  source_mode,
+  mock_scenario
+})
+```
+
+At most one active command exists for this key in one process.
+
+### 8.2 Command generation
+
+```text
+command_key = canonical_sha256({
+  expected_runtime_status_fingerprint,
+  trigger
+})
+
+refresh_intent_scope_revision_id = canonical_sha256({
+  runtime_scope_revision_id,
+  expected_runtime_status_fingerprint,
+  trigger
+})
+```
+
+`TodayMarketRefreshIntent.scope_revision_id` receives `refresh_intent_scope_revision_id`. Its `local_clock_utc` receives the server-owned `planning_recorded_at_utc` from the runtime scope.
+
+Consequences:
+
+- the first automatic attempt and a later retry have distinct deterministic attempt IDs;
+- two simultaneous requests using the same stale expected fingerprint cannot both acquire;
+- a changed status transition creates a new status fingerprint and therefore a new command generation;
+- planning time cannot vary independently inside one runtime scope;
+- identical completed replay returns the current immutable status and does not silently reacquire.
+
+### 8.3 Concurrency rules
+
+1. Lock by `coordinator_scope_key` before status-fingerprint comparison.
+2. First valid command transitions status to `refresh_in_progress`, increments revision and publishes the new status atomically.
+3. A simultaneous request carrying the old expected fingerprint receives `runtime_status_conflict` and zero acquisition.
+4. A request with changed boundaries/series resolves to a different runtime scope.
+5. Process restart discards locks and synthetic state; persisted local data is unchanged.
+
+## 9. Mock-only plan and future live boundary
+
+### 9.1 V1 plan eligibility
+
+The current `TodayMarketRefreshPlan` and `build_refresh_plan` are explicitly Mock-only:
+
+```text
+assumption_profile_id = MOCK_ASSUMPTION_PROFILE_ID
+production_eligible = false
+```
+
+Runtime Integration v1 constructs only this plan and may call only an explicitly injected deterministic Mock port.
+
+### 9.2 What is provider-neutral today
+
+Reusable in v1 and future architecture:
+
+- high-level runtime status/orchestration shape;
+- all-or-nothing candidate publication;
+- explicit acquisition seam concept;
+- failure retention of the prior snapshot;
+- no hidden fallback or source mixing.
+
+Not production-neutral:
+
+- the current Mock assumption-bearing plan payload;
+- Mock quota/completion assumptions;
+- synthetic source provenance.
+
+### 9.3 Future THS insertion
+
+After Issue #225 is closed by reviewed evidence, live integration requires a separate Strict Architecture Preflight that freezes either:
+
+1. a new production planning contract/version accepted by a live acquisition port; or
+2. a reviewed source-specific plan translation owner outside the runtime coordinator.
+
+A future adapter must not:
+
+- relax the current Mock assumption-profile validation;
+- disguise live inputs as synthetic;
+- interpret THS quotas, completion, corrections or credentials inside the runtime coordinator;
+- reuse Provider-valued fixtures without reviewed permission;
+- create fallback from THS to Mock or another Provider.
+
+Until that separate architecture is accepted:
+
+```text
+SOURCE_SPECIFIC_LIVE request = rejected
+live adapter construction = absent
+credential lookup = absent
+network transport = absent
+```
+
+## 10. Runtime phases and Chinese projection
+
+Closed phases:
 
 ```text
 runtime_not_started
@@ -340,11 +470,7 @@ scope_stale
 local_database_unavailable
 ```
 
-The runtime adapter maps from existing `PlanningState`, `OrchestrationState`, failure category and local-snapshot read result. It must not invent success when the existing outcome is blocked or failed.
-
-## 11. Ordinary-Chinese state contract
-
-Every runtime status provides exactly:
+Every status answers exactly:
 
 ```text
 发生了什么
@@ -352,22 +478,22 @@ Every runtime status provides exactly:
 现在可以做什么
 ```
 
-Minimum stable mappings:
+Minimum meanings:
 
 ### `prior_snapshot_ready`
 
 ```text
-发生了什么 = 已读取明确选择的本地完整快照，尚未运行模拟更新。
-为什么重要 = 当前页面展示的仍是已持久化的本地数据，不是模拟结果。
-现在可以做什么 = 可以查看本地快照，或在明确启用时运行模拟更新演示。
+发生了什么 = 已读取明确选择的本地完整快照，模拟更新尚未开始。
+为什么重要 = 当前页面展示的是已持久化的本地数据，不是模拟结果。
+现在可以做什么 = 继续查看本地快照；若演示模式已启用，系统会执行一次有界模拟更新。
 ```
 
-### `no_refresh_needed`
+### `refresh_in_progress`
 
 ```text
-发生了什么 = 按当前模拟交易日场景，本地快照不需要补充会话。
-为什么重要 = 系统没有创建不必要的候选更新。
-现在可以做什么 = 继续查看本地快照，或更换明确的数据边界。
+发生了什么 = 正在执行一次有界的模拟更新演示。
+为什么重要 = 原本地快照仍保持可见，只有完整候选通过校验后才会显示演示结果。
+现在可以做什么 = 继续查看本地快照，不需要重复提交。
 ```
 
 ### `demo_published`
@@ -375,7 +501,7 @@ Minimum stable mappings:
 ```text
 发生了什么 = 模拟更新流程已完成，并生成一份进程内演示结果。
 为什么重要 = 这只证明刷新编排可运行，不代表真实数据源已启用。
-现在可以做什么 = 查看模拟来源和覆盖详情，或返回本地真实快照。
+现在可以做什么 = 查看模拟来源和覆盖详情，或继续使用本地真实快照。
 ```
 
 ### `failed_retained_prior`
@@ -383,7 +509,15 @@ Minimum stable mappings:
 ```text
 发生了什么 = 模拟候选未通过完整批次校验。
 为什么重要 = 未发布部分或不完整结果，原本地快照保持不变。
-现在可以做什么 = 查看失败原因，并明确选择是否重试演示。
+现在可以做什么 = 查看失败原因，并明确选择是否重新运行模拟演示。
+```
+
+### `mock_not_enabled`
+
+```text
+发生了什么 = 当前应用进程没有启用模拟更新演示。
+为什么重要 = 系统不会隐藏运行模拟数据，也不会把模拟结果当成真实市场数据。
+现在可以做什么 = 继续查看本地快照；测试或演示启动器可显式注入 Mock。
 ```
 
 ### `live_source_blocked`
@@ -394,13 +528,11 @@ Minimum stable mappings:
 现在可以做什么 = 继续使用本地快照；不能从本页面启用真实数据源。
 ```
 
-Warnings and failures must remain warnings and failures. Technical identifiers, fingerprints, source contracts and chronology remain under progressive disclosure.
+Technical identifiers remain under progressive disclosure.
 
-## 12. API boundary for a later implementation
+## 11. API boundary for later implementation
 
-A later separately authorized implementation may add exactly two bounded API responsibilities.
-
-### 12.1 Runtime status read
+### 11.1 Runtime status read
 
 Candidate route:
 
@@ -408,17 +540,17 @@ Candidate route:
 GET /today-market/api/runtime-status
 ```
 
-Required exact inputs are the same boundaries and explicit series keys used by the local snapshot read. The server:
+Inputs are the exact dual-as-of boundaries and explicit series keys used by the snapshot read. The server:
 
-1. validates all inputs before constructing database resources;
-2. resolves the exact visible local snapshot;
+1. validates inputs before constructing database resources;
+2. resolves the exact authoritative local snapshot identity/content;
 3. derives the exact runtime scope;
-4. reads only matching process-local runtime state;
-5. returns a deterministic `TodayMarketRuntimeStatus`.
+4. reads only process-local state matching that scope;
+5. returns the complete status and `runtime_status_fingerprint`.
 
-This GET performs no acquisition and no write.
+GET performs no acquisition and no database write. Creating an initial in-memory status projection is allowed only as deterministic request-local/coordinator initialization; it does not trigger refresh.
 
-### 12.2 Explicit Mock runtime command
+### 11.2 Runtime command
 
 Candidate route:
 
@@ -430,7 +562,7 @@ Closed request shape:
 
 ```text
 runtime_scope_version
-scope_revision_id
+runtime_scope_revision_id
 prior_snapshot_id
 prior_snapshot_content_fingerprint
 as_of_cutoff
@@ -447,73 +579,68 @@ expected_runtime_status_fingerprint
 Rules:
 
 - strict unknown-field rejection;
-- route/body and server-resolved scope equality;
-- only closed trigger values;
+- exact request/server-resolved scope equality;
+- only reviewed trigger values;
 - only `synthetic_mock` source mode;
 - only reviewed `MockScenario` values;
-- stale scope or moved prior snapshot returns conflict before planning;
+- stale scope/status/prior snapshot rejected under lock before planning;
+- no client planning clock;
 - no arbitrary URL, headers, queries, capability names or source keys;
-- no automatic retry;
+- no automatic retry loop;
 - no credential or network field.
 
-The response is the complete runtime status and is sufficient for first render. No per-family browser requests are permitted.
+The response is the complete new runtime status with a new fingerprint.
 
-## 13. UI boundary for a later implementation
+## 12. UI boundary for later implementation
 
-The existing selection-first Today Market flow remains unchanged:
+Existing selection-first flow remains:
 
 ```text
 set exact dual-as-of boundaries
   -> read local series catalog
   -> explicitly select equity / optional benchmark / optional sector
   -> read and render exact local snapshot
+  -> read exact runtime status
 ```
 
-Runtime Integration may add one secondary synthetic panel after the persisted snapshot is visible.
-
-Required hierarchy:
-
-1. persisted local snapshot remains the primary page content;
-2. synthetic runtime status is visually separated and labelled `模拟更新演示`;
-3. one dominant action exists inside the synthetic panel for its current state;
-4. the panel never hides scope/freshness warnings from the persisted snapshot;
-5. changing boundaries or selection immediately invalidates and hides the old runtime candidate;
-6. runtime candidate identity is never stored in localStorage;
-7. current selection storage may remain unchanged, but it does not authorize acquisition;
-8. all text rendering uses safe text nodes;
-9. status is distinguishable without color alone;
-10. keyboard focus moves to the status/error summary after an explicit command.
-
-Candidate primary actions by state:
+A separate panel is added only after the persisted snapshot is visible:
 
 ```text
-prior_snapshot_ready       -> 运行模拟更新演示
-failed_retained_prior      -> 重新运行模拟演示
-manual_catchup_required    -> 查看手动补齐说明
-not_initialized            -> 查看初始化说明
-demo_published             -> 查看模拟结果详情
-live_source_blocked        -> 查看真实数据源限制
+模拟更新演示
 ```
+
+Rules:
+
+1. Persisted local snapshot remains primary page content.
+2. Synthetic panel is visibly separate and never labelled as real/latest/live market data.
+3. If Mock is enabled and status is eligible/not-attempted, browser sends one automatic first-entry command.
+4. Browser keeps a request-local guard against duplicate submission, but server status/single-flight remains authoritative.
+5. Failures expose an explicit retry button; no retry loop or polling.
+6. Changing boundaries or series immediately invalidates and hides the old candidate.
+7. Runtime candidate identity/status fingerprint is never stored in localStorage.
+8. Current series-selection storage may remain, but it does not authorize acquisition.
+9. Text uses safe text nodes; status does not rely on color alone.
+10. Prior snapshot remains visible during `refresh_in_progress`.
 
 No action may imply recommendation, buy, sell, hold, target price, expected return, position sizing, portfolio addition or execution.
 
-## 14. Complete-batch publication boundary
+## 13. Complete-batch publication
 
-The runtime coordinator calls the accepted `TodayMarketAcquisitionPort` with one already validated plan.
+The coordinator calls the accepted Mock acquisition port with one already validated Mock plan.
 
-Before exposing a candidate, the existing validator must prove:
+Existing validation must prove:
 
 - plan and batch fingerprints are valid;
-- source provenance is explicitly synthetic;
+- provenance is explicitly synthetic;
 - `provider_confirmed = false`;
 - required family identity and ordering are compatible;
 - every family is schema-valid;
-- coverage status is complete;
+- coverage is complete;
 - covered sessions exactly equal requested sessions;
 - no required family is missing;
 - every family covers every requested session.
 
-Publication is one immutable in-memory pointer replacement under the exact single-flight key. The operation is atomic at the coordinator boundary.
+Successful publication is one immutable process-local pointer replacement under the exact coordinator scope. It increments status revision and produces a new status fingerprint.
 
 Any failure produces:
 
@@ -523,15 +650,13 @@ prior_snapshot = unchanged
 persisted_write = none
 ```
 
-A synthetic correction scenario creates a distinct fingerprinted process-local candidate. It never rewrites persisted local history.
+A synthetic correction scenario creates a distinct process-local candidate fingerprint and never rewrites persisted local history.
 
-## 15. No-prior-snapshot behavior
+## 14. No-prior and manual-catch-up states
 
-The existing planner returns `NOT_INITIALIZED` when no prior snapshot exists. V1 preserves that state.
+### No prior snapshot
 
-Runtime Integration v1 does not fabricate an empty prior snapshot and does not use the Mock to initialize production local market history.
-
-Required result:
+The existing planner's `NOT_INITIALIZED` meaning is preserved. Mock never initializes production local history.
 
 ```text
 phase = not_initialized
@@ -539,60 +664,20 @@ candidate_projection = null
 allowed_actions = [view_initialization_explanation]
 ```
 
-A future initialization workflow requires a separate architecture decision and, if persistent, separate migration/persistence authorization.
-
-## 16. Manual catch-up behavior
-
-The automatic session ceiling remains exactly ten completed sessions.
-
-When the missing session count exceeds ten:
+### More than ten missing sessions
 
 ```text
 phase = manual_catchup_required
-acquisition_called = false
+planning_or_acquisition_called = false
 candidate_projection = null
 prior_snapshot = unchanged
 ```
 
-The v1 page may explain the state but must not implement historical bulk catch-up, split the request silently or loop automatically.
+V1 explains this state but does not split requests, loop automatically or implement historical bulk catch-up.
 
-## 17. Future THS insertion point
+## 15. Persistence, rollback and shutdown
 
-The future architecture remains:
-
-```text
-Today Market runtime coordinator
-  -> TodayMarketAcquisitionPort
-      -> future THS application adapter
-          -> datasource.ths_structured_provider contracts/readiness
-          -> future reviewed transport
-```
-
-The future adapter must consume existing source-specific contracts. Runtime Integration may not own or duplicate:
-
-- THS host, endpoint or selector rules;
-- account entitlement;
-- QPS, daily quota or concurrency;
-- dataset completion time;
-- correction, revision or late-data behavior;
-- API-key lifecycle;
-- authentication or credential redaction;
-- Provider-valued fixture permission.
-
-Until Issue #225 is closed by reviewed evidence:
-
-```text
-SOURCE_SPECIFIC_LIVE request = rejected
-live adapter construction = absent
-credential lookup = absent
-network transport = absent
-```
-
-Mock success cannot change this result.
-
-## 18. Migration, persistence, rollback and downgrade
-
-Selected v1 decision:
+Selected decision:
 
 ```text
 schema_migration = none
@@ -604,34 +689,40 @@ new_runtime_state_persistence = none
 browser_runtime_identity_persistence = none
 ```
 
-Rollback for a later implementation is a code/static/test/demo revert. Existing local market data is untouched.
+Process-local coordinator state owns only:
 
-Process-local synthetic runtime state is discarded on restart and has no downgrade data-loss concern.
+- current status revision;
+- automatic-attempt state;
+- active command identity;
+- latest successful synthetic candidate;
+- latest typed failure.
 
-If implementation discovers that truthful runtime status requires durable attempt history, cross-process coordination or persisted synthetic candidates, it must stop and return for a new architecture review. Such persistence is not authorized by this v1 contract.
+It does not survive restart. Restart truthfully returns to `runtime_not_started` while persisted local snapshots remain unchanged.
 
-## 19. Candidate implementation file families
+Shutdown before publication produces `cancelled_retained_prior`, clears active ownership and publishes no candidate.
 
-Architecture acceptance may authorize a later separately governed implementation Issue to consider only bounded changes in:
+If implementation requires durable attempt history, cross-process coordination or persisted synthetic candidates, it must stop and return for a new architecture review.
+
+## 16. Candidate implementation families
+
+Architecture acceptance may authorize a later separately governed implementation Issue to consider only a frozen subset of:
 
 ```text
-backend/today_market_refresh/runtime.py                 # new process-local coordinator
-backend/today_market_refresh/runtime_projection.py      # stable runtime/Chinese projection
-backend/today_market_refresh/__init__.py                # bounded exports
-backend/api/today_market.py                             # bounded status/command adapter
-backend/main.py                                         # router/dependency wiring only; no startup hook
-today_market/static/today_market.html                   # separate synthetic panel
-today_market/static/today_market.js                     # explicit command and exact invalidation
-today_market/static/today_market.css                    # bounded presentation/accessibility
+backend/today_market_refresh/runtime.py
+backend/today_market_refresh/runtime_projection.py
+backend/today_market_refresh/__init__.py
+backend/api/today_market.py
+backend/main.py                         # dependency/application-factory wiring only; no startup hook
+today_market/static/today_market.html
+today_market/static/today_market.js
+today_market/static/today_market.css
 tests/test_today_market_runtime_*.py
 scripts/demo_today_market_runtime_integration.py
-.github/workflows/local-tests.yml                        # additive offline demo only if required
+.github/workflows/local-tests.yml       # additive offline demo only if required
 .codex/tasks/issue-<IMPLEMENTATION>-*.md
 ```
 
-The later implementation Issue must re-read the repository and freeze an exact subset. This list authorizes nothing by itself.
-
-Explicitly excluded implementation families:
+Explicitly excluded:
 
 ```text
 datasource/ths_structured_provider/**
@@ -642,160 +733,126 @@ market_cockpit calculation ownership
 Industry Thesis / Evidence / Candidate owners
 ```
 
-## 20. Query and performance boundaries
+This list authorizes nothing by itself.
 
-A later implementation must preserve bounded operations:
+## 17. Query, locality and security bounds
 
-- one existing local-series catalog request when the user asks for it;
-- one existing exact snapshot request;
-- at most one runtime-status request per eligible scope load;
-- one explicit runtime-refresh request per user action;
-- zero per-family browser requests;
-- zero per-row runtime API requests;
-- no polling loop;
-- no background refresh status requests;
-- no additional database statements after a validated exact local snapshot is already available unless the adapter must revalidate that same exact scope before the command.
+Later implementation must preserve:
 
-The server must revalidate the prior snapshot before acquisition even when this adds one bounded read. Correctness takes priority over trusting browser state.
+- one local-series catalog request when user asks;
+- one exact snapshot request;
+- at most one status request per eligible scope load;
+- one automatic command per eligible Mock-enabled scope generation;
+- one explicit command per user retry;
+- zero per-family or per-row browser requests;
+- no polling/background status loop;
+- one bounded revalidation read before command acquisition.
 
-## 21. Security and locality
-
-Required properties:
+Security properties:
 
 - same-origin local API only;
-- strict request schemas and unknown-field rejection;
-- no arbitrary redirect or external origin;
-- no URL/header/query construction from free text;
+- strict closed schemas and unknown-field rejection;
+- no arbitrary redirect, URL, header or query construction;
 - no HTML injection;
-- no credential, token, Cookie, API key, account ID or request ID;
+- no credential/token/Cookie/API key/account ID;
 - no environment-secret read;
 - no HTTP, DNS, socket, subprocess, browser automation or Provider SDK path in Mock mode;
 - no external AI or remote transmission;
-- redacted typed diagnostics only;
-- runtime fingerprints and technical details are read-only.
+- redacted typed diagnostics only.
 
-## 22. Required executable validation for a later implementation
+## 18. Required later executable validation
 
-### 22.1 Exact scope and trigger
+### Exact snapshot identity
 
-- raw `/today-market` page request performs no refresh;
-- FastAPI import/startup performs no refresh;
-- no eligible scope exists before explicit boundaries, series and prior snapshot;
-- first eligible scoped interaction uses `FIRST_TODAY_MARKET_ENTRY`;
-- explicit retry uses `EXPLICIT_USER_RETRY`;
-- changed boundary or selection invalidates old runtime state;
-- no automatic source selection.
+- identical authoritative reads produce identical snapshot ID/content fingerprint;
+- changed selected run, content, boundary or series changes the exact identity/fingerprint;
+- ambiguous/non-unique component resolution fails closed;
+- GET and POST rebuild through the same authoritative path;
+- stale or moved prior snapshot produces zero acquisition.
 
-### 22.2 Single-flight and idempotency
+### Status fingerprint
 
-- two identical simultaneous commands create one acquisition call;
-- duplicate active request gets a stable conflict/current status;
-- identical completed replay returns the same process-local outcome;
-- stale prior snapshot is rejected before acquisition;
-- changed scenario produces a distinct fingerprint;
-- restart drops runtime state without changing persisted local data.
+- every GET/POST returns a valid server-owned status fingerprint;
+- localized copy changes do not change fingerprint;
+- identity/phase/candidate/failure/action changes do change fingerprint;
+- stale expected fingerprint returns conflict and zero planning/acquisition;
+- simultaneous commands using the same fingerprint create one acquisition only.
 
-### 22.3 Golden paths
+### Trigger and single-flight
 
-- prior snapshot current / no refresh needed;
-- one-session complete synthetic refresh;
-- ten-session complete synthetic refresh;
-- valid synthetic correction revision;
-- explicit demo publication remains separate from persisted local snapshot.
+- import/startup/raw page load performs no refresh;
+- first eligible Mock-enabled scope automatically submits exactly one command;
+- Mock-disabled scope submits none;
+- automatic command uses `FIRST_TODAY_MARKET_ENTRY`;
+- explicit retry uses `EXPLICIT_USER_RETRY` and a newer status fingerprint;
+- same scope has one server-owned planning clock;
+- repeated rendering/navigation does not create a second automatic attempt;
+- process restart drops runtime state without changing persisted data.
 
-### 22.4 Failure paths
+### Golden/failure paths
 
+- no-refresh-needed;
+- one-session and ten-session complete synthetic refresh;
+- valid synthetic correction;
 - no prior snapshot;
 - more than ten missing sessions;
 - Mock not enabled;
-- live source requested while #225 remains open;
+- live source requested while #225 open;
 - assumption budget exhausted;
-- concurrency conflict;
 - partial family failure;
 - schema mismatch;
 - incomplete coverage;
 - invalid fingerprint;
 - shutdown before publication;
 - database unavailable;
-- stale scope conflict.
+- stale scope/status/prior snapshot.
 
-Every failure must prove zero partial publication and retained prior snapshot where one exists.
+Every failure proves zero partial publication and retained prior snapshot where one exists.
 
-### 22.5 Zero-network and scope safety
+### Zero-network and boundaries
 
-- import, FastAPI startup, page load, status read, command, tests and demo remain zero-network;
-- forbidden transport imports and calls are denied;
-- sentinel credentials never appear in request, response, log or failure details;
+- import, startup, page load, status read, command, tests and demo remain zero-network;
+- forbidden transport imports/calls are denied;
+- sentinel credentials never appear;
 - no schema, migration or database write;
 - no Provider readiness mutation;
-- no accepted research, recommendation, portfolio or trading mutation;
-- full repository pytest and every configured offline demo remain green.
+- no research, recommendation, portfolio or trading mutation;
+- full pytest and configured offline demos remain green.
 
-## 23. Production-realistic offline golden path
+## 19. Stop conditions
 
-```text
-1. One exact persisted local snapshot is visible under explicit dual-as-of boundaries.
-2. The browser renders that snapshot before any runtime command.
-3. The user explicitly chooses “运行模拟更新演示”.
-4. The server revalidates exact scope and prior snapshot fingerprint.
-5. The injected completed-session sequence identifies one missing session.
-6. The accepted planner creates one exact bounded plan.
-7. The explicitly injected Mock port returns one complete synthetic batch.
-8. Existing validation accepts all required families and coverage.
-9. The coordinator atomically exposes one process-local synthetic projection.
-10. The page renders it in a separate “模拟更新演示” panel.
-11. The persisted local snapshot remains visible and unchanged.
-12. The technical details show synthetic source, plan/batch/projection fingerprints and blocked live gate.
-13. No database write, credential, network, Provider readiness, research, recommendation, portfolio or trading state changes.
-```
+Stop and return for explicit project-owner review if later design or implementation requires:
 
-## 24. Primary failure path
-
-```text
-1. One exact persisted local snapshot is visible.
-2. The user explicitly runs the Mock demonstration.
-3. The Mock returns one required family as partial, schema-invalid or coverage-incomplete.
-4. Existing validation rejects the entire candidate.
-5. The process-local candidate pointer is not replaced.
-6. The persisted local snapshot remains visible.
-7. The page shows a stable Chinese failure reason and one explicit retry action.
-8. No partial result, database write, source fallback or hidden retry occurs.
-```
-
-Shutdown before publication follows the same no-publication outcome.
-
-## 25. Stop conditions
-
-Stop and return for explicit project-owner review if a later design or implementation requires:
-
-- FastAPI startup side effects;
-- a raw page-load acquisition before exact scope selection;
+- FastAPI startup refresh side effects;
+- raw page-load acquisition before exact scope;
 - hidden source or series selection;
+- client-supplied planning clock;
+- identity inferred from labels/presentation JSON;
+- non-unique or fuzzy snapshot selection;
 - live THS, credentials or network;
 - weakening Issue #225;
 - treating Mock assumptions as Provider facts;
-- arbitrary adapter discovery or source fallback;
-- cross-Provider row mixing;
-- source-specific validation inside the runtime coordinator;
-- schema, migration, database table/column or durable runtime state;
-- synthetic result persisted as real local market data;
-- background task, daemon, scheduler, polling or work after application close;
+- current Mock plan used as a live production plan;
+- arbitrary adapter discovery, fallback or source mixing;
+- source-specific validation inside runtime coordinator;
+- schema, migration or durable runtime state;
+- synthetic result persisted as real local data;
+- background task, daemon, scheduler, polling or work after close;
 - partial publication;
-- automatic retry or catch-up loop;
-- latest-compatible or fuzzy snapshot selection;
+- automatic retry/catch-up loop;
 - mandatory raw identifiers as ordinary-user inputs;
 - AI-owned state, evidence acceptance, recommendation, target price, expected return, position sizing, portfolio, broker, order or trading behavior;
 - release, tag or version change.
 
-## 26. Locked exclusions
+## 20. Locked exclusions
 
-This architecture preflight authorizes no production code, API route, UI change, test, fixture, workflow, dependency, schema, migration, persistence, Provider transport, credential, source activation, scheduler, daemon, push notification, continuous polling, AI call, accepted-state mutation, recommendation, portfolio, trading, release, tag or version change.
+This architecture preflight authorizes no production code, API route, UI change, executable test, fixture, workflow, dependency, schema, migration, persistence, Provider transport, credential, source activation, scheduler, daemon, push notification, continuous polling, AI call, accepted-state mutation, recommendation, portfolio, trading, release, tag or version change.
 
-## 27. Strict delivery gates
+## 21. Strict delivery gates
 
 Before architecture merge consideration:
 
-1. Branch base is exactly `1b2de3544844647ad02beffe2e6a8e14c467fd98`.
+1. Branch base remains exactly `1b2de3544844647ad02beffe2e6a8e14c467fd98`.
 2. Base-to-head diff contains exactly:
 
 ```text
@@ -804,7 +861,7 @@ docs/today_market_refresh_runtime_integration_v1_preflight.md
 ```
 
 3. Applicable repository CI succeeds on one immutable HEAD.
-4. A fresh process-independent fixed-head review contains exactly:
+4. A fresh process-independent review verifies all five previous blockers and contains exactly:
 
 ```text
 AUTHORIZED TODAY MARKET REFRESH RUNTIME INTEGRATION V1 PREFLIGHT APPROVED at fixed head <FULL_HEAD_SHA>
