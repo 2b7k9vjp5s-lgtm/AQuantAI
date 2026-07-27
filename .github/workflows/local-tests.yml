@@ -41,6 +41,8 @@ jobs:
             backend/today_market_refresh/runtime.py
             tests/test_today_market.py
             tests/test_today_market_runtime_integration.py
+            today_market/static/today_market.html
+            today_market/static/today_market.js
           if-no-files-found: error
           retention-days: 1
 
