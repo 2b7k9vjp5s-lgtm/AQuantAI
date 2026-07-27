@@ -166,10 +166,20 @@ class DeterministicTodayMarketMock:
                     category=FailureCategory.INTERNAL_VALIDATION_FAILED,
                     retryability=Retryability.NONE,
                 )
-            fixture, fixture_fingerprint = _load_fixture(
-                self._fixture_root / fixture_name
-            )
-            return self._build_batch(plan, fixture, fixture_fingerprint)
+            try:
+                fixture, fixture_fingerprint = _load_fixture(
+                    self._fixture_root / fixture_name
+                )
+                return self._build_batch(plan, fixture, fixture_fingerprint)
+            except TodayMarketAcquisitionError:
+                raise
+            except (OSError, UnicodeError, ValueError, TypeError):
+                raise _failure(
+                    plan,
+                    code="mock_fixture_contract_invalid",
+                    category=FailureCategory.SCHEMA_MISMATCH,
+                    retryability=Retryability.NONE,
+                ) from None
         finally:
             self._usage.active_requests -= 1
 
