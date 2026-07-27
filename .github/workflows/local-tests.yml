@@ -1,117 +1,113 @@
-name: Apply Today Market Refactor
+name: Local Tests
 
 on:
   pull_request:
-
-permissions:
-  contents: write
+  push:
+    branches:
+      - main
 
 jobs:
-  apply-authorized-refactor:
+  pytest-and-demo:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aquantai
+          POSTGRES_PASSWORD: aquantai
+          POSTGRES_DB: aquantai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aquantai -d aquantai_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai_test
+
     steps:
-      - name: Check out exact PR branch
+      - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
+          python-version: "3.12"
 
-      - name: Reuse reviewed refactor script
+      - name: Install dependencies
+        run: python -m pip install -q -e ".[dev]"
+
+      - name: Check Owner Acceptance JavaScript syntax
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          from subprocess import check_output
-          from textwrap import dedent
+          node --check industry_analysis/static/owner_acceptance.js
+          node --check industry_analysis/static/owner_acceptance_pool.js
+          node --check industry_analysis/static/accepted_result.js
 
-          source = check_output(
-              [
-                  "git",
-                  "show",
-                  "b5f74374c31e3f06bad489d34ce7827c4b788328:.github/workflows/local-tests.yml",
-              ],
-              text=True,
-          )
-          lines = source.splitlines()
-          start = next(
-              index + 1
-              for index, line in enumerate(lines)
-              if line.strip() == "python - <<'PY'"
-          )
-          end = next(
-              index
-              for index in range(start, len(lines))
-              if lines[index].strip() == "PY"
-          )
-          script = dedent("\n".join(lines[start:end])) + "\n"
-          Path("/tmp/apply_today_market_refactor.py").write_text(
-              script,
-              encoding="utf-8",
-          )
-          PY
-          python /tmp/apply_today_market_refactor.py
-          git checkout -- .github/workflows/local-tests.yml
+      - name: Check Today Market runtime JavaScript syntax
+        run: node --check today_market/static/today_market.js
 
-      - name: Validate exact non-workflow refactor
+      - name: Test exact candidate pool controls
+        run: node --test tests/js/owner_acceptance_pool.test.js
+
+      - name: Run Today Market runtime integration tests
         run: |
-          python -m py_compile \
-            backend/api/today_market.py \
-            backend/main.py \
-            backend/today_market_refresh/__init__.py \
-            backend/today_market_refresh/runtime.py \
-            tests/test_today_market_runtime_integration.py
-          node --check today_market/static/today_market.js
-          python - <<'PY'
-          import ast
-          from pathlib import Path
+          set -o pipefail
+          python -m pytest tests/test_today_market_runtime_integration.py -q --tb=short 2>&1 \
+            | tee /tmp/today-market-runtime-tests.log
 
-          forbidden = (
-              "requests",
-              "httpx",
-              "urllib.request",
-              "socket",
-              "subprocess",
-              "sqlalchemy",
-              "psycopg",
-              "sqlite3",
-          )
-          path = Path("backend/today_market_refresh/runtime.py")
-          for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-              if isinstance(node, ast.Import):
-                  modules = [alias.name for alias in node.names]
-              elif isinstance(node, ast.ImportFrom):
-                  modules = [node.module or ""]
-              else:
-                  continue
-              for module in modules:
-                  assert not module.startswith(forbidden), module
-          html = Path("today_market/static/today_market.html").read_text(
-              encoding="utf-8"
-          )
-          assert "today-market-runtime-script" not in html
-          assert "series_key" not in html
-          PY
-          expected=$(printf '%s\n' \
-            backend/api/today_market.py \
-            backend/main.py \
-            backend/today_market_refresh/__init__.py \
-            backend/today_market_refresh/runtime.py \
-            tests/test_today_market_runtime_integration.py \
-            today_market/static/today_market.html \
-            today_market/static/today_market.js | sort)
-          actual=$(git diff --name-only | sort)
-          test "$actual" = "$expected"
+      - name: Upload Today Market runtime test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: today-market-runtime-test-diagnostics
+          path: /tmp/today-market-runtime-tests.log
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Commit exact authorized refactor
+      - name: Run tests
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            backend/api/today_market.py \
-            backend/main.py \
-            backend/today_market_refresh/__init__.py \
-            backend/today_market_refresh/runtime.py \
-            tests/test_today_market_runtime_integration.py \
-            today_market/static/today_market.html \
-            today_market/static/today_market.js
-          git commit -m "refactor: isolate Today Market runtime adapter (#261)"
-          git push origin HEAD:${{ github.head_ref }}
+          set -o pipefail
+          python -m pytest -q --tb=short 2>&1 | tee /tmp/full-pytest.log
+
+      - name: Upload full pytest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-pytest-diagnostics
+          path: /tmp/full-pytest.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Run local fixture demo
+        run: python -m scripts.demo_research_flow
+
+      - name: Run personal workbench fixture demo
+        run: python -m scripts.demo_industry_analysis_workbench
+
+      - name: Run candidate universe fixture demo
+        run: python -m scripts.demo_industry_analysis_candidates
+
+      - name: Run candidate review and exact result fixture demo
+        run: python -m scripts.demo_industry_analysis_review
+
+      - name: Run Owner Context v2 acceptance fixture demo
+        run: python -m scripts.demo_industry_analysis_acceptance_v2
+
+      - name: Run exact industry research result assembly demo
+        run: python -m scripts.demo_industry_research_result_assembly
+
+      - name: Run Today Market local snapshot fixture demo
+        run: python -m scripts.demo_today_market
+
+      - name: Run Phase 2B ordinary-user usability demo
+        run: python -m scripts.demo_industry_analysis_phase2b
+
+      - name: Run THS Stage C0 offline contract demo
+        run: python -m scripts.demo_ths_stage_c0_offline
+
+      - name: Run Today Market deterministic mock refresh demo
+        run: python -m scripts.demo_today_market_mock_refresh
+
+      - name: Run Today Market runtime integration demo
+        run: python -m scripts.demo_today_market_runtime_integration
