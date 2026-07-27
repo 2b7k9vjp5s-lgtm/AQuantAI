@@ -28,9 +28,6 @@ from backend.today_market_refresh import (
     canonical_sha256,
     run_mock_refresh,
 )
-from datasource.ths_structured_provider.planner import build_index_history_plan
-from datasource.ths_structured_provider.readiness import CapabilityReadiness
-from datasource.ths_structured_provider.selectors import IndexHistorySelector
 
 ROOT = Path(__file__).parents[1]
 PACKAGE_ROOT = ROOT / "backend" / "today_market_refresh"
@@ -70,6 +67,18 @@ def _sessions(
     count: int, *, start: date = date(2026, 7, 24)
 ) -> tuple[date, ...]:
     return tuple(start + timedelta(days=index) for index in range(count))
+
+
+def _build_current_ths_plan():  # type: ignore[no-untyped-def]
+    """Resolve Stage C0 modules at call time so existing reload tests remain valid."""
+
+    planner = importlib.import_module("datasource.ths_structured_provider.planner")
+    readiness = importlib.import_module("datasource.ths_structured_provider.readiness")
+    selectors = importlib.import_module("datasource.ths_structured_provider.selectors")
+    return planner.build_index_history_plan(
+        selectors.IndexHistorySelector("SYNTH.IDX.C0", 1000, 2000),
+        readiness.CapabilityReadiness(),
+    )
 
 
 def test_mock_assumption_is_frozen_synthetic_and_non_production() -> None:
@@ -176,16 +185,10 @@ def test_success_is_deterministic_synthetic_and_does_not_change_ths_readiness() 
         prior_snapshot=prior,
         capability_set=REQUIRED_CAPABILITY_FAMILIES,
     )
-    before = build_index_history_plan(
-        IndexHistorySelector("SYNTH.IDX.C0", 1000, 2000),
-        CapabilityReadiness(),
-    )
+    before = _build_current_ths_plan()
     first = run_mock_refresh(port=first_adapter, **kwargs)
     second = run_mock_refresh(port=second_adapter, **kwargs)
-    after = build_index_history_plan(
-        IndexHistorySelector("SYNTH.IDX.C0", 1000, 2000),
-        CapabilityReadiness(),
-    )
+    after = _build_current_ths_plan()
 
     assert first.state is OrchestrationState.PUBLISHED_DEMO
     assert first.candidate_projection is not None
