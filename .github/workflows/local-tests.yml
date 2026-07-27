@@ -44,6 +44,21 @@ jobs:
           node --check industry_analysis/static/owner_acceptance_pool.js
           node --check industry_analysis/static/accepted_result.js
 
+      - name: Check Today Market runtime JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html = Path("today_market/static/today_market.html").read_text(encoding="utf-8")
+          marker = '<script id="today-market-runtime-script">'
+          start = html.index(marker) + len(marker)
+          end = html.index("</script>", start)
+          Path("/tmp/today-market-runtime.js").write_text(
+              html[start:end],
+              encoding="utf-8",
+          )
+          PY
+          node --check /tmp/today-market-runtime.js
+
       - name: Test exact candidate pool controls
         run: node --test tests/js/owner_acceptance_pool.test.js
 
@@ -79,3 +94,6 @@ jobs:
 
       - name: Run Today Market deterministic mock refresh demo
         run: python -m scripts.demo_today_market_mock_refresh
+
+      - name: Run Today Market runtime integration demo
+        run: python -m scripts.demo_today_market_runtime_integration
