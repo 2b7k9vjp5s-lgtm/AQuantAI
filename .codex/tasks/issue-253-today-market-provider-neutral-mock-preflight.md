@@ -257,10 +257,10 @@ downgrade_data_loss = none
 
 ## Candidate implementation file families
 
-A later separately authorized implementation Issue may use only bounded files under:
+Repository inspection confirms that Python packages are discovered under `backend*`, while the existing top-level `today_market/` directory is a static-resource surface. A later separately authorized implementation Issue may therefore use only bounded files under:
 
 ```text
-today_market/acquisition/
+backend/today_market_refresh/
 tests/test_today_market_*mock*.py
 tests/fixtures/today_market_mock/
 scripts/demo_today_market_mock_refresh.py
