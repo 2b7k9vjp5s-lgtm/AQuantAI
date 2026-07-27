@@ -76,3 +76,6 @@ jobs:
 
       - name: Run THS Stage C0 offline contract demo
         run: python -m scripts.demo_ths_stage_c0_offline
+
+      - name: Run Today Market deterministic mock refresh demo
+        run: python -m scripts.demo_today_market_mock_refresh
