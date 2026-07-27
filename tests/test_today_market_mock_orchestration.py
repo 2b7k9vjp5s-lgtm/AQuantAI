@@ -95,6 +95,24 @@ def test_failure_scenarios_retain_prior_and_publish_nothing(
     assert "request_id" not in rendered
 
 
+def test_missing_fixture_returns_typed_redacted_failure(tmp_path: Path) -> None:
+    prior = _prior()
+    outcome = run_mock_refresh(
+        intent=_intent(),
+        expected_completed_sessions=_sessions(2),
+        prior_snapshot=prior,
+        capability_set=REQUIRED_CAPABILITY_FAMILIES,
+        port=DeterministicTodayMarketMock(fixture_root=tmp_path),
+    )
+    assert outcome.state is OrchestrationState.FAILED_RETAINED_PRIOR
+    assert outcome.prior_snapshot is prior
+    assert outcome.candidate_projection is None
+    assert outcome.failure is not None
+    assert outcome.failure.category is FailureCategory.SCHEMA_MISMATCH
+    assert outcome.failure.failure_code == "mock_fixture_contract_invalid"
+    assert str(tmp_path) not in repr(outcome)
+
+
 def test_application_shutdown_before_publish_retains_prior() -> None:
     prior = _prior()
     outcome = run_mock_refresh(
