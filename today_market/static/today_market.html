@@ -116,6 +116,24 @@
             <div id="warnings" class="warning-list"></div>
           </section>
 
+          <section id="runtime-panel" class="panel" aria-labelledby="runtime-title" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">MOCK-ONLY · PROCESS-LOCAL</p>
+                <h2 id="runtime-title">模拟更新演示</h2>
+                <p>模拟结果与本地市场快照分开展示，不写入数据库，也不代表真实数据源已就绪。</p>
+              </div>
+              <span id="runtime-state-pill" class="status-pill">尚未读取运行状态</span>
+            </div>
+            <div id="runtime-explanation" class="explanation-grid"></div>
+            <div id="runtime-candidate" class="scope-warning"></div>
+            <button id="runtime-retry" class="button button-secondary" type="button" hidden>重新运行模拟演示</button>
+            <details>
+              <summary>查看模拟运行技术详情</summary>
+              <pre id="runtime-technical"></pre>
+            </details>
+          </section>
+
           <section class="panel" aria-labelledby="price-title">
             <h2 id="price-title">价格行为</h2>
             <div id="price-behavior" class="data-grid"></div>

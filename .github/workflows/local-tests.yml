@@ -44,11 +44,40 @@ jobs:
           node --check industry_analysis/static/owner_acceptance_pool.js
           node --check industry_analysis/static/accepted_result.js
 
+      - name: Check Today Market runtime JavaScript syntax
+        run: node --check today_market/static/today_market.js
+
       - name: Test exact candidate pool controls
         run: node --test tests/js/owner_acceptance_pool.test.js
 
+      - name: Run Today Market runtime integration tests
+        run: |
+          set -o pipefail
+          python -m pytest tests/test_today_market_runtime_integration.py -q --tb=short 2>&1 \
+            | tee /tmp/today-market-runtime-tests.log
+
+      - name: Upload Today Market runtime test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: today-market-runtime-test-diagnostics
+          path: /tmp/today-market-runtime-tests.log
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Run tests
-        run: python -m pytest -q --tb=short
+        run: |
+          set -o pipefail
+          python -m pytest -q --tb=short 2>&1 | tee /tmp/full-pytest.log
+
+      - name: Upload full pytest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-pytest-diagnostics
+          path: /tmp/full-pytest.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run local fixture demo
         run: python -m scripts.demo_research_flow
@@ -79,3 +108,6 @@ jobs:
 
       - name: Run Today Market deterministic mock refresh demo
         run: python -m scripts.demo_today_market_mock_refresh
+
+      - name: Run Today Market runtime integration demo
+        run: python -m scripts.demo_today_market_runtime_integration
