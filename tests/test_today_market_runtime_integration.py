@@ -7,11 +7,11 @@ from pathlib import Path
 from threading import Event, Lock
 
 import pytest
-import backend.today_market_refresh.runtime as runtime_module
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
+import backend.today_market_refresh.runtime as runtime_module
 from backend.api.today_market import TodayMarketBoundaries, TodayMarketSnapshotRequest
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun
