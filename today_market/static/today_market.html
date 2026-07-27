@@ -116,6 +116,24 @@
             <div id="warnings" class="warning-list"></div>
           </section>
 
+          <section id="runtime-panel" class="panel" aria-labelledby="runtime-title" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">MOCK-ONLY · PROCESS-LOCAL</p>
+                <h2 id="runtime-title">模拟更新演示</h2>
+                <p>模拟结果与本地市场快照分开展示，不写入数据库，也不代表真实数据源已就绪。</p>
+              </div>
+              <span id="runtime-state-pill" class="status-pill">尚未读取运行状态</span>
+            </div>
+            <div id="runtime-explanation" class="explanation-grid"></div>
+            <div id="runtime-candidate" class="scope-warning"></div>
+            <button id="runtime-retry" class="button button-secondary" type="button" hidden>重新运行模拟演示</button>
+            <details>
+              <summary>查看模拟运行技术详情</summary>
+              <pre id="runtime-technical"></pre>
+            </details>
+          </section>
+
           <section class="panel" aria-labelledby="price-title">
             <h2 id="price-title">价格行为</h2>
             <div id="price-behavior" class="data-grid"></div>
@@ -163,5 +181,222 @@
     </div>
   </div>
   <script src="/today-market/static/today_market.js" defer></script>
+  <script id="today-market-runtime-script">
+(() => {
+  "use strict";
+
+  const snapshotContent = document.querySelector("#snapshot-content");
+  const panel = document.querySelector("#runtime-panel");
+  const pill = document.querySelector("#runtime-state-pill");
+  const explanation = document.querySelector("#runtime-explanation");
+  const candidate = document.querySelector("#runtime-candidate");
+  const retryButton = document.querySelector("#runtime-retry");
+  const technical = document.querySelector("#runtime-technical");
+  const automaticScopes = new Set();
+  let currentStatus = null;
+  let requestVersion = 0;
+
+  function selectedScopeQuery() {
+    const cutoff = document.querySelector("#as-of-cutoff").value;
+    const recordedRaw = document.querySelector("#as-of-recorded-at").value;
+    const equity = document.querySelector("#equity-series").value;
+    if (!cutoff || !recordedRaw || !equity) return null;
+    const recorded = new Date(recordedRaw);
+    if (Number.isNaN(recorded.getTime())) return null;
+    const params = new URLSearchParams({
+      as_of_cutoff: cutoff,
+      as_of_recorded_at_utc: recorded.toISOString(),
+      equity_series_key: equity,
+    });
+    const benchmark = document.querySelector("#benchmark-series").value;
+    const sector = document.querySelector("#sector-series").value;
+    if (benchmark) params.set("benchmark_series_key", benchmark);
+    if (sector) params.set("sector_series_key", sector);
+    return params;
+  }
+
+  async function jsonRequest(url, options = {}) {
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+      },
+      ...options,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload.detail || {};
+      const error = new Error(detail.message || "运行状态读取失败。");
+      error.code = detail.code || `http_${response.status}`;
+      error.currentStatus = detail.current_status || null;
+      throw error;
+    }
+    return payload;
+  }
+
+  function explanationItem(title, value) {
+    const item = document.createElement("div");
+    item.className = "explanation-item";
+    const heading = document.createElement("strong");
+    heading.textContent = title;
+    const text = document.createElement("span");
+    text.textContent = value || "无可用说明";
+    item.append(heading, text);
+    return item;
+  }
+
+  function renderStatus(status) {
+    currentStatus = status;
+    panel.hidden = false;
+    pill.textContent = phaseLabel(status.phase);
+    const state = status.state_explanation || {};
+    explanation.replaceChildren(
+      explanationItem("发生了什么", state.what_happened),
+      explanationItem("为什么重要", state.why_it_matters),
+      explanationItem("现在可以做什么", state.available_action),
+    );
+    candidate.replaceChildren();
+    if (status.candidate_projection) {
+      const heading = document.createElement("h3");
+      heading.textContent = "模拟候选结果（不写入本地历史）";
+      const message = document.createElement("p");
+      message.textContent = status.candidate_projection.message_zh;
+      const metadata = document.createElement("p");
+      metadata.textContent = [
+        status.candidate_projection.source_label,
+        `数据截至 ${status.candidate_projection.data_through_session}`,
+        "明确标记为模拟数据",
+      ].join(" · ");
+      candidate.append(heading, message, metadata);
+    } else {
+      const message = document.createElement("p");
+      message.textContent = status.mock_enabled
+        ? "尚未发布完整模拟候选。"
+        : "默认应用未启用模拟更新，不会发送自动获取请求。";
+      candidate.append(message);
+    }
+    retryButton.hidden = !(status.allowed_actions || []).includes("explicit_user_retry");
+    technical.textContent = JSON.stringify({
+      runtime_scope_revision_id: status.runtime_scope_revision_id,
+      runtime_status_revision: status.runtime_status_revision,
+      runtime_status_fingerprint: status.runtime_status_fingerprint,
+      mock_enabled: status.mock_enabled,
+      mock_scenario_id: status.mock_scenario_id,
+      plan_fingerprint: status.plan_fingerprint,
+      failure: status.failure,
+      technical_details: status.technical_details,
+    }, null, 2);
+  }
+
+  function phaseLabel(phase) {
+    const labels = {
+      prior_snapshot_ready: "模拟更新已准备",
+      mock_not_enabled: "模拟更新未启用",
+      refresh_in_progress: "模拟更新进行中",
+      demo_published: "完整模拟结果已发布",
+      no_refresh_needed: "无需模拟补齐",
+      not_initialized: "本地快照未初始化",
+      manual_catchup_required: "需要手动补齐",
+      failed_retained_prior: "模拟失败，已保留原快照",
+      cancelled_retained_prior: "模拟取消，已保留原快照",
+      scope_stale: "运行范围已失效",
+    };
+    return labels[phase] || phase;
+  }
+
+  function commandBody(status, trigger) {
+    const scope = status.runtime_scope;
+    return {
+      runtime_scope_version: scope.runtime_scope_version,
+      runtime_scope_revision_id: status.runtime_scope_revision_id,
+      prior_snapshot_id: scope.prior_snapshot_id,
+      prior_snapshot_content_fingerprint: scope.prior_snapshot_content_fingerprint,
+      as_of_cutoff: scope.as_of_cutoff,
+      as_of_recorded_at_utc: scope.as_of_recorded_at_utc,
+      equity_series_key: scope.equity_series_key,
+      benchmark_series_key: scope.benchmark_series_key,
+      sector_series_key: scope.sector_series_key,
+      trigger,
+      expected_runtime_status_fingerprint: status.runtime_status_fingerprint,
+    };
+  }
+
+  async function execute(status, trigger) {
+    const version = ++requestVersion;
+    try {
+      renderStatus({
+        ...status,
+        phase: "refresh_in_progress",
+        state_explanation: {
+          what_happened: "正在执行一次同步、有限的模拟更新。",
+          why_it_matters: "先前本地快照仍是当前权威内容。",
+          available_action: "等待本次请求返回，不会后台轮询。",
+        },
+      });
+      const next = await jsonRequest("/today-market/api/runtime-refresh", {
+        method: "POST",
+        body: JSON.stringify(commandBody(status, trigger)),
+      });
+      if (version === requestVersion) renderStatus(next);
+    } catch (error) {
+      if (version !== requestVersion) return;
+      if (error.currentStatus) {
+        renderStatus(error.currentStatus);
+      } else {
+        renderStatus({
+          ...status,
+          phase: "scope_stale",
+          state_explanation: {
+            what_happened: error.message,
+            why_it_matters: "系统已在规划和获取前停止。",
+            available_action: "重新读取本地快照和运行状态。",
+          },
+        });
+      }
+    }
+  }
+
+  async function loadRuntimeStatus() {
+    const params = selectedScopeQuery();
+    if (!params || snapshotContent.hidden) return;
+    const version = ++requestVersion;
+    try {
+      const status = await jsonRequest(`/today-market/api/runtime-status?${params.toString()}`);
+      if (version !== requestVersion || snapshotContent.hidden) return;
+      renderStatus(status);
+      if (
+        status.mock_enabled
+        && status.automatic_attempt_state === "not_attempted"
+        && !automaticScopes.has(status.runtime_scope_revision_id)
+      ) {
+        automaticScopes.add(status.runtime_scope_revision_id);
+        await execute(status, "first_today_market_entry");
+      }
+    } catch (error) {
+      if (version !== requestVersion) return;
+      panel.hidden = false;
+      pill.textContent = "运行状态不可用";
+      explanation.replaceChildren(
+        explanationItem("发生了什么", error.message),
+        explanationItem("为什么重要", "系统没有对未知或失效状态作推断。"),
+        explanationItem("现在可以做什么", "重新读取本地快照后再试。"),
+      );
+      candidate.replaceChildren();
+      retryButton.hidden = true;
+      technical.textContent = JSON.stringify({ code: error.code }, null, 2);
+    }
+  }
+
+  retryButton.addEventListener("click", () => {
+    if (currentStatus) execute(currentStatus, "explicit_user_retry");
+  });
+
+  new MutationObserver(() => {
+    if (!snapshotContent.hidden) loadRuntimeStatus();
+  }).observe(snapshotContent, { attributes: true, attributeFilter: ["hidden"] });
+})();
+
+  </script>
 </body>
 </html>
