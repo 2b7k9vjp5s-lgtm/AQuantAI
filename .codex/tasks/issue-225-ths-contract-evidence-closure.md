@@ -1,115 +1,132 @@
-# Issue #225 — THS Contract Evidence Closure
+# Issue #225 — THS Contract Evidence Final Fail-Closed Resolution
 
 ## Authority
 
-- Project-owner instruction: continue Stage B autonomously in work mode.
-- Linked Issue: #225.
-- Parent architecture: #223 / merged PR #224.
-- Exact branch base: `1c5de620446ecbd8b36c22e6945348cb2556cf72`.
-- Risk tier: **Strict External Contract Evidence Preflight**.
-- Workflow authority: `.codex/WORKFLOW.md`.
+Project-owner instruction on 2026-07-27:
+
+```text
+进行下一步工作
+```
+
+This instruction is interpreted after:
+
+```text
+repository = 2b7k9vjp5s-lgtm/AQuantAI
+default_branch = main
+exact_base = 6e1a98f18cce689ad002e2fb8fa4f72ad1bd438d
+runtime_integration_pr = #262 / merged
+state_baseline_pr = #264 / merged
+controlling_issue = #225
+parent_roadmap = #137
+risk_tier = Strict External Contract Evidence Preflight
+```
+
+Workflow authority remains `.codex/WORKFLOW.md`.
 
 ## Objective
 
-Synchronize new non-secret official evidence from the Tonghuashun-maintained `HiThink-Tech/Financial-API` repository and narrow the remaining implementation blockers without inferring missing account limits or market-data semantics.
+Finalize Issue #225 in one explicit fail-closed state after rechecking current official public sources, without inferring missing account limits or market-data chronology.
 
-This task does not authorize production Provider code, application live-network access, credentials, schema, migration, Provider-valued fixtures, UI work, release, merge or a Stage C implementation Issue.
+This task does not authorize:
 
-## Exact evidence boundary
+- production Provider code;
+- application live-network access;
+- credentials or credential storage;
+- schema or migration changes;
+- Provider-valued fixtures;
+- source activation;
+- a Stage C implementation Issue;
+- merge, release, tag or version change.
 
-Official upstream repository:
+## Current official evidence recheck
 
-```text
-repository = HiThink-Tech/Financial-API
-commit = f8cdea908469b1b3b8bfb88dbb4d4a3959b1905c
-observed_at_utc = 2026-07-24
-```
-
-Reviewed files:
-
-```text
-README.md
-python/toolkit/marketdb/README.md
-hithink-finance-cli/src/infrastructure/fuyao/retry.ts
-hithink-finance-cli/src/infrastructure/fuyao/client.ts
-```
-
-Canonical evidence excerpt SHA-256:
+Observed on 2026-07-27:
 
 ```text
-b19b6841c9255c18b4d29b58c57029ef25dacef340d41d8f69875f0477ae64d4
+https://fuyao.aicubes.cn/docs/introduction/
+https://fuyao.aicubes.cn/docs/quickstart/
+https://fuyao.aicubes.cn/admin/
+https://github.com/HiThink-Tech/Financial-API
+latest_visible_official_repository_commit = f8cdea908469b1b3b8bfb88dbb4d4a3959b1905c
 ```
 
-No API key, account identifier, order information, request ID or Provider market value is included.
+The public recheck confirms no newer official repository commit than the already reviewed pinned commit.
 
-## Accepted determinations
+The current official material continues to support:
 
 ```text
 automated_personal_research_use_permission = confirmed_from_official_repository
 local_normalized_market_data_retention_permission = confirmed_from_official_marketdb_product
 derived_local_research_output_retention_permission = confirmed_from_official_workflows
-local_duckdb_long_term_storage = explicitly_supported
-full_market_results_local_persistence = explicitly_supported
-```
-
-The evidence supports local normalized storage, incremental synchronization, SQL analysis, factor/panel research and file export. It does not grant redistribution rights.
-
-## Fixture decision
-
-```text
-public_repository_provider_valued_fixture = prohibited_without_explicit_permission
 public_repository_fixture_strategy = synthetic_or_schema_only
-provider_valued_fixture_required_for_stage_c = false
-local_contract_validation_output = schema_and_envelope_fingerprints_only
+public_repository_provider_valued_fixture = prohibited_without_explicit_permission
+retry_reference_contract = confirmed_from_official_client
+credential_mechanism = X-api-key
+api_key_creation_and_management_shape = documented
 ```
 
-Repository tests remain zero-network and may not contain actual Provider market values. A synthetic fixture must use only fields reachable through the reviewed production contract.
+The recheck does not establish account-specific numeric quotas, completion cutoffs, revision semantics or API-key lifecycle limits.
 
-## Official reference-client retry facts
+## Evidence precedence
 
-```text
-default_timeout_ms = 30000
-default_max_attempts = 3
-retry_after_header_precedence = true
-client_backoff = exponential_1s_2s_4s_capped_8s_plus_jitter
-retryable_business_codes = [4001, 5001, 5002, 5003]
-authentication_errors = non_retryable
-validation_errors = non_retryable
-```
-
-These facts describe the official maintained client implementation. They do not establish account QPS, daily-total or concurrency entitlements.
-
-## Remaining blockers
+The accepted evidence document remains:
 
 ```text
-qps_limit = unresolved
-daily_total_limit = unresolved
-concurrency_limit = unresolved
-limit_scope = unresolved
-stage_c_dataset_completion_time = unresolved
-snapshot_complete_session_cutoff = unresolved
-correction_revision_late_data_behavior = unresolved
-stable_source_update_timestamp = unresolved
-api_key_expiry_and_max_active_keys = unresolved
-corporate_action_account_entitlement = pending_bounded_local_validation
-historical_full_market_gap_fill = separately_blocked
-historical_dated_membership = unsupported
-```
-
-The official README explicitly states that data permissions, call frequency and accessible capabilities depend on website/account authorization. Unknown values remain fail-closed.
-
-## Required output
-
-Authorized changed files:
-
-```text
-.codex/tasks/issue-225-ths-contract-evidence-closure.md
 docs/ths_today_market_contract_evidence.md
 ```
 
-No existing accepted architecture document is deleted or rewritten by this evidence-only slice. The new evidence document has focused precedence only for the facts it explicitly resolves.
+It already records the controlling outcome `blocked_quota_contract` and has focused precedence for the facts explicitly resolved there.
 
-## Required outcome
+No rewrite of the accepted evidence document, capability manifest, contract resolution or source-sync architecture is required for this finalization task.
+
+## Resolved facts retained
+
+```text
+transport_contract = confirmed
+authentication_shape = confirmed
+required_candidate_entitlements = partially_confirmed
+automated_personal_research_use_permission = confirmed_from_official_repository
+local_normalized_research_storage = supported_by_official_product_evidence
+derived_local_output_retention = confirmed_for_documented_local_research_workflows
+fixture_policy = resolved_synthetic_only
+reference_client_timeout_ms = 30000
+reference_client_max_attempts = 3
+reference_client_retry_after_precedence = true
+reference_client_retryable_business_codes = [4001, 5001, 5002, 5003]
+```
+
+Reference-client behavior is not an account quota contract.
+
+## Required unresolved facts
+
+The following remain unresolved and must not be guessed:
+
+```text
+qps_limit
+daily_total_limit
+concurrency_limit
+per_endpoint_or_global_limit_scope
+account_specific_rate_limit_headers_or_capability_fields
+stage_c_dataset_completion_time
+snapshot_complete_session_cutoff
+provider_correction_behavior
+provider_revision_behavior
+late_data_behavior
+stable_source_update_timestamp
+api_key_expiry
+api_key_inactivity_expiry
+maximum_active_keys
+revocation_effect_time
+rotation_contract
+production_dump_api_key_authentication
+current_account_dump_entitlement
+```
+
+The quick-start page documents that an API-key quantity ceiling exists, but it does not disclose the numeric ceiling or lifecycle contract. This does not close any required key-lifecycle fact.
+
+No successful low-volume call, absence of a public limit, reference-client default or Mock assumption may substitute for these facts.
+
+## Final deterministic resolution
 
 ```text
 retention_gate = closed_for_documented_local_normalized_storage
@@ -117,50 +134,80 @@ fixture_policy = resolved_synthetic_only
 retry_reference_contract = confirmed_from_official_client
 quota_gate = blocked
 completion_and_revision_semantics_gate = blocked
+api_key_lifecycle_gate = blocked
+production_dump_authentication_gate = blocked
 production_implementation_authorized = false
 overall_gate = blocked_quota_contract
+resolution_mode = explicit_fail_closed
 ```
 
-`blocked_quota_contract` is the single controlling outcome for this task. Semantic facts remain separately listed as unresolved and must also close before Stage C readiness.
+`blocked_quota_contract` is the single controlling Issue #225 outcome.
 
-## Offline evidence golden path
+The unresolved completion, correction, revision, late-data, API-key lifecycle and dump-authentication facts remain named blockers under that controlling outcome.
 
-1. Select the exact official upstream commit and reviewed files.
-2. Verify the evidence contains no secrets, account identifiers, request IDs or Provider market values.
-3. Map each quoted product/client behavior to one narrowly scoped contract fact.
-4. Resolve local normalized retention and synthetic fixture strategy without expanding redistribution rights.
-5. Preserve unresolved quota, completion, revision and key-lifecycle facts as blockers.
-6. Publish no runtime configuration, schema, network path or Provider data.
+## Consequences
 
-## Primary failure path
+Until a later separately reviewed official evidence packet changes the controlling state:
 
-If an official source does not explicitly establish a fact, retain `unresolved`; do not infer it from product positioning, source code defaults or successful account entitlement tests.
+```text
+stage_c_implementation_issue = prohibited
+live_ths_source_activation = prohibited
+application_live_network_access = prohibited
+credential_setup = prohibited
+production_http_transport = prohibited
+provider_raw_capture = prohibited
+provider_persistence = prohibited
+schema_or_migration = prohibited
+provider_valued_public_fixture = prohibited
+runtime_provider_fallback = disabled
+cross_provider_row_mixing = prohibited
+```
 
-## Stop conditions
+The default application remains Mock-disabled and performs zero acquisition.
 
-Stop if work would require:
+The accepted deterministic Mock remains test/demo infrastructure only and cannot close or bypass Issue #225.
 
-- API keys, account identifiers or private support information;
-- Provider-valued fixtures in the public repository;
-- load testing or hidden-limit probing;
-- browser session replay or undocumented endpoints;
-- production network access, code, schema or migration changes;
-- creation of a Stage C implementation Issue;
-- merge without separate owner authorization.
+## Exact authorized file
 
-## Strict delivery gates
+Only:
 
-Before merge consideration:
+```text
+.codex/tasks/issue-225-ths-contract-evidence-closure.md
+```
 
-1. verify exact base-to-head inventory;
-2. run applicable repository validation on the exact HEAD;
-3. obtain a process-independent fixed-head review containing:
+No second documentation file, production file, test, fixture, workflow, dependency, schema, migration or Provider file is authorized.
+
+## Validation
+
+Required checks:
+
+1. Base remains exact `6e1a98f18cce689ad002e2fb8fa4f72ad1bd438d`.
+2. Base-to-HEAD contains exactly this one Markdown file.
+3. `behind = 0`.
+4. The official source identities and current public state are re-read without secrets or keyed requests.
+5. Existing accepted evidence remains unchanged.
+6. Repository CI succeeds on one exact immutable HEAD.
+7. A fresh process-independent fixed-head review contains exactly:
 
 ```text
 AUTHORIZED THS CONTRACT EVIDENCE CLOSURE PREFLIGHT APPROVED at fixed head <FULL_HEAD_SHA>
 ```
 
-4. resolve all review threads;
-5. receive separate explicit project-owner merge authorization.
+8. All review threads are resolved.
+9. Merge requires a separate project-owner command equivalent to `批准合并 PR #<number>`.
+
+## Post-merge boundary
+
+Merging this documentation PR would only accept the explicit fail-closed outcome.
+
+It would not authorize:
+
+- closing Issue #225 without a separate owner instruction;
+- creating a live Stage C1 Issue, branch or PR;
+- credential or network work;
+- fallback to Tushare, AKShare, scraping or another Provider;
+- recommendation, portfolio or trading behavior.
+
+Any future official evidence must enter a new separately authorized evidence amendment and must not rewrite this historical fail-closed decision.
 
 Any new commit invalidates prior CI and fixed-head review evidence.
