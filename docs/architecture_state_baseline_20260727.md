@@ -2,9 +2,9 @@
 
 ## Status and focused authority
 
-This document synchronizes the current repository and governance state after the Today Market deterministic Mock MVP.
+This document synchronizes the current repository and governance state after the accepted Today Market Refresh Runtime Integration v1.
 
-It has focused precedence over older current-state, active-gate and next-action statements in `docs/architecture_baseline.md` as of the exact base recorded below.
+It has focused precedence over older current-state, active-gate and next-action statements in `docs/architecture_baseline.md` as of the exact baseline recorded below.
 
 It does **not** replace or modify the authoritative contracts in `docs/architecture_baseline.md` for:
 
@@ -22,16 +22,16 @@ When this document and the detailed architecture baseline differ outside current
 ```text
 repository = 2b7k9vjp5s-lgtm/AQuantAI
 default_branch = main
-main = 517c39db9dab848faf365e3a1e7bbd9cf94b0663
+main = 518d14fb6cc40e8dc5804bbed436497bfdb97ee7
 released_version = 0.2.0
 python = >=3.12
 state_observed_on = 2026-07-27
 ```
 
-The current `main` commit is the squash merge of PR #256:
+The exact `main` commit is the squash merge of PR #262:
 
 ```text
-[Strict Implementation] Today Market Deterministic Mock Adapter MVP (#256)
+[Strict Implementation] Today Market Refresh Runtime Integration v1 (#262)
 ```
 
 Documentation synchronization does not change the released version and does not authorize a release, tag or version change.
@@ -55,7 +55,7 @@ Deterministic calculations, canonicalization, accepted workflow state and histor
 
 ### Industry research and accepted-result flow
 
-The accepted Industry Thesis and ordinary-user flow now includes:
+The accepted Industry Thesis and ordinary-user flow includes:
 
 ```text
 ordinary-language scope
@@ -87,27 +87,21 @@ The result assembler:
 - does not recompute score, status, priority or downstream owner state;
 - performs no write, migration, Provider call, AI call, portfolio or trading action.
 
-Older statements that describe Issue #247 result assembly as future or active are superseded by this accepted state.
-
 ### THS public acquisition-contract evidence
 
-The official public full-market snapshot and Market Dump evidence amendment is accepted through:
+Accepted official and public evidence is synchronized through PRs #224, #226 and #252.
 
-```text
-PR = #252
-merge commit = 6084b20a2467f02465d3a9a342009a78f58e9773
-```
-
-Reviewed public documentation establishes candidate acquisition shapes for:
+Reviewed documentation establishes candidate acquisition shapes for:
 
 - current full-market A-share snapshot;
 - approximately ten-year unadjusted full-market daily-K Market Dump;
 - recent ten-trading-day unadjusted daily-K Market Dump;
-- full-history adjustment-factor event Market Dump.
+- full-history adjustment-factor event Market Dump;
+- source-specific index history and related account-capability candidates.
 
-Documented shape does not equal production readiness. Browser Cookie/session replay remains prohibited, and production API-key authentication for Market Dump download links remains unresolved.
+Documented shape does not equal production readiness. Browser Cookie/session replay remains prohibited, and unresolved account quota, completion, revision and API-key lifecycle facts remain controlled by Issue #225.
 
-### Provider-neutral Today Market application seam
+### Provider-neutral Today Market acquisition seam
 
 The accepted provider-neutral architecture is merged through:
 
@@ -138,7 +132,7 @@ Provider-neutral applies only at the application seam. It does not authorize:
 
 ### Deterministic Today Market Mock MVP
 
-The zero-network implementation is merged through:
+The zero-network Mock implementation is accepted through:
 
 ```text
 implementation Issue = #255
@@ -148,7 +142,7 @@ merge commit = 517c39db9dab848faf365e3a1e7bbd9cf94b0663
 Issue #255 = closed / completed
 ```
 
-Implemented slices:
+Implemented slices include:
 
 ```text
 M1 immutable contracts and canonical fingerprints
@@ -157,29 +151,53 @@ M3 deterministic synthetic fixture-backed acquisition adapter
 M4 prior-snapshot retention, complete-batch validation and demo projection
 ```
 
-The runtime now contains the additive package:
+The Mock is application-test infrastructure only. It does not create a valid live Provider contract or production market observation.
+
+### Today Market Refresh Runtime Integration v1
+
+The application/runtime integration architecture and implementation are accepted through:
 
 ```text
-backend.today_market_refresh
+architecture Issue = #259
+architecture PR = #260
+architecture reviewed head = 2b021a9ef17332b8afae5611c348bbc6d62ad6c4
+implementation Issue = #261
+implementation PR = #262
+implementation reviewed head = dcf3cf18d962cc91d178a2de1bd5e9c8971594ee
+Local Tests = #947
+workflow run = 30269900750
+merge commit = 518d14fb6cc40e8dc5804bbed436497bfdb97ee7
+Issue #261 = closed / completed
+PR #262 = closed / merged
 ```
 
-Its reviewed behavior includes:
+The accepted runtime contract includes:
 
-- exact refresh intents, plans, capability families and fingerprints;
-- one-session and ten-session automatic Mock planning;
-- manual catch-up state above the ten-session ceiling;
-- deterministic synthetic source provenance;
-- typed redacted fixture and validation failures;
-- no candidate publication on partial, schema-invalid or coverage-incomplete batches;
-- prior snapshot retention on every rejected candidate path;
-- distinct fingerprints for changed synthetic correction scenarios;
-- no network, credential, environment-secret, HTTP, socket, subprocess, SQLAlchemy or persistence path.
+- one immutable application-factory Mock configuration;
+- default application state `mock_enabled = false` and `mock_scenario_id = null`;
+- zero acquisition during raw application/page load;
+- one server-owned `runtime_scope_revision_id` as the sole canonical runtime-scope identity;
+- one server-owned `runtime_status_fingerprint` covering the complete visible state generation;
+- one authoritative prior-snapshot identity and canonical content path using exact selected `IngestionRun` components and service/repository provenance agreement;
+- stable prior content fingerprints that exclude only request-time `generated_at_utc` while retaining original projected and technical details;
+- `GET /today-market/api/runtime-status` with no acquisition and no database write;
+- a closed `POST /today-market/api/runtime-refresh` command that rejects client-owned scenario, source, adapter, fixture, planning-clock, URL, header, query and credential fields;
+- optimistic status comparison before planning or acquisition;
+- one process-local active attempt per exact scope;
+- same-scope concurrent single-flight behavior;
+- completed identical replay without reacquisition;
+- exactly one bounded `FIRST_TODAY_MARKET_ENTRY` attempt only in explicitly Mock-enabled test/demo application instances;
+- explicit retry only after retained-prior failure or cancellation;
+- complete synthetic candidate publication only;
+- prior persisted snapshot retention on every failure, cancellation or rejected candidate;
+- a separate ordinary-Chinese panel visibly labelled `MOCK-ONLY`, `PROCESS-LOCAL` and synthetic/demo;
+- no polling, background task, scheduler, daemon or runtime identity in `localStorage`.
 
-The Mock is application-test infrastructure only. It does not create a valid live Provider contract or production market observation.
+Database and HTTP adaptation remain in the existing Today Market API owner. The provider-neutral runtime core contains no SQLAlchemy, database, credential, network, subprocess or HTTP-framework dependency.
 
 ## Synthetic engineering assumption boundary
 
-The accepted Mock-only planning profile is:
+The accepted Mock-only planning profile remains:
 
 ```text
 assumption_profile = aquantai.today-market.mock-planning-assumption.v1
@@ -198,15 +216,15 @@ These values may be used only by deterministic Mock scenarios and tests.
 They must not:
 
 - populate THS quota or completion facts;
-- change `CapabilityReadiness`;
+- change source capability readiness;
 - be read by a future live adapter;
 - prove account entitlement;
 - close Issue #225;
-- authorize production transport, persistence or automatic refresh.
+- authorize production transport, persistence or automatic live refresh.
 
 ## Current live THS gate
 
-Issue #225 remains the sole live THS external-contract gate and must remain open.
+Issue #225 remains the sole live THS external-contract gate and must remain open until its required evidence is reviewed or the gate is explicitly resolved fail-closed.
 
 Current deterministic interpretation:
 
@@ -230,72 +248,70 @@ production_implementation_authorized = false
 overall_gate = blocked_quota_contract
 ```
 
-No live Stage C1 Issue, branch, PR, credential boundary, HTTP client, raw capture, source activation, Provider persistence or production smoke request may be created from this state alone.
+No live Stage C1 Issue, branch, PR, credential boundary, HTTP client, raw Provider capture, source activation, Provider persistence or production smoke request may be created from this state alone.
 
-## Runtime state after PR #256
+## Runtime state after PR #262
 
-When the configured local database and assets are available, the reviewed runtime includes all previously accepted research workspaces plus:
+When the configured local database and assets are available, the reviewed runtime includes:
 
 1. exact accepted Industry Thesis result assembly with an optional explicit exact candidate overlay;
-2. the provider-neutral Today Market refresh contract package;
-3. deterministic zero-network Mock planning, acquisition, validation, orchestration and demo projection.
+2. provider-neutral Today Market refresh contracts and deterministic Mock acquisition;
+3. first-entry runtime status integration over one authoritative local prior snapshot;
+4. process-local single-flight, optimistic concurrency and completed replay;
+5. Chinese-first synthetic/demo status projection separated from local persisted market state.
+
+The default application still performs no live or Mock acquisition because Mock is disabled and no production source is authorized.
 
 The runtime still does **not** provide:
 
-- application-start or first-entry integration of the refresh state machine into `/today-market`;
-- a refresh-status API or ordinary-user runtime state projection;
-- persistence of Mock or Provider acquisition candidates;
-- real THS transport or credentials;
+- real THS transport or credential use;
 - automatic trading-calendar or daily-bar acquisition;
+- persistence of acquisition candidates or runtime state;
+- immutable raw live-Provider capture and source normalization;
 - full-market individual-security history;
-- immutable raw Provider capture and source normalization;
 - corporate-action correction and adjustment implementation;
 - dated historical industry/concept membership;
-- full-market breadth, turnover or exact limit-price claims;
+- production full-market breadth, turnover or exact limit-price claims;
 - production sector-strength/hotspot and stock-anomaly calculations over authorized full coverage;
 - official announcement acquisition or first-class manual PDF import;
-- background scheduler, push notification or continuous polling.
+- operating-system scheduler, daemon, push notification or continuous polling.
+
+A successful synthetic candidate is not current-market truth and cannot replace the accepted local persisted snapshot.
 
 ## Governance state
 
 ### Open controlling work
 
-- Issue #137 remains the authoritative product roadmap.
-- Issue #225 remains open and controls live THS contract readiness.
-- Issue #257 is the Light current-state synchronization task for this document.
-
-### Completed implementation
-
-- Issue #255 is closed as completed after PR #256 merge.
-
-### Merged-work cleanup candidates
-
-The following historical Issues have linked merged work or have been superseded, but remain separate governance items until the project owner explicitly authorizes closure:
-
 ```text
-#219 controlled THS refresh architecture
-#221 Today Market automatic-refresh architecture
-#223 THS source synchronization
-#227 THS Stage C0 architecture
-#230 THS Stage C0 implementation
-#232 previous state-baseline housekeeping
-#234 owner-acceptance architecture
-#238 ordinary-user completion architecture
-#242 Owner Context v2 architecture
-#245 Owner Context v2 implementation
-#253 provider-neutral Mock architecture
+Issue #137 = open / authoritative product roadmap
+Issue #225 = open / sole live THS external-contract gate
+Issue #263 = open / Light current-state synchronization
+open pull requests at Issue #263 creation = none
 ```
 
-This state synchronization closes none of them.
+### Completed Runtime Integration work
+
+```text
+Issue #259 = closed / completed
+PR #260 = closed / merged
+Issue #261 = closed / completed
+PR #262 = closed / merged
+```
+
+### Historical merged-work cleanup candidates
+
+Historical Issues with merged or superseded work remain separate governance items unless the project owner explicitly authorizes closure. This synchronization closes none beyond the separately completed Issue #261.
 
 ### Frozen superseded work
 
-PR #241 remains frozen and read-only:
+PR #241 is closed, unmerged and permanently read-only at:
 
 ```text
-state = open
+state = closed
 draft = true
+merged = false
 head = 3116a67ec472131eea3bf3d1bd9daee884c69ee9
+reopen = prohibited
 resume = prohibited
 rebase = prohibited
 force_push = prohibited
@@ -304,61 +320,46 @@ merge = prohibited
 
 Its predecessor Issue #240 is superseded by the accepted Owner Context v2 replacement path. Neither #240 nor #241 may be resumed or modified without an explicit new project-owner decision.
 
-## Next governed product gate
+## Next governed gate
 
-After this baseline synchronization PR is explicitly authorized and merged, the next authorized roadmap phase is:
+The next controlling gate for production Today Market automatic daily data is the existing Issue #225 evidence closure or explicit fail-closed resolution.
+
+Required sequence:
 
 ```text
-Today Market Refresh Runtime Integration v1
-Strict Architecture Preflight
+Issue #225 non-secret contract evidence
+  -> exact reviewed outcome
+  -> ready_for_separate_stage_c_implementation_issue
+     or one explicit blocked outcome
+  -> separate project-owner instruction
+  -> only then create any live Stage C1 architecture or implementation Issue/PR
 ```
 
-The preflight must be created from the exact post-merge `main` commit and must define only the application/runtime integration boundary for already accepted local snapshot and provider-neutral refresh contracts.
+Runtime Integration completion does not bypass this sequence.
 
-Expected product path:
+While Issue #225 remains blocked:
 
-```text
-enter /today-market or application-start entry
-  -> render the prior valid local snapshot immediately
-  -> perform one deterministic stale check
-  -> build one bounded provider-neutral refresh plan
-  -> call an explicitly selected acquisition port
-  -> validate the complete candidate batch
-  -> atomically expose a complete candidate projection
-  -> retain the prior snapshot on failure or shutdown
-  -> show stable ordinary-Chinese refresh state and next action
-```
+- no live THS source is enabled;
+- no credential boundary or production HTTP transport is added;
+- no source-valued fixture enters the public repository;
+- no quota, completion or revision value is inferred from the Mock profile;
+- no hidden Tushare, AKShare or other Provider fallback is introduced;
+- no cross-Provider row mixing is permitted.
 
-The preflight must decide:
+Any separate non-live product slice also requires an explicit project-owner instruction and its own governed Issue/PR.
 
-- exact trigger and idempotency boundaries;
-- prior-snapshot versus candidate-snapshot ownership;
-- application state DTOs and Chinese-first presentation states;
-- Mock/demo mode isolation from production local market data;
-- behavior when no live Provider is configured or authorized;
-- insertion point for a future THS adapter without weakening Issue #225;
-- API/UI scope for a later separately authorized implementation;
-- migration and persistence decision;
-- rollback, failure and zero-network CI contracts.
-
-The preflight must **not** authorize implementation, live THS access, credentials, Provider-valued fixtures, schema/migration, persistence, scheduler, source fallback, recommendation, portfolio or trading behavior.
-
-## Required execution sequence
+## Required execution sequence for this synchronization
 
 ```text
-Issue #257 baseline synchronization
-  -> Light PR
-  -> checks and author-side exact-head review
-  -> separate explicit owner merge authorization
+Issue #263
+  -> one-file Light documentation branch and Draft PR
+  -> exact-head CI and author-side fixed-head review
+  -> separate explicit project-owner merge authorization
   -> merge to main
-  -> create Runtime Integration Strict Architecture Issue from new exact main
-  -> architecture branch and Draft PR
-  -> exact-head CI and process-independent fixed-head review
-  -> separate explicit owner merge authorization
-  -> later separate implementation Issue/PR only after architecture merge
+  -> separately choose and authorize the next governed product slice
 ```
 
-The current project-owner instruction authorizes entering the Runtime Integration architecture phase **after** baseline synchronization is merged. It does not waive the separate merge gate for either PR.
+This synchronization does not itself authorize the next architecture or implementation task.
 
 ## Locked boundaries
 
@@ -367,8 +368,8 @@ This synchronization authorizes no change to:
 - runtime code or behavior;
 - API or UI routes;
 - database schemas or migrations;
-- dependencies or workflow configuration;
+- dependencies, fixtures, executable tests or workflow configuration;
 - Provider transport, credentials or account probing;
 - accepted research or candidate history;
 - release, tag or version;
-- recommendation, target price, expected return, position sizing, broker, order or trading behavior.
+- recommendation, target price, expected return, position sizing, portfolio, broker, order or trading behavior.
