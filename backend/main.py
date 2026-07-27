@@ -38,7 +38,6 @@ from backend.api.today_market import router as today_market_router
 from backend.today_market_refresh.runtime import (
     TodayMarketMockRuntimeConfigurationV1,
     install_today_market_runtime,
-    router as today_market_runtime_router,
 )
 from dashboard import build_dashboard_overview, build_dashboard_report
 
@@ -116,7 +115,6 @@ app.mount(
 )
 app.include_router(market_cockpit_router)
 app.include_router(today_market_router)
-app.include_router(today_market_runtime_router)
 app.include_router(industry_alpha_router)
 app.include_router(beneficiary_semantics_router)
 app.include_router(evidence_intelligence_router)

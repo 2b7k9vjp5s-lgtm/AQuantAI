@@ -51,7 +51,6 @@ from .runtime import (
     TodayMarketPriorSnapshotContext,
     TodayMarketRuntimeCoordinator,
     TodayMarketRuntimeScopeV1,
-    build_prior_snapshot_context,
     build_runtime_scope,
     install_today_market_runtime,
 )
@@ -101,7 +100,6 @@ __all__ = [
     "TodayMarketSourceProvenance",
     "ValidationStatus",
     "build_demo_projection",
-    "build_prior_snapshot_context",
     "build_refresh_plan",
     "build_runtime_scope",
     "canonical_json_bytes",

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
@@ -47,6 +48,19 @@ from market_cockpit.sector_repository import (
 )
 from market_cockpit.service import MarketCockpitService
 
+from backend.today_market_refresh.contracts import RefreshTrigger, SnapshotReference
+from backend.today_market_refresh.fingerprint import canonical_sha256
+from backend.today_market_refresh.runtime import (
+    RUNTIME_SCOPE_VERSION,
+    RuntimeScopeConflict,
+    RuntimeStatusConflict,
+    TodayMarketMockRuntimeConfigurationV1,
+    TodayMarketPriorSnapshotContext,
+    TodayMarketRuntimeCoordinator,
+    TodayMarketRuntimeScopeV1,
+    build_runtime_scope,
+)
+
 router = APIRouter(prefix="/today-market/api", tags=["today-market"])
 _CATALOG_LIMIT = 20
 _FAMILY_BY_DATASET = {
@@ -54,6 +68,41 @@ _FAMILY_BY_DATASET = {
     BENCHMARK_DATASET: "benchmark",
     SECTOR_DATASET: "sector",
 }
+
+SNAPSHOT_IDENTITY_VERSION = "aquantai.today-market-local-snapshot-identity.v1"
+SNAPSHOT_CONTENT_VERSION = "aquantai.today-market-local-snapshot-content.v1"
+_DATASET_BY_RUNTIME_FAMILY = {
+    "equity": MARKET_DATASET,
+    "benchmark": BENCHMARK_DATASET,
+    "sector": SECTOR_DATASET,
+}
+_ALLOWED_RUNTIME_COMMAND_FIELDS = {
+    "runtime_scope_version",
+    "runtime_scope_revision_id",
+    "prior_snapshot_id",
+    "prior_snapshot_content_fingerprint",
+    "as_of_cutoff",
+    "as_of_recorded_at_utc",
+    "equity_series_key",
+    "benchmark_series_key",
+    "sector_series_key",
+    "trigger",
+    "expected_runtime_status_fingerprint",
+}
+_DOMAIN_SNAPSHOT_KEYS = (
+    "provenance",
+    "universe_stock_count",
+    "available_stock_count",
+    "scope_coverage_status",
+    "calculation_status",
+    "completeness_status",
+    "warnings",
+    "price_behavior_context",
+    "liquidity_context",
+    "benchmark_context",
+    "sector_context",
+    "latest_data_diagnostics",
+)
 
 
 @dataclass(frozen=True)
@@ -565,3 +614,473 @@ def _utc_iso(value: datetime) -> str:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def build_prior_snapshot_context(
+    request: TodayMarketSnapshotRequest,
+    session_factory: sessionmaker[Session],
+) -> TodayMarketPriorSnapshotContext:
+    projected = today_market_snapshot(
+        request=request,
+        session_factory=session_factory,
+    )
+    raw = projected["technical_details"]["raw_market_cockpit_snapshot"]
+    components: list[dict[str, Any] | None] = []
+    with session_factory() as session:
+        for family, series_key in (
+            ("equity", request.equity_series_key),
+            ("benchmark", request.benchmark_series_key),
+            ("sector", request.sector_series_key),
+        ):
+            components.append(
+                None
+                if series_key is None
+                else _authoritative_component(
+                    session,
+                    family=family,
+                    series_key=series_key,
+                    boundaries=request.boundaries,
+                )
+            )
+    equity_component = components[0]
+    if equity_component is None:
+        raise RuntimeError("equity component is required")
+    components[0] = _bind_component_to_service(
+        equity_component,
+        raw.get("provenance"),
+        effective_session_key="effective_as_of_session",
+    )
+    benchmark_component = components[1]
+    benchmark_context = raw.get("benchmark_context")
+    if benchmark_component is not None:
+        components[1] = _bind_component_to_service(
+            benchmark_component,
+            (
+                benchmark_context.get("provenance")
+                if isinstance(benchmark_context, Mapping)
+                else None
+            ),
+            effective_session_key="effective_benchmark_session",
+        )
+    sector_component = components[2]
+    sector_context = raw.get("sector_context")
+    if sector_component is not None:
+        components[2] = _bind_component_to_service(
+            sector_component,
+            (
+                sector_context.get("provenance")
+                if isinstance(sector_context, Mapping)
+                else None
+            ),
+            effective_session_key="effective_sector_session",
+        )
+
+    identity_payload = {
+        "snapshot_identity_version": SNAPSHOT_IDENTITY_VERSION,
+        "as_of_cutoff": request.boundaries.cutoff.isoformat(),
+        "as_of_recorded_at_utc": request.boundaries.recorded_at_iso,
+        "selected_components": components,
+        "market_snapshot_contract_version": raw.get(
+            "snapshot_contract_version",
+            raw.get("contract_version", "market-cockpit-domain-snapshot"),
+        ),
+    }
+    content_payload = {
+        "snapshot_content_version": SNAPSHOT_CONTENT_VERSION,
+        "identity_payload": identity_payload,
+        "market_cockpit_domain_snapshot": (
+            _canonical_market_cockpit_domain_snapshot(raw)
+        ),
+    }
+    effective_session = date.fromisoformat(
+        projected["scope_and_freshness"]["effective_equity_session"]
+    )
+    return TodayMarketPriorSnapshotContext(
+        snapshot_reference=SnapshotReference(
+            snapshot_id=(
+                "today-market-local-v1:" + canonical_sha256(identity_payload)
+            ),
+            data_through_session=effective_session,
+            content_fingerprint=canonical_sha256(content_payload),
+        ),
+        identity_payload=identity_payload,
+        content_payload=content_payload,
+        projected_snapshot=projected,
+    )
+
+
+@router.get("/runtime-status")
+def today_market_runtime_status(
+    http_request: Request,
+    snapshot_request: TodayMarketSnapshotRequest = Depends(
+        require_today_market_snapshot_request
+    ),
+    session_factory: sessionmaker[Session] = Depends(
+        get_today_market_session_factory
+    ),
+) -> dict[str, Any]:
+    try:
+        prior = build_prior_snapshot_context(snapshot_request, session_factory)
+        configuration, _, coordinator = _app_runtime_dependencies(http_request)
+        scope = build_runtime_scope(
+            request=snapshot_request,
+            prior=prior,
+            configuration=configuration,
+        )
+        return coordinator.get_status(scope, configuration)
+    except RuntimeScopeConflict as exc:
+        raise _error(
+            409,
+            "runtime_scope_identity_conflict",
+            "本地快照身份与权威读取结果不一致，请重新读取。",
+        ) from exc
+
+
+@router.post("/runtime-refresh")
+def today_market_runtime_refresh(
+    http_request: Request,
+    payload: dict[str, Any] = Body(...),
+) -> dict[str, Any]:
+    command = _validate_command(payload)
+    snapshot_request = _snapshot_request_from_command(command)
+    try:
+        engine = build_engine()
+    except RuntimeError as exc:
+        raise _error(
+            503,
+            "runtime_database_unavailable",
+            "本地数据库不可用，模拟更新未执行。",
+        ) from exc
+    try:
+        session_factory = build_session_factory(engine)
+        prior = build_prior_snapshot_context(snapshot_request, session_factory)
+        configuration, fixture_root, coordinator = _app_runtime_dependencies(
+            http_request
+        )
+        scope = build_runtime_scope(
+            request=snapshot_request,
+            prior=prior,
+            configuration=configuration,
+        )
+        _compare_command_scope(command, scope, prior)
+        try:
+            trigger = RefreshTrigger(str(command["trigger"]))
+        except ValueError as exc:
+            raise _error(
+                422,
+                "runtime_trigger_not_allowed",
+                "当前触发方式未获授权。",
+            ) from exc
+        try:
+            return coordinator.execute(
+                scope=scope,
+                configuration=configuration,
+                expected_runtime_status_fingerprint=str(
+                    command["expected_runtime_status_fingerprint"]
+                ),
+                trigger=trigger,
+                fixture_root=fixture_root,
+            )
+        except RuntimeStatusConflict as exc:
+            current = coordinator.get_status(scope, configuration)
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "runtime_status_conflict",
+                    "message": "运行状态已变化，请使用最新状态重试。",
+                    "current_status": current,
+                },
+            ) from exc
+        except RuntimeScopeConflict as exc:
+            raise _error(
+                409,
+                "runtime_mock_not_enabled",
+                "当前应用未启用模拟更新。",
+            ) from exc
+        except ValueError as exc:
+            raise _error(
+                422,
+                "runtime_trigger_not_allowed",
+                "当前状态不允许此操作。",
+            ) from exc
+    except RuntimeScopeConflict as exc:
+        raise _error(
+            409,
+            "runtime_scope_identity_conflict",
+            "本地快照身份与权威读取结果不一致，请重新读取。",
+        ) from exc
+    except SQLAlchemyError as exc:
+        raise _error(
+            503,
+            "runtime_database_unavailable",
+            "本地数据库读取失败，模拟更新未执行。",
+        ) from exc
+    except RuntimeError as exc:
+        raise _error(
+            500,
+            "runtime_internal_validation_failed",
+            "模拟更新内部校验失败，先前本地快照保持不变。",
+        ) from exc
+    finally:
+        engine.dispose()
+
+
+def _canonical_market_cockpit_domain_snapshot(
+    raw: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Exclude request-time clocks without mutating the projected snapshot."""
+
+    domain = {key: raw.get(key) for key in _DOMAIN_SNAPSHOT_KEYS}
+    domain["provenance"] = _canonical_domain_provenance(
+        domain.get("provenance")
+    )
+    domain["benchmark_context"] = _canonical_domain_context(
+        domain.get("benchmark_context")
+    )
+    domain["sector_context"] = _canonical_domain_context(
+        domain.get("sector_context")
+    )
+    return domain
+
+
+def _canonical_domain_context(value: Any) -> Any:
+    if not isinstance(value, Mapping):
+        return value
+    context = dict(value)
+    context["provenance"] = _canonical_domain_provenance(
+        context.get("provenance")
+    )
+    return context
+
+
+def _canonical_domain_provenance(value: Any) -> Any:
+    if not isinstance(value, Mapping):
+        return value
+    return {
+        key: item
+        for key, item in value.items()
+        if key != "generated_at_utc"
+    }
+
+
+def _authoritative_component(
+    session: Session,
+    *,
+    family: str,
+    series_key: str,
+    boundaries: TodayMarketBoundaries,
+) -> dict[str, Any]:
+    dataset = _DATASET_BY_RUNTIME_FAMILY[family]
+    run = session.scalar(
+        select(IngestionRun)
+        .where(
+            IngestionRun.dataset == dataset,
+            IngestionRun.series_key == series_key,
+            IngestionRun.status == "succeeded",
+            IngestionRun.snapshot_mode == "complete",
+            IngestionRun.information_cutoff_date <= boundaries.cutoff,
+            IngestionRun.imported_at <= boundaries.recorded_at,
+            IngestionRun.completed_at.is_not(None),
+            IngestionRun.completed_at <= boundaries.recorded_at,
+        )
+        .order_by(
+            IngestionRun.information_cutoff_date.desc(),
+            IngestionRun.completed_at.desc(),
+            IngestionRun.id.desc(),
+        )
+        .limit(1)
+    )
+    if run is None or run.completed_at is None:
+        raise RuntimeScopeConflict("authoritative ingestion run is unavailable")
+    raw_identity = dict(run.series_identity)
+    if family == "equity":
+        canonical_identity = dict(
+            validate_snapshot_series_identity(
+                SnapshotSeriesIdentity(run.series_key, raw_identity)
+            ).canonical
+        )
+    elif family == "benchmark":
+        canonical_identity = dict(
+            validate_benchmark_series_identity(
+                BenchmarkSeriesIdentity(run.series_key, raw_identity)
+            ).canonical
+        )
+    elif family == "sector":
+        canonical_identity = dict(
+            validate_sector_series_identity(
+                SectorSeriesIdentity(run.series_key, raw_identity)
+            ).canonical
+        )
+    else:
+        raise RuntimeScopeConflict("unsupported authoritative snapshot family")
+    return {
+        "family_key": family,
+        "ingestion_run_id": run.id,
+        "dataset": run.dataset,
+        "provider": run.provider,
+        "series_key": run.series_key,
+        "information_cutoff_date": run.information_cutoff_date.isoformat(),
+        "imported_at_utc": _utc_iso(run.imported_at),
+        "completed_at_utc": _utc_iso(run.completed_at),
+        "snapshot_mode": run.snapshot_mode,
+        "effective_session": None,
+        "canonical_series_identity": canonical_identity,
+    }
+
+
+def _bind_component_to_service(
+    component: dict[str, Any],
+    provenance: Mapping[str, Any] | None,
+    *,
+    effective_session_key: str,
+) -> dict[str, Any]:
+    if not isinstance(provenance, Mapping):
+        raise RuntimeScopeConflict("service provenance is unavailable")
+    expected = {
+        "ingestion_run_id": component["ingestion_run_id"],
+        "provider": component["provider"],
+        "series_key": component["series_key"],
+    }
+    for field, value in expected.items():
+        if provenance.get(field) != value:
+            raise RuntimeScopeConflict(
+                f"service/repository {field} disagreement"
+            )
+    effective_session = provenance.get(effective_session_key)
+    if effective_session is None:
+        raise RuntimeScopeConflict("service effective session is unavailable")
+    return {**component, "effective_session": str(effective_session)}
+
+
+def _validate_command(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise _error(
+            422,
+            "runtime_request_unknown_field",
+            "运行请求必须是封闭的 JSON 对象。",
+        )
+    unknown = sorted(set(payload) - _ALLOWED_RUNTIME_COMMAND_FIELDS)
+    missing = sorted(_ALLOWED_RUNTIME_COMMAND_FIELDS - set(payload))
+    if unknown:
+        raise _error(
+            422,
+            "runtime_request_unknown_field",
+            f"运行请求包含未授权字段：{', '.join(unknown)}。",
+        )
+    if missing:
+        raise _error(
+            422,
+            "runtime_request_missing_field",
+            f"运行请求缺少字段：{', '.join(missing)}。",
+        )
+    return payload
+
+
+def _snapshot_request_from_command(
+    command: Mapping[str, Any],
+) -> TodayMarketSnapshotRequest:
+    try:
+        cutoff = date.fromisoformat(str(command["as_of_cutoff"]))
+        recorded = _parse_utc(str(command["as_of_recorded_at_utc"]))
+        equity = validate_series_key(str(command["equity_series_key"]))
+        benchmark_raw = command["benchmark_series_key"]
+        sector_raw = command["sector_series_key"]
+        benchmark = (
+            None
+            if benchmark_raw is None
+            else validate_series_key(str(benchmark_raw))
+        )
+        sector = (
+            None if sector_raw is None else validate_series_key(str(sector_raw))
+        )
+    except (ValueError, TypeError, SnapshotSeriesError) as exc:
+        raise _error(
+            422,
+            "runtime_scope_stale",
+            "运行请求中的边界或数据选择无效。",
+        ) from exc
+    return TodayMarketSnapshotRequest(
+        equity_series_key=equity,
+        benchmark_series_key=benchmark,
+        sector_series_key=sector,
+        boundaries=TodayMarketBoundaries(
+            cutoff=cutoff,
+            cutoff_compact=cutoff.strftime("%Y%m%d"),
+            recorded_at=recorded,
+            recorded_at_iso=_utc_iso(recorded),
+        ),
+    )
+
+
+def _compare_command_scope(
+    command: Mapping[str, Any],
+    scope: TodayMarketRuntimeScopeV1,
+    prior: TodayMarketPriorSnapshotContext,
+) -> None:
+    if str(command["runtime_scope_version"]) != RUNTIME_SCOPE_VERSION:
+        raise _error(
+            409,
+            "runtime_scope_stale",
+            "运行范围版本已变化，请重新读取状态。",
+        )
+    if str(command["prior_snapshot_id"]) != prior.snapshot_reference.snapshot_id:
+        raise _error(
+            409,
+            "runtime_prior_snapshot_moved",
+            "先前本地快照已变化，请重新读取。",
+        )
+    if (
+        str(command["prior_snapshot_content_fingerprint"])
+        != prior.snapshot_reference.content_fingerprint
+    ):
+        raise _error(
+            409,
+            "runtime_prior_snapshot_moved",
+            "先前本地快照内容已变化，请重新读取。",
+        )
+    if (
+        str(command["runtime_scope_revision_id"])
+        != scope.runtime_scope_revision_id
+    ):
+        raise _error(
+            409,
+            "runtime_scope_stale",
+            "运行范围已变化，请重新读取状态。",
+        )
+
+
+def _app_runtime_dependencies(
+    request: Request,
+) -> tuple[
+    TodayMarketMockRuntimeConfigurationV1,
+    Path | None,
+    TodayMarketRuntimeCoordinator,
+]:
+    configuration = getattr(
+        request.app.state,
+        "today_market_runtime_configuration",
+        TodayMarketMockRuntimeConfigurationV1(),
+    )
+    fixture_root = getattr(
+        request.app.state,
+        "today_market_runtime_fixture_root",
+        None,
+    )
+    coordinator = getattr(
+        request.app.state,
+        "today_market_runtime_coordinator",
+        None,
+    )
+    if coordinator is None:
+        coordinator = TodayMarketRuntimeCoordinator()
+        request.app.state.today_market_runtime_coordinator = coordinator
+    return configuration, fixture_root, coordinator
+
+
+
+
+def _parse_utc(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed.astimezone(timezone.utc)

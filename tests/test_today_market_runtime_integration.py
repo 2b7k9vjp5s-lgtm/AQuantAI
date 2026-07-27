@@ -11,8 +11,14 @@ from fastapi import FastAPI, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-import backend.today_market_refresh.runtime as runtime_module
-from backend.api.today_market import TodayMarketBoundaries, TodayMarketSnapshotRequest
+import backend.api.today_market as today_market_api_module
+from backend.api.today_market import (
+    TodayMarketBoundaries,
+    TodayMarketSnapshotRequest,
+    _compare_command_scope,
+    _validate_command,
+    build_prior_snapshot_context,
+)
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun
 from backend.main import app as default_app
@@ -23,7 +29,6 @@ from backend.today_market_refresh import (
     TodayMarketMockRuntimeConfigurationV1,
     TodayMarketPriorSnapshotContext,
     TodayMarketRuntimeCoordinator,
-    build_prior_snapshot_context,
     build_runtime_scope,
     install_today_market_runtime,
 )
@@ -32,8 +37,6 @@ from backend.today_market_refresh.runtime import (
     RUNTIME_SCOPE_VERSION,
     RuntimeScopeConflict,
     RuntimeStatusConflict,
-    _compare_command_scope,
-    _validate_command,
 )
 from scripts.demo_today_market import (
     VISIBLE_AT,
@@ -347,7 +350,7 @@ def test_authoritative_snapshot_context_is_repeatable_and_fails_when_moved(
                 not in canonical_domain[context_key]["provenance"]
             )
 
-        original_snapshot_read = runtime_module.today_market_snapshot
+        original_snapshot_read = today_market_api_module.today_market_snapshot
 
         def changed_domain_snapshot(*args, **kwargs):
             changed = copy.deepcopy(original_snapshot_read(*args, **kwargs))
@@ -356,7 +359,7 @@ def test_authoritative_snapshot_context_is_repeatable_and_fails_when_moved(
             return changed
 
         monkeypatch.setattr(
-            runtime_module,
+            today_market_api_module,
             "today_market_snapshot",
             changed_domain_snapshot,
         )
@@ -381,15 +384,16 @@ def test_page_contract_has_one_automatic_attempt_and_no_polling() -> None:
     html = (ROOT / "today_market" / "static" / "today_market.html").read_text(
         encoding="utf-8"
     )
-    assert "/today-market/api/runtime-status" in html
-    assert "/today-market/api/runtime-refresh" in html
+    script = (ROOT / "today_market" / "static" / "today_market.js").read_text(
+        encoding="utf-8"
+    )
     assert 'id="runtime-retry"' in html
-    assert "first_today_market_entry" in html
-    assert "explicit_user_retry" in html
-    assert "MutationObserver" in html
-    assert "setInterval" not in html
     assert "模拟结果与本地市场快照分开展示" in html
     assert 'id="mock-scenario' not in html
-    assert "localStorage.setItem" not in html.split(
-        '<section id="runtime-panel"', 1
-    )[1]
+    assert "/today-market/api/runtime-status" in script
+    assert "/today-market/api/runtime-refresh" in script
+    assert "first_today_market_entry" in script
+    assert "explicit_user_retry" in script
+    assert "MutationObserver" in script
+    assert "setInterval" not in script
+    assert "aquantai.today-market.runtime" not in script
