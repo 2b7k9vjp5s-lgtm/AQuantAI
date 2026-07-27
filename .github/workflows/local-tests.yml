@@ -30,6 +30,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Upload Today Market refactor source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: today-market-refactor-source
+          path: |
+            backend/api/today_market.py
+            backend/main.py
+            backend/today_market_refresh/__init__.py
+            backend/today_market_refresh/runtime.py
+            tests/test_today_market.py
+            tests/test_today_market_runtime_integration.py
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
