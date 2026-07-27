@@ -44,23 +44,34 @@ def _sessions(count: int) -> tuple[date, ...]:
 
 
 @pytest.mark.parametrize(
-    ("scenario", "expected_category"),
+    ("scenario", "expected_category", "expected_code"),
     (
         (
             MockScenario.PARTIAL_FAMILY_FAILURE,
             FailureCategory.COVERAGE_INCOMPLETE,
+            "mock_batch_coverage_incomplete",
         ),
-        (MockScenario.SCHEMA_MISMATCH, FailureCategory.SCHEMA_MISMATCH),
-        (MockScenario.COVERAGE_INCOMPLETE, FailureCategory.COVERAGE_INCOMPLETE),
+        (
+            MockScenario.SCHEMA_MISMATCH,
+            FailureCategory.SCHEMA_MISMATCH,
+            "mock_family_schema_invalid",
+        ),
+        (
+            MockScenario.COVERAGE_INCOMPLETE,
+            FailureCategory.COVERAGE_INCOMPLETE,
+            "mock_batch_coverage_incomplete",
+        ),
         (
             MockScenario.QUOTA_ASSUMPTION_EXHAUSTED,
             FailureCategory.ASSUMPTION_BUDGET_EXHAUSTED,
+            "mock_daily_budget_exhausted",
         ),
     ),
 )
 def test_failure_scenarios_retain_prior_and_publish_nothing(
     scenario: MockScenario,
     expected_category: FailureCategory,
+    expected_code: str,
 ) -> None:
     prior = _prior()
     outcome = run_mock_refresh(
@@ -78,6 +89,7 @@ def test_failure_scenarios_retain_prior_and_publish_nothing(
     assert outcome.candidate_projection is None
     assert outcome.failure is not None
     assert outcome.failure.category is expected_category
+    assert outcome.failure.failure_code == expected_code
     rendered = repr(outcome)
     assert "X-api-key" not in rendered
     assert "request_id" not in rendered
@@ -98,6 +110,7 @@ def test_application_shutdown_before_publish_retains_prior() -> None:
     assert outcome.candidate_projection is None
     assert outcome.failure is not None
     assert outcome.failure.category is FailureCategory.APPLICATION_SHUTDOWN
+    assert outcome.failure.failure_code == "application_shutdown_before_publish"
     assert outcome.message_zh == "应用已关闭，更新未继续执行"
 
 
