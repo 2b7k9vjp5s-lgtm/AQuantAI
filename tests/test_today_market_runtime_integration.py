@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import copy
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from threading import Event, Lock
 
 import pytest
+import backend.today_market_refresh.runtime as runtime_module
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
@@ -295,7 +297,9 @@ def test_closed_command_rejects_client_scenario_and_moved_prior() -> None:
     assert conflict.value.detail["code"] == "runtime_prior_snapshot_moved"
 
 
-def test_authoritative_snapshot_context_is_repeatable_and_fails_when_moved() -> None:
+def test_authoritative_snapshot_context_is_repeatable_and_fails_when_moved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -324,6 +328,44 @@ def test_authoritative_snapshot_context_is_repeatable_and_fails_when_moved() -> 
         assert first.snapshot_reference == second.snapshot_reference
         assert first.identity_payload == second.identity_payload
         assert first.content_payload == second.content_payload
+
+        projected_domain = first.projected_snapshot["technical_details"][
+            "raw_market_cockpit_snapshot"
+        ]
+        canonical_domain = first.content_payload[
+            "market_cockpit_domain_snapshot"
+        ]
+        assert "generated_at_utc" in projected_domain["provenance"]
+        assert "generated_at_utc" not in canonical_domain["provenance"]
+        for context_key in ("benchmark_context", "sector_context"):
+            assert (
+                "generated_at_utc"
+                in projected_domain[context_key]["provenance"]
+            )
+            assert (
+                "generated_at_utc"
+                not in canonical_domain[context_key]["provenance"]
+            )
+
+        original_snapshot_read = runtime_module.today_market_snapshot
+
+        def changed_domain_snapshot(*args, **kwargs):
+            changed = copy.deepcopy(original_snapshot_read(*args, **kwargs))
+            raw = changed["technical_details"]["raw_market_cockpit_snapshot"]
+            raw["available_stock_count"] += 1
+            return changed
+
+        monkeypatch.setattr(
+            runtime_module,
+            "today_market_snapshot",
+            changed_domain_snapshot,
+        )
+        changed = build_prior_snapshot_context(request, session_factory)
+        assert changed.snapshot_reference.snapshot_id == first.snapshot_reference.snapshot_id
+        assert (
+            changed.snapshot_reference.content_fingerprint
+            != first.snapshot_reference.content_fingerprint
+        )
 
         with session_factory.begin() as session:
             run = session.get(IngestionRun, equity.ingestion_run_id)
