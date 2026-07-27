@@ -62,6 +62,21 @@ jobs:
       - name: Test exact candidate pool controls
         run: node --test tests/js/owner_acceptance_pool.test.js
 
+      - name: Run Today Market runtime integration tests
+        run: |
+          set -o pipefail
+          python -m pytest tests/test_today_market_runtime_integration.py -q --tb=short 2>&1 \
+            | tee /tmp/today-market-runtime-tests.log
+
+      - name: Upload Today Market runtime test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: today-market-runtime-test-diagnostics
+          path: /tmp/today-market-runtime-tests.log
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Run tests
         run: python -m pytest -q --tb=short
 
