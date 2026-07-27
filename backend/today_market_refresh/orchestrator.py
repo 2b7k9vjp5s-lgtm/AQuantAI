@@ -131,16 +131,10 @@ def run_mock_refresh(
     try:
         projection = build_demo_projection(batch)
     except CandidateValidationError as exc:
-        message = str(exc)
-        category = (
-            FailureCategory.SCHEMA_MISMATCH
-            if "invalid" in message or "fingerprint" in message
-            else FailureCategory.COVERAGE_INCOMPLETE
-        )
         failure = _validation_failure(
             plan.refresh_attempt_id,
-            code="mock_candidate_validation_failed",
-            category=category,
+            code=exc.failure_code,
+            category=exc.category,
         )
         return TodayMarketRefreshOutcome(
             state=OrchestrationState.FAILED_RETAINED_PRIOR,
