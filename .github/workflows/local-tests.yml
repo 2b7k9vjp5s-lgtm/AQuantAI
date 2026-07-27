@@ -1,141 +1,424 @@
-name: Local Tests
+name: Apply Today Market Refactor
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+
+permissions:
+  contents: write
 
 jobs:
-  pytest-and-demo:
+  apply-authorized-refactor:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: aquantai
-          POSTGRES_PASSWORD: aquantai
-          POSTGRES_DB: aquantai_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U aquantai -d aquantai_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      TEST_DATABASE_URL: postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai_test
-
     steps:
-      - name: Check out repository
+      - name: Check out exact PR branch
         uses: actions/checkout@v4
-
-      - name: Upload Today Market refactor source snapshot
-        uses: actions/upload-artifact@v4
         with:
-          name: today-market-refactor-source
-          path: |
-            backend/api/today_market.py
-            backend/main.py
-            backend/today_market_refresh/__init__.py
-            backend/today_market_refresh/runtime.py
-            tests/test_today_market.py
-            tests/test_today_market_runtime_integration.py
-            today_market/static/today_market.html
-            today_market/static/today_market.js
-          if-no-files-found: error
-          retention-days: 1
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: python -m pip install -q -e ".[dev]"
-
-      - name: Check Owner Acceptance JavaScript syntax
-        run: |
-          node --check industry_analysis/static/owner_acceptance.js
-          node --check industry_analysis/static/owner_acceptance_pool.js
-          node --check industry_analysis/static/accepted_result.js
-
-      - name: Check Today Market runtime JavaScript syntax
+      - name: Apply reviewed adapter split
         run: |
           python - <<'PY'
           from pathlib import Path
-          html = Path("today_market/static/today_market.html").read_text(encoding="utf-8")
-          marker = '<script id="today-market-runtime-script">'
-          start = html.index(marker) + len(marker)
-          end = html.index("</script>", start)
-          Path("/tmp/today-market-runtime.js").write_text(
-              html[start:end],
-              encoding="utf-8",
+
+          root = Path('.')
+          runtime_path = root / 'backend/today_market_refresh/runtime.py'
+          api_path = root / 'backend/api/today_market.py'
+          init_path = root / 'backend/today_market_refresh/__init__.py'
+          main_path = root / 'backend/main.py'
+          test_runtime_path = root / 'tests/test_today_market_runtime_integration.py'
+          html_path = root / 'today_market/static/today_market.html'
+          js_path = root / 'today_market/static/today_market.js'
+          workflow_path = root / '.github/workflows/local-tests.yml'
+
+          runtime = runtime_path.read_text(encoding='utf-8')
+          classes_start = runtime.index('@dataclass(frozen=True, slots=True)\nclass TodayMarketMockRuntimeConfigurationV1')
+          prior_start = runtime.index('def build_prior_snapshot_context(')
+          status_start = runtime.index('def _status_dict(')
+          parse_start = runtime.index('def _parse_utc(')
+          utc_iso_start = runtime.index('def _utc_iso(')
+
+          core_header = '''"""Process-local Mock-only Today Market runtime integration."""
+
+          from __future__ import annotations
+
+          from collections.abc import Callable, Mapping
+          from dataclasses import dataclass
+          from datetime import date, datetime, timedelta, timezone
+          from pathlib import Path
+          from threading import RLock
+          from typing import Any
+
+          from .contracts import (
+              PLANNING_POLICY_VERSION,
+              REQUIRED_CAPABILITY_FAMILIES,
+              MockScenario,
+              OrchestrationState,
+              RefreshTrigger,
+              SnapshotReference,
+              TodayMarketRefreshIntent,
           )
+          from .fingerprint import canonical_sha256
+          from .mock import DeterministicTodayMarketMock
+          from .orchestrator import run_mock_refresh
+          from .port import TodayMarketAcquisitionPort
+
+          RUNTIME_SCOPE_VERSION = "aquantai.today-market-runtime-scope.v1"
+          RUNTIME_STATUS_VERSION = "aquantai.today-market-runtime-status.v1"
+          MOCK_CONFIGURATION_VERSION = "aquantai.today-market-mock-runtime-configuration.v1"
+
+          _ALLOWED_TRIGGERS = {
+              RefreshTrigger.FIRST_TODAY_MARKET_ENTRY,
+              RefreshTrigger.EXPLICIT_USER_RETRY,
+          }
+
+
+          '''
+          core_header = '\n'.join(line[10:] if line.startswith('          ') else line for line in core_header.splitlines()) + '\n'
+          core_middle = runtime[classes_start:prior_start]
+          core_tail = runtime[status_start:utc_iso_start]
+          runtime_path.write_text((core_header + core_middle + core_tail).rstrip() + '\n', encoding='utf-8')
+
+          adapter = runtime[prior_start:status_start] + '\n\n' + runtime[parse_start:utc_iso_start]
+          api = api_path.read_text(encoding='utf-8')
+          api = api.replace('from collections.abc import Iterator\n', 'from collections.abc import Iterator, Mapping\n')
+          api = api.replace('from typing import Any\n', 'from pathlib import Path\nfrom typing import Any\n')
+          api = api.replace(
+              'from fastapi import APIRouter, Depends, HTTPException, Query\n',
+              'from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request\n',
+          )
+          insert_after = 'from market_cockpit.service import MarketCockpitService\n'
+          api = api.replace(
+              insert_after,
+              insert_after + '''
+          from backend.today_market_refresh.contracts import RefreshTrigger, SnapshotReference
+          from backend.today_market_refresh.fingerprint import canonical_sha256
+          from backend.today_market_refresh.runtime import (
+              RUNTIME_SCOPE_VERSION,
+              RuntimeScopeConflict,
+              RuntimeStatusConflict,
+              TodayMarketMockRuntimeConfigurationV1,
+              TodayMarketPriorSnapshotContext,
+              TodayMarketRuntimeCoordinator,
+              TodayMarketRuntimeScopeV1,
+              build_runtime_scope,
+          )
+          '''.replace('          ', ''),
+          )
+          family_marker = '''_FAMILY_BY_DATASET = {
+              MARKET_DATASET: "equity",
+              BENCHMARK_DATASET: "benchmark",
+              SECTOR_DATASET: "sector",
+          }
+          '''.replace('          ', '')
+          api = api.replace(
+              family_marker,
+              family_marker + '''
+          SNAPSHOT_IDENTITY_VERSION = "aquantai.today-market-local-snapshot-identity.v1"
+          SNAPSHOT_CONTENT_VERSION = "aquantai.today-market-local-snapshot-content.v1"
+          _DATASET_BY_RUNTIME_FAMILY = {
+              "equity": MARKET_DATASET,
+              "benchmark": BENCHMARK_DATASET,
+              "sector": SECTOR_DATASET,
+          }
+          _ALLOWED_RUNTIME_COMMAND_FIELDS = {
+              "runtime_scope_version",
+              "runtime_scope_revision_id",
+              "prior_snapshot_id",
+              "prior_snapshot_content_fingerprint",
+              "as_of_cutoff",
+              "as_of_recorded_at_utc",
+              "equity_series_key",
+              "benchmark_series_key",
+              "sector_series_key",
+              "trigger",
+              "expected_runtime_status_fingerprint",
+          }
+          _DOMAIN_SNAPSHOT_KEYS = (
+              "provenance",
+              "universe_stock_count",
+              "available_stock_count",
+              "scope_coverage_status",
+              "calculation_status",
+              "completeness_status",
+              "warnings",
+              "price_behavior_context",
+              "liquidity_context",
+              "benchmark_context",
+              "sector_context",
+              "latest_data_diagnostics",
+          )
+          '''.replace('          ', ''),
+          )
+          adapter = adapter.replace('_DATASET_BY_FAMILY', '_DATASET_BY_RUNTIME_FAMILY')
+          adapter = adapter.replace('_ALLOWED_COMMAND_FIELDS', '_ALLOWED_RUNTIME_COMMAND_FIELDS')
+          api_path.write_text(api.rstrip() + '\n\n\n' + adapter.strip() + '\n', encoding='utf-8')
+
+          init = init_path.read_text(encoding='utf-8')
+          init = init.replace('    build_prior_snapshot_context,\n', '')
+          init = init.replace('    "build_prior_snapshot_context",\n', '')
+          init_path.write_text(init, encoding='utf-8')
+
+          main = main_path.read_text(encoding='utf-8')
+          main = main.replace(
+              'from backend.today_market_refresh.runtime import (\n'
+              '    TodayMarketMockRuntimeConfigurationV1,\n'
+              '    install_today_market_runtime,\n'
+              '    router as today_market_runtime_router,\n'
+              ')\n',
+              'from backend.today_market_refresh.runtime import (\n'
+              '    TodayMarketMockRuntimeConfigurationV1,\n'
+              '    install_today_market_runtime,\n'
+              ')\n',
+          )
+          main = main.replace('app.include_router(today_market_runtime_router)\n', '')
+          main_path.write_text(main, encoding='utf-8')
+
+          test_runtime = test_runtime_path.read_text(encoding='utf-8')
+          test_runtime = test_runtime.replace(
+              'import backend.today_market_refresh.runtime as runtime_module\n'
+              'from backend.api.today_market import TodayMarketBoundaries, TodayMarketSnapshotRequest\n',
+              'import backend.api.today_market as today_market_api_module\n'
+              'from backend.api.today_market import (\n'
+              '    TodayMarketBoundaries,\n'
+              '    TodayMarketSnapshotRequest,\n'
+              '    _compare_command_scope,\n'
+              '    _validate_command,\n'
+              '    build_prior_snapshot_context,\n'
+              ')\n',
+          )
+          pkg_start = test_runtime.index('from backend.today_market_refresh import (')
+          pkg_end = test_runtime.index(')\nfrom backend.today_market_refresh.mock', pkg_start)
+          pkg = test_runtime[pkg_start:pkg_end].replace('    build_prior_snapshot_context,\n', '')
+          test_runtime = test_runtime[:pkg_start] + pkg + test_runtime[pkg_end:]
+          rt_start = test_runtime.index('from backend.today_market_refresh.runtime import (')
+          rt_end = test_runtime.index(')\nfrom scripts.demo_today_market', rt_start)
+          rt = test_runtime[rt_start:rt_end]
+          rt = rt.replace('    _compare_command_scope,\n', '').replace('    _validate_command,\n', '')
+          test_runtime = test_runtime[:rt_start] + rt + test_runtime[rt_end:]
+          test_runtime = test_runtime.replace('runtime_module.today_market_snapshot', 'today_market_api_module.today_market_snapshot')
+          test_runtime = test_runtime.replace('runtime_module,\n            "today_market_snapshot",', 'today_market_api_module,\n            "today_market_snapshot",')
+          old_page_test = '''def test_page_contract_has_one_automatic_attempt_and_no_polling() -> None:
+              html = (ROOT / "today_market" / "static" / "today_market.html").read_text(
+                  encoding="utf-8"
+              )
+              assert "/today-market/api/runtime-status" in html
+              assert "/today-market/api/runtime-refresh" in html
+              assert 'id="runtime-retry"' in html
+              assert "first_today_market_entry" in html
+              assert "explicit_user_retry" in html
+              assert "MutationObserver" in html
+              assert "setInterval" not in html
+              assert "模拟结果与本地市场快照分开展示" in html
+              assert 'id="mock-scenario' not in html
+              assert "localStorage.setItem" not in html.split(
+                  '<section id="runtime-panel"', 1
+              )[1]
+          '''.replace('          ', '')
+          new_page_test = '''def test_page_contract_has_one_automatic_attempt_and_no_polling() -> None:
+              html = (ROOT / "today_market" / "static" / "today_market.html").read_text(
+                  encoding="utf-8"
+              )
+              script = (ROOT / "today_market" / "static" / "today_market.js").read_text(
+                  encoding="utf-8"
+              )
+              assert 'id="runtime-retry"' in html
+              assert "模拟结果与本地市场快照分开展示" in html
+              assert 'id="mock-scenario' not in html
+              assert "/today-market/api/runtime-status" in script
+              assert "/today-market/api/runtime-refresh" in script
+              assert "first_today_market_entry" in script
+              assert "explicit_user_retry" in script
+              assert "MutationObserver" in script
+              assert "setInterval" not in script
+              assert "aquantai.today-market.runtime" not in script
+          '''.replace('          ', '')
+          if old_page_test not in test_runtime:
+              raise RuntimeError('focused page test block not found')
+          test_runtime = test_runtime.replace(old_page_test, new_page_test)
+          test_runtime_path.write_text(test_runtime, encoding='utf-8')
+
+          html = html_path.read_text(encoding='utf-8')
+          marker = '  <script id="today-market-runtime-script">\n'
+          start = html.index(marker)
+          script_start = start + len(marker)
+          end = html.index('  </script>', script_start)
+          runtime_script = html[script_start:end].strip()
+          html = html[:start] + html[end + len('  </script>\n'):]
+          html_path.write_text(html, encoding='utf-8')
+          js = js_path.read_text(encoding='utf-8').rstrip() + '\n\n' + runtime_script + '\n'
+          js_path.write_text(js, encoding='utf-8')
+
+          workflow_path.write_text('''name: Local Tests
+
+          on:
+            pull_request:
+            push:
+              branches:
+                - main
+
+          jobs:
+            pytest-and-demo:
+              runs-on: ubuntu-latest
+              services:
+                postgres:
+                  image: postgres:16
+                  env:
+                    POSTGRES_USER: aquantai
+                    POSTGRES_PASSWORD: aquantai
+                    POSTGRES_DB: aquantai_test
+                  ports:
+                    - 5432:5432
+                  options: >-
+                    --health-cmd "pg_isready -U aquantai -d aquantai_test"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 10
+              env:
+                TEST_DATABASE_URL: postgresql+psycopg://aquantai:aquantai@127.0.0.1:5432/aquantai_test
+
+              steps:
+                - name: Check out repository
+                  uses: actions/checkout@v4
+
+                - name: Set up Python
+                  uses: actions/setup-python@v5
+                  with:
+                    python-version: "3.12"
+
+                - name: Install dependencies
+                  run: python -m pip install -q -e ".[dev]"
+
+                - name: Check Owner Acceptance JavaScript syntax
+                  run: |
+                    node --check industry_analysis/static/owner_acceptance.js
+                    node --check industry_analysis/static/owner_acceptance_pool.js
+                    node --check industry_analysis/static/accepted_result.js
+
+                - name: Check Today Market runtime JavaScript syntax
+                  run: node --check today_market/static/today_market.js
+
+                - name: Test exact candidate pool controls
+                  run: node --test tests/js/owner_acceptance_pool.test.js
+
+                - name: Run Today Market runtime integration tests
+                  run: |
+                    set -o pipefail
+                    python -m pytest tests/test_today_market_runtime_integration.py -q --tb=short 2>&1 \
+                      | tee /tmp/today-market-runtime-tests.log
+
+                - name: Upload Today Market runtime test diagnostics
+                  if: always()
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: today-market-runtime-test-diagnostics
+                    path: /tmp/today-market-runtime-tests.log
+                    if-no-files-found: error
+                    retention-days: 7
+
+                - name: Run tests
+                  run: |
+                    set -o pipefail
+                    python -m pytest -q --tb=short 2>&1 | tee /tmp/full-pytest.log
+
+                - name: Upload full pytest diagnostics
+                  if: always()
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: full-pytest-diagnostics
+                    path: /tmp/full-pytest.log
+                    if-no-files-found: error
+                    retention-days: 7
+
+                - name: Run local fixture demo
+                  run: python -m scripts.demo_research_flow
+
+                - name: Run personal workbench fixture demo
+                  run: python -m scripts.demo_industry_analysis_workbench
+
+                - name: Run candidate universe fixture demo
+                  run: python -m scripts.demo_industry_analysis_candidates
+
+                - name: Run candidate review and exact result fixture demo
+                  run: python -m scripts.demo_industry_analysis_review
+
+                - name: Run Owner Context v2 acceptance fixture demo
+                  run: python -m scripts.demo_industry_analysis_acceptance_v2
+
+                - name: Run exact industry research result assembly demo
+                  run: python -m scripts.demo_industry_research_result_assembly
+
+                - name: Run Today Market local snapshot fixture demo
+                  run: python -m scripts.demo_today_market
+
+                - name: Run Phase 2B ordinary-user usability demo
+                  run: python -m scripts.demo_industry_analysis_phase2b
+
+                - name: Run THS Stage C0 offline contract demo
+                  run: python -m scripts.demo_ths_stage_c0_offline
+
+                - name: Run Today Market deterministic mock refresh demo
+                  run: python -m scripts.demo_today_market_mock_refresh
+
+                - name: Run Today Market runtime integration demo
+                  run: python -m scripts.demo_today_market_runtime_integration
+          '''.replace('          ', ''), encoding='utf-8')
           PY
-          node --check /tmp/today-market-runtime.js
 
-      - name: Test exact candidate pool controls
-        run: node --test tests/js/owner_acceptance_pool.test.js
-
-      - name: Run Today Market runtime integration tests
+      - name: Validate exact authorized refactor
         run: |
-          set -o pipefail
-          python -m pytest tests/test_today_market_runtime_integration.py -q --tb=short 2>&1 \
-            | tee /tmp/today-market-runtime-tests.log
+          python -m py_compile \
+            backend/api/today_market.py \
+            backend/main.py \
+            backend/today_market_refresh/__init__.py \
+            backend/today_market_refresh/runtime.py \
+            tests/test_today_market_runtime_integration.py
+          node --check today_market/static/today_market.js
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          forbidden = (
+              "requests", "httpx", "urllib.request", "socket", "subprocess",
+              "sqlalchemy", "psycopg", "sqlite3",
+          )
+          path = Path("backend/today_market_refresh/runtime.py")
+          for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+              if isinstance(node, ast.Import):
+                  modules = [alias.name for alias in node.names]
+              elif isinstance(node, ast.ImportFrom):
+                  modules = [node.module or ""]
+              else:
+                  continue
+              for module in modules:
+                  assert not module.startswith(forbidden), module
+          html = Path("today_market/static/today_market.html").read_text(encoding="utf-8")
+          assert "today-market-runtime-script" not in html
+          assert "series_key" not in html
+          PY
+          expected=$(printf '%s\n' \
+            .github/workflows/local-tests.yml \
+            backend/api/today_market.py \
+            backend/main.py \
+            backend/today_market_refresh/__init__.py \
+            backend/today_market_refresh/runtime.py \
+            tests/test_today_market_runtime_integration.py \
+            today_market/static/today_market.html \
+            today_market/static/today_market.js | sort)
+          actual=$(git diff --name-only | sort)
+          test "$actual" = "$expected"
 
-      - name: Upload Today Market runtime test diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: today-market-runtime-test-diagnostics
-          path: /tmp/today-market-runtime-tests.log
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Run tests
+      - name: Commit exact authorized refactor
         run: |
-          set -o pipefail
-          python -m pytest -q --tb=short 2>&1 | tee /tmp/full-pytest.log
-
-      - name: Upload full pytest diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: full-pytest-diagnostics
-          path: /tmp/full-pytest.log
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Run local fixture demo
-        run: python -m scripts.demo_research_flow
-
-      - name: Run personal workbench fixture demo
-        run: python -m scripts.demo_industry_analysis_workbench
-
-      - name: Run candidate universe fixture demo
-        run: python -m scripts.demo_industry_analysis_candidates
-
-      - name: Run candidate review and exact result fixture demo
-        run: python -m scripts.demo_industry_analysis_review
-
-      - name: Run Owner Context v2 acceptance fixture demo
-        run: python -m scripts.demo_industry_analysis_acceptance_v2
-
-      - name: Run exact industry research result assembly demo
-        run: python -m scripts.demo_industry_research_result_assembly
-
-      - name: Run Today Market local snapshot fixture demo
-        run: python -m scripts.demo_today_market
-
-      - name: Run Phase 2B ordinary-user usability demo
-        run: python -m scripts.demo_industry_analysis_phase2b
-
-      - name: Run THS Stage C0 offline contract demo
-        run: python -m scripts.demo_ths_stage_c0_offline
-
-      - name: Run Today Market deterministic mock refresh demo
-        run: python -m scripts.demo_today_market_mock_refresh
-
-      - name: Run Today Market runtime integration demo
-        run: python -m scripts.demo_today_market_runtime_integration
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .github/workflows/local-tests.yml \
+            backend/api/today_market.py \
+            backend/main.py \
+            backend/today_market_refresh/__init__.py \
+            backend/today_market_refresh/runtime.py \
+            tests/test_today_market_runtime_integration.py \
+            today_market/static/today_market.html \
+            today_market/static/today_market.js
+          git commit -m "refactor: isolate Today Market runtime adapter (#261)"
+          git push origin HEAD:${{ github.head_ref }}
