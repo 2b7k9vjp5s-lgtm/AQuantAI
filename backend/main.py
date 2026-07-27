@@ -35,12 +35,21 @@ from backend.api.investment_candidate import router as investment_candidate_rout
 from backend.api.market_cockpit import router as market_cockpit_router
 from backend.api.normalized_valuation import router as normalized_valuation_router
 from backend.api.today_market import router as today_market_router
+from backend.today_market_refresh.runtime import (
+    TodayMarketMockRuntimeConfigurationV1,
+    install_today_market_runtime,
+    router as today_market_runtime_router,
+)
 from dashboard import build_dashboard_overview, build_dashboard_report
 
 app = FastAPI(
     title="AQuantAI",
     version="0.2.0",
     description="A-share AI multi-factor quantitative research platform with a local read-only Dashboard.",
+)
+install_today_market_runtime(
+    app,
+    configuration=TodayMarketMockRuntimeConfigurationV1(),
 )
 
 DASHBOARD_STATIC_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "static"
@@ -107,6 +116,7 @@ app.mount(
 )
 app.include_router(market_cockpit_router)
 app.include_router(today_market_router)
+app.include_router(today_market_runtime_router)
 app.include_router(industry_alpha_router)
 app.include_router(beneficiary_semantics_router)
 app.include_router(evidence_intelligence_router)
