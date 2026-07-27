@@ -146,14 +146,31 @@ class MockPlanningAssumption:
     production_eligible: bool = False
 
     def __post_init__(self) -> None:
-        _require_non_empty(self.profile_id, "profile_id")
-        if self.assumption_class != "synthetic_engineering_scenario":
-            raise ValueError("assumption_class must remain synthetic_engineering_scenario")
-        if min(self.mock_qps, self.mock_concurrency, self.mock_daily_request_budget) <= 0:
-            raise ValueError("mock quota values must be positive")
-        if self.provider_confirmed or self.production_eligible:
+        reviewed_profile = (
+            MOCK_ASSUMPTION_PROFILE_ID,
+            "synthetic_engineering_scenario",
+            5,
+            2,
+            50_000,
+            time(18, 0),
+            "Asia/Shanghai",
+            False,
+            False,
+        )
+        supplied_profile = (
+            self.profile_id,
+            self.assumption_class,
+            self.mock_qps,
+            self.mock_concurrency,
+            self.mock_daily_request_budget,
+            self.mock_completion_after_local_time,
+            self.mock_timezone,
+            self.provider_confirmed,
+            self.production_eligible,
+        )
+        if supplied_profile != reviewed_profile:
             raise ValueError(
-                "mock assumptions can never be Provider-confirmed or production-eligible"
+                "mock assumption must equal the exact reviewed synthetic profile"
             )
 
 
