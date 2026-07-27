@@ -2,7 +2,9 @@
 
 ## Authority
 
-Project-owner authorization on 2026-07-27 permits this Strict Architecture Preflight only after PR #258 merged. It does not authorize production implementation, live THS access, credentials, network, schema, migration, persistence, scheduler, recommendation, portfolio, trading, release, tag or version change.
+Project-owner authorization on 2026-07-27 permits this Strict Architecture Preflight only. It does not authorize production implementation, live THS access, credentials, network, schema, migration, persistence, scheduler, recommendation, portfolio, trading, release, tag or version change.
+
+This revision preserves the five resolutions required by fixed-head review `4786108502` and resolves the two additional blockers recorded by fixed-head review `4786209951`.
 
 ## Exact base
 
@@ -20,16 +22,14 @@ risk_tier = Strict Architecture Preflight
 - Live THS external-contract gate: open Issue #225.
 - Current-state baseline: Issue #257 / merged PR #258.
 - Accepted Today Market automatic-refresh architecture: Issue #221 / merged PR #222.
-- Accepted THS source synchronization: Issue #223 / merged PR #224.
-- Accepted THS Stage C0 offline foundation: Issues #227/#230 and merged PRs #229/#231.
-- Accepted public full-market snapshot and Market Dump evidence: Issue #251 / merged PR #252.
-- Accepted provider-neutral acquisition port: Issue #253 / merged PR #254.
-- Accepted deterministic zero-network Mock: Issue #255 / merged PR #256.
+- Accepted THS synchronization architecture: Issue #223 / merged PR #224.
+- Accepted THS Stage C0 offline foundation: #227/#229 and #230/#231.
+- Accepted public full-market snapshot and Market Dump evidence: #251/#252.
+- Accepted provider-neutral acquisition port: #253/#254.
+- Accepted deterministic zero-network Mock: #255/#256.
 - Superseded PR #241 remains closed, unmerged and read-only at `3116a67ec472131eea3bf3d1bd9daee884c69ee9`.
 
-## Reviewed architecture outcome
-
-The v1 candidate remains zero-network, process-local and Mock-only:
+## Reviewed v1 outcome
 
 ```text
 raw application/page load
@@ -37,7 +37,7 @@ raw application/page load
 explicit boundaries + explicit local series
   -> exact prior local snapshot is read and rendered
   -> exact server-owned runtime scope/status is returned
-server-side Mock demo mode enabled
+server-side demo factory injects Mock enabled + one reviewed scenario
   -> browser automatically submits one bounded first-eligible-scope command
   -> one synchronous process-local attempt runs
   -> complete synthetic candidate is validated and exposed separately
@@ -45,94 +45,144 @@ failure or shutdown
   -> prior persisted snapshot remains authoritative and unchanged
 ```
 
-Mock is disabled by default. When disabled, no automatic acquisition occurs and the runtime truthfully returns `mock_not_enabled`. When explicitly injected by a test/demo application factory, the first eligible scoped interaction performs exactly one automatic Mock attempt using `FIRST_TODAY_MARKET_ENTRY`; later user retries use `EXPLICIT_USER_RETRY`.
+Mock is disabled by default and has no implicit scenario. A test/demo application factory may inject exactly one reviewed scenario for one application instance. Later user retries use `EXPLICIT_USER_RETRY`.
 
-## Fixed review-blocker resolutions
+## Preserved original blocker resolutions
 
-### 1. Runtime status fingerprint
+### 1. Server-owned runtime status fingerprint
 
-A later implementation must expose a server-owned `runtime_status_fingerprint` in every `TodayMarketRuntimeStatus` returned by GET and POST.
-
-The fingerprint is canonical SHA-256 over the closed status payload, including:
-
-- status contract/version;
-- exact runtime scope fingerprint;
-- process-local status revision;
-- phase and prior-snapshot state;
-- source mode and Mock enablement state;
-- automatic-attempt state;
-- active attempt identity;
-- plan fingerprint;
-- candidate projection fingerprint;
-- typed failure code/category/retryability;
-- allowed action codes.
-
-It excludes localized prose, presentation ordering and expanded technical display details. POST must carry `expected_runtime_status_fingerprint`; under the same coordinator lock, the server re-resolves the exact prior snapshot and runtime scope, rebuilds the current status fingerprint, compares it before planning/acquisition, and returns a stable conflict with zero acquisition on mismatch.
+Every GET/POST status exposes an opaque server-owned `runtime_status_fingerprint`. POST carries `expected_runtime_status_fingerprint`; under the coordinator lock, the server rebuilds exact snapshot, scope, current process-local status and fingerprint before planning/acquisition. Mismatch returns stable conflict with zero planning, acquisition and candidate change.
 
 ### 2. Authoritative prior-snapshot identity
 
-`prior_snapshot_id` and `prior_snapshot_content_fingerprint` are server-derived only from one exact authoritative local read path.
+`prior_snapshot_id` and `prior_snapshot_content_fingerprint` derive only from one exact server read path using the selected successful complete `IngestionRun` components, exact dual-as-of boundaries, canonical series identities and deterministic Market Cockpit domain snapshot.
 
-The identity payload is versioned and includes:
-
-- normalized dual-as-of boundaries;
-- exact selected equity/benchmark/sector series keys, with explicit nulls;
-- exact succeeded/complete `IngestionRun` identities selected by the existing repositories for each family;
-- dataset, provider, series key, information cutoff, imported/completed timestamps and snapshot mode for those runs;
-- effective equity/benchmark/sector sessions;
-- the closed snapshot contract version.
-
-The content fingerprint is canonical SHA-256 over that identity payload plus the deterministic domain snapshot payload returned by the existing Market Cockpit service, excluding UI copy and browser state. Dates use ISO format, timestamps use UTC `Z`, mapping keys are sorted, family order is fixed as equity/benchmark/sector, and warnings/sets are canonically sorted.
-
-The implementation may add a bounded read-only projection from existing repository results, but no new persisted owner. If the exact selected run set cannot be uniquely resolved, if any component becomes invisible, or if the identity/content fingerprint changes between status GET and command POST, the command fails closed before acquisition.
-
-### 3. Planning clock and single-flight
-
-The client cannot supply an independent planning clock. For one runtime scope:
+The selected run algorithm matches existing repository order:
 
 ```text
-planning_recorded_at_utc = exact normalized as_of_recorded_at_utc
+information_cutoff_date DESC
+completed_at DESC
+id DESC
+LIMIT 1
 ```
 
-That value is already bound into the runtime scope fingerprint, so the same scope cannot have two planning clocks.
+A missing, moved, inconsistent or service/repository-disagreeing component fails closed before acquisition.
 
-The coordinator uses:
+### 3. Server-owned planning clock
 
 ```text
-coordinator_scope_key = runtime_scope_revision_id + source_mode + mock_scenario
-command_key = expected_runtime_status_fingerprint + trigger
-refresh_intent_scope_revision_id = canonical_sha256(
-  runtime_scope_revision_id + expected_runtime_status_fingerprint + trigger
-)
+planning_recorded_at_utc = normalized as_of_recorded_at_utc
 ```
 
-At most one command is active for a coordinator scope. The first automatic command and every later retry start from a different server-returned status fingerprint, so they receive distinct deterministic intent/attempt identities without changing the underlying local snapshot scope. Simultaneous stale requests fail with conflict and zero second acquisition.
+The client cannot supply a separate planning clock.
 
-### 4. Mock-only plan and future live seam
+### 4. Current Plan strictly Mock-only
 
-The accepted `TodayMarketRefreshPlan` and current planner are explicitly Mock-only because the plan requires `MOCK_ASSUMPTION_PROFILE_ID`.
+The accepted plan requires `MOCK_ASSUMPTION_PROFILE_ID` and is not production-live eligible. Future THS integration requires a separate Strict Architecture Preflight after Issue #225 closes; current Mock validation cannot be weakened.
 
-Runtime Integration v1 may construct only this Mock plan. A future live THS adapter may reuse the high-level runtime orchestration and provider-neutral seam, but it may not consume the current Mock assumption-bearing plan.
+### 5. One automatic first-eligible attempt
 
-After Issue #225 is closed by reviewed evidence, live integration requires a separate Strict Architecture Preflight that freezes either:
+FastAPI startup and raw `/today-market` loading perform no acquisition. After explicit boundaries/series and prior snapshot render, a Mock-enabled application automatically submits exactly one synchronous bounded command using `FIRST_TODAY_MARKET_ENTRY`. Failure allows only explicit retry; no retry loop, scheduler, daemon or polling exists.
 
-- a new production planning contract/version; or
-- a reviewed source-specific translation owner outside the runtime coordinator.
+## Review 4786209951 blocker resolutions
 
-It may not weaken the current assumption-profile validation, disguise live inputs as synthetic, or move THS quota/completion/revision semantics into the coordinator.
+### 6. One authoritative runtime scope identifier
 
-### 5. Bounded automatic attempt
+The sole authoritative field is:
 
-V1 preserves the Issue #259 automatic-attempt requirement without adding startup side effects:
+```text
+runtime_scope_revision_id
+```
 
-- FastAPI import/startup and raw `/today-market` page load perform no refresh.
-- After the user explicitly establishes boundaries/series and the prior snapshot is rendered, GET returns the exact eligible runtime status.
-- When server-side Mock demo mode is enabled and that exact scope has not attempted automatic refresh, the browser automatically sends one POST with trigger `FIRST_TODAY_MARKET_ENTRY` and the returned status fingerprint.
-- The attempt is synchronous, bounded and single-flight.
-- The page continues to show the prior snapshot while the command runs.
-- No second automatic attempt occurs for the same scope generation.
-- Failures expose one explicit retry action using `EXPLICIT_USER_RETRY`.
-- When Mock mode is disabled, the status is `mock_not_enabled` and no acquisition is attempted.
+It is canonical SHA-256 over the closed runtime scope payload, including:
+
+- exact dual-as-of boundaries;
+- exact series selection;
+- prior snapshot ID/content fingerprint/data-through session;
+- capability set and planning policy;
+- server-owned planning time;
+- server Mock configuration version;
+- `mock_enabled`;
+- `mock_scenario_id | null`.
+
+All of the following use that same value and same payload:
+
+- runtime scope DTO;
+- runtime status DTO;
+- runtime status fingerprint;
+- GET response;
+- POST equality check;
+- coordinator scope key;
+- command/refresh intent generation;
+- stale/conflict validation;
+- executable tests.
+
+`runtime_scope_fingerprint` is not an independent v1 field. If exposed only as a presentation alias:
+
+```text
+runtime_scope_fingerprint = runtime_scope_revision_id
+```
+
+It cannot have a separate calculation, version or comparison path. Any unequal scope identity fails before planning and acquisition.
+
+### 7. Server-owned Mock scenario
+
+The application factory is the unique scenario owner:
+
+```text
+TodayMarketMockRuntimeConfigurationV1 = {
+  configuration_version,
+  mock_enabled,
+  mock_scenario_id | null
+}
+```
+
+Rules:
+
+- default application: disabled + scenario `null`;
+- test/demo application: enabled + exactly one reviewed scenario;
+- GET and POST use the same immutable dependency;
+- browser, request body, query string, localStorage and cookies cannot select/change scenario;
+- server configuration identity enters runtime scope, `runtime_scope_revision_id`, status DTO/fingerprint and coordinator ownership;
+- scenario/configuration change creates a new scope/status generation;
+- there is no implicit default/fallback scenario.
+
+The POST request excludes and rejects as unknown:
+
+```text
+mock_scenario
+mock_scenario_id
+mock_enabled
+source_mode
+adapter_name
+fixture_path
+planning_clock
+```
+
+The coordinator key is exactly:
+
+```text
+coordinator_scope_key = runtime_scope_revision_id
+```
+
+No scenario-dependent parallel key exists outside the scope identity, so different scenarios cannot bypass single-flight.
+
+## Required negative validation
+
+A later implementation must prove:
+
+- every scope/status/API/comparison uses one `runtime_scope_revision_id`;
+- optional alias equality is byte-for-byte;
+- unequal scope IDs fail before planning/acquisition;
+- client-supplied scenario/configuration fields are rejected by unknown-field validation;
+- GET and POST repeatedly observe the same server scenario for one application instance;
+- server scenario/status-scope mismatch fails before planning;
+- scenario change changes both scope revision and status fingerprint;
+- two requests with the same expected status cannot select different scenarios;
+- two same-status simultaneous commands create one acquisition only;
+- multiple scenario coordinator keys cannot bypass single-flight;
+- default disabled Mock has scenario `null` and zero acquisition;
+- no startup/raw-page acquisition, persistence, network, live THS or Provider fallback appears.
 
 ## Authorized files
 
@@ -145,14 +195,6 @@ docs/today_market_refresh_runtime_integration_v1_preflight.md
 
 No other file may change in this architecture PR.
 
-## Golden path
-
-One prior complete local snapshot renders under explicit boundaries and series selection. The server returns its exact snapshot identity, runtime scope and status fingerprint. In an explicitly Mock-enabled demo process, the first eligible scoped interaction automatically submits one bounded command. Existing planner, acquisition port, orchestrator and validators accept one complete synthetic batch. One separate synthetic projection is exposed atomically, while the persisted local snapshot, database and THS readiness remain unchanged.
-
-## Primary failure path
-
-A required Mock family is partial, schema-invalid or coverage-incomplete. The candidate is rejected, no partial result is exposed, the prior snapshot remains visible and the user receives a stable Chinese reason and one explicit retry action. Shutdown, stale status, moved prior snapshot or non-unique identity resolution all fail before publication; stale identity/status failures occur before acquisition.
-
 ## Locked invariants
 
 ```text
@@ -160,6 +202,8 @@ live_ths_gate = Issue #225
 production_live_network_authorized = false
 overall_live_gate = blocked_quota_contract
 current_refresh_plan = mock_only
+runtime_scope_owner = runtime_scope_revision_id
+mock_scenario_owner = server_application_factory
 schema_migration = prohibited
 new_persistence = prohibited
 scheduler_or_daemon = prohibited
@@ -169,13 +213,21 @@ partial_publication = prohibited
 recommendation_portfolio_trading = prohibited
 ```
 
-## Validation and review gates
+## Golden path
+
+One prior complete local snapshot renders under explicit boundaries and series selection. The server returns exact snapshot identity, server-owned Mock configuration, `runtime_scope_revision_id` and status fingerprint. In an explicitly Mock-enabled demo process, the first eligible interaction automatically submits one bounded command without scenario fields. Existing planner, acquisition port, orchestrator and validators accept one complete synthetic batch. One separate synthetic projection is exposed atomically while persisted local data and THS readiness remain unchanged.
+
+## Primary failure path
+
+A required Mock family is partial, schema-invalid or coverage-incomplete. The candidate is rejected, no partial result is exposed, the prior snapshot remains visible, and one explicit retry action is available. Stale status, moved snapshot, scope mismatch, server configuration mismatch or client scenario field fails before planning/acquisition.
+
+## Strict validation and delivery gates
 
 Before merge consideration:
 
 1. Complete base-to-head inventory contains exactly the two authorized Markdown files.
 2. Applicable repository CI succeeds on one exact immutable HEAD.
-3. The architecture document resolves every required decision and all five fixed-head review blockers.
+3. The architecture resolves all five original blockers and both Review `4786209951` blockers.
 4. A fresh process-independent fixed-head review contains exactly:
 
 ```text
