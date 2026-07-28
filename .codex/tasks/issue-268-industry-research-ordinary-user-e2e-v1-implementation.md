@@ -40,6 +40,13 @@ Investment Candidate overlay. It introduces no new persistence owner.
 
 ## Exact authorized files
 
+Initial Issue #268 authority covered ten files. On 2026-07-28 the project owner
+explicitly approved one scope amendment adding only the two existing Authoring
+and Candidate Pool regression-test files so their existing Preview/Commit
+requests can propagate the server-issued acceptance-view snapshot fields.
+
+The resulting exact inventory is:
+
 ```text
 .codex/tasks/issue-268-industry-research-ordinary-user-e2e-v1-implementation.md
 industry_alpha/industry_research_e2e_rules.py
@@ -51,9 +58,20 @@ tests/test_industry_analysis_phase2b.py
 tests/test_industry_analysis_acceptance_v2_static.py
 scripts/demo_industry_research_ordinary_user_e2e_v1.py
 .github/workflows/local-tests.yml
+tests/test_industry_analysis_acceptance_v2_authoring_api.py
+tests/test_industry_analysis_acceptance_v2_pool.py
 ```
 
-No other file is authorized.
+The two amended regression-test files may only add propagation of:
+
+```text
+acceptance_view_snapshot_contract_version
+acceptance_view_snapshot_content_sha256
+```
+
+They do not authorize any production DTO relaxation or Authoring, Candidate Pool,
+Owner Acceptance, complete-beneficiary, or candidate-overlay semantic change.
+No file outside the exact twelve-file inventory is authorized.
 
 ## Locked contracts
 
@@ -62,22 +80,25 @@ snapshot_contract_version =
   aquantai.industry-thesis-owner-acceptance-view-snapshot.v1
 ```
 
-The canonical snapshot includes:
+The canonical snapshot includes only the authoritative commit-relevant content:
 
 ```text
 reviewed_session_revision_id
 expected_session_latest_revision_number
 reviewed_plan_fingerprint_sha256
-owner_context
+exact Owner Context identifiers and map_mode
 information_cutoff_date
 owner_acceptance_plan_version
-ordered members and complete exact options
+ordered reviewed member identities and complete exact Stage 1/semantic options
 candidate_pool_operation_contract
 output_metadata_defaults
 ```
 
-Canonical JSON uses UTF-8, `ensure_ascii=false`, sorted object keys, compact
-separators and preserved list order. The SHA-256 is lowercase hexadecimal.
+Presentation-only labels, localized copy, blocking messages, technical
+ disclosures, and other non-commit display metadata are excluded from the
+canonical snapshot. Canonical JSON uses UTF-8, `ensure_ascii=false`, sorted
+object keys, compact separators and preserved list order. The SHA-256 is
+lowercase hexadecimal.
 
 Preview and Commit both require the server-issued snapshot contract version and
 content fingerprint. Commit also requires the existing preview fingerprint.
@@ -111,6 +132,7 @@ Required proof:
 - strict request DTOs require the fingerprint fields;
 - member/options/default-body replacement with unchanged top-level IDs fails
   before owner writes;
+- presentation-only copy changes do not invalidate the commit-relevant snapshot;
 - stale hash invalidates a prior preview;
 - valid three-company Preview/Commit still succeeds once;
 - zero-supported complete result remains unchanged;
@@ -128,7 +150,7 @@ version work. Do not update architecture baselines. Do not modify PR #241.
 ## Delivery gates
 
 - one Draft PR linked to #268, #266/#267 and #137;
-- exact Base-to-HEAD inventory inside the ten authorized files;
+- exact Base-to-HEAD inventory inside the twelve authorized files;
 - `behind = 0`;
 - exact-head CI success;
 - fixed-head independent review containing exactly:
