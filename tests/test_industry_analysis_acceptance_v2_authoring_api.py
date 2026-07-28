@@ -142,6 +142,12 @@ def _payload(view: dict, binding: dict, *, supported: bool) -> dict:
         "reviewed_plan_fingerprint_sha256": view[
             "reviewed_plan_fingerprint_sha256"
         ],
+        "acceptance_view_snapshot_contract_version": view[
+            "acceptance_view_snapshot_contract_version"
+        ],
+        "acceptance_view_snapshot_content_sha256": view[
+            "acceptance_view_snapshot_content_sha256"
+        ],
         "research_case_id": view["owner_context"]["research_case_id"],
         "map_mode": view["owner_context"]["map_mode"],
         "industry_map_id": view["owner_context"]["industry_map_id"],

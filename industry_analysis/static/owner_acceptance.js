@@ -177,12 +177,10 @@ function renderReuseFields(member, container) {
   reuse.required = true;
   reuse.append(new Option("请选择精确 Stage 1 版本", ""));
   for (const item of member.stage1_reuse_options || []) {
-    reuse.add(
-      new Option(
-        `第 ${item.revision_number} 版 · ${item.legacy_beneficiary_kind} · ${item.assessment_status}`,
-        item.beneficiary_revision_id,
-      ),
-    );
+    reuse.add(new Option(
+      `第 ${item.revision_number} 版 · ${item.legacy_beneficiary_kind} · ${item.assessment_status}`,
+      item.beneficiary_revision_id,
+    ));
   }
   const defaultReuse = latestReuse(member);
   if (defaultReuse) reuse.value = defaultReuse.beneficiary_revision_id;
@@ -190,19 +188,19 @@ function renderReuseFields(member, container) {
   const semantic = document.createElement("select");
   semantic.dataset.semanticFor = member.reviewed_candidate_revision_id;
   renderSemanticSelect(semantic, defaultReuse);
-
   const grid = node("div", null, "form-grid");
   grid.append(
     labeledField("精确 Stage 1 版本", reuse),
     labeledField("类型化语义", semantic),
   );
-  const notice = node(
-    "p",
-    "复用不会创建新的 Stage 1 修订；类型化语义只能复用该精确 Beneficiary Revision 已有的版本。",
-    "operation-note",
+  container.append(
+    grid,
+    node(
+      "p",
+      "复用不会创建新的 Stage 1 修订；类型化语义只能复用该精确 Beneficiary Revision 已有的版本。",
+      "operation-note",
+    ),
   );
-  container.append(grid, notice);
-
   reuse.addEventListener("change", () => {
     renderSemanticSelect(semantic, selectedReuse(member));
     renderPoolOptions();
@@ -214,18 +212,15 @@ function renderReuseFields(member, container) {
 function renderAuthoringFields(member, container, operation) {
   const contract = authoringContract(member);
   const grid = node("div", null, "form-grid authoring-grid");
-
   if (operation === OP_APPEND) {
     const target = document.createElement("select");
     target.dataset.appendFor = member.reviewed_candidate_revision_id;
     target.append(new Option("请选择要追加的精确受益公司身份", ""));
     for (const item of member.stage1_append_options || []) {
-      target.add(
-        new Option(
-          `现有第 ${item.revision_number} 版 · ${item.current_legacy_beneficiary_kind} · ${item.current_assessment_status}`,
-          item.expected_latest_revision_id,
-        ),
-      );
+      target.add(new Option(
+        `现有第 ${item.revision_number} 版 · ${item.current_legacy_beneficiary_kind} · ${item.current_assessment_status}`,
+        item.expected_latest_revision_id,
+      ));
     }
     grid.append(labeledField("追加目标", target));
     bindMutable(target);
@@ -257,7 +252,6 @@ function renderAuthoringFields(member, container, operation) {
   rationale.dataset.rationaleFor = member.reviewed_candidate_revision_id;
   rationale.maxLength = 4000;
   rationale.placeholder = "说明该公司在当前精确产业地图中的受益位置、证据状态与限制。";
-
   const assertions = buildMultiSelect(
     contract.map_assertion_options,
     "assertion_revision_id",
@@ -270,7 +264,6 @@ function renderAuthoringFields(member, container, operation) {
     (item) => `${item.ordinary_label} · ${item.claim_status}`,
   );
   claims.dataset.claimsFor = member.reviewed_candidate_revision_id;
-
   grid.append(
     labeledField("受益类型", kind),
     labeledField("assessment 状态", status),
@@ -291,7 +284,6 @@ function renderAuthoringFields(member, container, operation) {
       "operation-note",
     ),
   );
-
   [kind, status].forEach((element) => bindMutable(element, { affectsPool: true }));
   [rationale, assertions, claims].forEach((element) => bindMutable(element));
 }
@@ -299,13 +291,11 @@ function renderAuthoringFields(member, container, operation) {
 function renderOperationFields(member, operation, container) {
   container.replaceChildren();
   if (!operation) {
-    container.append(
-      node(
-        "p",
-        "请选择复用、追加或新建。页面不会根据股票、名称或唯一可达路径自动决定。",
-        "operation-empty",
-      ),
-    );
+    container.append(node(
+      "p",
+      "请选择复用、追加或新建。页面不会根据股票、名称或唯一可达路径自动决定。",
+      "operation-empty",
+    ));
     return;
   }
   if (operation === OP_REUSE) {
@@ -313,13 +303,11 @@ function renderOperationFields(member, operation, container) {
     return;
   }
   if (!canAuthor(member)) {
-    container.append(
-      node(
-        "p",
-        "当前精确 Context 缺少可用的 Map assertion 或 Case Claim，不能安全新建或追加。",
-        "is-error",
-      ),
-    );
+    container.append(node(
+      "p",
+      "当前精确 Context 缺少可用的 Map assertion 或 Case Claim，不能安全新建或追加。",
+      "is-error",
+    ));
     return;
   }
   renderAuthoringFields(member, container, operation);
@@ -353,8 +341,6 @@ function renderMember(member) {
     operation.add(new Option("新建受益公司身份和首个修订", OP_CREATE));
   }
   if ((member.stage1_reuse_options || []).length) operation.value = OP_REUSE;
-
-  const operationField = labeledField("Stage 1 操作", operation);
   const details = node("div", null, "operation-details");
   const notices = node("div", null, "member-notices");
   const blocking = [...(member.blocking_reasons || [])];
@@ -362,8 +348,7 @@ function renderMember(member) {
     blocking.push({ message: "当前精确 Context 中没有可完成的 Stage 1 操作。" });
   }
   for (const item of blocking) notices.append(node("p", item.message, "is-error"));
-
-  card.append(header, operationField, details, notices);
+  card.append(labeledField("Stage 1 操作", operation), details, notices);
   renderOperationFields(member, operation.value, details);
   operation.addEventListener("change", () => {
     renderOperationFields(member, operation.value, details);
@@ -381,9 +366,7 @@ function selectedStatuses() {
     if (operation === OP_REUSE) {
       const reuse = selectedReuse(member);
       if (reuse) statuses.push(reuse.assessment_status);
-      continue;
-    }
-    if ([OP_APPEND, OP_CREATE].includes(operation)) {
+    } else if ([OP_APPEND, OP_CREATE].includes(operation)) {
       const select = memberControl("data-status-for", member);
       if (select && select.value) statuses.push(select.value);
     }
@@ -403,12 +386,10 @@ function renderPoolOptions() {
   } else {
     select.add(new Option("新建 supported 后续研究池", "create_supported_handoff"));
     for (const option of contract.append_options || []) {
-      select.add(
-        new Option(
-          `追加到 ${option.title} · 第 ${option.revision_number} 版`,
-          `append:${option.candidate_pool_id}:${option.expected_latest_revision_id}`,
-        ),
-      );
+      select.add(new Option(
+        `追加到 ${option.title} · 第 ${option.revision_number} 版`,
+        `append:${option.candidate_pool_id}:${option.expected_latest_revision_id}`,
+      ));
     }
   }
   if ([...select.options].some((option) => option.value === previous)) select.value = previous;
@@ -436,8 +417,7 @@ function renderView(view) {
   document.querySelector("#member-count").textContent = String(view.members.length);
   document.querySelector("#context-summary").textContent =
     `${view.research_case.case_key} / ${view.industry_map.map_key} / 第 ${view.industry_map.revision_number} 版`;
-  const list = document.querySelector("#acceptance-members");
-  list.replaceChildren(...view.members.map(renderMember));
+  document.querySelector("#acceptance-members").replaceChildren(...view.members.map(renderMember));
   const defaults = view.output_metadata_defaults;
   document.querySelector("#output-title").value = defaults.output_title;
   document.querySelector("#output-scope").value = defaults.output_scope;
@@ -452,6 +432,10 @@ function renderView(view) {
     information_cutoff_date: view.information_cutoff_date,
     as_of_recorded_at_utc: view.as_of_recorded_at_utc,
     owner_acceptance_plan_version: view.owner_acceptance_plan_version,
+    acceptance_view_snapshot_contract_version:
+      view.acceptance_view_snapshot_contract_version,
+    acceptance_view_snapshot_content_sha256:
+      view.acceptance_view_snapshot_content_sha256,
     authoring_material_counts: view.technical_details.authoring_material_counts,
   }, null, 2);
   document.querySelector("#page-state").textContent = "精确 Context 已验证";
@@ -501,13 +485,11 @@ function buildAuthoredStage1(member, operation, errors) {
   const assertions = selectedAssertionPayload(member);
   const claims = selectedClaimIds(member);
   const prefix = member.ordinary_identity_label;
-
   if (!kind || !kind.value) errors.push(`${prefix}：请选择受益类型。`);
   if (!status || !status.value) errors.push(`${prefix}：请选择 assessment 状态。`);
   if (!rationale || !rationale.value.trim()) errors.push(`${prefix}：请填写 Stage 1 理由。`);
   if (!assertions.length) errors.push(`${prefix}：请至少选择一条产业地图断言。`);
   if (!claims.length) errors.push(`${prefix}：请至少选择一条研究 Claim。`);
-
   const authored = {
     legacy_beneficiary_kind: kind ? kind.value : "",
     assessment_status: status ? status.value : "",
@@ -613,6 +595,10 @@ function buildPayload() {
     information_cutoff_date: state.view.information_cutoff_date,
     revision_note: note,
     owner_acceptance_plan_version: state.view.owner_acceptance_plan_version,
+    acceptance_view_snapshot_contract_version:
+      state.view.acceptance_view_snapshot_contract_version,
+    acceptance_view_snapshot_content_sha256:
+      state.view.acceptance_view_snapshot_content_sha256,
   };
 }
 
@@ -623,6 +609,12 @@ function fact(label, value) {
 }
 
 function renderPreview(preview) {
+  if (
+    preview.acceptance_view_snapshot_content_sha256
+    !== state.view.acceptance_view_snapshot_content_sha256
+  ) {
+    throw new Error("预览返回的接受页面指纹与当前页面不一致，请重新读取页面。");
+  }
   state.preview = preview;
   document.querySelector("#preview-section").hidden = false;
   document.querySelector("#preview-state").textContent = preview.commit_ready ? "可提交" : "需要修正";
@@ -692,7 +684,7 @@ async function commit() {
 
 async function initialize() {
   if (!route || !boundary.cutoff || !boundary.recordedAtUtc) {
-    showErrors(["缺少精确 session、reviewed revision 或双时间边界。请从审阅结果重新打开。"]) ;
+    showErrors(["缺少精确 session、reviewed revision 或双时间边界。请从审阅结果重新打开。"]);
     document.querySelector("#page-state").textContent = "精确链接无效";
     return;
   }

@@ -14,6 +14,10 @@ import backend.api.industry_analysis_acceptance as acceptance_api
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
 from backend.main import app
+from industry_alpha.industry_research_e2e_rules import (
+    ACCEPTANCE_VIEW_SNAPSHOT_CONTRACT_VERSION,
+    SNAPSHOT_BODY_MISMATCH_CODE,
+)
 from industry_alpha.industry_thesis_models import (
     IndustryThesisOutputLinkRevision,
     IndustryThesisSessionRevision,
@@ -145,6 +149,12 @@ def _payload_from_view(view: dict) -> dict:
         "owner_acceptance_plan_version": view[
             "owner_acceptance_plan_version"
         ],
+        "acceptance_view_snapshot_contract_version": view[
+            "acceptance_view_snapshot_contract_version"
+        ],
+        "acceptance_view_snapshot_content_sha256": view[
+            "acceptance_view_snapshot_content_sha256"
+        ],
     }
 
 
@@ -160,6 +170,24 @@ def _view(client, review: dict) -> tuple[str, dict]:
     return query, response.json()
 
 
+def _replace_workbench_body(monkeypatch, mutate):
+    original = (
+        acceptance_api.IndustryThesisOwnerAcceptanceWorkbenchQueryService
+        .get_acceptance_view
+    )
+
+    def changed(self, *args, **kwargs):
+        view = deepcopy(original(self, *args, **kwargs))
+        mutate(view)
+        return view
+
+    monkeypatch.setattr(
+        acceptance_api.IndustryThesisOwnerAcceptanceWorkbenchQueryService,
+        "get_acceptance_view",
+        changed,
+    )
+
+
 def test_three_company_preview_commit_and_exact_result(database, client) -> None:
     fixture = build_stage1_beneficiary_fixture(database)
     review, _industry_map, _map_revision, _rows = _reviewed(
@@ -173,9 +201,21 @@ def test_three_company_preview_commit_and_exact_result(database, client) -> None
     query, view = _view(client, review)
     assert len(view["members"]) == 3
     assert view["owner_context"] == review["acceptance_plan"]["owner_context"]
+    assert view["acceptance_view_snapshot_contract_version"] == (
+        ACCEPTANCE_VIEW_SNAPSHOT_CONTRACT_VERSION
+    )
+    assert len(view["acceptance_view_snapshot_content_sha256"]) == 64
+    repeated = client.get(
+        f"/industry-analysis/api/session-revisions/"
+        f"{review['reviewed_session_revision_id']}/owner-acceptance-view?{query}"
+    )
+    assert repeated.status_code == 200
+    assert repeated.json()["acceptance_view_snapshot_content_sha256"] == view[
+        "acceptance_view_snapshot_content_sha256"
+    ]
+
     payload = _payload_from_view(view)
     counts_before = _counts(database)
-
     reviewed_id = review["reviewed_session_revision_id"]
     preview = client.post(
         f"/industry-analysis/api/session-revisions/{reviewed_id}/"
@@ -187,6 +227,9 @@ def test_three_company_preview_commit_and_exact_result(database, client) -> None
     assert preview_body["commit_ready"] is True
     assert preview_body["complete_universe_count"] == 3
     assert preview_body["supported_handoff_count"] == 2
+    assert preview_body["acceptance_view_snapshot_content_sha256"] == view[
+        "acceptance_view_snapshot_content_sha256"
+    ]
     assert _counts(database) == counts_before
 
     commit_payload = {
@@ -206,6 +249,9 @@ def test_three_company_preview_commit_and_exact_result(database, client) -> None
     assert committed["supported_handoff_count"] == 2
     assert committed["accepted_candidate_pool_revision_id"] is not None
     assert committed["accepted_result_path"].startswith("/industry-analysis/")
+    assert committed["acceptance_view_snapshot_content_sha256"] == view[
+        "acceptance_view_snapshot_content_sha256"
+    ]
 
     result_query = _query(
         review["acceptance_plan"]["session_id"],
@@ -264,6 +310,108 @@ def test_context_substitution_rejected_before_writes(database, client) -> None:
     assert response.json()["detail"]["code"] == (
         "INDUSTRY_THESIS_ACCEPTANCE_MAP_REVISION_MISMATCH"
     )
+    assert _counts(database) == counts_before
+
+
+def test_snapshot_fields_are_required_and_unknown_fields_fail_closed(database, client) -> None:
+    fixture = build_stage1_beneficiary_fixture(database)
+    review, *_ = _reviewed(database, (fixture.direct_beneficiary_id,))
+    query, view = _view(client, review)
+    payload = _payload_from_view(view)
+    reviewed_id = review["reviewed_session_revision_id"]
+
+    missing = deepcopy(payload)
+    missing.pop("acceptance_view_snapshot_content_sha256")
+    response = client.post(
+        f"/industry-analysis/api/session-revisions/{reviewed_id}/"
+        f"owner-acceptance/preview?{query}",
+        json=missing,
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "industry_analysis_request_invalid"
+
+    unknown = {**payload, "client_calculated_snapshot_sha256": "0" * 64}
+    response = client.post(
+        f"/industry-analysis/api/session-revisions/{reviewed_id}/"
+        f"owner-acceptance/preview?{query}",
+        json=unknown,
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "industry_analysis_request_invalid"
+
+
+def test_member_body_replacement_with_same_top_level_ids_is_rejected(
+    database,
+    client,
+    monkeypatch,
+) -> None:
+    fixture = build_stage1_beneficiary_fixture(database)
+    review, *_ = _reviewed(
+        database,
+        (
+            fixture.direct_beneficiary_id,
+            fixture.secondary_beneficiary_id,
+            fixture.draft_beneficiary_id,
+        ),
+    )
+    query, view = _view(client, review)
+    payload = _payload_from_view(view)
+    counts_before = _counts(database)
+    _replace_workbench_body(
+        monkeypatch,
+        lambda changed: changed["members"].reverse(),
+    )
+
+    response = client.post(
+        f"/industry-analysis/api/session-revisions/"
+        f"{review['reviewed_session_revision_id']}/owner-acceptance/preview?{query}",
+        json=payload,
+    )
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == SNAPSHOT_BODY_MISMATCH_CODE
+    assert detail["message"] == "接受页面内容已变化，不能使用旧预览提交。"
+    assert detail["preserve_form"] is True
+    assert _counts(database) == counts_before
+
+
+def test_output_default_replacement_and_stale_commit_invalidate_preview(
+    database,
+    client,
+    monkeypatch,
+) -> None:
+    fixture = build_stage1_beneficiary_fixture(database)
+    review, *_ = _reviewed(database, (fixture.direct_beneficiary_id,))
+    query, view = _view(client, review)
+    payload = _payload_from_view(view)
+    counts_before = _counts(database)
+    reviewed_id = review["reviewed_session_revision_id"]
+    preview = client.post(
+        f"/industry-analysis/api/session-revisions/{reviewed_id}/"
+        f"owner-acceptance/preview?{query}",
+        json=payload,
+    )
+    assert preview.status_code == 200
+    assert _counts(database) == counts_before
+
+    _replace_workbench_body(
+        monkeypatch,
+        lambda changed: changed.__setitem__(
+            "thesis_title", changed["thesis_title"] + "（正文已替换）"
+        ),
+    )
+    commit = client.post(
+        f"/industry-analysis/api/session-revisions/{reviewed_id}/"
+        f"owner-acceptance/commit?{query}",
+        json={
+            **payload,
+            "preview_fingerprint_sha256": preview.json()[
+                "preview_fingerprint_sha256"
+            ],
+        },
+    )
+    assert commit.status_code == 409
+    assert commit.json()["detail"]["code"] == SNAPSHOT_BODY_MISMATCH_CODE
     assert _counts(database) == counts_before
 
 

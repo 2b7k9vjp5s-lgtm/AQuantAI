@@ -321,8 +321,18 @@ def _exact_continuation(item: dict[str, Any]) -> dict[str, str | None]:
             "path": f"/industry-analysis/sessions/{session_id}/revisions/{revision_id}/result?{query}",
             "reason_code": "exact_reviewed_plan_ready",
         }
+    if workflow_state == "accepted_outputs_linked":
+        query = urlencode(boundary_query)
+        return {
+            "kind": "accepted_result",
+            "label": "查看已接受成果",
+            "path": (
+                f"/industry-analysis/sessions/{session_id}/revisions/"
+                f"{revision_id}/accepted-result?{query}"
+            ),
+            "reason_code": "exact_accepted_outputs_linked",
+        }
     reason_codes = {
-        "accepted_outputs_linked": "accepted_outputs_not_supported_in_phase2b",
         "superseded": "superseded_record",
         "abandoned": "abandoned_record",
     }
