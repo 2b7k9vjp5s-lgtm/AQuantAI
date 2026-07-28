@@ -19,6 +19,11 @@ from backend.api.industry_analysis import (
     get_industry_analysis_session_factory,
     get_industry_analysis_write_factory,
 )
+from industry_alpha.industry_research_e2e_rules import (
+    ACCEPTANCE_VIEW_SNAPSHOT_CONTRACT_VERSION,
+    SNAPSHOT_BODY_MISMATCH_CODE,
+    acceptance_view_snapshot_content_sha256,
+)
 from industry_alpha.industry_thesis_models import IndustryThesisSessionRevision
 from industry_alpha.industry_thesis_owner_acceptance import (
     IndustryThesisOwnerAcceptanceService,
@@ -66,6 +71,14 @@ class OwnerAcceptancePlanRequest(_StrictModel):
     information_cutoff_date: date
     revision_note: str = Field(min_length=1, max_length=1000)
     owner_acceptance_plan_version: str = Field(min_length=1, max_length=128)
+    acceptance_view_snapshot_contract_version: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+    acceptance_view_snapshot_content_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+    )
 
 
 class OwnerAcceptanceCommitRequest(OwnerAcceptancePlanRequest):
@@ -84,6 +97,7 @@ def _http_error(exc: IndustryThesisError) -> HTTPException:
         "INDUSTRY_THESIS_ACCEPTANCE_OWNER_REVISION_CONFLICT",
         "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_ALREADY_EXISTS",
         "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_CONFLICT",
+        SNAPSHOT_BODY_MISMATCH_CODE,
     }
     recovery = {
         "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE": "重新读取精确审核结果并再次预览。",
@@ -93,14 +107,20 @@ def _http_error(exc: IndustryThesisError) -> HTTPException:
         "INDUSTRY_THESIS_ACCEPTANCE_STAGE1_BINDINGS_REQUIRED": "补齐精确产业地图断言和研究主张绑定。",
         "INDUSTRY_THESIS_ACCEPTANCE_SUPPORTED_HANDOFF_MISMATCH": "重新确认 supported 后续研究池操作。",
         "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE": "停止使用当前链接并执行本地完整性检查。",
+        SNAPSHOT_BODY_MISMATCH_CODE: "保留填写内容并重新读取接受页面，再次预览。",
     }
     status = 404 if code in not_found else 409 if code in conflicts else 422
     detail = getattr(exc, "detail", None)
+    message = (
+        "接受页面内容已变化，不能使用旧预览提交。"
+        if code == SNAPSHOT_BODY_MISMATCH_CODE
+        else str(exc)
+    )
     return HTTPException(
         status_code=status,
         detail={
             "code": code,
-            "message": str(exc),
+            "message": message,
             "technical_message": detail or str(exc),
             "recovery_action": recovery.get(
                 code,
@@ -125,7 +145,10 @@ def _database_failure(message: str) -> HTTPException:
 
 
 def _raw_plan(payload: OwnerAcceptancePlanRequest) -> dict[str, Any]:
-    return payload.model_dump(mode="json")
+    result = payload.model_dump(mode="json")
+    result.pop("acceptance_view_snapshot_contract_version", None)
+    result.pop("acceptance_view_snapshot_content_sha256", None)
+    return result
 
 
 def _load_view(
@@ -157,7 +180,20 @@ def _load_view(
         "title_default": f"{view['thesis_title']} · supported 后续研究",
         "scope_default": "仅包含本次接受后 Stage 1 状态为 supported 的精确成员。",
     }
+    view["acceptance_view_snapshot_contract_version"] = (
+        ACCEPTANCE_VIEW_SNAPSHOT_CONTRACT_VERSION
+    )
+    view["acceptance_view_snapshot_content_sha256"] = (
+        acceptance_view_snapshot_content_sha256(view)
+    )
     return view
+
+
+def _snapshot_body_mismatch() -> IndustryThesisOwnerAcceptanceError:
+    return IndustryThesisOwnerAcceptanceError(
+        SNAPSHOT_BODY_MISMATCH_CODE,
+        "submitted acceptance-view snapshot does not match the authoritative body",
+    )
 
 
 def _validate_route_and_snapshot(
@@ -170,6 +206,14 @@ def _validate_route_and_snapshot(
             "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE",
             "route reviewed revision does not equal body reviewed revision",
         )
+    if (
+        payload.acceptance_view_snapshot_contract_version
+        != view["acceptance_view_snapshot_contract_version"]
+        or payload.acceptance_view_snapshot_content_sha256
+        != view["acceptance_view_snapshot_content_sha256"]
+    ):
+        raise _snapshot_body_mismatch()
+
     expected = {
         "reviewed_session_revision_id": view.get("reviewed_session_revision_id"),
         "expected_session_latest_revision_number": view.get(
@@ -430,7 +474,9 @@ def _compose_result(
     for member in result["members"]:
         member["readiness"] = readiness_by_revision[member["beneficiary_revision_id"]]
     supported = [
-        member for member in result["members"] if member["included_in_supported_handoff"]
+        member
+        for member in result["members"]
+        if member["included_in_supported_handoff"]
     ]
     semantic_count = sum(
         member["readiness"]["typed_semantics"]["state"] != "missing"
@@ -461,8 +507,14 @@ def _compose_result(
             "facts": [
                 {"label": "完整成员", "value": len(result["members"])},
                 {"label": "supported 后续研究", "value": len(supported)},
-                {"label": "类型化语义覆盖", "value": f"{semantic_count}/{len(result['members'])}"},
-                {"label": "Company Research 已存在", "value": f"{company_count}/{len(result['members'])}"},
+                {
+                    "label": "类型化语义覆盖",
+                    "value": f"{semantic_count}/{len(result['members'])}",
+                },
+                {
+                    "label": "Company Research 已存在",
+                    "value": f"{company_count}/{len(result['members'])}",
+                },
                 {"label": "研究用途", "value": "不构成投资建议"},
             ],
             "technical_details": output,
@@ -549,7 +601,17 @@ async def _preview_or_commit(
         _validate_route_and_snapshot(reviewed_session_revision_id, payload, view)
         _validate_bindings(payload, view)
         service = IndustryThesisOwnerAcceptanceService(write_factory)
-        result = service.commit(_raw_plan(payload)) if commit else service.preview(_raw_plan(payload))
+        result = (
+            service.commit(_raw_plan(payload))
+            if commit
+            else service.preview(_raw_plan(payload))
+        )
+        result["acceptance_view_snapshot_contract_version"] = view[
+            "acceptance_view_snapshot_contract_version"
+        ]
+        result["acceptance_view_snapshot_content_sha256"] = view[
+            "acceptance_view_snapshot_content_sha256"
+        ]
         if not commit:
             result["primary_action"] = (
                 {"kind": "commit", "label": "确认接受研究成果"}
@@ -574,7 +636,11 @@ async def _preview_or_commit(
     except IndustryThesisError as exc:
         raise _http_error(exc) from exc
     except SQLAlchemyError as exc:
-        message = "研究成果提交失败，请重新打开精确结果确认是否已经写入。" if commit else "研究成果预览失败。"
+        message = (
+            "研究成果提交失败，请重新打开精确结果确认是否已经写入。"
+            if commit
+            else "研究成果预览失败。"
+        )
         raise _database_failure(message) from exc
 
 
