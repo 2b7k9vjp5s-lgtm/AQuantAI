@@ -97,6 +97,9 @@ jobs:
       - name: Run exact industry research result assembly demo
         run: python -m scripts.demo_industry_research_result_assembly
 
+      - name: Run Industry Research ordinary-user end-to-end demo
+        run: python -m scripts.demo_industry_research_ordinary_user_e2e_v1
+
       - name: Run Today Market local snapshot fixture demo
         run: python -m scripts.demo_today_market
 
