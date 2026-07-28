@@ -6,6 +6,7 @@ import json
 from copy import deepcopy
 from datetime import timedelta
 from urllib.parse import urlencode
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
@@ -196,6 +197,15 @@ def run_demo() -> dict:
         )
         assert commit.status_code == 200, commit.text
         committed = commit.json()
+        accepted_revision_id = UUID(committed["accepted_session_revision_id"])
+        with factory() as session:
+            accepted_revision = session.get(
+                IndustryThesisSessionRevision,
+                accepted_revision_id,
+            )
+            assert accepted_revision is not None
+            accepted_revision_number = accepted_revision.revision_number
+
         result_query = urlencode(
             {
                 "session_id": session_id,
@@ -217,9 +227,7 @@ def run_demo() -> dict:
                 "visible_latest_revision_id": committed[
                     "accepted_session_revision_id"
                 ],
-                "visible_latest_revision_number": committed[
-                    "accepted_session_revision_number"
-                ],
+                "visible_latest_revision_number": accepted_revision_number,
                 "information_cutoff_date": owner_fixture.CUTOFF.isoformat(),
                 "recorded_at_utc": committed["recorded_at_utc"],
                 "workflow_state": "accepted_outputs_linked",
