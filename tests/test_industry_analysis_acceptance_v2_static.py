@@ -25,10 +25,10 @@ def test_owner_acceptance_and_result_pages_are_active() -> None:
     assert "确认接受研究成果" in acceptance.text
     assert "页面不会自动提交、自动重试、自动撤销" in acceptance.text
     main_script = acceptance.text.index(
-        '/industry-analysis/static/owner_acceptance.js'
+        "/industry-analysis/static/owner_acceptance.js"
     )
     pool_script = acceptance.text.index(
-        '/industry-analysis/static/owner_acceptance_pool.js'
+        "/industry-analysis/static/owner_acceptance_pool.js"
     )
     assert main_script < pool_script
 
@@ -94,6 +94,12 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     assert "selectedOptions" in acceptance
     assert "页面不会根据股票、名称或唯一可达路径自动决定" in acceptance
     assert "ranking_applied" not in acceptance
+    assert "acceptance_view_snapshot_contract_version" in acceptance
+    assert "acceptance_view_snapshot_content_sha256" in acceptance
+    assert "state.view.acceptance_view_snapshot_content_sha256" in acceptance
+    assert "crypto.subtle" not in acceptance
+    assert "Web Crypto" not in acceptance
+    assert ".digest(" not in acceptance
 
     assert 'const MODE_REUSE = "reuse_exact_supported_handoff"' in pool
     assert "beneficiary_revision_ids" in pool
