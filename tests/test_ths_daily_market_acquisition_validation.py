@@ -48,7 +48,7 @@ def _daily_selector(
 def _benchmark_selector() -> ths.BenchmarkDailySelector:
     identity = ths.BenchmarkIdentity(
         "SYNTH.SSE.IDX50",
-        "SYNTH50",
+        "999950",
         ths.Exchange.SSE,
     )
     return ths.BenchmarkDailySelector(
