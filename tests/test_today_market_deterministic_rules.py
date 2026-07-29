@@ -219,7 +219,7 @@ def test_sector_hotspot_priority_states() -> None:
             "S00",
             r1=-0.05,
             r5=0.30,
-            r20=0.25,
+            r20=0.16,
             breadth_up=0.60,
             breadth_ma20=0.50,
             activity=1.3,
