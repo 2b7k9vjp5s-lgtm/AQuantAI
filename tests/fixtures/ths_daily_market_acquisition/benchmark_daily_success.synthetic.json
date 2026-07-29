@@ -9,7 +9,7 @@
     "items": [
       {
         "provider_symbol": "SYNTH.SSE.IDX50",
-        "index_code": "SYNTH50",
+        "index_code": "999950",
         "exchange": "SSE",
         "trade_date": "2026-07-27",
         "open": 100,
@@ -21,7 +21,7 @@
       },
       {
         "provider_symbol": "SYNTH.SSE.IDX50",
-        "index_code": "SYNTH50",
+        "index_code": "999950",
         "exchange": "SSE",
         "trade_date": "2026-07-28",
         "open": 103,
