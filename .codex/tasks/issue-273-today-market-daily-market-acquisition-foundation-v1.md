@@ -235,7 +235,7 @@ Completed in Draft PR #274:
 - synthetic repository fixtures only;
 - historical block response schema remains explicitly unavailable pending exact taxonomy review.
 
-Last successful executable-code evidence before final task-note-only commits:
+Executable-code evidence:
 
 ```text
 code_head = 59b912eaacb350ec445bf2be78bf234dcac2aecf
@@ -245,7 +245,7 @@ pytest = 959 passed, 7 skipped, 1 existing warning
 offline demos = success
 ```
 
-Later commits only update this task snapshot. Their current-head CI must be checked from PR #274 / GitHub Actions rather than inferred from this file. M4–M6 remain pending, so no fixed-head implementation review is requested yet.
+Subsequent commits modify only this task snapshot. Current-head CI is authoritative from PR #274 / GitHub Actions. M4–M6 remain pending, so no fixed-head implementation review is requested yet.
 
 ## Remaining implementation sequence
 
