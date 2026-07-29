@@ -159,14 +159,16 @@ release/tag/version files = unchanged
 PR #241 = unchanged
 ```
 
-## Clean M1–M3 reconstruction
+## Implemented M1–M6 candidate
 
 The replacement branch reconstructs the final authorized M1–M3 content as a new commit whose
-only parent is exact `main`. It does not copy or preserve #274 commit ancestry.
+only parent is exact `main`. It does not copy or preserve #274 commit ancestry. M4–M6 were then
+implemented additively inside the same exact allowlist. The implementation is a candidate until
+one exact immutable HEAD passes focused tests, full tests, configured offline demos and GitHub CI.
 
 ### M1 — source policy and readiness
 
-Completed content:
+Implemented content:
 
 - one THS/iFinD source authority;
 - reviewed host family, credential-reference type, QPS and ten-year boundary;
@@ -178,7 +180,7 @@ Completed content:
 
 ### M2 — selectors and request planning
 
-Completed content:
+Implemented content:
 
 - closed capability registry;
 - explicit instrument identity, exchange and exact requested sessions;
@@ -188,11 +190,11 @@ Completed content:
 - explicit call/cell/QPS budget revision without account identity;
 - no arbitrary host/path/header/query dictionaries;
 - request and plan fingerprints exclude credentials and volatile request IDs;
-- all plans remain `remote_executable=false` until M4.
+- persisted logical plans remain non-executable; transport execution is a separate explicit M4 boundary.
 
 ### M3 — response validation
 
-Completed content:
+Implemented content:
 
 - strict envelope/source/capability/schema validation;
 - exact selector-to-response identity/date/natural-key agreement;
@@ -202,18 +204,20 @@ Completed content:
 - synthetic fixtures only;
 - historical block response schema remains unavailable pending exact taxonomy review.
 
-## Remaining implementation sequence
-
 ### M4 — credential reference and transport
+
+Implemented candidate content:
 
 - credential reference only; no token value, fragment, length or hash persistence;
 - only reviewed THS/iFinD host and operation contracts;
-- network disabled by default;
+- network disabled by default and no concrete live network client in normal runtime/tests/demos;
 - deterministic timeout, authentication, quota, rate-limit and bounded-retry mapping;
 - no fallback or source mixing;
 - ordinary CI/import/demo remains zero-network.
 
 ### M5 — immutable persistence
+
+Implemented candidate content:
 
 - reuse existing market and benchmark persistence services;
 - bind source policy, request fingerprint and attempt metadata to `IngestionRun`;
@@ -221,15 +225,35 @@ Completed content:
 - changed facts append as a new run;
 - partial attempts never become a completed acquisition batch;
 - preserve prior valid local history on every failure;
-- trigger schema stop condition instead of side storage.
+- trigger schema stop condition instead of side storage;
+- preserve concrete persistence-owner provenance inside the M5 receipt;
+- expose a stable provider-neutral component key on each persisted receipt for the M5→M6 boundary.
 
 ### M6 — provider-neutral handoff
 
-- explicitly extend Today Market contracts for live THS mode;
+Implemented candidate content:
+
 - preserve all existing Mock-only invariants and tests;
 - expose acquisition completeness and provenance only;
+- consume provider-neutral persisted component identities plus run/batch/series/cutoff provenance;
+- do not import or depend on concrete database persistence services;
+- do not expose persistence implementation owner names in application component DTOs or summaries;
+- mismatched component roles, source, acquisition fingerprint or coverage fail closed;
 - do not calculate market, sector, hotspot or anomaly truth;
 - do not activate startup/first-entry networking.
+
+Current gate:
+
+```text
+M1 = implemented
+M2 = implemented
+M3 = implemented
+M4 = implemented candidate
+M5 = implemented candidate
+M6 = implemented candidate
+implementation_candidate = complete pending exact-head validation
+final_fixed_head_gate = pending CI and independent review
+```
 
 ## Required golden path
 
