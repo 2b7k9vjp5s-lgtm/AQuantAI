@@ -1,0 +1,36 @@
+{
+  "_aquantai_fixture_kind": "synthetic",
+  "code": 0,
+  "message": "synthetic success",
+  "data": {
+    "source_key": "ths-account-structured-provider-v1",
+    "capability": "benchmark_index_daily",
+    "schema_version": "aquantai.ths-benchmark-daily-response.v1",
+    "items": [
+      {
+        "provider_symbol": "SYNTH.SSE.IDX50",
+        "index_code": "SYNTH50",
+        "exchange": "SSE",
+        "trade_date": "2026-07-27",
+        "open": 100,
+        "high": 105,
+        "low": 98,
+        "close": 103,
+        "volume": 100000,
+        "amount": 500000
+      },
+      {
+        "provider_symbol": "SYNTH.SSE.IDX50",
+        "index_code": "SYNTH50",
+        "exchange": "SSE",
+        "trade_date": "2026-07-28",
+        "open": 103,
+        "high": 108,
+        "low": 102,
+        "close": 107,
+        "volume": 110000,
+        "amount": 550000
+      }
+    ]
+  }
+}
