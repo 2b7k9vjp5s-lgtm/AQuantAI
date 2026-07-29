@@ -174,7 +174,6 @@ class TodayMarketLiveHandoffRequest:
 @dataclass(frozen=True, slots=True)
 class TodayMarketLiveComponentResult:
     component_key: LiveComponentKey
-    owner: str
     source_key: str
     ingestion_run_id: int
     batch_identifier: str
@@ -186,15 +185,6 @@ class TodayMarketLiveComponentResult:
         if not isinstance(self.component_key, LiveComponentKey):
             raise LiveHandoffValidationError(
                 "component_key must be a LiveComponentKey",
-                LiveHandoffFailureCode.COMPONENT_MISMATCH,
-            )
-        expected_owner = {
-            LiveComponentKey.MARKET_DATA_BUNDLE: "MarketDataPersistenceService",
-            LiveComponentKey.BENCHMARK_INDEX_DAILY: "BenchmarkPersistenceService",
-        }[self.component_key]
-        if self.owner != expected_owner:
-            raise LiveHandoffValidationError(
-                "component owner does not match its provider-neutral key",
                 LiveHandoffFailureCode.COMPONENT_MISMATCH,
             )
         _required_text(self.source_key, "component.source_key")
@@ -219,7 +209,6 @@ class TodayMarketLiveComponentResult:
     def fingerprint_payload(self) -> Mapping[str, object]:
         return {
             "component_key": self.component_key,
-            "owner": self.owner,
             "source_key": self.source_key,
             "ingestion_run_id": self.ingestion_run_id,
             "batch_identifier": self.batch_identifier,
@@ -311,6 +300,15 @@ class TodayMarketLiveAcquisitionBatch:
             raise LiveHandoffValidationError(
                 "component source differs from live provenance",
                 LiveHandoffFailureCode.SOURCE_MISMATCH,
+            )
+        component_identities = tuple(
+            (component.ingestion_run_id, component.batch_identifier, component.series_key)
+            for component in self.components
+        )
+        if len(set(component_identities)) != len(component_identities):
+            raise LiveHandoffValidationError(
+                "live components must have distinct persisted identities",
+                LiveHandoffFailureCode.COMPONENT_MISMATCH,
             )
         _sha256(self.batch_fingerprint, "batch_fingerprint")
         if not self.verify_fingerprint():
@@ -463,7 +461,7 @@ def _component_from_receipt(
     information_cutoff: date,
 ) -> TodayMarketLiveComponentResult:
     try:
-        owner = value.owner
+        persisted_component_key = value.component_key
         ingestion_run_id = value.ingestion_run_id
         batch_identifier = value.batch_identifier
         series_key = value.series_key
@@ -477,6 +475,20 @@ def _component_from_receipt(
             "receipt component is missing required persisted identity fields",
             LiveHandoffFailureCode.COMPONENT_MISMATCH,
         ) from exc
+    try:
+        normalized_component_key = LiveComponentKey(
+            _required_text(persisted_component_key, "component.component_key")
+        )
+    except ValueError as exc:
+        raise LiveHandoffValidationError(
+            "receipt component key is outside the provider-neutral handoff contract",
+            LiveHandoffFailureCode.COMPONENT_MISMATCH,
+        ) from exc
+    if normalized_component_key is not component_key:
+        raise LiveHandoffValidationError(
+            "receipt component key does not match its provider-neutral handoff role",
+            LiveHandoffFailureCode.COMPONENT_MISMATCH,
+        )
     if component_cutoff != information_cutoff:
         raise LiveHandoffValidationError(
             "component cutoff differs from the live handoff cutoff",
@@ -484,7 +496,6 @@ def _component_from_receipt(
         )
     return TodayMarketLiveComponentResult(
         component_key=component_key,
-        owner=owner,
         source_key=source_key,
         ingestion_run_id=ingestion_run_id,
         batch_identifier=batch_identifier,
