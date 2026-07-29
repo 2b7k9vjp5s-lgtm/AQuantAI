@@ -9,6 +9,13 @@ Project-owner instruction on 2026-07-29:
 确认无需 migration 后，创建只包含精确授权文件的 Draft PR
 ```
 
+Project-owner continuation on 2026-07-29:
+
+```text
+在同一个 Draft PR #274 内继续 M2 请求规划与 M3 响应校验，
+所有提交必须限制在任务快照冻结的精确文件清单内
+```
+
 Authoritative start state:
 
 ```text
@@ -16,6 +23,7 @@ repository = 2b7k9vjp5s-lgtm/AQuantAI
 base_branch = main
 exact_base = afc6ae442a440fa9099494d0aa3f6ab12e64fb57
 implementation_issue = #273
+implementation_pr = #274
 parent_roadmap = #137
 branch = feat/today-market-daily-market-acquisition-foundation-v1
 risk_tier = Strict Implementation
@@ -188,23 +196,11 @@ PR #241 = unchanged
 
 If a required change falls outside the exact list, stop before editing and return for owner review.
 
-## Initial Draft PR increment
-
-The first Draft PR increment is intentionally limited to M1:
-
-```text
-task snapshot
-+ immutable live source-policy/readiness contracts
-+ package exports
-+ zero-network contract tests
-```
-
-It does not add transport, credentials, persistence execution or runtime wiring yet. Later commits may
-use only the exact authorized paths above and invalidate any prior fixed-HEAD CI/review evidence.
-
-## Implementation sequence
+## Completed increments
 
 ### M1 — live source policy and readiness
+
+Completed in Draft PR #274:
 
 - preserve `SOURCE_KEY = ths-account-structured-provider-v1`;
 - freeze reviewed host family, authentication-reference type, QPS and ten-year boundary;
@@ -215,21 +211,44 @@ use only the exact authorized paths above and invalidate any prior fixed-HEAD CI
 
 ### M2 — selectors and request planning
 
+Completed at exact HEAD `59b912eaacb350ec445bf2be78bf234dcac2aecf`:
+
 - closed capability registry only;
-- exact instrument/exchange/date selectors;
-- exact trading-calendar-driven sessions;
+- explicit instrument identity, exchange and requested sessions;
+- exact expected natural-key observations instead of inferred suspension/listing behavior;
 - rolling ten-year rejection with no silent truncation;
-- quota/data-volume budgeting;
+- one-session and ten-session deterministic planning;
+- explicit call/cell/QPS budget revision with no account identifier;
 - no arbitrary host/path/header/query dictionaries;
-- deterministic request fingerprints without credentials.
+- request and plan fingerprints exclude credentials and volatile request IDs;
+- all plans remain `remote_executable=false` and transport mapping remains deferred to M4.
 
 ### M3 — response validation
 
-- strict envelope and field validation;
-- requested capability/date/identity agreement;
-- OHLC, units, chronology and natural-key checks;
-- duplicate/conflicting/unrequested/partial rows fail closed;
-- synthetic repository fixtures only.
+Completed at exact HEAD `59b912eaacb350ec445bf2be78bf234dcac2aecf`:
+
+- strict envelope/source/capability/schema field validation;
+- exact selector-to-response identity/date/natural-key agreement;
+- OHLC, finite numeric, nonnegative volume/amount and chronological ordering validation;
+- duplicate, conflicting, unrequested and partial rows fail closed;
+- request IDs do not affect content fingerprints;
+- synthetic repository fixtures only;
+- historical block response schema remains explicitly unavailable pending exact taxonomy review.
+
+Validation at this intermediate HEAD:
+
+```text
+workflow = Local Tests #986
+head = 59b912eaacb350ec445bf2be78bf234dcac2aecf
+result = success
+pytest = 959 passed, 7 skipped, 1 existing warning
+offline demos = success
+```
+
+This is not the final fixed HEAD because M4–M6 remain pending. Any later commit invalidates this
+intermediate CI evidence for final-review purposes.
+
+## Remaining implementation sequence
 
 ### M4 — credential reference and transport
 
