@@ -1,9 +1,7 @@
 """Deterministic Today Market Slice B rules.
 
-The functions in this module are deliberately pure. They consume explicit calculation
-inputs and return versioned source-neutral results. They do not read databases, call
-networks, resolve credentials, invoke runtime commands, mutate research state, or
-perform AI/recommendation work.
+All functions are pure and source-neutral. No database, network, credential, runtime,
+UI, AI, research-mutation, recommendation, portfolio, or trading path exists here.
 """
 
 from __future__ import annotations
@@ -36,23 +34,23 @@ from market_cockpit.today_market_rule_contracts import (
 
 
 def calculate_market_overview(value: MarketOverviewInput) -> MarketOverviewResult:
-    """Apply the frozen Market Overview v1 rule contract."""
-
+    """Apply the frozen Market Overview v1 contract."""
     if value.expected_active_count <= 0:
         raise TodayMarketRuleInputError("expected_active_count must be positive")
     if not 0 <= value.accounted_count <= value.expected_active_count:
         raise TodayMarketRuleInputError("accounted_count must be within the expected universe")
     if value.identity_conflict_count < 0:
         raise TodayMarketRuleInputError("identity_conflict_count must be nonnegative")
+
     returns = tuple(_finite_required(item, "valid_returns") for item in value.valid_returns)
     if len(returns) > value.accounted_count:
         raise TodayMarketRuleInputError("valid returns cannot exceed accounted instruments")
 
     eligible_20_count = len(value.above_ma20_flags)
     if value.new_high_20_flags and len(value.new_high_20_flags) != eligible_20_count:
-        raise TodayMarketRuleInputError("new_high_20_flags must use the same eligible 20-session universe")
+        raise TodayMarketRuleInputError("new_high_20_flags must use the same 20-session universe")
     if value.new_low_20_flags and len(value.new_low_20_flags) != eligible_20_count:
-        raise TodayMarketRuleInputError("new_low_20_flags must use the same eligible 20-session universe")
+        raise TodayMarketRuleInputError("new_low_20_flags must use the same 20-session universe")
 
     valid_return_count = len(returns)
     return_coverage_ratio = valid_return_count / value.expected_active_count
@@ -64,7 +62,6 @@ def calculate_market_overview(value: MarketOverviewInput) -> MarketOverviewResul
         (advancing - declining) / valid_return_count if valid_return_count else None
     )
     median_return = float(median(returns)) if returns else None
-
     above_ma20_ratio = (
         sum(value.above_ma20_flags) / eligible_20_count if eligible_20_count else None
     )
@@ -79,24 +76,26 @@ def calculate_market_overview(value: MarketOverviewInput) -> MarketOverviewResul
         else None
     )
 
-    missing_inputs: list[str] = []
+    missing: list[str] = []
     if value.calendar_conflict:
-        missing_inputs.append("calendar_conflict")
+        missing.append("calendar_conflict")
     if value.identity_conflict_count:
-        missing_inputs.append("identity_conflict")
+        missing.append("identity_conflict")
     if return_coverage_ratio < 0.90:
-        missing_inputs.append("return_coverage_below_0.90")
+        missing.append("return_coverage_below_0.90")
     if above_ma20_ratio is None:
-        missing_inputs.append("above_ma20_ratio_unavailable")
+        missing.append("above_ma20_ratio_unavailable")
 
-    market_amount_current = _finite_optional(value.market_amount_current)
+    market_amount_current = _finite_optional_checked(
+        value.market_amount_current, "market_amount_current"
+    )
     market_amount_ratio_20: float | None = None
-    if market_amount_current is None or market_amount_current < 0:
-        if value.market_amount_current is not None:
-            raise TodayMarketRuleInputError("market_amount_current must be finite and nonnegative")
-        missing_inputs.append("market_amount_current_unavailable")
+    if market_amount_current is None:
+        missing.append("market_amount_current_unavailable")
+    elif market_amount_current < 0:
+        raise TodayMarketRuleInputError("market_amount_current must be nonnegative")
     elif len(value.market_amount_previous_20) != 20:
-        missing_inputs.append("market_amount_previous_20_incomplete")
+        missing.append("market_amount_previous_20_incomplete")
     else:
         prior_amounts = tuple(
             _finite_required(item, "market_amount_previous_20")
@@ -106,34 +105,24 @@ def calculate_market_overview(value: MarketOverviewInput) -> MarketOverviewResul
             raise TodayMarketRuleInputError("market amount history must be nonnegative")
         baseline = float(median(prior_amounts))
         if baseline <= 0:
-            missing_inputs.append("market_amount_previous_20_nonpositive_baseline")
+            missing.append("market_amount_previous_20_nonpositive_baseline")
         else:
             market_amount_ratio_20 = market_amount_current / baseline
 
-    if missing_inputs and any(
-        item
-        in {
+    core_failure = any(
+        reason in {
             "calendar_conflict",
             "identity_conflict",
             "return_coverage_below_0.90",
             "above_ma20_ratio_unavailable",
         }
-        for item in missing_inputs
-    ):
+        for reason in missing
+    )
+    if core_failure or breadth_balance is None or median_return is None or above_ma20_ratio is None:
         market_state = "insufficient_coverage"
-    elif breadth_balance is None or median_return is None or above_ma20_ratio is None:
-        market_state = "insufficient_coverage"
-    elif (
-        breadth_balance >= 0.20
-        and median_return > 0
-        and above_ma20_ratio >= 0.55
-    ):
+    elif breadth_balance >= 0.20 and median_return > 0 and above_ma20_ratio >= 0.55:
         market_state = "strong"
-    elif (
-        breadth_balance <= -0.20
-        and median_return < 0
-        and above_ma20_ratio <= 0.45
-    ):
+    elif breadth_balance <= -0.20 and median_return < 0 and above_ma20_ratio <= 0.45:
         market_state = "weak"
     else:
         market_state = "mixed"
@@ -159,13 +148,12 @@ def calculate_market_overview(value: MarketOverviewInput) -> MarketOverviewResul
         new_low_20_ratio=new_low_20_ratio,
         market_amount_current=market_amount_current,
         market_amount_ratio_20=market_amount_ratio_20,
-        missing_inputs=tuple(sorted(set(missing_inputs))),
+        missing_inputs=tuple(sorted(set(missing))),
     )
 
 
 def calculate_sector_hotspots(values: tuple[SectorRuleInput, ...]) -> tuple[SectorHotspotResult, ...]:
-    """Apply percentile ranking and ordered Sector Hotspot v1 states."""
-
+    """Rank within exact taxonomy/level groups and apply ordered hotspot states."""
     seen: set[tuple[str, str | None, str]] = set()
     groups: dict[tuple[str, str | None], list[SectorRuleInput]] = defaultdict(list)
     for value in values:
@@ -182,14 +170,17 @@ def calculate_sector_hotspots(values: tuple[SectorRuleInput, ...]) -> tuple[Sect
     results: list[SectorHotspotResult] = []
     for group_key in sorted(groups, key=lambda item: (item[0], item[1] or "")):
         group = sorted(groups[group_key], key=lambda item: item.sector_code)
-        r1_pct = _rank_percentiles(
-            [(item.sector_code, item.sector_r1) for item in group if item.sector_r1 is not None]
+        r1_pct = _percentiles(
+            [(item.sector_code, item.sector_r1) for item in group],
+            minimum_count=MINIMUM_RANKED_SECTOR_COUNT,
         )
-        r5_pct = _rank_percentiles(
-            [(item.sector_code, item.sector_r5) for item in group if item.sector_r5 is not None]
+        r5_pct = _percentiles(
+            [(item.sector_code, item.sector_r5) for item in group],
+            minimum_count=MINIMUM_RANKED_SECTOR_COUNT,
         )
-        r20_pct = _rank_percentiles(
-            [(item.sector_code, item.sector_r20) for item in group if item.sector_r20 is not None]
+        r20_pct = _percentiles(
+            [(item.sector_code, item.sector_r20) for item in group],
+            minimum_count=MINIMUM_RANKED_SECTOR_COUNT,
         )
         for item in group:
             results.append(
@@ -205,8 +196,7 @@ def calculate_sector_hotspots(values: tuple[SectorRuleInput, ...]) -> tuple[Sect
 
 
 def calculate_stock_anomalies(values: tuple[StockRuleInput, ...]) -> StockAnomalyResult:
-    """Apply the frozen Stock Anomaly v1 rules with stable ordering."""
-
+    """Apply all Stock Anomaly v1 rules with deterministic ordering."""
     seen: set[str] = set()
     for value in values:
         _require_text(value.stock_code, "stock_code")
@@ -215,19 +205,19 @@ def calculate_stock_anomalies(values: tuple[StockRuleInput, ...]) -> StockAnomal
         seen.add(value.stock_code)
         _validate_stock_input(value)
 
-    abs_r1_pct = _rank_percentiles(
+    abs_r1_pct = _percentiles(
         [
-            (item.stock_code, abs(float(item.r1)))
+            (item.stock_code, abs(float(item.r1)) if item.return_semantics_valid and item.r1 is not None else None)
             for item in values
-            if item.return_semantics_valid and item.r1 is not None
-        ]
+        ],
+        minimum_count=1,
     )
-    r5_pct = _rank_percentiles(
+    r5_pct = _percentiles(
         [
-            (item.stock_code, float(item.r5))
+            (item.stock_code, float(item.r5) if item.return_semantics_valid and item.r5 is not None else None)
             for item in values
-            if item.return_semantics_valid and item.r5 is not None
-        ]
+        ],
+        minimum_count=1,
     )
 
     sector_groups: dict[tuple[str, str], list[StockRuleInput]] = defaultdict(list)
@@ -252,10 +242,7 @@ def calculate_stock_anomalies(values: tuple[StockRuleInput, ...]) -> StockAnomal
         )
         anomalies.extend(stock_anomalies)
         diagnostics.append(
-            StockRuleDiagnostics(
-                stock_code=item.stock_code,
-                unavailable_rules=tuple(unavailable),
-            )
+            StockRuleDiagnostics(item.stock_code, tuple(unavailable))
         )
 
     order = {rule: index for index, rule in enumerate(ANOMALY_RULE_ORDER)}
@@ -309,8 +296,7 @@ def _sector_result(
         missing.append("constituent_ma20_state_input_unavailable")
 
     core_failure = any(
-        reason
-        in {
+        reason in {
             "ranked_sector_count_below_10",
             "ambiguous_sector_identity",
             "dated_membership_unavailable",
@@ -331,11 +317,7 @@ def _sector_result(
     ) and _gte(item.activity_ratio_20, 1.00):
         state = "high_level_divergence"
         matched_rule = "priority_2_high_level_divergence"
-    elif (
-        item.prior_state in STRONG_PRIOR_STATES
-        and _lt(r5_pct, 0.50)
-        and _lt(item.breadth_up_1, 0.50)
-    ):
+    elif item.prior_state in STRONG_PRIOR_STATES and _lt(r5_pct, 0.50) and _lt(item.breadth_up_1, 0.50):
         state = "cooling"
         matched_rule = "priority_3_cooling"
     elif (
@@ -370,10 +352,7 @@ def _sector_result(
         _gte(r5_pct, 0.70)
         and _gte(r20_pct, 0.50)
         and _gte(item.breadth_up_1, 0.55)
-        and (
-            _gte(item.activity_ratio_20, 1.20)
-            or _gte(breadth_above_ma20, 0.55)
-        )
+        and (_gte(item.activity_ratio_20, 1.20) or _gte(breadth_above_ma20, 0.55))
     ):
         state = "strengthening"
         matched_rule = "priority_7_strengthening"
@@ -440,16 +419,9 @@ def _stock_anomalies_for_one(
         pct = abs_r1_pct[item.stock_code]
         if abs(item.r1) >= 0.07 or (pct >= 0.975 and abs(item.r1) >= 0.04):
             anomalies.append(
-                StockAnomaly(
-                    item.stock_code,
-                    "large_move",
-                    item.r1,
-                    ANOMALY_RULE_VERSION,
-                    (("abs_return_percentile", pct),),
-                )
+                StockAnomaly(item.stock_code, "large_move", item.r1, ANOMALY_RULE_VERSION, (("abs_return_percentile", pct),))
             )
 
-    volume_ratio: float | None = None
     if item.volume_current is None or len(item.volume_previous_20) != 20:
         unavailable.append(("unusual_volume", "exact_20_session_volume_window_unavailable"))
     else:
@@ -461,66 +433,34 @@ def _stock_anomalies_for_one(
             volume_ratio = float(item.volume_current) / baseline
             if volume_ratio >= 2.00:
                 anomalies.append(
-                    StockAnomaly(
-                        item.stock_code,
-                        "unusual_volume",
-                        volume_ratio,
-                        ANOMALY_RULE_VERSION,
-                        (("volume_baseline_20", baseline),),
-                    )
+                    StockAnomaly(item.stock_code, "unusual_volume", volume_ratio, ANOMALY_RULE_VERSION, (("volume_baseline_20", baseline),))
                 )
 
-    closes_ready = item.return_semantics_valid and len(item.analysis_closes_60) == 60
-    if not closes_ready:
-        reason = (
-            "return_semantics_unavailable"
-            if not item.return_semantics_valid
-            else "exact_60_session_analysis_close_window_unavailable"
-        )
-        unavailable.append(("new_high", reason))
-        unavailable.append(("new_low", reason))
+    if not item.return_semantics_valid or len(item.analysis_closes_60) != 60:
+        reason = "return_semantics_unavailable" if not item.return_semantics_valid else "exact_60_session_analysis_close_window_unavailable"
+        unavailable.extend((("new_high", reason), ("new_low", reason)))
     else:
         current = item.analysis_closes_60[-1]
         if current >= max(item.analysis_closes_60) - RETURN_EPSILON:
-            anomalies.append(
-                StockAnomaly(item.stock_code, "new_high", current, ANOMALY_RULE_VERSION)
-            )
+            anomalies.append(StockAnomaly(item.stock_code, "new_high", current, ANOMALY_RULE_VERSION))
         if current <= min(item.analysis_closes_60) + RETURN_EPSILON:
-            anomalies.append(
-                StockAnomaly(item.stock_code, "new_low", current, ANOMALY_RULE_VERSION)
-            )
+            anomalies.append(StockAnomaly(item.stock_code, "new_low", current, ANOMALY_RULE_VERSION))
 
-    if (
-        not item.reference_close_semantics_valid
-        or item.open_current is None
-        or item.reference_close_previous is None
-    ):
+    if not item.reference_close_semantics_valid or item.open_current is None or item.reference_close_previous is None:
         unavailable.append(("gap", "reference_close_semantics_unavailable"))
     else:
         gap_return = item.open_current / item.reference_close_previous - 1.0
         if abs(gap_return) >= 0.025:
-            anomalies.append(
-                StockAnomaly(item.stock_code, "gap", gap_return, ANOMALY_RULE_VERSION)
-            )
+            anomalies.append(StockAnomaly(item.stock_code, "gap", gap_return, ANOMALY_RULE_VERSION))
 
-    if (
-        not item.return_semantics_valid
-        or item.r5 is None
-        or item.broad_market_benchmark_r5 is None
-    ):
+    if not item.return_semantics_valid or item.r5 is None or item.broad_market_benchmark_r5 is None:
         unavailable.append(("persistent_relative_strength", "five_session_return_semantics_unavailable"))
     else:
         relative_return_5 = item.r5 - item.broad_market_benchmark_r5
         pct = r5_pct[item.stock_code]
         if relative_return_5 >= 0.05 and pct >= 0.90:
             anomalies.append(
-                StockAnomaly(
-                    item.stock_code,
-                    "persistent_relative_strength",
-                    relative_return_5,
-                    ANOMALY_RULE_VERSION,
-                    (("stock_r5_percentile", pct),),
-                )
+                StockAnomaly(item.stock_code, "persistent_relative_strength", relative_return_5, ANOMALY_RULE_VERSION, (("stock_r5_percentile", pct),))
             )
 
     if not item.return_semantics_valid:
@@ -538,8 +478,7 @@ def _stock_anomalies_for_one(
         else:
             member_returns = [float(member.r1) for member in members if member.r1 is not None]
             sector_median = float(median(member_returns))
-            deviations = [abs(value - sector_median) for value in member_returns]
-            mad = float(median(deviations))
+            mad = float(median(abs(value - sector_median) for value in member_returns))
             if mad <= 0:
                 unavailable.append(("sector_relative_outlier", "sector_mad_zero"))
             else:
@@ -559,16 +498,17 @@ def _stock_anomalies_for_one(
     return anomalies, unavailable
 
 
-def _rank_percentiles(values: list[tuple[str, float | None]]) -> dict[str, float]:
+def _percentiles(
+    values: list[tuple[str, float | None]], *, minimum_count: int
+) -> dict[str, float]:
     clean = [(key, float(value)) for key, value in values if value is not None]
-    if len(clean) < MINIMUM_RANKED_SECTOR_COUNT:
+    if len(clean) < minimum_count:
         return {}
     ordered = sorted(clean, key=lambda item: (-item[1], item[0]))
+    if len(ordered) == 1:
+        return {ordered[0][0]: 1.0}
     denominator = len(ordered) - 1
-    return {
-        key: 1.0 - (index / denominator)
-        for index, (key, _value) in enumerate(ordered)
-    }
+    return {key: 1.0 - index / denominator for index, (key, _) in enumerate(ordered)}
 
 
 def _validate_sector_input(value: SectorRuleInput) -> None:
@@ -625,46 +565,11 @@ def _validate_stock_input(value: StockRuleInput) -> None:
         raise TodayMarketRuleInputError("reference_close_previous must be positive")
 
 
-def _rank_percentiles_for_any_size(values: list[tuple[str, float]]) -> dict[str, float]:
-    if not values:
-        return {}
-    ordered = sorted(values, key=lambda item: (-item[1], item[0]))
-    if len(ordered) == 1:
-        return {ordered[0][0]: 1.0}
-    denominator = len(ordered) - 1
-    return {key: 1.0 - index / denominator for index, (key, _) in enumerate(ordered)}
-
-
-# Stock percentiles do not carry the sector contract's N>=10 restriction. Keep the
-# public sector helper strict while replacing stock lookups with their own ranking.
-_sector_rank_percentiles = _rank_percentiles
-
-
-def _rank_percentiles(values: list[tuple[str, float | None]]) -> dict[str, float]:  # type: ignore[no-redef]
-    clean = [(key, float(value)) for key, value in values if value is not None]
-    if not clean:
-        return {}
-    # Callers for sector ranking pass sector codes and enforce N>=10 through state
-    # coverage; callers for stock ranking may use any explicit selected universe.
-    ordered = sorted(clean, key=lambda item: (-item[1], item[0]))
-    if len(ordered) == 1:
-        return {ordered[0][0]: 1.0}
-    denominator = len(ordered) - 1
-    return {key: 1.0 - index / denominator for index, (key, _) in enumerate(ordered)}
-
-
 def _finite_required(value: float, field_name: str) -> float:
     converted = float(value)
     if not isfinite(converted):
         raise TodayMarketRuleInputError(f"{field_name} must contain finite values")
     return converted
-
-
-def _finite_optional(value: float | None) -> float | None:
-    if value is None:
-        return None
-    converted = float(value)
-    return converted if isfinite(converted) else None
 
 
 def _finite_optional_checked(value: float | None, field_name: str) -> float | None:
