@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta, timezone
 import inspect
 import json
 
@@ -13,7 +14,7 @@ from backend.database.models import (
     TradeCalendarRecord,
 )
 from datasource import ths_structured_provider as ths
-from datasource.ths_structured_provider import live_contracts
+from datasource.ths_structured_provider import credentials, live_contracts, transport
 
 
 def test_live_source_policy_is_exact_secret_free_and_disabled_by_default() -> None:
@@ -171,3 +172,243 @@ def test_initial_live_contract_increment_has_no_network_or_secret_lookup_imports
 
     assert "os.environ" not in source
     assert "getenv(" not in source
+
+
+def _transport_plan() -> ths.DailyMarketRequestPlan:
+    selector = ths.TradingCalendarSelector(
+        exchange=ths.Exchange.SSE,
+        requested_dates=(date(2026, 7, 28), date(2026, 7, 29)),
+        provider_horizon_reference_date=date(2026, 7, 29),
+    )
+    budget = ths.AcquisitionQuotaBudget(
+        budget_revision_id="synthetic-transport-budget-v1",
+        remaining_calls=10,
+        remaining_cells=10_000,
+        per_function_qps=10,
+        account_total_qps=20,
+    )
+    return ths.build_live_request_plan(selector, budget)
+
+
+class _Resolver:
+    def __init__(self, resolved: ths.ResolvedCredential | None) -> None:
+        self.resolved = resolved
+        self.calls = 0
+
+    def resolve(self, reference: ths.CredentialReference) -> ths.ResolvedCredential | None:
+        self.calls += 1
+        assert reference.reference_id == "ths-primary-runtime-slot"
+        return self.resolved
+
+
+class _Executor:
+    def __init__(self, outcomes: list[object]) -> None:
+        self.outcomes = list(outcomes)
+        self.calls = 0
+        self.credential_values: list[str] = []
+        self.requests: list[ths.TransportOperationRequest] = []
+
+    def execute(
+        self,
+        request: ths.TransportOperationRequest,
+        *,
+        credential_value: str,
+    ) -> dict[str, object]:
+        self.calls += 1
+        self.requests.append(request)
+        self.credential_values.append(credential_value)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        assert isinstance(outcome, dict)
+        return outcome
+
+
+def test_credential_reference_and_resolved_value_are_secret_free_by_default() -> None:
+    reference = ths.CredentialReference("ths-primary-runtime-slot")
+    resolved = ths.ResolvedCredential(
+        "SYNTHETIC-SECRET-THAT-MUST-NOT-LEAK",
+        expires_at=datetime(2026, 7, 30, tzinfo=timezone.utc),
+    )
+
+    assert len(reference.reference_fingerprint) == 64
+    assert "SYNTHETIC-SECRET" not in repr(resolved)
+    assert "SYNTHETIC-SECRET" not in str(resolved)
+    assert "SYNTHETIC-SECRET" not in json.dumps(resolved.safe_metadata())
+    assert "credential_value" not in json.dumps(reference.fingerprint_payload())
+
+
+def test_transport_is_disabled_before_resolver_or_executor_is_touched() -> None:
+    resolver = _Resolver(ths.ResolvedCredential("SYNTHETIC-TOKEN"))
+    executor = _Executor([{"status": "ok"}])
+    client = ths.ThsDailyMarketTransport(
+        credential_resolver=resolver,
+        executor=executor,
+    )
+
+    with pytest.raises(ths.TransportExecutionError) as error:
+        client.execute(
+            _transport_plan(),
+            ths.CredentialReference("ths-primary-runtime-slot"),
+            now=datetime(2026, 7, 29, tzinfo=timezone.utc),
+        )
+
+    assert error.value.reason_code is ths.TransportFailureCode.REMOTE_EXECUTION_DISABLED
+    assert resolver.calls == 0
+    assert executor.calls == 0
+
+
+def test_enabled_transport_uses_injected_credential_without_public_leakage() -> None:
+    secret = "SYNTHETIC-TOKEN-VALUE"
+    resolver = _Resolver(
+        ths.ResolvedCredential(
+            secret,
+            expires_at=datetime(2026, 7, 30, tzinfo=timezone.utc),
+        )
+    )
+    executor = _Executor([{"schema_version": "synthetic", "data": []}])
+    client = ths.ThsDailyMarketTransport(
+        credential_resolver=resolver,
+        executor=executor,
+        config=ths.TransportExecutionConfig(enabled=True),
+    )
+
+    result = client.execute(
+        _transport_plan(),
+        ths.CredentialReference("ths-primary-runtime-slot"),
+        now=datetime(2026, 7, 29, tzinfo=timezone.utc),
+    )
+
+    assert result.attempts == 1
+    assert resolver.calls == 1
+    assert executor.calls == 1
+    assert executor.credential_values == [secret]
+    assert executor.requests[0].host == "quantapi.51ifind.com"
+    summary = json.dumps(dict(result.public_summary()), sort_keys=True)
+    assert secret not in summary
+    assert "credential_reference_fingerprint" in summary
+
+
+def test_missing_or_expired_credentials_fail_with_sanitized_reason() -> None:
+    reference = ths.CredentialReference("ths-primary-runtime-slot")
+    executor = _Executor([{"status": "unused"}])
+
+    missing = ths.ThsDailyMarketTransport(
+        credential_resolver=_Resolver(None),
+        executor=executor,
+        config=ths.TransportExecutionConfig(enabled=True),
+    )
+    with pytest.raises(ths.TransportExecutionError) as missing_error:
+        missing.execute(
+            _transport_plan(),
+            reference,
+            now=datetime(2026, 7, 29, tzinfo=timezone.utc),
+        )
+    assert missing_error.value.reason_code is ths.TransportFailureCode.CREDENTIAL_UNAVAILABLE
+
+    expired = ths.ThsDailyMarketTransport(
+        credential_resolver=_Resolver(
+            ths.ResolvedCredential(
+                "SYNTHETIC-EXPIRED",
+                expires_at=datetime(2026, 7, 28, tzinfo=timezone.utc),
+            )
+        ),
+        executor=executor,
+        config=ths.TransportExecutionConfig(enabled=True),
+    )
+    with pytest.raises(ths.TransportExecutionError) as expired_error:
+        expired.execute(
+            _transport_plan(),
+            reference,
+            now=datetime(2026, 7, 29, tzinfo=timezone.utc),
+        )
+    assert expired_error.value.reason_code is ths.TransportFailureCode.CREDENTIAL_UNAVAILABLE
+    assert executor.calls == 0
+
+
+def test_transport_retry_is_bounded_and_auth_or_rate_limit_never_retries() -> None:
+    now = datetime(2026, 7, 29, tzinfo=timezone.utc)
+    reference = ths.CredentialReference("ths-primary-runtime-slot")
+    resolver = _Resolver(
+        ths.ResolvedCredential("SYNTHETIC-TOKEN", expires_at=now + timedelta(days=1))
+    )
+    sleeps: list[float] = []
+    executor = _Executor(
+        [ths.ExecutorTimeoutError("synthetic timeout"), {"status": "ok"}]
+    )
+    client = ths.ThsDailyMarketTransport(
+        credential_resolver=resolver,
+        executor=executor,
+        config=ths.TransportExecutionConfig(
+            enabled=True,
+            max_attempts=2,
+            retry_delay_seconds=0.25,
+        ),
+        sleep=sleeps.append,
+    )
+    result = client.execute(_transport_plan(), reference, now=now)
+    assert result.attempts == 2
+    assert executor.calls == 2
+    assert sleeps == [0.25]
+
+    for failure, reason in (
+        (ths.ExecutorAuthenticationError("synthetic auth"), ths.TransportFailureCode.AUTHENTICATION_FAILED),
+        (ths.ExecutorRateLimitError("synthetic quota"), ths.TransportFailureCode.RATE_LIMITED),
+    ):
+        no_retry_executor = _Executor([failure, {"status": "must-not-run"}])
+        no_retry = ths.ThsDailyMarketTransport(
+            credential_resolver=resolver,
+            executor=no_retry_executor,
+            config=ths.TransportExecutionConfig(enabled=True, max_attempts=3),
+        )
+        with pytest.raises(ths.TransportExecutionError) as error:
+            no_retry.execute(_transport_plan(), reference, now=now)
+        assert error.value.reason_code is reason
+        assert no_retry_executor.calls == 1
+
+
+def test_transport_rejects_unreviewed_host_and_unsupported_block_operation() -> None:
+    plan = _transport_plan()
+    reference = ths.CredentialReference("ths-primary-runtime-slot")
+    with pytest.raises(ths.TransportExecutionError) as host_error:
+        ths.build_transport_request(
+            plan,
+            reference,
+            ths.TransportExecutionConfig(enabled=True, host="ft.10jqka.com.cn"),
+        )
+    assert host_error.value.reason_code is ths.TransportFailureCode.HOST_NOT_AUTHORIZED
+
+    block_selector = ths.HistoricalBlockSnapshotSelector(
+        taxonomy=ths.BlockTaxonomy.INDUSTRY,
+        block_id="SYNTH.INDUSTRY.A",
+        snapshot_date=date(2026, 7, 29),
+        expected_member_count=2,
+        provider_horizon_reference_date=date(2026, 7, 29),
+    )
+    budget = ths.AcquisitionQuotaBudget(
+        budget_revision_id="synthetic-block-budget",
+        remaining_calls=10,
+        remaining_cells=100,
+        per_function_qps=10,
+        account_total_qps=20,
+    )
+    with pytest.raises(ths.TransportExecutionError) as block_error:
+        ths.build_transport_request(
+            ths.build_live_request_plan(block_selector, budget),
+            reference,
+            ths.TransportExecutionConfig(enabled=True),
+        )
+    assert block_error.value.reason_code is ths.TransportFailureCode.OPERATION_NOT_AUTHORIZED
+
+
+def test_m4_modules_have_no_network_client_or_environment_lookup() -> None:
+    source = inspect.getsource(credentials) + inspect.getsource(transport)
+    for forbidden in (
+        "import requests",
+        "import httpx",
+        "import socket",
+        "urllib.request",
+        "os.environ",
+        "getenv(",
+    ):
+        assert forbidden not in source
