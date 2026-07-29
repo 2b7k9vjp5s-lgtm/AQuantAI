@@ -1,0 +1,29 @@
+{
+  "_aquantai_fixture_kind": "synthetic",
+  "code": 0,
+  "message": "synthetic success",
+  "request_id": "SYNTH-REQ-STOCK",
+  "data": {
+    "source_key": "ths-account-structured-provider-v1",
+    "capability": "listed_instrument_identity",
+    "schema_version": "aquantai.ths-listed-instrument-response.v1",
+    "items": [
+      {
+        "provider_symbol": "SYNTH.SSE.EQ001",
+        "stock_code": "990001",
+        "stock_name": "合成甲",
+        "exchange": "SSE",
+        "listing_date": "2020-01-02",
+        "status": "listed"
+      },
+      {
+        "provider_symbol": "SYNTH.SZSE.EQ002",
+        "stock_code": "990002",
+        "stock_name": "合成乙",
+        "exchange": "SZSE",
+        "listing_date": "2021-02-03",
+        "status": "listed"
+      }
+    ]
+  }
+}

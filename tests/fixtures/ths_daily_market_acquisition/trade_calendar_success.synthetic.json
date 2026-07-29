@@ -1,0 +1,22 @@
+{
+  "_aquantai_fixture_kind": "synthetic",
+  "code": 0,
+  "message": "synthetic success",
+  "data": {
+    "source_key": "ths-account-structured-provider-v1",
+    "capability": "trading_calendar",
+    "schema_version": "aquantai.ths-trading-calendar-response.v1",
+    "items": [
+      {
+        "exchange": "SSE",
+        "trade_date": "2026-07-27",
+        "is_open": true
+      },
+      {
+        "exchange": "SSE",
+        "trade_date": "2026-07-28",
+        "is_open": true
+      }
+    ]
+  }
+}
