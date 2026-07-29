@@ -14,6 +14,7 @@ from datasource import ths_structured_provider as ths
 
 
 def _component(
+    component_key: str,
     owner: str,
     run_id: int,
     batch_character: str,
@@ -21,6 +22,7 @@ def _component(
     rows: int,
 ) -> ths.PersistedComponentReceipt:
     return ths.PersistedComponentReceipt(
+        component_key=component_key,
         owner=owner,
         ingestion_run_id=run_id,
         batch_identifier=batch_character * 64,
@@ -44,6 +46,7 @@ def _receipt() -> ths.DailyMarketFoundationReceipt:
         stock_codes=("990001", "990002"),
         index_codes=("999950",),
         market=_component(
+            "market_data_bundle",
             "MarketDataPersistenceService",
             101,
             "a",
@@ -51,6 +54,7 @@ def _receipt() -> ths.DailyMarketFoundationReceipt:
             8,
         ),
         benchmark=_component(
+            "benchmark_index_daily",
             "BenchmarkPersistenceService",
             102,
             "c",
@@ -112,6 +116,7 @@ def test_complete_m5_receipt_projects_to_live_completeness_and_provenance_only()
         live_port.LiveComponentKey.MARKET_DATA_BUNDLE,
     )
     assert {component.ingestion_run_id for component in batch.components} == {101, 102}
+    assert all(not hasattr(component, "owner") for component in batch.components)
 
     summary = json.dumps(dict(batch.public_summary()), sort_keys=True)
     for forbidden in (
@@ -121,6 +126,8 @@ def test_complete_m5_receipt_projects_to_live_completeness_and_provenance_only()
         "credential",
         "token",
         "http",
+        "persistence",
+        "owner",
         "market_state",
         "sector_state",
         "anomaly",
@@ -182,7 +189,7 @@ def test_wrong_source_acquisition_or_coverage_fails_closed() -> None:
     assert coverage_error.value.reason_code is live_port.LiveHandoffFailureCode.COVERAGE_MISMATCH
 
 
-def test_incomplete_or_wrong_owner_receipt_cannot_be_promoted() -> None:
+def test_incomplete_or_wrong_component_receipt_cannot_be_promoted() -> None:
     receipt = _receipt()
     incomplete = SimpleNamespace(
         source_key=receipt.source_key,
@@ -201,17 +208,26 @@ def test_incomplete_or_wrong_owner_receipt_cannot_be_promoted() -> None:
         )
     assert missing_error.value.reason_code is live_port.LiveHandoffFailureCode.COMPONENT_MISMATCH
 
-    wrong_owner = replace(
+    wrong_component_key = replace(
         receipt,
-        benchmark=replace(receipt.benchmark, owner="UnknownPersistenceOwner"),
+        benchmark=replace(receipt.benchmark, component_key="market_data_bundle"),
     )
-    with pytest.raises(live_port.LiveHandoffValidationError) as owner_error:
+    with pytest.raises(live_port.LiveHandoffValidationError) as key_error:
         live_port.project_live_foundation_receipt(
             _request(receipt),
-            wrong_owner,
+            wrong_component_key,
             observed_at_utc=datetime(2026, 7, 28, 8, 1, tzinfo=timezone.utc),
         )
-    assert owner_error.value.reason_code is live_port.LiveHandoffFailureCode.COMPONENT_MISMATCH
+    assert key_error.value.reason_code is live_port.LiveHandoffFailureCode.COMPONENT_MISMATCH
+
+    market_as_benchmark = replace(receipt, benchmark=receipt.market)
+    with pytest.raises(live_port.LiveHandoffValidationError) as role_error:
+        live_port.project_live_foundation_receipt(
+            _request(receipt),
+            market_as_benchmark,
+            observed_at_utc=datetime(2026, 7, 28, 8, 1, tzinfo=timezone.utc),
+        )
+    assert role_error.value.reason_code is live_port.LiveHandoffFailureCode.COMPONENT_MISMATCH
 
 
 def test_existing_mock_contracts_remain_locked_to_synthetic_values() -> None:
@@ -290,6 +306,7 @@ def test_m6_port_has_no_network_persistence_runtime_or_market_truth_path() -> No
         "import httpx",
         "urllib.request",
         "from .runtime",
+        "backend.database",
         "MarketDataPersistenceService",
         "BenchmarkPersistenceService",
         "market_state",
