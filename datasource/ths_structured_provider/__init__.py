@@ -1,4 +1,4 @@
-"""Offline-only THS Stage C0 contract and request-planning foundation."""
+"""THS contract, planning, and zero-network acquisition foundations."""
 
 from .contracts import (
     ADAPTER_FAMILY,
@@ -10,6 +10,32 @@ from .contracts import (
     get_contract,
 )
 from .fingerprint import canonical_json_bytes, canonical_sha256
+from .live_contracts import (
+    ACCOUNT_TOTAL_QPS,
+    A_SHARE_DAILY_COMPLETION_REFERENCE,
+    AUTHENTICATION_REFERENCE_TYPE,
+    BACKUP_HTTPS_HOST,
+    COMPLETION_TIMEZONE,
+    DEFAULT_LIVE_SOURCE_POLICY,
+    FOUNDATION_REQUIRED_CAPABILITIES,
+    HISTORICAL_QUERY_YEARS,
+    LIVE_READINESS_BY_KEY,
+    LIVE_READINESS_FACTS,
+    LIVE_SOURCE_POLICY_VERSION,
+    OPTIONAL_FAIL_CLOSED_CAPABILITIES,
+    PER_FUNCTION_QPS,
+    PRIMARY_HTTPS_HOST,
+    PROVIDER_PRODUCT_NAME,
+    PUBLIC_FIXTURE_POLICY,
+    RETENTION_POLICY_BASIS,
+    DailyMarketCapability,
+    EvidenceBasis,
+    LiveDailyMarketSourcePolicy,
+    ReadinessDisposition,
+    ReadinessFact,
+    public_contract_snapshot,
+    readiness_fingerprint,
+)
 from .planner import DryRunRequestPlan, PlanValidationError, build_index_history_plan
 from .readiness import (
     BLOCKED_REASON_MESSAGES_ZH,
@@ -30,17 +56,39 @@ from .schemas import (
 from .selectors import IndexHistorySelector, SelectorValidationError
 
 __all__ = [
+    "ACCOUNT_TOTAL_QPS",
     "ADAPTER_FAMILY",
+    "AUTHENTICATION_REFERENCE_TYPE",
+    "A_SHARE_DAILY_COMPLETION_REFERENCE",
+    "BACKUP_HTTPS_HOST",
     "BLOCKED_REASON_MESSAGES_ZH",
+    "COMPLETION_TIMEZONE",
     "CONTRACT_REGISTRY",
+    "DEFAULT_LIVE_SOURCE_POLICY",
+    "DailyMarketCapability",
     "DryRunRequestPlan",
     "ErrorEnvelope",
+    "EvidenceBasis",
+    "FOUNDATION_REQUIRED_CAPABILITIES",
+    "HISTORICAL_QUERY_YEARS",
     "INDEX_DAILY_HISTORY_CONTRACT",
     "INDEX_HISTORY_CAPABILITY",
     "IndexHistoryEnvelope",
     "IndexHistorySelector",
+    "LIVE_READINESS_BY_KEY",
+    "LIVE_READINESS_FACTS",
+    "LIVE_SOURCE_POLICY_VERSION",
+    "LiveDailyMarketSourcePolicy",
+    "OPTIONAL_FAIL_CLOSED_CAPABILITIES",
+    "PER_FUNCTION_QPS",
+    "PRIMARY_HTTPS_HOST",
+    "PROVIDER_PRODUCT_NAME",
+    "PUBLIC_FIXTURE_POLICY",
     "PlanValidationError",
     "PublicEndpointContract",
+    "RETENTION_POLICY_BASIS",
+    "ReadinessDisposition",
+    "ReadinessFact",
     "SOURCE_KEY",
     "BlockedReasonCode",
     "CapabilityReadiness",
@@ -54,6 +102,8 @@ __all__ = [
     "get_contract",
     "index_history_schema_fingerprint",
     "load_synthetic_fixture",
+    "public_contract_snapshot",
+    "readiness_fingerprint",
     "redact_mapping",
     "redact_text",
     "validate_error_envelope",
