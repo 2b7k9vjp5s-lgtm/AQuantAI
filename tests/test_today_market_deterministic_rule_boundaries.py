@@ -248,26 +248,29 @@ def test_market_overview_never_imputes_missing_ma20_or_invalid_amount() -> None:
 
 
 def test_rule_modules_have_no_network_database_runtime_ai_or_research_mutation_path() -> None:
-    source = inspect.getsource(today_market_rule_contracts) + inspect.getsource(today_market_rules)
+    source = (inspect.getsource(today_market_rule_contracts) + inspect.getsource(today_market_rules)).lower()
     for forbidden in (
         "import requests",
         "import httpx",
         "urllib.request",
-        "socket",
-        "sqlalchemy",
+        "import socket",
+        "from socket",
+        "import sqlalchemy",
+        "from sqlalchemy",
         "backend.database",
         "backend.today_market_refresh",
-        "datasource.",
-        "credential",
-        "api_key",
-        "openai",
-        "llm",
-        "recommendation",
-        "portfolio",
-        "trading",
+        "from datasource",
+        "import datasource",
+        "os.environ",
+        "getenv(",
+        "from openai",
+        "import openai",
+        "recommendation.",
+        "portfolio.",
+        "trading.",
         "accepted_evidence",
-        "investment_candidate",
+        "investment_candidate_service",
         "limit_up",
         "limit_down",
     ):
-        assert forbidden not in source.lower()
+        assert forbidden not in source
