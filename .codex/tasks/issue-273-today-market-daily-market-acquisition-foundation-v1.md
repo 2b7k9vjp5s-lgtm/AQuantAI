@@ -211,7 +211,7 @@ Completed in Draft PR #274:
 
 ### M2 — selectors and request planning
 
-Completed at exact HEAD `59b912eaacb350ec445bf2be78bf234dcac2aecf`:
+Completed in Draft PR #274:
 
 - closed capability registry only;
 - explicit instrument identity, exchange and requested sessions;
@@ -225,7 +225,7 @@ Completed at exact HEAD `59b912eaacb350ec445bf2be78bf234dcac2aecf`:
 
 ### M3 — response validation
 
-Completed at exact HEAD `59b912eaacb350ec445bf2be78bf234dcac2aecf`:
+Completed in Draft PR #274:
 
 - strict envelope/source/capability/schema field validation;
 - exact selector-to-response identity/date/natural-key agreement;
@@ -235,14 +235,16 @@ Completed at exact HEAD `59b912eaacb350ec445bf2be78bf234dcac2aecf`:
 - synthetic repository fixtures only;
 - historical block response schema remains explicitly unavailable pending exact taxonomy review.
 
-Validation at this intermediate HEAD:
+Current intermediate evidence:
 
 ```text
-workflow = Local Tests #986
-head = 59b912eaacb350ec445bf2be78bf234dcac2aecf
+head = 364c9e43ab61fad012dacaaef028747abd500221
+workflow = Local Tests #987
 result = success
 pytest = 959 passed, 7 skipped, 1 existing warning
 offline demos = success
+behind = 0
+changed_files = 14, all inside exact allowlist
 ```
 
 This is not the final fixed HEAD because M4–M6 remain pending. Any later commit invalidates this
