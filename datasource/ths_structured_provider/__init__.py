@@ -1,5 +1,16 @@
 """THS contract, planning, and zero-network acquisition foundations."""
 
+from .acquisition import (
+    ACQUISITION_ADAPTER_VERSION,
+    ACQUISITION_CONTRACT_VERSION,
+    AcquisitionFailureCode,
+    DailyMarketAcquisitionError,
+    DailyMarketAcquisitionPersistenceService,
+    DailyMarketFoundationInput,
+    DailyMarketFoundationReceipt,
+    PersistedComponentReceipt,
+    ValidatedAcquisitionComponent,
+)
 from .contracts import (
     ADAPTER_FAMILY,
     CONTRACT_REGISTRY,
@@ -118,10 +129,13 @@ from .transport import (
 
 __all__ = [
     "ACCOUNT_TOTAL_QPS",
+    "ACQUISITION_ADAPTER_VERSION",
+    "ACQUISITION_CONTRACT_VERSION",
     "ADAPTER_FAMILY",
     "AShareDailySelector",
     "AUTHENTICATION_REFERENCE_TYPE",
     "A_SHARE_DAILY_COMPLETION_REFERENCE",
+    "AcquisitionFailureCode",
     "AcquisitionQuotaBudget",
     "BACKUP_HTTPS_HOST",
     "BLOCKED_REASON_MESSAGES_ZH",
@@ -142,7 +156,11 @@ __all__ = [
     "CredentialResolver",
     "DEFAULT_LIVE_SOURCE_POLICY",
     "DailyAdjustment",
+    "DailyMarketAcquisitionError",
+    "DailyMarketAcquisitionPersistenceService",
     "DailyMarketCapability",
+    "DailyMarketFoundationInput",
+    "DailyMarketFoundationReceipt",
     "DailyMarketRequestPlan",
     "DryRunRequestPlan",
     "EXPECTED_PLANNING_MAPPING_STATUS",
@@ -177,6 +195,7 @@ __all__ = [
     "PRIMARY_HTTPS_HOST",
     "PROVIDER_PRODUCT_NAME",
     "PUBLIC_FIXTURE_POLICY",
+    "PersistedComponentReceipt",
     "PlanValidationError",
     "PublicEndpointContract",
     "RETENTION_POLICY_BASIS",
@@ -200,6 +219,7 @@ __all__ = [
     "TransportFailureCode",
     "TransportOperationContract",
     "TransportOperationRequest",
+    "ValidatedAcquisitionComponent",
     "ValidatedLiveResponse",
     "assert_safe_display_url",
     "build_index_history_plan",
