@@ -54,6 +54,8 @@ from .live_selectors import (
 
 ACQUISITION_CONTRACT_VERSION = "aquantai.ths-daily-market-acquisition.v1"
 ACQUISITION_ADAPTER_VERSION = "aquantai.ths-daily-market-acquisition-adapter.v1"
+MARKET_DATA_COMPONENT_KEY = "market_data_bundle"
+BENCHMARK_INDEX_DAILY_COMPONENT_KEY = "benchmark_index_daily"
 _INDEX_OWNER_CODE = re.compile(r"^[0-9]{6}$")
 
 
@@ -71,6 +73,7 @@ class AcquisitionFailureCode(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class PersistedComponentReceipt:
+    component_key: str
     owner: str
     ingestion_run_id: int
     batch_identifier: str
@@ -82,6 +85,7 @@ class PersistedComponentReceipt:
 
     def stable_identity_payload(self) -> dict[str, object]:
         return {
+            "component_key": self.component_key,
             "owner": self.owner,
             "ingestion_run_id": self.ingestion_run_id,
             "batch_identifier": self.batch_identifier,
@@ -552,6 +556,7 @@ def _prepare(value: DailyMarketFoundationInput) -> _PreparedPersistence:
 
 def _market_receipt(result: IngestionResult) -> PersistedComponentReceipt:
     return PersistedComponentReceipt(
+        component_key=MARKET_DATA_COMPONENT_KEY,
         owner="MarketDataPersistenceService",
         ingestion_run_id=result.ingestion_run_id,
         batch_identifier=result.batch_identifier,
@@ -565,6 +570,7 @@ def _market_receipt(result: IngestionResult) -> PersistedComponentReceipt:
 
 def _benchmark_receipt(result: BenchmarkIngestionResult) -> PersistedComponentReceipt:
     return PersistedComponentReceipt(
+        component_key=BENCHMARK_INDEX_DAILY_COMPONENT_KEY,
         owner="BenchmarkPersistenceService",
         ingestion_run_id=result.ingestion_run_id,
         batch_identifier=result.batch_identifier,
