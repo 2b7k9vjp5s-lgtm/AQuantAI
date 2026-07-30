@@ -183,6 +183,19 @@ class SectorHotspotResult:
     missing_inputs: tuple[str, ...]
     component_thresholds: tuple[tuple[str, float | int | str], ...]
 
+    def __post_init__(self) -> None:
+        missing = set(self.missing_inputs)
+        state_specific_inputs = (
+            ("breadth_up_1", self.breadth_up_1),
+            ("activity_ratio_20", self.activity_ratio_20),
+            ("new_high_20_share", self.new_high_20_share),
+            ("strong_rank_sessions_5", self.strong_rank_sessions_5),
+        )
+        for field_name, value in state_specific_inputs:
+            if value is None:
+                missing.add(f"{field_name}_unavailable")
+        object.__setattr__(self, "missing_inputs", tuple(sorted(missing)))
+
     @property
     def fingerprint(self) -> str:
         return canonical_fingerprint(self)
