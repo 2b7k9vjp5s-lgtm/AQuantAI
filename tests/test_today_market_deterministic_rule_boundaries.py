@@ -27,10 +27,11 @@ def _sector(
     membership: str | None = "dated-membership-v1",
     return_coverage: float = 0.95,
     ma20_coverage: float = 0.90,
-    breadth_up: float = 0.70,
+    breadth_up: float | None = 0.70,
     breadth_ma20: float = 0.65,
-    activity: float = 1.1,
-    new_high: float = 0.20,
+    activity: float | None = 1.1,
+    new_high: float | None = 0.20,
+    strong_sessions: int | None = 4,
     prior_state: str | None = None,
     ambiguous: bool = False,
 ) -> SectorRuleInput:
@@ -50,7 +51,7 @@ def _sector(
         breadth_above_ma20=breadth_ma20,
         activity_ratio_20=activity,
         new_high_20_share=new_high,
-        strong_rank_sessions_5=4,
+        strong_rank_sessions_5=strong_sessions,
         prior_state=prior_state,  # type: ignore[arg-type]
         identity_ambiguous=ambiguous,
     )
@@ -75,13 +76,17 @@ def _ten_sectors(target: SectorRuleInput) -> tuple[SectorRuleInput, ...]:
     return tuple(values)
 
 
-def test_missing_dated_membership_is_insufficient_but_price_metrics_remain_visible() -> None:
-    target = _sector("TARGET", r1=0.20, r5=0.30, r20=0.40, membership=None)
-    result = next(
+def _target_result(target: SectorRuleInput):
+    return next(
         item
         for item in calculate_sector_hotspots(_ten_sectors(target))
-        if item.sector_code == "TARGET"
+        if item.sector_code == target.sector_code
     )
+
+
+def test_missing_dated_membership_is_insufficient_but_price_metrics_remain_visible() -> None:
+    target = _sector("TARGET", r1=0.20, r5=0.30, r20=0.40, membership=None)
+    result = _target_result(target)
     assert result.state == "insufficient_coverage"
     assert result.r1_pct is not None
     assert result.r5_pct is not None
@@ -102,11 +107,7 @@ def test_fewer_than_ten_ranked_sectors_and_low_return_coverage_fail_closed() -> 
     target = _sector(
         "TARGET", r1=0.20, r5=0.30, r20=0.40, return_coverage=0.899999
     )
-    result = next(
-        item
-        for item in calculate_sector_hotspots(_ten_sectors(target))
-        if item.sector_code == "TARGET"
-    )
+    result = _target_result(target)
     assert result.state == "insufficient_coverage"
     assert "constituent_return_coverage_below_0.90" in result.missing_inputs
 
@@ -123,14 +124,86 @@ def test_ma20_coverage_below_080_blocks_ma20_dependent_state_without_imputation(
         activity=0.8,
         new_high=0.20,
     )
-    result = next(
-        item
-        for item in calculate_sector_hotspots(_ten_sectors(target))
-        if item.sector_code == "TARGET"
-    )
+    result = _target_result(target)
     assert result.breadth_above_ma20 is None
     assert result.state == "neutral"
     assert "constituent_ma20_state_input_unavailable" in result.missing_inputs
+
+
+def test_state_specific_missing_inputs_are_explicit_without_forcing_priority_one() -> None:
+    missing_breadth = _target_result(
+        _sector(
+            "TARGET",
+            r1=0.20,
+            r5=0.30,
+            r20=0.08,
+            breadth_up=None,
+            breadth_ma20=0.50,
+            activity=1.3,
+            new_high=0.02,
+            strong_sessions=1,
+            prior_state="neutral",
+        )
+    )
+    assert missing_breadth.state == "neutral"
+    assert "breadth_up_1_unavailable" in missing_breadth.missing_inputs
+
+    missing_activity = _target_result(
+        _sector(
+            "TARGET",
+            r1=0.20,
+            r5=0.30,
+            r20=0.08,
+            breadth_up=0.60,
+            breadth_ma20=0.50,
+            activity=None,
+            new_high=0.02,
+            strong_sessions=1,
+            prior_state="neutral",
+        )
+    )
+    assert missing_activity.state == "neutral"
+    assert "activity_ratio_20_unavailable" in missing_activity.missing_inputs
+
+    missing_new_high = _target_result(
+        _sector(
+            "TARGET",
+            r1=0.20,
+            r5=0.30,
+            r20=0.40,
+            breadth_up=0.70,
+            breadth_ma20=0.65,
+            activity=1.1,
+            new_high=None,
+            strong_sessions=4,
+        )
+    )
+    assert missing_new_high.state == "persistent_strong"
+    assert "new_high_20_share_unavailable" in missing_new_high.missing_inputs
+
+    missing_persistence = _target_result(
+        _sector(
+            "TARGET",
+            r1=0.20,
+            r5=0.30,
+            r20=0.40,
+            breadth_up=0.60,
+            breadth_ma20=0.65,
+            activity=1.1,
+            new_high=0.02,
+            strong_sessions=None,
+        )
+    )
+    assert missing_persistence.state == "strengthening"
+    assert "strong_rank_sessions_5_unavailable" in missing_persistence.missing_inputs
+
+    for result in (
+        missing_breadth,
+        missing_activity,
+        missing_new_high,
+        missing_persistence,
+    ):
+        assert result.state != "insufficient_coverage"
 
 
 def test_duplicate_or_ambiguous_sector_identity_fails_closed() -> None:
@@ -139,11 +212,7 @@ def test_duplicate_or_ambiguous_sector_identity_fails_closed() -> None:
         calculate_sector_hotspots((duplicate, duplicate))
 
     target = _sector("TARGET", r1=0.20, r5=0.30, r20=0.40, ambiguous=True)
-    result = next(
-        item
-        for item in calculate_sector_hotspots(_ten_sectors(target))
-        if item.sector_code == "TARGET"
-    )
+    result = _target_result(target)
     assert result.state == "insufficient_coverage"
     assert "ambiguous_sector_identity" in result.missing_inputs
 
