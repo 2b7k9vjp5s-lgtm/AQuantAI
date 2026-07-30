@@ -294,6 +294,8 @@ def _sector_result(
     breadth_above_ma20 = item.breadth_above_ma20 if ma20_available else None
     if not ma20_available:
         missing.append("constituent_ma20_state_input_unavailable")
+    if item.prior_state is None:
+        missing.append("prior_state_unavailable")
 
     core_failure = any(
         reason in {
@@ -330,7 +332,8 @@ def _sector_result(
         state = "spreading"
         matched_rule = "priority_4_spreading"
     elif (
-        item.prior_state not in STRONG_PRIOR_STATES
+        item.prior_state is not None
+        and item.prior_state not in STRONG_PRIOR_STATES
         and _gte(r1_pct, 0.80)
         and _gte(r5_pct, 0.70)
         and _lt(r20_pct, 0.60)
