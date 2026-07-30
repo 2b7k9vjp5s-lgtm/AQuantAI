@@ -65,6 +65,23 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Run Today Market deterministic Slice B focused tests
+        run: |
+          set -o pipefail
+          python -m pytest \
+            tests/test_today_market_deterministic_rules.py \
+            tests/test_today_market_deterministic_rule_boundaries.py \
+            -q --tb=short 2>&1 | tee /tmp/today-market-slice-b-tests.log
+
+      - name: Upload Today Market deterministic Slice B diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: today-market-slice-b-test-diagnostics
+          path: /tmp/today-market-slice-b-tests.log
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Run tests
         run: |
           set -o pipefail
@@ -114,3 +131,6 @@ jobs:
 
       - name: Run Today Market runtime integration demo
         run: python -m scripts.demo_today_market_runtime_integration
+
+      - name: Run Today Market deterministic Slice B demo
+        run: python -m scripts.demo_today_market_deterministic_rules
