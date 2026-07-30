@@ -195,6 +195,7 @@ def test_sector_hotspot_priority_states() -> None:
             activity=1.3,
             new_high_share=0.02,
             strong_sessions=1,
+            prior_state="neutral",
         )
     )
     assert new_state.state == "new"
@@ -241,6 +242,25 @@ def test_sector_hotspot_priority_states() -> None:
         )
     )
     assert neutral.state == "neutral"
+
+
+def test_sector_new_requires_explicit_prior_state() -> None:
+    result = _result_for(
+        _sector(
+            "S00",
+            r1=0.20,
+            r5=0.30,
+            r20=0.08,
+            breadth_up=0.60,
+            breadth_ma20=0.50,
+            activity=1.3,
+            new_high_share=0.02,
+            strong_sessions=1,
+            prior_state=None,
+        )
+    )
+    assert result.state != "new"
+    assert "prior_state_unavailable" in result.missing_inputs
 
 
 def _stock(
