@@ -20,7 +20,7 @@
         <span class="nav-item nav-disabled" aria-disabled="true"><span>关注与跟踪</span><small>后续阶段</small></span>
         <span class="nav-item nav-disabled" aria-disabled="true"><span>研究组合</span><small>后续阶段</small></span>
       </nav>
-      <div class="sidebar-note"><strong>两层结果</strong><p>已接受研究是不可变历史；候选快照是用户另行选择的只读覆盖层。</p></div>
+      <div class="sidebar-note"><strong>解释不改写历史</strong><p>完整受益公司来自已接受研究；产品、业绩传导、预期、估值、催化和风险只展开精确冻结的本地 Revision。</p></div>
     </aside>
     <div class="app-main">
       <header class="topbar">
@@ -28,28 +28,28 @@
         <div class="topbar-actions"><span id="page-state" class="status-pill">正在验证精确成果</span><a class="button" href="/industry-analysis">返回研究历史</a></div>
       </header>
       <main id="main-content" tabindex="-1" class="accepted-result-page">
-        <section class="page-heading"><div><p class="eyebrow">ACCEPTED HISTORY + USER-SELECTED CURRENT SNAPSHOT</p><h1 id="result-title">已接受研究成果</h1><p>完整已接受研究与当前候选快照分层显示；页面不会自动选择、重算或改写历史。</p></div></section>
+        <section class="page-heading"><div><p class="eyebrow">ACCEPTED HISTORY + USER-SELECTED CURRENT SNAPSHOT</p><h1 id="result-title">已接受研究成果</h1><p>先保留完整已接受受益公司，再按精确证据和显式候选快照解释“为什么受益、为什么是当前状态”；不会自动选择、重算或改写历史。</p></div></section>
 
         <section class="layer-explainer" aria-label="结果含义说明">
-          <article><span class="layer-label is-accepted">已接受研究快照</span><h2>不可变研究历史</h2><p>来自一个精确 Output Link Revision，包含完整成员、精确产业地图版本和接受时的准备度。</p></article>
-          <article><span class="layer-label is-overlay">当前候选覆盖层</span><h2>显式选择的研究优先级快照</h2><p>仅在用户选择一个精确 Candidate Snapshot Revision 后显示，不属于接受时历史。</p></article>
+          <article><span class="layer-label is-accepted">已接受研究快照</span><h2>完整受益公司与产业上下文</h2><p>来自一个精确 Output Link Revision，包括完整成员、精确产业地图版本、受益语义和接受时准备度。</p></article>
+          <article><span class="layer-label is-overlay">当前候选覆盖层</span><h2>显式选择后的解释增强</h2><p>只有用户选择精确 Candidate Snapshot Revision 后，才展开其冻结的 Company Research、组件输入、预期、估值、催化、风险和证伪信息。</p></article>
         </section>
 
         <section class="notice-panel"><strong>研究用途，不构成投资建议</strong><p id="coverage-notice">正在读取覆盖说明。</p></section>
 
         <section class="panel" aria-labelledby="facts-title">
-          <div class="panel-heading"><div><h2 id="facts-title">结论摘要</h2><p>每张卡片标明来源层；候选状态只来自所选精确快照。</p></div></div>
+          <div class="panel-heading"><div><h2 id="facts-title">结论摘要</h2><p>结论卡标明来源层；候选状态只来自所选精确快照，完整公司不会因候选状态而消失。</p></div></div>
           <div id="facts-grid" class="facts-grid"></div>
           <p id="largest-gap" class="muted-copy"></p>
         </section>
 
         <section class="panel" aria-labelledby="map-title">
-          <div class="panel-heading"><div><h2 id="map-title">精确产业链上下文</h2><p>只读取已接受 Output Link 冻结的 Map Revision；不使用最新版本回退。</p></div><span id="map-revision-label" class="group-count">—</span></div>
+          <div class="panel-heading"><div><h2 id="map-title">精确产业链与价值池上下文</h2><p>只读取已接受 Output Link 冻结的 Map Revision；不使用最新版本回退。</p></div><span id="map-revision-label" class="group-count">—</span></div>
           <div id="map-summary" class="map-summary"></div>
           <div class="map-columns">
             <div><h3>节点</h3><div id="map-nodes" class="map-list"></div></div>
             <div><h3>关系</h3><div id="map-relationships" class="map-list"></div></div>
-            <div><h3>驱动与瓶颈</h3><div id="map-observations" class="map-list"></div></div>
+            <div><h3>驱动 / 瓶颈 / 价值池</h3><div id="map-observations" class="map-list"></div></div>
           </div>
         </section>
 
@@ -66,9 +66,9 @@
           <div id="candidate-overlay-details"></div>
         </section>
 
-        <section class="panel" aria-labelledby="complete-title"><div class="panel-heading"><div><h2 id="complete-title">完整已接受成员</h2><p>这是外层权威集合；draft、disputed、无候选状态或证据不足的成员都不会消失。</p></div><span id="complete-count" class="group-count">0</span></div><div id="complete-members"></div></section>
+        <section class="panel" aria-labelledby="complete-title"><div class="panel-heading"><div><h2 id="complete-title">完整已接受受益公司</h2><p>这是外层权威集合。每家公司优先显示产品/链条、客户/认证/产能/订单、业绩传导、预期/估值、催化/风险及明确缺失；draft、disputed、无候选状态或证据不足的成员都不会消失。</p></div><span id="complete-count" class="group-count">0</span></div><div id="complete-members"></div></section>
         <section class="panel" aria-labelledby="supported-title"><div class="panel-heading"><div><h2 id="supported-title">supported 后续研究</h2><p>仅表示接受时进入精确 Candidate Pool 的成员，不等同于当前候选评级。</p></div><span id="supported-count" class="group-count">0</span></div><div id="supported-members"></div></section>
-        <section class="panel technical-details"><details><summary>查看精确 Output Link、Map Revision、候选快照和双时间边界</summary><pre id="result-technical" class="json-block"></pre></details></section>
+        <section class="panel technical-details"><details><summary>查看精确 Output Link、Map Revision、候选快照、解释指纹和双时间边界</summary><pre id="result-technical" class="json-block"></pre></details></section>
         <p id="result-status" class="status-message" role="status" aria-live="polite"></p>
       </main>
     </div>
