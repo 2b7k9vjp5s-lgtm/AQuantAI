@@ -4,6 +4,8 @@ import ast
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
+
 from backend.main import app as default_app
 from backend.today_market_refresh.read_model import (
     READ_MODEL_VERSION,
@@ -331,6 +333,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.api.today_market import (
     TodayMarketSnapshotRequest,
+    _volume_only_stock_inputs,
     today_market_read_model,
 )
 from backend.database.engine import build_session_factory
@@ -407,3 +410,115 @@ def test_real_read_model_boundary_is_zero_write_and_volume_only_fail_closed() ->
         )
     finally:
         engine.dispose()
+
+
+def _exact_volume_fixture() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    sessions = [f"202606{day:02d}" for day in range(1, 22)]
+    calendar = pd.DataFrame(
+        {"trade_date": sessions, "is_open": [True] * len(sessions)}
+    )
+    daily = pd.DataFrame(
+        [
+            {
+                "stock_code": "000001",
+                "trade_date": session,
+                "close": 10.0,
+                "volume": 300.0 if session == sessions[-1] else 100.0,
+                "amount": 1000.0,
+                "adjust_type": "",
+            }
+            for session in sessions
+        ]
+    )
+    return daily, calendar, sessions
+
+
+def _volume_result(daily: pd.DataFrame, calendar: pd.DataFrame) -> dict:
+    inputs = _volume_only_stock_inputs(
+        daily,
+        calendar,
+        ["000001"],
+        "",
+        date(2026, 6, 21),
+    )
+    return _build(
+        TodayMarketRuleProjectionInputs(
+            stocks=inputs,
+            stock_unavailable_reasons=(
+                "analysis_price_semantics_unavailable",
+                "reference_close_semantics_unavailable",
+            ),
+        )
+    )
+
+
+def _assert_unusual_volume_fail_closed(
+    daily: pd.DataFrame,
+    calendar: pd.DataFrame,
+) -> None:
+    result = _volume_result(daily, calendar)
+    anomaly_types = {
+        item["anomaly_type"] for item in result["stock_anomalies"]["items"]
+    }
+    assert "unusual_volume" not in anomaly_types
+    diagnostics = result["stock_anomalies"]["diagnostics"][0]["unavailable_rules"]
+    assert (
+        "unusual_volume",
+        "exact_20_session_volume_window_unavailable",
+    ) in diagnostics
+
+
+def test_volume_window_uses_exact_authoritative_open_sessions() -> None:
+    daily, calendar, _ = _exact_volume_fixture()
+    result = _volume_result(daily, calendar)
+    anomaly_types = {
+        item["anomaly_type"] for item in result["stock_anomalies"]["items"]
+    }
+    assert anomaly_types == {"unusual_volume"}
+
+
+def test_volume_window_missing_middle_or_current_session_fails_closed() -> None:
+    daily, calendar, sessions = _exact_volume_fixture()
+    for missing_session in (sessions[10], sessions[-1]):
+        _assert_unusual_volume_fail_closed(
+            daily[daily["trade_date"].ne(missing_session)].copy(),
+            calendar,
+        )
+
+
+def test_volume_window_duplicate_stock_session_fails_closed() -> None:
+    daily, calendar, sessions = _exact_volume_fixture()
+    duplicate = daily[daily["trade_date"].eq(sessions[7])].copy()
+    _assert_unusual_volume_fail_closed(
+        pd.concat([daily, duplicate], ignore_index=True),
+        calendar,
+    )
+
+
+def test_volume_window_incompatible_adjustment_fails_closed() -> None:
+    daily, calendar, sessions = _exact_volume_fixture()
+    incompatible = daily.copy()
+    incompatible.loc[
+        incompatible["trade_date"].eq(sessions[5]), "adjust_type"
+    ] = "qfq"
+    _assert_unusual_volume_fail_closed(incompatible, calendar)
+
+
+def test_volume_window_no_trade_or_invalid_row_fails_closed() -> None:
+    daily, calendar, sessions = _exact_volume_fixture()
+    no_trade = daily.copy()
+    no_trade.loc[no_trade["trade_date"].eq(sessions[8]), ["volume", "amount"]] = 0.0
+    _assert_unusual_volume_fail_closed(no_trade, calendar)
+
+    invalid = daily.copy()
+    invalid.loc[invalid["trade_date"].eq(sessions[9]), "close"] = 0.0
+    _assert_unusual_volume_fail_closed(invalid, calendar)
+
+
+def test_volume_window_duplicate_calendar_session_fails_closed() -> None:
+    daily, calendar, sessions = _exact_volume_fixture()
+    duplicate_calendar = pd.concat(
+        [calendar, calendar[calendar["trade_date"].eq(sessions[3])]],
+        ignore_index=True,
+    )
+    _assert_unusual_volume_fail_closed(daily, duplicate_calendar)
