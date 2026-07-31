@@ -1163,7 +1163,9 @@ def _ordinary_user_rule_inputs(
         )
         stock_inputs = _volume_only_stock_inputs(
             persisted.daily_price,
+            persisted.trade_calendar,
             persisted.stock_codes,
+            persisted.adjust_type,
             data_through_session,
         )
 
@@ -1184,40 +1186,89 @@ def _ordinary_user_rule_inputs(
 
 def _volume_only_stock_inputs(
     daily_price: Any,
+    trade_calendar: Any,
     stock_codes: list[str],
+    expected_adjust_type: str,
     data_through_session: date,
 ) -> tuple[StockRuleInput, ...]:
-    """Expose exact 21-row volume windows without enabling price semantics.
+    """Expose volume inputs only for one exact authoritative 21-open-session window.
 
-    Price-based rules remain unavailable because the current durable owners do not
-    prove the Slice B adjustment/reference-close contract. The volume anomaly rule is
-    independent and may run only when the exact current + prior-20 rows are finite and
-    nonnegative.
+    The persisted trade calendar owns session identity. Every stock must have exactly
+    one compatible, valid traded row for the current open session and each of the
+    previous 20 open sessions. Missing, duplicate, incompatible-adjustment, no-trade,
+    or otherwise invalid rows fail closed for ``unusual_volume``. Price-based rules
+    remain unavailable because adjustment/reference-close semantics are not durable.
     """
 
     cutoff = data_through_session.strftime("%Y%m%d")
+    exact_sessions: tuple[str, ...] = ()
+    if {"trade_date", "is_open"}.issubset(set(trade_calendar.columns)):
+        calendar = trade_calendar.copy()
+        calendar["trade_date"] = calendar["trade_date"].map(
+            lambda value: str(value).strip().replace("-", "")
+        )
+        duplicate_calendar_dates = calendar.duplicated(["trade_date"], keep=False)
+        if not duplicate_calendar_dates.any():
+            open_sessions = sorted(
+                str(value)
+                for value in calendar.loc[
+                    calendar["is_open"].eq(True)
+                    & calendar["trade_date"].le(cutoff),
+                    "trade_date",
+                ].unique()
+            )
+            if (
+                len(open_sessions) >= 21
+                and open_sessions[-1] == cutoff
+            ):
+                exact_sessions = tuple(open_sessions[-21:])
+
     results: list[StockRuleInput] = []
     for stock_code in sorted(stock_codes):
-        rows = daily_price[
-            (daily_price["stock_code"] == stock_code)
-            & (daily_price["trade_date"] <= cutoff)
-        ].sort_values("trade_date")
-        window = rows.tail(21)
         volumes: list[float] = []
-        exact_window = len(window.index) == 21
+        exact_window = bool(exact_sessions)
         if exact_window:
-            for raw_volume in window["volume"].tolist():
-                try:
-                    volume = float(raw_volume)
-                except (TypeError, ValueError):
+            rows = daily_price[
+                daily_price["stock_code"].astype(str).eq(stock_code)
+            ].copy()
+            rows["trade_date"] = rows["trade_date"].map(
+                lambda value: str(value).strip().replace("-", "")
+            )
+            window_rows = rows[rows["trade_date"].isin(exact_sessions)]
+            for session in exact_sessions:
+                session_rows = window_rows[window_rows["trade_date"].eq(session)]
+                if len(session_rows.index) != 1:
                     exact_window = False
                     break
-                if not isfinite(volume) or volume < 0:
+                row = session_rows.iloc[0]
+                if str(row.get("adjust_type") or "") != expected_adjust_type:
+                    exact_window = False
+                    break
+                try:
+                    close = float(row["close"])
+                    volume = float(row["volume"])
+                    amount = float(row["amount"])
+                except (KeyError, TypeError, ValueError):
+                    exact_window = False
+                    break
+                if (
+                    not isfinite(close)
+                    or not isfinite(volume)
+                    or not isfinite(amount)
+                    or close <= 0
+                    or volume < 0
+                    or amount < 0
+                    or (volume == 0 and amount == 0)
+                ):
                     exact_window = False
                     break
                 volumes.append(volume)
-        current_volume = volumes[-1] if exact_window else None
-        prior_volumes = tuple(volumes[:-1]) if exact_window else ()
+        current_volume = volumes[-1] if exact_window and len(volumes) == 21 else None
+        prior_volumes = (
+            tuple(volumes[:-1])
+            if exact_window and len(volumes) == 21
+            else ()
+        )
         results.append(
             StockRuleInput(
                 stock_code=stock_code,
