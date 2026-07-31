@@ -17,7 +17,7 @@ const SOURCE_LAYER_LABELS = {
   accepted_snapshot: "已接受研究快照",
   accepted_fact: "已接受事实/精确观察",
   accepted_research_judgment: "已接受研究判断",
-  deterministic_candidate: "确定性候选计算",
+  deterministic_candidate: "确定性规则/候选计算",
   missing_or_unavailable: "缺失或当前不可用",
 };
 
@@ -239,6 +239,32 @@ function companyLayer(companyResearch) {
   return companyResearch.source_layer || "accepted_research_judgment";
 }
 
+function memberSummaryCard(member) {
+  const card = node("article", null, "accepted-member");
+  const header = node("div");
+  header.append(
+    node("h3", member.company_label_original),
+    node("p", `${member.source} · ${member.stock_code}`, "muted-copy"),
+  );
+  const meta = node("div", null, "member-meta");
+  meta.append(
+    node("span", member.legacy_beneficiary_kind, "meta-chip"),
+    node("span", member.assessment_status, "meta-chip"),
+    node(
+      "span",
+      member.included_in_supported_handoff ? "进入 supported 后续研究" : "保留在完整成果",
+      "meta-chip",
+    ),
+  );
+  card.append(
+    header,
+    meta,
+    node("p", member.rationale_summary),
+    node("p", readinessText(member), "muted-copy"),
+  );
+  return card;
+}
+
 function memberCard(member) {
   const card = node("article", null, "accepted-member");
   const header = node("div");
@@ -293,7 +319,7 @@ function memberCard(member) {
   return card;
 }
 
-function renderList(selector, countSelector, members, emptyText) {
+function renderList(selector, countSelector, members, emptyText, renderer = memberCard) {
   const container = document.querySelector(selector);
   document.querySelector(countSelector).textContent = String(members.length);
   container.replaceChildren();
@@ -301,7 +327,7 @@ function renderList(selector, countSelector, members, emptyText) {
     container.append(node("p", emptyText, "muted-copy"));
     return;
   }
-  container.append(...members.map(memberCard));
+  container.append(...members.map(renderer));
 }
 
 function mapItem(title, subtitle, description) {
@@ -442,10 +468,29 @@ function render(result) {
   document.querySelector("#facts-grid").replaceChildren(...result.conclusion_cards.map(factCard));
   document.querySelector("#largest-gap").textContent = `最大准备度缺口：${result.largest_missing_prerequisite}`;
   renderMap(result.industry_map);
+  renderList(
+    "#complete-members",
+    "#complete-count",
+    accepted.members,
+    "没有完整成员；该输出图不应被视为有效成果。",
+    memberSummaryCard,
+  );
   renderSnapshotPicker(result);
   renderOverlay(result.candidate_overlay);
-  renderList("#complete-members", "#complete-count", accepted.members, "没有完整成员；该输出图不应被视为有效成果。");
-  renderList("#supported-members", "#supported-count", accepted.supported_handoff_members, "本次没有 supported 后续研究成员；完整成果仍保持可读。");
+  renderList(
+    "#company-explanations",
+    "#company-explanation-count",
+    accepted.members,
+    "没有可解释的完整成员。",
+    memberCard,
+  );
+  renderList(
+    "#supported-members",
+    "#supported-count",
+    accepted.supported_handoff_members,
+    "本次没有 supported 后续研究成员；完整成果仍保持可读。",
+    memberSummaryCard,
+  );
   document.querySelector("#result-technical").textContent = JSON.stringify({
     result_contract_version: result.result_contract_version,
     explained_result_contract_version: result.explained_result.contract_version,
