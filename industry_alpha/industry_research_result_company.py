@@ -186,15 +186,26 @@ def _serialize_company_research(row: Stage2CompanyResearchRevision) -> dict[str,
     }
 
 
+def _target_source_layer(kind: str, row: Any) -> str:
+    """Classify only from persisted meaning; never promote derived material to fact."""
+    if kind == "claim":
+        return (
+            "accepted_fact"
+            if getattr(row, "claim_kind", None) == "fact"
+            else "accepted_research_judgment"
+        )
+    if kind == "canonical_price":
+        return "accepted_fact"
+    if kind == "comparison_eligibility":
+        return "deterministic_candidate"
+    return "accepted_research_judgment"
+
+
 def _serialize_target(kind: str, row: Any) -> dict[str, Any]:
     common = {
         "kind": kind,
         "revision_id": str(row.id),
-        "source_layer": (
-            "accepted_fact"
-            if kind in {"map_revision", "map_observation", "claim", "evidence", "canonical_price", "comparison_eligibility"}
-            else "accepted_research_judgment"
-        ),
+        "source_layer": _target_source_layer(kind, row),
     }
     fields: dict[str, tuple[str, ...]] = {
         "map_revision": ("revision_no", "title", "scope", "information_cutoff_date", "recorded_at_utc"),
@@ -606,7 +617,7 @@ class ExplainedCompanyProjectionReader:
                     "source_layers": [
                         "accepted_snapshot",
                         "accepted_research_judgment",
-                        *( ["deterministic_candidate"] if candidate is not None else [] ),
+                        *(["deterministic_candidate"] if candidate is not None else []),
                     ],
                     "company_research": company_research_projection,
                     "beneficiary_semantics": {
