@@ -321,18 +321,280 @@
       explanationCard("现在可以做什么", payload.state_explanation.available_action),
     );
     renderSummary(scopeSummary, payload.scope_and_freshness);
+    appendContextSummary(
+      scopeSummary,
+      payload.supported_analysis.benchmark,
+      payload.supported_analysis.sector,
+    );
     warnings.replaceChildren();
     (payload.scope_and_freshness.warnings || []).forEach((message) => appendWarning(warnings, message));
-    renderObjectCards(priceBehavior, payload.supported_analysis.price_behavior, "价格行为");
-    renderObjectCards(liquidity, payload.supported_analysis.liquidity, "流动性");
-    renderObjectCards(benchmark, payload.supported_analysis.benchmark, "基准");
-    renderObjectCards(sector, payload.supported_analysis.sector, "行业");
-    renderObjectCards(completeness, payload.supported_analysis.data_completeness, "完整性");
+    renderPriceBehavior(priceBehavior, payload.supported_analysis.price_behavior);
+    renderLiquidity(liquidity, payload.supported_analysis.liquidity);
+    renderBenchmark(benchmark, payload.supported_analysis.benchmark);
+    renderSector(sector, payload.supported_analysis.sector);
+    renderCompleteness(completeness, payload.supported_analysis.data_completeness);
     unavailable.replaceChildren();
     (payload.unavailable_sections || []).forEach((section) => {
-      unavailable.append(dataCard(section.label, section.message));
+      const card = document.createElement("article");
+      card.className = "unavailable-card";
+      const title = document.createElement("h3");
+      title.textContent = section.label;
+      const text = document.createElement("p");
+      text.textContent = section.message;
+      card.append(title, text);
+      unavailable.append(card);
     });
     technical.textContent = JSON.stringify(payload.technical_details, null, 2);
+  }
+
+  function explanationCard(title, text) {
+    const card = document.createElement("div");
+    card.className = "explanation-item";
+    const heading = document.createElement("strong");
+    heading.textContent = title;
+    const content = document.createElement("span");
+    content.textContent = text || "暂无";
+    card.append(heading, content);
+    return card;
+  }
+
+  function renderSummary(container, value) {
+    container.replaceChildren();
+    Object.entries(value || {}).forEach(([key, item]) => {
+      if (key === "warnings") return;
+      appendSummaryItem(container, labelFor(key), displayValue(item, key));
+    });
+  }
+
+  function appendSummaryItem(container, label, value) {
+    const wrapper = document.createElement("dl");
+    wrapper.className = "summary-item";
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = displayValue(value);
+    wrapper.append(term, description);
+    container.append(wrapper);
+  }
+
+  function appendContextSummary(container, benchmarkValue, sectorValue) {
+    if (benchmarkValue && benchmarkValue.status !== "not_selected") {
+      const codes = (benchmarkValue.metrics || []).map((metric) => metric.index_code);
+      appendSummaryItem(
+        container,
+        "基准范围",
+        codes.length
+          ? `${benchmarkValue.requested_code_count} 个明确指数：${codes.slice(0, 5).join("、")}${codes.length > 5 ? " 等" : ""}`
+          : `${benchmarkValue.requested_code_count} 个明确指数`,
+      );
+      appendSummaryItem(container, "基准有效交易日", formatDate(benchmarkValue.effective_benchmark_session));
+      appendSummaryItem(container, "基准对齐状态", statusLabel(benchmarkValue.alignment_status));
+    } else {
+      appendSummaryItem(container, "基准范围", "未选择本地基准数据");
+    }
+
+    if (sectorValue && sectorValue.status !== "not_selected") {
+      const provenance = sectorValue.provenance || {};
+      appendSummaryItem(
+        container,
+        "行业分类范围",
+        `${provenance.taxonomy || "明确行业分类"} / ${provenance.classification_level || "未分级"}`,
+      );
+      appendSummaryItem(container, "行业有效交易日", formatDate(sectorValue.effective_sector_session));
+      appendSummaryItem(container, "行业对齐状态", statusLabel(sectorValue.alignment_status));
+    } else {
+      appendSummaryItem(container, "行业分类范围", "未选择本地行业数据");
+    }
+  }
+
+  function renderPriceBehavior(container, value) {
+    container.replaceChildren();
+    if (!value) {
+      container.append(dataCard("状态", "当前没有可显示的价格行为数据。"));
+      return;
+    }
+    container.append(
+      dataCard("有效交易日", formatDate(value.effective_session)),
+      dataCard("整体计算状态", statusLabel(value.calculation_status)),
+      metricCard("近 20 个交易日", value.return_20, "median_return"),
+      metricCard("近 60 个交易日", value.return_60, "median_return"),
+      metricCard("近 20 个交易日波动", value.volatility_20, "median_annualized_volatility"),
+      dataCard(
+        "可比较样本",
+        lines([
+          ["匹配公司数", value.matched_cohort?.matched_cohort_count],
+          ["请求公司数", value.matched_cohort?.requested_stock_count],
+          ["中位年化波动", formatPercent(value.matched_cohort?.matched_median_annualized_volatility)],
+          ["状态", statusLabel(value.matched_cohort?.calculation_status)],
+          ["说明", reasonLabel(value.matched_cohort?.reason)],
+        ]),
+      ),
+      dataCard("价格行为警告", warningText(value.warnings)),
+    );
+  }
+
+  function metricCard(title, metric, valueKey) {
+    if (!metric) return dataCard(title, "当前没有可显示的数据。");
+    return dataCard(
+      title,
+      lines([
+        [valueKey === "median_return" ? "中位收益" : "中位年化波动", formatPercent(metric[valueKey])],
+        ["可用公司数", metric.eligible_stock_count],
+        ["请求公司数", metric.requested_stock_count],
+        ["正收益占比", formatPercent(metric.positive_share)],
+        ["状态", statusLabel(metric.calculation_status)],
+        ["说明", reasonLabel(metric.reason)],
+      ]),
+    );
+  }
+
+  function renderLiquidity(container, value) {
+    container.replaceChildren();
+    if (!value) {
+      container.append(dataCard("状态", "当前没有可显示的流动性数据。"));
+      return;
+    }
+    container.append(
+      dataCard("有效交易日", formatDate(value.effective_session)),
+      dataCard("整体计算状态", statusLabel(value.calculation_status)),
+      dataCard(
+        "最新成交额分布",
+        lines([
+          ["可用公司数", value.latest_eligible_count],
+          ["不可用公司数", value.latest_unavailable_count],
+          ["合计成交额（来源原始单位）", formatNumber(value.latest_total_amount)],
+          ["中位成交额（来源原始单位）", formatNumber(value.latest_median_amount)],
+          ["说明", reasonLabel(value.latest_aggregate_reason)],
+        ]),
+      ),
+      dataCard(
+        "成交集中度",
+        lines([
+          ["前 5 家占比", formatPercent(value.top5_concentration_share)],
+          ["前 10% 公司占比", formatPercent(value.top_decile_concentration_share)],
+          ["前 10% 公司数", value.top_decile_member_count],
+        ]),
+      ),
+      activityCard("近 5 个交易日活跃度", value.activity_5),
+      activityCard("近 20 个交易日活跃度", value.activity_20),
+      dataCard(
+        "高于 20 日基准的公司",
+        lines([
+          ["公司数", value.latest_above_20_session_baseline_count],
+          ["占比", formatPercent(value.latest_above_20_session_baseline_share)],
+        ]),
+      ),
+      dataCard("流动性警告", warningText(value.warnings)),
+    );
+  }
+
+  function activityCard(title, activity) {
+    if (!activity) return dataCard(title, "当前没有可显示的数据。");
+    return dataCard(
+      title,
+      lines([
+        ["活跃度比值", formatRatio(activity.activity_ratio)],
+        ["匹配公司数", activity.matched_cohort_count],
+        ["最新合计成交额（来源原始单位）", formatNumber(activity.latest_matched_total_amount)],
+        ["历史基准成交额（来源原始单位）", formatNumber(activity.baseline_total_amount)],
+        ["状态", statusLabel(activity.calculation_status)],
+        ["说明", reasonLabel(activity.reason)],
+      ]),
+    );
+  }
+
+  function renderBenchmark(container, value) {
+    container.replaceChildren();
+    if (!value || value.status === "not_selected") {
+      container.append(dataCard("状态", value?.message || "未选择本地基准数据。"));
+      return;
+    }
+    container.append(
+      dataCard(
+        "范围与对齐",
+        lines([
+          ["整体对齐", statusLabel(value.alignment_status)],
+          ["交易日对齐", statusLabel(value.session_alignment_status)],
+          ["截止日对齐", statusLabel(value.cutoff_alignment_status)],
+          ["请求指数数", value.requested_code_count],
+          ["可用指数数", value.available_code_count],
+          ["缺少指数", codeList(value.missing_codes)],
+          ["有效交易日", formatDate(value.effective_benchmark_session)],
+        ]),
+      ),
+      dataCard("基准警告", warningText(value.warnings)),
+    );
+    (value.metrics || []).forEach((metric) => {
+      container.append(dataCard(
+        `指数 ${metric.index_code}`,
+        lines([
+          ["最新收盘", formatNumber(metric.latest_close)],
+          ["最新日收益", formatPercent(metric.latest_return)],
+          ["高于 20 日均线", displayValue(metric.above_sma20)],
+          ["高于 60 日均线", displayValue(metric.above_sma60)],
+          ["近 20 日年化波动", formatPercent(metric.realized_volatility_20)],
+          ["近 20 日最大回撤", formatPercent(metric.max_drawdown_20)],
+        ]),
+      ));
+    });
+  }
+
+  function renderSector(container, value) {
+    container.replaceChildren();
+    if (!value || value.status === "not_selected") {
+      container.append(dataCard("状态", value?.message || "未选择本地行业数据。"));
+      return;
+    }
+    const cross = value.cross_section || {};
+    const provenance = value.provenance || {};
+    container.append(
+      dataCard(
+        "范围与对齐",
+        lines([
+          ["分类体系", provenance.taxonomy],
+          ["分类级别", provenance.classification_level || "未分级"],
+          ["覆盖状态", statusLabel(value.coverage_status)],
+          ["整体对齐", statusLabel(value.alignment_status)],
+          ["交易日对齐", statusLabel(value.session_alignment_status)],
+          ["截止日对齐", statusLabel(value.cutoff_alignment_status)],
+          ["请求行业数", value.requested_sector_count],
+          ["可用行业数", value.available_sector_count],
+          ["缺少行业", codeList(value.missing_sector_codes)],
+          ["有效交易日", formatDate(value.effective_sector_session)],
+        ]),
+      ),
+      dataCard(
+        "行业横截面",
+        lines([
+          ["日收益为正的行业占比", formatPercent(cross.positive_latest_return_share)],
+          ["高于 20 日均线的行业占比", formatPercent(cross.above_sma20_share)],
+          ["有效日收益行业数", cross.valid_latest_return_count],
+          ["有效均线行业数", cross.valid_sma20_count],
+        ]),
+      ),
+      dataCard("当日表现靠前", rankedSectorText(cross.top_latest_return)),
+      dataCard("当日表现靠后", rankedSectorText(cross.bottom_latest_return)),
+      dataCard("近 20 日表现靠前", rankedSectorText(cross.top_return_20)),
+      dataCard("近 20 日表现靠后", rankedSectorText(cross.bottom_return_20)),
+      dataCard("行业警告", warningText(value.warnings)),
+      dataCard("含义边界", "行业强弱只描述明确选择的本地分类范围，不代表产业受益确定性或投资质量。"),
+    );
+  }
+
+  function renderCompleteness(container, value) {
+    container.replaceChildren();
+    const diagnostics = value?.latest_data_diagnostics || {};
+    container.append(
+      dataCard("完整性状态", statusLabel(value?.status)),
+      dataCard(
+        "最新数据诊断",
+        lines([
+          ["最新数据陈旧或缺失", diagnostics.stale_or_missing_latest_count],
+          ["最新交易日无成交", diagnostics.no_trade_latest_count],
+          ["最新收益不可用", diagnostics.latest_return_unavailable_count],
+        ]),
+      ),
+    );
   }
 
   async function loadReadModel() {
@@ -482,7 +744,7 @@
       ["范围覆盖状态", statusLabel(value.scope_coverage_status)],
       ["不可用原因", (value.unsupported_metric_reasons || []).map(reasonLabel).join("、") || "无"],
     ];
-    entries.forEach(([label, item]) => ordinaryCoverage.append(summaryItem(label, item)));
+    entries.forEach(([label, item]) => appendSummaryItem(ordinaryCoverage, label, item));
   }
 
   ordinaryAction.addEventListener("click", () => {
@@ -494,54 +756,11 @@
     if (code === "reread_local_snapshot") snapshotButton.click();
   });
 
-  function renderSummary(container, value) {
-    container.replaceChildren();
-    Object.entries(value || {}).forEach(([key, item]) => {
-      if (key === "warnings") return;
-      container.append(summaryItem(labelFor(key), displayValue(item, key)));
-    });
-  }
-
-  function summaryItem(label, value) {
-    const wrapper = document.createElement("dl");
-    wrapper.className = "summary-item";
-    const term = document.createElement("dt");
-    term.textContent = label;
-    const description = document.createElement("dd");
-    description.textContent = displayValue(value);
-    wrapper.append(term, description);
-    return wrapper;
-  }
-
-  function explanationCard(title, text) {
-    const card = document.createElement("div");
-    card.className = "explanation-item";
-    const heading = document.createElement("strong");
-    heading.textContent = title;
-    const content = document.createElement("span");
-    content.textContent = text || "暂无";
-    card.append(heading, content);
-    return card;
-  }
-
   function appendWarning(container, message) {
     const item = document.createElement("div");
     item.className = "warning-item";
     item.textContent = message;
     container.append(item);
-  }
-
-  function renderObjectCards(container, value, label) {
-    container.replaceChildren();
-    if (!value) {
-      container.append(dataCard("状态", "当前没有可显示的数据。"));
-      return;
-    }
-    if (value.status === "not_selected") {
-      container.append(dataCard("状态", value.message || "未选择。"));
-      return;
-    }
-    container.append(dataCard(label, JSON.stringify(value, null, 2)));
   }
 
   function dataCard(label, value) {
@@ -561,6 +780,21 @@
       .filter(([, value]) => value !== undefined)
       .map(([label, value]) => `${label}：${displayValue(value)}`)
       .join("\n");
+  }
+
+  function warningText(values) {
+    return Array.isArray(values) && values.length ? values.join("\n") : "无额外警告";
+  }
+
+  function codeList(values) {
+    return Array.isArray(values) && values.length ? values.join("、") : "无";
+  }
+
+  function rankedSectorText(values) {
+    if (!Array.isArray(values) || !values.length) return "暂无可用排名";
+    return values.map((item, index) => (
+      `${index + 1}. ${item.sector_name}（${item.sector_code}）：${formatPercent(item.value)}`
+    )).join("\n");
   }
 
   function formatDate(value) {
@@ -595,7 +829,7 @@
     if (value === false) return "否";
     if (value === null || value === undefined || value === "") return "暂无";
     if (Array.isArray(value)) return value.length ? value.join("、") : "无";
-    if (typeof value === "object") return JSON.stringify(value, null, 2);
+    if (typeof value === "object") return "详细内容请在下方技术详情中查看";
     return String(value);
   }
 
@@ -664,6 +898,7 @@
       fewer_than_10_eligible_sector_members: "板块有效成员不足 10 个",
       sector_mad_zero: "板块离差基准为零",
       available: "可用",
+      complete: "完整",
       partial_eligible_cohort: "可用样本不完整",
       partial_matched_cohort: "匹配样本不完整",
       insufficient_open_session_history: "交易日历史不足",
