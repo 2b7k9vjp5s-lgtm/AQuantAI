@@ -30,20 +30,38 @@
   const unavailable = document.querySelector("#unavailable-sections");
   const technical = document.querySelector("#technical-details");
 
+  const ordinarySentence = document.querySelector("#ordinary-market-sentence");
+  const ordinaryDataDate = document.querySelector("#ordinary-data-date");
+  const ordinaryMarketState = document.querySelector("#ordinary-market-state");
+  const ordinaryRefreshState = document.querySelector("#ordinary-refresh-state");
+  const ordinaryAction = document.querySelector("#ordinary-primary-action");
+  const ordinarySource = document.querySelector("#ordinary-source-summary");
+  const ordinaryCore = document.querySelector("#ordinary-core-grid");
+  const ordinarySectorFocus = document.querySelector("#ordinary-sector-focus-grid");
+  const ordinarySectorRisk = document.querySelector("#ordinary-sector-risk-grid");
+  const ordinaryAnomalies = document.querySelector("#ordinary-anomaly-list");
+  const ordinaryCoverage = document.querySelector("#ordinary-coverage-grid");
+  const ordinaryWarnings = document.querySelector("#ordinary-warnings");
+  const ordinaryTechnical = document.querySelector("#ordinary-technical-content");
+
+  const runtimePanel = document.querySelector("#runtime-panel");
+  const runtimePill = document.querySelector("#runtime-state-pill");
+  const runtimeExplanation = document.querySelector("#runtime-explanation");
+  const runtimeCandidate = document.querySelector("#runtime-candidate");
+  const runtimeRetry = document.querySelector("#runtime-retry");
+  const runtimeTechnical = document.querySelector("#runtime-technical");
+
   let activeBoundaries = null;
   let catalogRequestVersion = 0;
   let snapshotRequestVersion = 0;
+  let readModelRequestVersion = 0;
+  let runtimeRequestVersion = 0;
+  let currentRuntimeStatus = null;
+  const automaticScopes = new Set();
 
   function setStatus(element, message, isError = false) {
     element.textContent = message;
     element.classList.toggle("error", isError);
-  }
-
-  function showPendingSnapshot(title, message) {
-    emptyTitle.textContent = title;
-    emptyMessage.textContent = message;
-    emptyState.hidden = false;
-    snapshotContent.hidden = true;
   }
 
   function recordedUtc() {
@@ -89,28 +107,50 @@
   }
 
   function queryString(boundary, extra = {}) {
-    const params = new URLSearchParams({
+    return new URLSearchParams({
       as_of_cutoff: boundary.cutoff,
       as_of_recorded_at_utc: boundary.recorded,
       ...extra,
-    });
-    return params.toString();
+    }).toString();
   }
 
-  async function jsonRequest(url) {
+  function selectedScopeQuery() {
+    if (!activeBoundaries || !equitySelect.value) return null;
+    const params = new URLSearchParams({
+      as_of_cutoff: activeBoundaries.cutoff,
+      as_of_recorded_at_utc: activeBoundaries.recorded,
+      equity_series_key: equitySelect.value,
+    });
+    if (benchmarkSelect.value) params.set("benchmark_series_key", benchmarkSelect.value);
+    if (sectorSelect.value) params.set("sector_series_key", sectorSelect.value);
+    return params;
+  }
+
+  async function jsonRequest(url, options = {}) {
     const response = await fetch(url, {
-      method: "GET",
       credentials: "same-origin",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+      },
+      ...options,
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const detail = payload.detail || {};
       const error = new Error(detail.message || "本地读取失败。");
       error.code = detail.code || `http_${response.status}`;
+      error.currentStatus = detail.current_status || null;
       throw error;
     }
     return payload;
+  }
+
+  function showPendingSnapshot(title, message) {
+    emptyTitle.textContent = title;
+    emptyMessage.textContent = message;
+    emptyState.hidden = false;
+    snapshotContent.hidden = true;
   }
 
   function resetSelect(select, firstLabel) {
@@ -122,7 +162,7 @@
   }
 
   function appendOptions(select, values) {
-    values.forEach((item) => {
+    (values || []).forEach((item) => {
       const option = document.createElement("option");
       option.value = item.series_key;
       option.textContent = item.label;
@@ -138,7 +178,7 @@
       saved = null;
     }
     if (!saved) return;
-    const visible = (items, key) => items.some((item) => item.series_key === key);
+    const visible = (items, key) => (items || []).some((item) => item.series_key === key);
     if (visible(families.equity, saved.equity)) equitySelect.value = saved.equity;
     if (visible(families.benchmark, saved.benchmark)) benchmarkSelect.value = saved.benchmark;
     if (visible(families.sector, saved.sector)) sectorSelect.value = saved.sector;
@@ -157,17 +197,11 @@
   function invalidateCatalogForBoundaryChange() {
     catalogRequestVersion += 1;
     snapshotRequestVersion += 1;
-    if (!activeBoundaries && selectionPanel.hidden) {
-      if (databaseState.textContent === "正在读取本地数据库") {
-        databaseState.textContent = "读取边界已更改";
-        setStatus(catalogStatus, "读取边界已更改，请重新读取本地数据列表。");
-      }
-      return;
-    }
+    readModelRequestVersion += 1;
+    runtimeRequestVersion += 1;
     activeBoundaries = null;
     selectionPanel.hidden = true;
     snapshotButton.disabled = true;
-    snapshotButton.textContent = "查看本地市场快照";
     databaseState.textContent = "读取边界已更改";
     setStatus(catalogStatus, "读取边界已更改，请重新读取本地数据列表。");
     setStatus(snapshotStatus, "请先按新边界读取本地数据列表。");
@@ -190,21 +224,17 @@
     }
     const requestVersion = ++catalogRequestVersion;
     snapshotRequestVersion += 1;
+    readModelRequestVersion += 1;
+    runtimeRequestVersion += 1;
     activeBoundaries = null;
     snapshotButton.disabled = true;
     selectionPanel.hidden = true;
-    showPendingSnapshot(
-      "正在读取本地数据列表",
-      "系统只会读取当前明确设置的双时间边界。",
-    );
+    showPendingSnapshot("正在读取本地数据列表", "系统只会读取当前明确设置的双时间边界。");
     setStatus(catalogStatus, "正在读取本地数据列表……");
     databaseState.textContent = "正在读取本地数据库";
     try {
       const payload = await jsonRequest(`/today-market/api/local-series?${queryString(boundary)}`);
-      if (
-        requestVersion !== catalogRequestVersion
-        || !sameBoundaries(boundary, boundaries())
-      ) return;
+      if (requestVersion !== catalogRequestVersion || !sameBoundaries(boundary, boundaries())) return;
       activeBoundaries = boundary;
       resetSelect(equitySelect, "请选择股票数据范围");
       resetSelect(benchmarkSelect, "不选择本地基准数据");
@@ -216,7 +246,7 @@
       selectionPanel.hidden = false;
       showPendingSnapshot(
         "尚未读取本地市场快照",
-        "明确选择一个股票数据范围后，点击“查看本地市场快照”。选择前不会显示指标。",
+        "明确选择一个股票数据范围后，点击“查看本地市场快照”。",
       );
       databaseState.textContent = payload.status === "ready" ? "本地数据列表已读取" : "当前边界内没有本地数据";
       setStatus(catalogStatus, payload.message);
@@ -232,13 +262,13 @@
   [equitySelect, benchmarkSelect, sectorSelect].forEach((select) => {
     select.addEventListener("change", () => {
       snapshotRequestVersion += 1;
+      readModelRequestVersion += 1;
+      runtimeRequestVersion += 1;
       saveSelections();
       snapshotButton.textContent = "查看本地市场快照";
       showPendingSnapshot(
         equitySelect.value ? "数据选择已更改" : "尚未选择本地市场数据",
-        equitySelect.value
-          ? "请重新点击“查看本地市场快照”，旧结果不会继续显示。"
-          : "请明确选择一个股票数据范围。",
+        equitySelect.value ? "请重新点击“查看本地市场快照”，旧结果不会继续显示。" : "请明确选择一个股票数据范围。",
       );
       updateSnapshotAvailability();
     });
@@ -248,6 +278,8 @@
     if (!activeBoundaries || !equitySelect.value) return;
     saveSelections();
     const requestVersion = ++snapshotRequestVersion;
+    readModelRequestVersion += 1;
+    runtimeRequestVersion += 1;
     const requestBoundaries = { ...activeBoundaries };
     const requestSelection = currentSelection();
     snapshotButton.disabled = true;
@@ -268,6 +300,7 @@
       snapshotButton.textContent = "重新读取本地快照";
       setStatus(snapshotStatus, payload.state_explanation.what_happened);
       databaseState.textContent = "本地快照已读取";
+      await loadReadModel();
     } catch (error) {
       if (requestVersion !== snapshotRequestVersion) return;
       setStatus(snapshotStatus, error.message, true);
@@ -288,35 +321,196 @@
       explanationCard("现在可以做什么", payload.state_explanation.available_action),
     );
     renderSummary(scopeSummary, payload.scope_and_freshness);
-    appendContextSummary(
-      scopeSummary,
-      payload.supported_analysis.benchmark,
-      payload.supported_analysis.sector,
-    );
     warnings.replaceChildren();
-    (payload.scope_and_freshness.warnings || []).forEach((message) => {
-      const item = document.createElement("div");
-      item.className = "warning-item";
-      item.textContent = message;
-      warnings.append(item);
-    });
-    renderPriceBehavior(priceBehavior, payload.supported_analysis.price_behavior);
-    renderLiquidity(liquidity, payload.supported_analysis.liquidity);
-    renderBenchmark(benchmark, payload.supported_analysis.benchmark);
-    renderSector(sector, payload.supported_analysis.sector);
-    renderCompleteness(completeness, payload.supported_analysis.data_completeness);
+    (payload.scope_and_freshness.warnings || []).forEach((message) => appendWarning(warnings, message));
+    renderObjectCards(priceBehavior, payload.supported_analysis.price_behavior, "价格行为");
+    renderObjectCards(liquidity, payload.supported_analysis.liquidity, "流动性");
+    renderObjectCards(benchmark, payload.supported_analysis.benchmark, "基准");
+    renderObjectCards(sector, payload.supported_analysis.sector, "行业");
+    renderObjectCards(completeness, payload.supported_analysis.data_completeness, "完整性");
     unavailable.replaceChildren();
-    payload.unavailable_sections.forEach((section) => {
-      const card = document.createElement("article");
-      card.className = "unavailable-card";
-      const title = document.createElement("h3");
-      title.textContent = section.label;
-      const text = document.createElement("p");
-      text.textContent = section.message;
-      card.append(title, text);
-      unavailable.append(card);
+    (payload.unavailable_sections || []).forEach((section) => {
+      unavailable.append(dataCard(section.label, section.message));
     });
     technical.textContent = JSON.stringify(payload.technical_details, null, 2);
+  }
+
+  async function loadReadModel() {
+    const params = selectedScopeQuery();
+    if (!params || snapshotContent.hidden) return;
+    const version = ++readModelRequestVersion;
+    ordinarySentence.textContent = "正在读取确定性市场投影……";
+    try {
+      const payload = await jsonRequest(`/today-market/api/read-model?${params.toString()}`);
+      if (version !== readModelRequestVersion || snapshotContent.hidden) return;
+      renderReadModel(payload);
+    } catch (error) {
+      if (version !== readModelRequestVersion) return;
+      ordinaryMarketState.textContent = "投影不可用";
+      ordinaryRefreshState.textContent = "状态未知";
+      ordinarySentence.textContent = error.message;
+      ordinaryAction.disabled = false;
+      ordinaryAction.textContent = "重新读取本地快照";
+      ordinaryAction.dataset.actionCode = "reread_local_snapshot";
+      ordinarySource.textContent = "系统没有对未知状态作推断。";
+    }
+  }
+
+  function renderReadModel(payload) {
+    ordinaryMarketState.textContent = statusLabel(payload.market_state);
+    ordinaryRefreshState.textContent = statusLabel(payload.refresh_state);
+    ordinaryDataDate.textContent = `最新完整交易日：${formatDate(payload.data_date)}`;
+    ordinarySentence.textContent = marketSentence(payload);
+    ordinarySource.textContent = [
+      payload.source_summary?.source_label,
+      payload.source_summary?.coverage_label,
+      payload.source_summary?.refresh_label,
+    ].filter(Boolean).join(" · ");
+
+    const action = payload.source_summary?.dominant_action || {};
+    ordinaryAction.textContent = action.label || "重新读取本地快照";
+    ordinaryAction.disabled = action.enabled === false;
+    ordinaryAction.dataset.actionCode = action.code || "reread_local_snapshot";
+
+    renderCore(payload);
+    renderSectorGroups(ordinarySectorFocus, payload.sector_groups, payload.sector_groups?.focus_states || []);
+    renderSectorGroups(ordinarySectorRisk, payload.sector_groups, payload.sector_groups?.risk_states || []);
+    renderAnomalies(payload.stock_anomalies);
+    renderCoverage(payload.coverage);
+
+    ordinaryWarnings.replaceChildren();
+    (payload.warnings || []).forEach((message) => appendWarning(ordinaryWarnings, message));
+    ordinaryTechnical.textContent = JSON.stringify({
+      read_model_version: payload.read_model_version,
+      read_model_fingerprint: payload.read_model_fingerprint,
+      snapshot_id: payload.snapshot_id,
+      data_status: payload.data_status,
+      technical_details: payload.technical_details,
+    }, null, 2);
+  }
+
+  function marketSentence(payload) {
+    if (payload.market_overview?.status !== "ready") {
+      return "完整市场范围尚未被当前本地契约证明；先展示可验证的本地范围背景，不对全市场状态作外推。";
+    }
+    return {
+      strong: "市场宽度与趋势条件同时偏强。",
+      weak: "市场宽度与趋势条件同时偏弱。",
+      mixed: "市场内部信号分化，当前为混合状态。",
+      insufficient_coverage: "市场覆盖不足，暂不生成完整市场状态。",
+    }[payload.market_state] || "当前市场状态需要查看覆盖说明。";
+  }
+
+  function renderCore(payload) {
+    ordinaryCore.replaceChildren();
+    const overview = payload.market_overview || {};
+    const context = overview.status === "ready" ? overview.result : overview.selected_scope_context || {};
+    ordinaryCore.append(
+      dataCard("市场状态", statusLabel(payload.market_state)),
+      dataCard("上涨 / 下跌 / 平盘", `${displayValue(context.advancing_count)} / ${displayValue(context.declining_count)} / ${displayValue(context.unchanged_count)}`),
+      dataCard("上涨占比", formatPercent(context.advance_ratio)),
+      dataCard("市场宽度平衡", formatPercent(context.breadth_balance)),
+      dataCard("收益中位数", formatPercent(context.median_return)),
+      dataCard("成交活跃度", formatRatio(context.market_amount_ratio_20 ?? context.amount_ratio_20)),
+    );
+    (payload.core_indices || []).forEach((item) => {
+      ordinaryCore.append(dataCard(
+        `指数 ${item.index_code}`,
+        lines([
+          ["最新收盘", formatNumber(item.latest_close)],
+          ["最新日收益", formatPercent(item.latest_return)],
+          ["高于 20 日均线", displayValue(item.above_sma20)],
+          ["近 20 日年化波动", formatPercent(item.realized_volatility_20)],
+        ]),
+      ));
+    });
+    if (overview.status !== "ready") {
+      ordinaryCore.append(dataCard("完整市场状态不可用原因", reasonLabel(overview.reason)));
+    }
+  }
+
+  function renderSectorGroups(container, projection, states) {
+    container.replaceChildren();
+    if (!projection || projection.status !== "ready") {
+      container.append(dataCard("当前不可用", reasonLabel(projection?.reason)));
+      return;
+    }
+    let count = 0;
+    states.forEach((state) => {
+      const items = projection.groups?.[state] || [];
+      if (!items.length) return;
+      count += items.length;
+      const body = items.map((item) => (
+        `${item.sector_name}（${item.sector_code}） · 1日 ${formatPercent(item.sector_r1)} · 5日 ${formatPercent(item.sector_r5)} · 20日 ${formatPercent(item.sector_r20)}`
+      )).join("\n");
+      container.append(dataCard(statusLabel(state), body));
+    });
+    if (!count) container.append(dataCard("当前没有匹配方向", "没有板块满足这一组确定性状态条件。"));
+  }
+
+  function renderAnomalies(projection) {
+    ordinaryAnomalies.replaceChildren();
+    if (!projection || projection.status !== "ready") {
+      ordinaryAnomalies.append(dataCard("当前不可用", (projection?.reasons || []).map(reasonLabel).join("\n") || "输入不足"));
+      return;
+    }
+    if (!(projection.items || []).length) {
+      ordinaryAnomalies.append(dataCard("没有触发的异动", "当前可证明规则没有触发异动；不可评估规则请查看技术详情。"));
+      return;
+    }
+    (projection.items || []).forEach((item) => {
+      ordinaryAnomalies.append(dataCard(
+        `${item.stock_code} · ${statusLabel(item.anomaly_type)}`,
+        `主指标：${formatNumber(item.primary_metric)}`,
+      ));
+    });
+  }
+
+  function renderCoverage(value) {
+    ordinaryCoverage.replaceChildren();
+    if (!value) return;
+    const entries = [
+      ["预期证券数", value.expected_instruments],
+      ["已计入证券数", value.accounted_instruments],
+      ["有效收益数", value.valid_returns],
+      ["无成交证券数", value.no_trade_instruments],
+      ["缺失来源行", value.missing_source_rows],
+      ["身份冲突", value.identity_conflicts],
+      ["行业数量", value.sector_count],
+      ["历史生效成分覆盖", statusLabel(value.sector_membership_coverage)],
+      ["历史窗口覆盖", statusLabel(value.history_window_coverage)],
+      ["范围覆盖状态", statusLabel(value.scope_coverage_status)],
+      ["不可用原因", (value.unsupported_metric_reasons || []).map(reasonLabel).join("、") || "无"],
+    ];
+    entries.forEach(([label, item]) => ordinaryCoverage.append(summaryItem(label, item)));
+  }
+
+  ordinaryAction.addEventListener("click", () => {
+    const code = ordinaryAction.dataset.actionCode;
+    if (code === "explicit_user_retry") {
+      runtimeRetry.click();
+      return;
+    }
+    if (code === "reread_local_snapshot") snapshotButton.click();
+  });
+
+  function renderSummary(container, value) {
+    container.replaceChildren();
+    Object.entries(value || {}).forEach(([key, item]) => {
+      if (key === "warnings") return;
+      container.append(summaryItem(labelFor(key), displayValue(item, key)));
+    });
+  }
+
+  function summaryItem(label, value) {
+    const wrapper = document.createElement("dl");
+    wrapper.className = "summary-item";
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = displayValue(value);
+    wrapper.append(term, description);
+    return wrapper;
   }
 
   function explanationCard(title, text) {
@@ -325,271 +519,29 @@
     const heading = document.createElement("strong");
     heading.textContent = title;
     const content = document.createElement("span");
-    content.textContent = text;
+    content.textContent = text || "暂无";
     card.append(heading, content);
     return card;
   }
 
-  function renderSummary(container, value) {
-    container.replaceChildren();
-    Object.entries(value).forEach(([key, item]) => {
-      if (key === "warnings") return;
-      const wrapper = document.createElement("dl");
-      wrapper.className = "summary-item";
-      const term = document.createElement("dt");
-      term.textContent = labelFor(key);
-      const description = document.createElement("dd");
-      description.textContent = displayValue(item, key);
-      wrapper.append(term, description);
-      container.append(wrapper);
-    });
+  function appendWarning(container, message) {
+    const item = document.createElement("div");
+    item.className = "warning-item";
+    item.textContent = message;
+    container.append(item);
   }
 
-  function appendSummaryItem(container, label, value) {
-    const wrapper = document.createElement("dl");
-    wrapper.className = "summary-item";
-    const term = document.createElement("dt");
-    term.textContent = label;
-    const description = document.createElement("dd");
-    description.textContent = displayValue(value);
-    wrapper.append(term, description);
-    container.append(wrapper);
-  }
-
-  function appendContextSummary(container, benchmarkValue, sectorValue) {
-    if (benchmarkValue && benchmarkValue.status !== "not_selected") {
-      const codes = (benchmarkValue.metrics || []).map((metric) => metric.index_code);
-      appendSummaryItem(
-        container,
-        "基准范围",
-        codes.length
-          ? `${benchmarkValue.requested_code_count} 个明确指数：${codes.slice(0, 5).join("、")}${codes.length > 5 ? " 等" : ""}`
-          : `${benchmarkValue.requested_code_count} 个明确指数`,
-      );
-      appendSummaryItem(
-        container,
-        "基准有效交易日",
-        formatDate(benchmarkValue.effective_benchmark_session),
-      );
-      appendSummaryItem(
-        container,
-        "基准对齐状态",
-        statusLabel(benchmarkValue.alignment_status),
-      );
-    } else {
-      appendSummaryItem(container, "基准范围", "未选择本地基准数据");
-    }
-
-    if (sectorValue && sectorValue.status !== "not_selected") {
-      const provenance = sectorValue.provenance || {};
-      appendSummaryItem(
-        container,
-        "行业分类范围",
-        `${provenance.taxonomy || "明确行业分类"} / ${provenance.classification_level || "未分级"}`,
-      );
-      appendSummaryItem(
-        container,
-        "行业有效交易日",
-        formatDate(sectorValue.effective_sector_session),
-      );
-      appendSummaryItem(
-        container,
-        "行业对齐状态",
-        statusLabel(sectorValue.alignment_status),
-      );
-    } else {
-      appendSummaryItem(container, "行业分类范围", "未选择本地行业数据");
-    }
-  }
-
-  function renderPriceBehavior(container, value) {
+  function renderObjectCards(container, value, label) {
     container.replaceChildren();
     if (!value) {
-      container.append(dataCard("状态", "当前没有可显示的价格行为数据。"));
+      container.append(dataCard("状态", "当前没有可显示的数据。"));
       return;
     }
-    container.append(
-      dataCard("有效交易日", formatDate(value.effective_session)),
-      dataCard("整体计算状态", statusLabel(value.calculation_status)),
-      metricCard("近 20 个交易日", value.return_20, "median_return"),
-      metricCard("近 60 个交易日", value.return_60, "median_return"),
-      metricCard("近 20 个交易日波动", value.volatility_20, "median_annualized_volatility"),
-      dataCard(
-        "可比较样本",
-        lines([
-          ["匹配公司数", value.matched_cohort?.matched_cohort_count],
-          ["请求公司数", value.matched_cohort?.requested_stock_count],
-          ["中位年化波动", formatPercent(value.matched_cohort?.matched_median_annualized_volatility)],
-          ["状态", statusLabel(value.matched_cohort?.calculation_status)],
-          ["说明", reasonLabel(value.matched_cohort?.reason)],
-        ]),
-      ),
-      dataCard("价格行为警告", warningText(value.warnings)),
-    );
-  }
-
-  function metricCard(title, metric, valueKey) {
-    if (!metric) return dataCard(title, "当前没有可显示的数据。");
-    return dataCard(
-      title,
-      lines([
-        [valueKey === "median_return" ? "中位收益" : "中位年化波动", formatPercent(metric[valueKey])],
-        ["可用公司数", metric.eligible_stock_count],
-        ["请求公司数", metric.requested_stock_count],
-        ["正收益占比", formatPercent(metric.positive_share)],
-        ["状态", statusLabel(metric.calculation_status)],
-        ["说明", reasonLabel(metric.reason)],
-      ]),
-    );
-  }
-
-  function renderLiquidity(container, value) {
-    container.replaceChildren();
-    if (!value) {
-      container.append(dataCard("状态", "当前没有可显示的流动性数据。"));
+    if (value.status === "not_selected") {
+      container.append(dataCard("状态", value.message || "未选择。"));
       return;
     }
-    container.append(
-      dataCard("有效交易日", formatDate(value.effective_session)),
-      dataCard("整体计算状态", statusLabel(value.calculation_status)),
-      dataCard(
-        "最新成交额分布",
-        lines([
-          ["可用公司数", value.latest_eligible_count],
-          ["不可用公司数", value.latest_unavailable_count],
-          ["合计成交额（来源原始单位）", formatNumber(value.latest_total_amount)],
-          ["中位成交额（来源原始单位）", formatNumber(value.latest_median_amount)],
-          ["说明", reasonLabel(value.latest_aggregate_reason)],
-        ]),
-      ),
-      dataCard(
-        "成交集中度",
-        lines([
-          ["前 5 家占比", formatPercent(value.top5_concentration_share)],
-          ["前 10% 公司占比", formatPercent(value.top_decile_concentration_share)],
-          ["前 10% 公司数", value.top_decile_member_count],
-        ]),
-      ),
-      activityCard("近 5 个交易日活跃度", value.activity_5),
-      activityCard("近 20 个交易日活跃度", value.activity_20),
-      dataCard(
-        "高于 20 日基准的公司",
-        lines([
-          ["公司数", value.latest_above_20_session_baseline_count],
-          ["占比", formatPercent(value.latest_above_20_session_baseline_share)],
-        ]),
-      ),
-      dataCard("流动性警告", warningText(value.warnings)),
-    );
-  }
-
-  function activityCard(title, activity) {
-    if (!activity) return dataCard(title, "当前没有可显示的数据。");
-    return dataCard(
-      title,
-      lines([
-        ["活跃度比值", formatRatio(activity.activity_ratio)],
-        ["匹配公司数", activity.matched_cohort_count],
-        ["最新合计成交额（来源原始单位）", formatNumber(activity.latest_matched_total_amount)],
-        ["历史基准成交额（来源原始单位）", formatNumber(activity.baseline_total_amount)],
-        ["状态", statusLabel(activity.calculation_status)],
-        ["说明", reasonLabel(activity.reason)],
-      ]),
-    );
-  }
-
-  function renderBenchmark(container, value) {
-    container.replaceChildren();
-    if (!value || value.status === "not_selected") {
-      container.append(dataCard("状态", value?.message || "未选择本地基准数据。"));
-      return;
-    }
-    container.append(
-      dataCard(
-        "范围与对齐",
-        lines([
-          ["整体对齐", statusLabel(value.alignment_status)],
-          ["交易日对齐", statusLabel(value.session_alignment_status)],
-          ["截止日对齐", statusLabel(value.cutoff_alignment_status)],
-          ["请求指数数", value.requested_code_count],
-          ["可用指数数", value.available_code_count],
-          ["缺少指数", codeList(value.missing_codes)],
-          ["有效交易日", formatDate(value.effective_benchmark_session)],
-        ]),
-      ),
-      dataCard("基准警告", warningText(value.warnings)),
-    );
-    (value.metrics || []).forEach((metric) => {
-      container.append(dataCard(
-        `指数 ${metric.index_code}`,
-        lines([
-          ["最新收盘", formatNumber(metric.latest_close)],
-          ["最新日收益", formatPercent(metric.latest_return)],
-          ["高于 20 日均线", displayValue(metric.above_sma20)],
-          ["高于 60 日均线", displayValue(metric.above_sma60)],
-          ["近 20 日年化波动", formatPercent(metric.realized_volatility_20)],
-          ["近 20 日最大回撤", formatPercent(metric.max_drawdown_20)],
-        ]),
-      ));
-    });
-  }
-
-  function renderSector(container, value) {
-    container.replaceChildren();
-    if (!value || value.status === "not_selected") {
-      container.append(dataCard("状态", value?.message || "未选择本地行业数据。"));
-      return;
-    }
-    const cross = value.cross_section || {};
-    const provenance = value.provenance || {};
-    container.append(
-      dataCard(
-        "范围与对齐",
-        lines([
-          ["分类体系", provenance.taxonomy],
-          ["分类级别", provenance.classification_level || "未分级"],
-          ["覆盖状态", statusLabel(value.coverage_status)],
-          ["整体对齐", statusLabel(value.alignment_status)],
-          ["交易日对齐", statusLabel(value.session_alignment_status)],
-          ["截止日对齐", statusLabel(value.cutoff_alignment_status)],
-          ["请求行业数", value.requested_sector_count],
-          ["可用行业数", value.available_sector_count],
-          ["缺少行业", codeList(value.missing_sector_codes)],
-          ["有效交易日", formatDate(value.effective_sector_session)],
-        ]),
-      ),
-      dataCard(
-        "行业横截面",
-        lines([
-          ["日收益为正的行业占比", formatPercent(cross.positive_latest_return_share)],
-          ["高于 20 日均线的行业占比", formatPercent(cross.above_sma20_share)],
-          ["有效日收益行业数", cross.valid_latest_return_count],
-          ["有效均线行业数", cross.valid_sma20_count],
-        ]),
-      ),
-      dataCard("当日表现靠前", rankedSectorText(cross.top_latest_return)),
-      dataCard("当日表现靠后", rankedSectorText(cross.bottom_latest_return)),
-      dataCard("近 20 日表现靠前", rankedSectorText(cross.top_return_20)),
-      dataCard("近 20 日表现靠后", rankedSectorText(cross.bottom_return_20)),
-      dataCard("行业警告", warningText(value.warnings)),
-      dataCard("含义边界", "行业强弱只描述明确选择的本地分类范围，不代表产业受益确定性或投资质量。"),
-    );
-  }
-
-  function renderCompleteness(container, value) {
-    container.replaceChildren();
-    const diagnostics = value?.latest_data_diagnostics || {};
-    container.append(
-      dataCard("完整性状态", statusLabel(value?.status)),
-      dataCard(
-        "最新数据诊断",
-        lines([
-          ["最新数据陈旧或缺失", diagnostics.stale_or_missing_latest_count],
-          ["最新交易日无成交", diagnostics.no_trade_latest_count],
-          ["最新收益不可用", diagnostics.latest_return_unavailable_count],
-        ]),
-      ),
-    );
+    container.append(dataCard(label, JSON.stringify(value, null, 2)));
   }
 
   function dataCard(label, value) {
@@ -609,21 +561,6 @@
       .filter(([, value]) => value !== undefined)
       .map(([label, value]) => `${label}：${displayValue(value)}`)
       .join("\n");
-  }
-
-  function warningText(values) {
-    return Array.isArray(values) && values.length ? values.join("\n") : "无额外警告";
-  }
-
-  function codeList(values) {
-    return Array.isArray(values) && values.length ? values.join("、") : "无";
-  }
-
-  function rankedSectorText(values) {
-    if (!Array.isArray(values) || !values.length) return "暂无可用排名";
-    return values.map((item, index) => (
-      `${index + 1}. ${item.sector_name}（${item.sector_code}）：${formatPercent(item.value)}`
-    )).join("\n");
   }
 
   function formatDate(value) {
@@ -658,7 +595,7 @@
     if (value === false) return "否";
     if (value === null || value === undefined || value === "") return "暂无";
     if (Array.isArray(value)) return value.length ? value.join("、") : "无";
-    if (typeof value === "object") return "详细内容请在下方技术详情中查看";
+    if (typeof value === "object") return JSON.stringify(value, null, 2);
     return String(value);
   }
 
@@ -670,6 +607,7 @@
       complete: "完整",
       partial: "部分可用",
       unavailable: "不可用",
+      available: "可用",
       ready: "可用",
       aligned: "已对齐",
       different_session: "交易日不同",
@@ -677,13 +615,55 @@
       unverified_selected_scope: "仅验证所选范围",
       no_eligible_local_data: "无可见本地数据",
       not_selected: "未选择",
+      strong: "偏强",
+      weak: "偏弱",
+      mixed: "分化",
+      insufficient_coverage: "覆盖不足",
+      strengthening: "正在增强",
+      new: "新出现",
+      spreading: "扩散",
+      persistent_strong: "持续强势",
+      high_level_divergence: "高位分化",
+      cooling: "降温",
+      neutral: "中性",
+      current: "当前",
+      checking: "检查中",
+      refresh_required: "需要更新",
+      refreshing: "更新中",
+      refreshed: "已完成更新",
+      not_initialized: "未初始化",
+      manual_catchup_required: "需要手动补齐",
+      blocked_source_contract: "真实数据源未授权",
+      failed_retained_prior: "更新失败，已保留旧快照",
+      cancelled_retained_prior: "更新取消，已保留旧快照",
+      large_move: "大幅波动",
+      unusual_volume: "成交量异常",
+      new_high: "阶段新高",
+      new_low: "阶段新低",
+      gap: "跳空",
+      persistent_relative_strength: "持续相对强势",
+      sector_relative_outlier: "板块相对异常",
     }[status] || reasonLabel(status);
   }
 
   function reasonLabel(reason) {
-    return {
+    const labels = {
+      full_market_universe_not_proven: "完整市场证券范围尚未被证明",
+      market_rule_inputs_unavailable: "完整市场规则输入不可用",
+      sector_rule_inputs_unavailable: "板块规则输入不可用",
+      stock_rule_inputs_unavailable: "个股规则输入不可用",
+      dated_membership_unavailable: "缺少历史生效的板块成分",
+      dated_sector_membership_unavailable: "缺少历史生效的板块成分",
+      reference_close_semantics_unavailable: "缺少精确参考收盘语义",
+      analysis_price_semantics_unavailable: "缺少精确分析价格语义",
+      full_market_cross_section_not_proven: "完整市场横截面尚未被证明",
+      return_semantics_unavailable: "收益语义不可用",
+      five_session_return_semantics_unavailable: "五日收益语义不可用",
+      exact_20_session_volume_window_unavailable: "精确 20 个前序交易日成交量窗口不可用",
+      exact_60_session_analysis_close_window_unavailable: "精确 60 个交易日分析价格窗口不可用",
+      fewer_than_10_eligible_sector_members: "板块有效成员不足 10 个",
+      sector_mad_zero: "板块离差基准为零",
       available: "可用",
-      complete: "完整",
       partial_eligible_cohort: "可用样本不完整",
       partial_matched_cohort: "匹配样本不完整",
       insufficient_open_session_history: "交易日历史不足",
@@ -694,11 +674,12 @@
       invalid_baseline: "历史基准无效",
       missing_expected_session: "缺少预期交易日",
       invalid_close: "收盘价无效",
-    }[reason] || (reason ? String(reason) : "暂无");
+    };
+    return labels[reason] || (reason ? String(reason) : "暂无");
   }
 
   function labelFor(key) {
-    const labels = {
+    return {
       local_only: "仅本地读取",
       coverage_label: "覆盖范围",
       coverage_notice: "覆盖提示",
@@ -715,120 +696,11 @@
       scope_coverage_status: "范围状态",
       calculation_status: "计算状态",
       completeness_status: "完整性状态",
-    };
-    return labels[key] || key.replaceAll("_", " ");
-  }
-})();
-
-(() => {
-  "use strict";
-
-  const snapshotContent = document.querySelector("#snapshot-content");
-  const panel = document.querySelector("#runtime-panel");
-  const pill = document.querySelector("#runtime-state-pill");
-  const explanation = document.querySelector("#runtime-explanation");
-  const candidate = document.querySelector("#runtime-candidate");
-  const retryButton = document.querySelector("#runtime-retry");
-  const technical = document.querySelector("#runtime-technical");
-  const automaticScopes = new Set();
-  let currentStatus = null;
-  let requestVersion = 0;
-
-  function selectedScopeQuery() {
-    const cutoff = document.querySelector("#as-of-cutoff").value;
-    const recordedRaw = document.querySelector("#as-of-recorded-at").value;
-    const equity = document.querySelector("#equity-series").value;
-    if (!cutoff || !recordedRaw || !equity) return null;
-    const recorded = new Date(recordedRaw);
-    if (Number.isNaN(recorded.getTime())) return null;
-    const params = new URLSearchParams({
-      as_of_cutoff: cutoff,
-      as_of_recorded_at_utc: recorded.toISOString(),
-      equity_series_key: equity,
-    });
-    const benchmark = document.querySelector("#benchmark-series").value;
-    const sector = document.querySelector("#sector-series").value;
-    if (benchmark) params.set("benchmark_series_key", benchmark);
-    if (sector) params.set("sector_series_key", sector);
-    return params;
-  }
-
-  async function jsonRequest(url, options = {}) {
-    const response = await fetch(url, {
-      credentials: "same-origin",
-      headers: {
-        Accept: "application/json",
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
-      },
-      ...options,
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = payload.detail || {};
-      const error = new Error(detail.message || "运行状态读取失败。");
-      error.code = detail.code || `http_${response.status}`;
-      error.currentStatus = detail.current_status || null;
-      throw error;
-    }
-    return payload;
-  }
-
-  function explanationItem(title, value) {
-    const item = document.createElement("div");
-    item.className = "explanation-item";
-    const heading = document.createElement("strong");
-    heading.textContent = title;
-    const text = document.createElement("span");
-    text.textContent = value || "无可用说明";
-    item.append(heading, text);
-    return item;
-  }
-
-  function renderStatus(status) {
-    currentStatus = status;
-    panel.hidden = false;
-    pill.textContent = phaseLabel(status.phase);
-    const state = status.state_explanation || {};
-    explanation.replaceChildren(
-      explanationItem("发生了什么", state.what_happened),
-      explanationItem("为什么重要", state.why_it_matters),
-      explanationItem("现在可以做什么", state.available_action),
-    );
-    candidate.replaceChildren();
-    if (status.candidate_projection) {
-      const heading = document.createElement("h3");
-      heading.textContent = "模拟候选结果（不写入本地历史）";
-      const message = document.createElement("p");
-      message.textContent = status.candidate_projection.message_zh;
-      const metadata = document.createElement("p");
-      metadata.textContent = [
-        status.candidate_projection.source_label,
-        `数据截至 ${status.candidate_projection.data_through_session}`,
-        "明确标记为模拟数据",
-      ].join(" · ");
-      candidate.append(heading, message, metadata);
-    } else {
-      const message = document.createElement("p");
-      message.textContent = status.mock_enabled
-        ? "尚未发布完整模拟候选。"
-        : "默认应用未启用模拟更新，不会发送自动获取请求。";
-      candidate.append(message);
-    }
-    retryButton.hidden = !(status.allowed_actions || []).includes("explicit_user_retry");
-    technical.textContent = JSON.stringify({
-      runtime_scope_revision_id: status.runtime_scope_revision_id,
-      runtime_status_revision: status.runtime_status_revision,
-      runtime_status_fingerprint: status.runtime_status_fingerprint,
-      mock_enabled: status.mock_enabled,
-      mock_scenario_id: status.mock_scenario_id,
-      plan_fingerprint: status.plan_fingerprint,
-      failure: status.failure,
-      technical_details: status.technical_details,
-    }, null, 2);
+    }[key] || key.replaceAll("_", " ");
   }
 
   function phaseLabel(phase) {
-    const labels = {
+    return {
       prior_snapshot_ready: "模拟更新已准备",
       mock_not_enabled: "模拟更新未启用",
       refresh_in_progress: "模拟更新进行中",
@@ -839,8 +711,44 @@
       failed_retained_prior: "模拟失败，已保留原快照",
       cancelled_retained_prior: "模拟取消，已保留原快照",
       scope_stale: "运行范围已失效",
-    };
-    return labels[phase] || phase;
+    }[phase] || phase;
+  }
+
+  function renderRuntimeStatus(status) {
+    currentRuntimeStatus = status;
+    runtimePanel.hidden = false;
+    runtimePill.textContent = phaseLabel(status.phase);
+    const explanation = status.state_explanation || {};
+    runtimeExplanation.replaceChildren(
+      explanationCard("发生了什么", explanation.what_happened),
+      explanationCard("为什么重要", explanation.why_it_matters),
+      explanationCard("现在可以做什么", explanation.available_action),
+    );
+    runtimeCandidate.replaceChildren();
+    if (status.candidate_projection) {
+      const heading = document.createElement("h3");
+      heading.textContent = "模拟候选结果（不写入本地历史）";
+      const message = document.createElement("p");
+      message.textContent = status.candidate_projection.message_zh;
+      runtimeCandidate.append(heading, message);
+    } else {
+      const message = document.createElement("p");
+      message.textContent = status.mock_enabled
+        ? "尚未发布完整模拟候选。"
+        : "默认应用未启用模拟更新，不会发送自动获取请求。";
+      runtimeCandidate.append(message);
+    }
+    runtimeRetry.hidden = !(status.allowed_actions || []).includes("explicit_user_retry");
+    runtimeTechnical.textContent = JSON.stringify({
+      runtime_scope_revision_id: status.runtime_scope_revision_id,
+      runtime_status_revision: status.runtime_status_revision,
+      runtime_status_fingerprint: status.runtime_status_fingerprint,
+      mock_enabled: status.mock_enabled,
+      mock_scenario_id: status.mock_scenario_id,
+      plan_fingerprint: status.plan_fingerprint,
+      failure: status.failure,
+      technical_details: status.technical_details,
+    }, null, 2);
   }
 
   function commandBody(status, trigger) {
@@ -860,10 +768,10 @@
     };
   }
 
-  async function execute(status, trigger) {
-    const version = ++requestVersion;
+  async function executeRuntime(status, trigger) {
+    const version = ++runtimeRequestVersion;
     try {
-      renderStatus({
+      renderRuntimeStatus({
         ...status,
         phase: "refresh_in_progress",
         state_explanation: {
@@ -872,17 +780,20 @@
           available_action: "等待本次请求返回，不会后台轮询。",
         },
       });
+      await loadReadModel();
       const next = await jsonRequest("/today-market/api/runtime-refresh", {
         method: "POST",
         body: JSON.stringify(commandBody(status, trigger)),
       });
-      if (version === requestVersion) renderStatus(next);
+      if (version !== runtimeRequestVersion) return;
+      renderRuntimeStatus(next);
+      await loadReadModel();
     } catch (error) {
-      if (version !== requestVersion) return;
+      if (version !== runtimeRequestVersion) return;
       if (error.currentStatus) {
-        renderStatus(error.currentStatus);
+        renderRuntimeStatus(error.currentStatus);
       } else {
-        renderStatus({
+        renderRuntimeStatus({
           ...status,
           phase: "scope_stale",
           state_explanation: {
@@ -892,42 +803,43 @@
           },
         });
       }
+      await loadReadModel();
     }
   }
 
   async function loadRuntimeStatus() {
     const params = selectedScopeQuery();
     if (!params || snapshotContent.hidden) return;
-    const version = ++requestVersion;
+    const version = ++runtimeRequestVersion;
     try {
       const status = await jsonRequest(`/today-market/api/runtime-status?${params.toString()}`);
-      if (version !== requestVersion || snapshotContent.hidden) return;
-      renderStatus(status);
+      if (version !== runtimeRequestVersion || snapshotContent.hidden) return;
+      renderRuntimeStatus(status);
       if (
         status.mock_enabled
         && status.automatic_attempt_state === "not_attempted"
         && !automaticScopes.has(status.runtime_scope_revision_id)
       ) {
         automaticScopes.add(status.runtime_scope_revision_id);
-        await execute(status, "first_today_market_entry");
+        await executeRuntime(status, "first_today_market_entry");
       }
     } catch (error) {
-      if (version !== requestVersion) return;
-      panel.hidden = false;
-      pill.textContent = "运行状态不可用";
-      explanation.replaceChildren(
-        explanationItem("发生了什么", error.message),
-        explanationItem("为什么重要", "系统没有对未知或失效状态作推断。"),
-        explanationItem("现在可以做什么", "重新读取本地快照后再试。"),
+      if (version !== runtimeRequestVersion) return;
+      runtimePanel.hidden = false;
+      runtimePill.textContent = "运行状态不可用";
+      runtimeExplanation.replaceChildren(
+        explanationCard("发生了什么", error.message),
+        explanationCard("为什么重要", "系统没有对未知或失效状态作推断。"),
+        explanationCard("现在可以做什么", "重新读取本地快照后再试。"),
       );
-      candidate.replaceChildren();
-      retryButton.hidden = true;
-      technical.textContent = JSON.stringify({ code: error.code }, null, 2);
+      runtimeCandidate.replaceChildren();
+      runtimeRetry.hidden = true;
+      runtimeTechnical.textContent = JSON.stringify({ code: error.code }, null, 2);
     }
   }
 
-  retryButton.addEventListener("click", () => {
-    if (currentStatus) execute(currentStatus, "explicit_user_retry");
+  runtimeRetry.addEventListener("click", () => {
+    if (currentRuntimeStatus) executeRuntime(currentRuntimeStatus, "explicit_user_retry");
   });
 
   new MutationObserver(() => {
