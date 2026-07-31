@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 from typing import Any
 
 from industry_alpha.investment_candidate_models import CANDIDATE_STATUSES
 
 RESULT_CONTRACT_VERSION = "aquantai.industry-research-result-assembly.v1"
+EXPLAINED_RESULT_CONTRACT_VERSION = "aquantai.industry-research-explained-result.v1"
 DEFAULT_OPTION_LIMIT = 20
 MAX_OPTION_LIMIT = 100
 STAGE1_STATUS_ORDER = ("supported", "draft", "disputed", "rejected")
@@ -44,6 +47,17 @@ def recorded_boundary(value: datetime) -> datetime:
             "as_of_recorded_at_utc must be an explicit UTC timestamp",
         )
     return value.astimezone(timezone.utc)
+
+
+def explained_result_fingerprint(value: dict[str, Any]) -> str:
+    """Fingerprint only the deterministic read projection; no clocks or hidden state."""
+    canonical = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def counter_text(counter: Counter[str], order: tuple[str, ...]) -> str:
@@ -140,3 +154,16 @@ def conclusion_cards(
         ],
         largest_gap,
     )
+
+
+__all__ = (
+    "DEFAULT_OPTION_LIMIT",
+    "EXPLAINED_RESULT_CONTRACT_VERSION",
+    "IndustryResearchResultError",
+    "MAX_OPTION_LIMIT",
+    "RESULT_CONTRACT_VERSION",
+    "conclusion_cards",
+    "explained_result_fingerprint",
+    "recorded_boundary",
+    "stored_utc",
+)
