@@ -204,12 +204,48 @@ pre {
   background: var(--bg);
   font-size: .76rem;
 }
+
+/* Slice C ordinary-user hierarchy. State is always expressed with text, never color alone. */
+.ordinary-hero {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  padding: 1.35rem;
+}
+.ordinary-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+}
+.ordinary-market-sentence {
+  margin: .35rem 0 .2rem;
+  max-width: 820px;
+  font-size: clamp(1.08rem, 2vw, 1.35rem);
+  font-weight: 750;
+  line-height: 1.45;
+}
+.ordinary-meta { margin: .2rem 0 0; color: var(--muted); }
+.ordinary-state-stack { display: flex; gap: .45rem; flex-wrap: wrap; justify-content: flex-end; }
+.ordinary-primary-action { width: 100%; margin-top: 1rem; min-height: 48px; font-size: 1rem; }
+.state-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: .75rem;
+}
+.anomaly-list { display: grid; gap: .65rem; }
+.legacy-detail { opacity: .94; }
+.legacy-detail > .eyebrow, .legacy-detail .eyebrow { color: var(--muted); }
+#ordinary-coverage .summary-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+#ordinary-technical { border-style: dashed; }
+
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { position: static; }
   .primary-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar-note { margin-top: 0; }
   .boundary-form, .selection-grid, .two-column { grid-template-columns: 1fr; }
+  .ordinary-hero-grid { grid-template-columns: 1fr; }
+  .ordinary-state-stack { justify-content: flex-start; }
 }
 @media (max-width: 560px) {
   main, .topbar { padding: 1rem; }
