@@ -320,3 +320,90 @@ def test_read_model_layer_has_no_provider_database_network_or_mutation_import_pa
 
 def test_read_model_route_is_installed_on_default_application() -> None:
     assert "/today-market/api/read-model" in set(default_app.openapi()["paths"])
+
+
+# Integration-level proof that the real read-model boundary stays read-only and
+# fail-closed while reusing the existing local snapshot owners.
+from types import SimpleNamespace
+
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.pool import StaticPool
+
+from backend.api.today_market import (
+    TodayMarketSnapshotRequest,
+    today_market_read_model,
+)
+from backend.database.engine import build_session_factory
+from backend.database.models import Base, IngestionRun
+from backend.today_market_refresh.runtime import (
+    TodayMarketMockRuntimeConfigurationV1,
+    install_today_market_runtime,
+)
+from scripts.demo_today_market import (
+    VISIBLE_AT,
+    _boundaries,
+    _fix_recorded_times,
+    _ingest_benchmark,
+    _ingest_equity,
+    _ingest_sector,
+)
+
+
+def test_real_read_model_boundary_is_zero_write_and_volume_only_fail_closed() -> None:
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = build_session_factory(engine)
+    try:
+        equity = _ingest_equity(session_factory)
+        benchmark = _ingest_benchmark(session_factory)
+        sector = _ingest_sector(session_factory)
+        _fix_recorded_times(
+            session_factory,
+            equity.ingestion_run_id,
+            benchmark.ingestion_run_id,
+            sector.ingestion_run_id,
+        )
+        with session_factory() as session:
+            before = session.scalar(select(func.count()).select_from(IngestionRun))
+
+        request = TodayMarketSnapshotRequest(
+            equity_series_key=equity.series_key,
+            benchmark_series_key=benchmark.series_key,
+            sector_series_key=sector.series_key,
+            boundaries=_boundaries(VISIBLE_AT),
+        )
+        app = SimpleNamespace(state=SimpleNamespace())
+        install_today_market_runtime(
+            app,
+            configuration=TodayMarketMockRuntimeConfigurationV1(),
+        )
+        result = today_market_read_model(
+            http_request=SimpleNamespace(app=app),
+            snapshot_request=request,
+            session_factory=session_factory,
+        )
+
+        with session_factory() as session:
+            after = session.scalar(select(func.count()).select_from(IngestionRun))
+
+        assert before == after == 3
+        assert result["refresh_state"] == "blocked_source_contract"
+        assert result["market_overview"]["status"] == "unavailable"
+        assert result["market_overview"]["reason"] == "full_market_universe_not_proven"
+        assert result["sector_groups"]["status"] == "unavailable"
+        assert result["sector_groups"]["reason"] == "dated_membership_unavailable"
+        assert result["technical_details"]["network_used"] is False
+        anomaly_types = {
+            item["anomaly_type"] for item in result["stock_anomalies"]["items"]
+        }
+        assert anomaly_types == {"unusual_volume"}
+        assert all(
+            item["anomaly_type"] != "sector_relative_outlier"
+            for item in result["stock_anomalies"]["items"]
+        )
+    finally:
+        engine.dispose()
