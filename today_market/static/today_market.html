@@ -30,7 +30,7 @@
     <div class="app-main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">LOCAL-ONLY · DETERMINISTIC</p>
+          <p class="eyebrow">LOCAL-FIRST · DETERMINISTIC</p>
           <p class="page-context">今日市场</p>
         </div>
         <span id="database-state" class="status-pill">尚未读取本地数据</span>
@@ -39,18 +39,18 @@
       <main id="main-content" tabindex="-1">
         <section class="page-heading">
           <div>
-            <p class="eyebrow">TODAY MARKET · PHASE 2A</p>
-            <h1>本地市场快照</h1>
-            <p>在你明确选择的数据范围和双时间边界内，查看价格行为、流动性以及可选的基准和行业背景。</p>
+            <p class="eyebrow">TODAY MARKET · SLICE C</p>
+            <h1>今日市场</h1>
+            <p>先看最近一份完整本地市场状态，再查看数据覆盖、刷新状态和可证明的确定性市场行为。</p>
           </div>
-          <span class="local-badge">仅本地读取</span>
+          <span class="local-badge">本地优先 · 研究用途</span>
         </section>
 
         <section class="panel boundary-panel" aria-labelledby="boundary-title">
           <div class="panel-heading">
             <div>
               <h2 id="boundary-title">一、选择读取边界</h2>
-              <p>系统不会自动使用“最新”数据。请明确选择信息截止日和系统记录时间。</p>
+              <p>系统不会猜测时间边界。请明确选择信息截止日和系统记录时间。</p>
             </div>
           </div>
           <form id="catalog-form" class="boundary-form">
@@ -91,7 +91,7 @@
           </div>
           <div class="scope-warning">
             <strong>覆盖边界</strong>
-            <p>页面只描述你选择的本地范围，不能据此声称“全 A 股”或完整市场覆盖。</p>
+            <p>页面只描述明确选择并可验证的本地范围。不能据此声称“全 A 股”或完整市场覆盖。</p>
           </div>
           <button id="snapshot-button" class="button button-primary main-action" type="button" disabled>查看本地市场快照</button>
           <p id="snapshot-status" class="status-message" role="status" aria-live="polite">请选择股票数据范围。</p>
@@ -99,15 +99,91 @@
 
         <section id="empty-state" class="panel empty-state" aria-labelledby="empty-title">
           <h2 id="empty-title">尚未选择本地市场数据</h2>
-          <p>设置双时间边界并读取数据列表后，再明确选择一个股票数据范围。选择前不会显示指标卡片。</p>
+          <p>设置双时间边界并读取数据列表后，再明确选择一个股票数据范围。选择前不会显示市场判断。</p>
         </section>
 
         <div id="snapshot-content" hidden>
-          <section class="panel scope-panel" aria-labelledby="scope-title">
+          <section id="ordinary-market-panel" class="panel ordinary-hero" aria-labelledby="ordinary-market-title">
+            <div class="ordinary-hero-grid">
+              <div>
+                <p class="eyebrow">确定性市场状态</p>
+                <h2 id="ordinary-market-title">最近完整市场状态</h2>
+                <p id="ordinary-market-sentence" class="ordinary-market-sentence">正在读取确定性市场投影……</p>
+                <p id="ordinary-data-date" class="ordinary-meta"></p>
+              </div>
+              <div class="ordinary-state-stack">
+                <span id="ordinary-market-state" class="status-pill">读取中</span>
+                <span id="ordinary-refresh-state" class="status-pill">检查刷新状态</span>
+              </div>
+            </div>
+            <button id="ordinary-primary-action" class="button button-primary ordinary-primary-action" type="button" disabled>正在读取状态</button>
+            <p id="ordinary-source-summary" class="status-message" role="status" aria-live="polite"></p>
+          </section>
+
+          <section id="ordinary-core" class="panel" aria-labelledby="ordinary-core-title">
             <div class="panel-heading">
               <div>
+                <h2 id="ordinary-core-title">核心市场指标</h2>
+                <p>只展示后端已计算或明确标记为选定范围背景的指标。</p>
+              </div>
+            </div>
+            <div id="ordinary-core-grid" class="data-grid"></div>
+          </section>
+
+          <section id="ordinary-sector-focus" class="panel" aria-labelledby="ordinary-sector-focus-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="ordinary-sector-focus-title">正在增强的方向</h2>
+                <p>依次查看正在增强、新出现、扩散和持续强势；缺少历史生效成分时明确显示不可用。</p>
+              </div>
+            </div>
+            <div id="ordinary-sector-focus-grid" class="state-group-grid"></div>
+          </section>
+
+          <section id="ordinary-sector-risk" class="panel" aria-labelledby="ordinary-sector-risk-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="ordinary-sector-risk-title">高位分化与降温</h2>
+                <p>这是确定性的市场行为状态，不代表产业逻辑或投资结论。</p>
+              </div>
+            </div>
+            <div id="ordinary-sector-risk-grid" class="state-group-grid"></div>
+          </section>
+
+          <section id="ordinary-anomalies" class="panel" aria-labelledby="ordinary-anomalies-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="ordinary-anomalies-title">有意义的个股异动</h2>
+                <p>异动只描述价格或成交行为。原因未确认，也不构成推荐。</p>
+              </div>
+            </div>
+            <div id="ordinary-anomaly-list" class="anomaly-list"></div>
+          </section>
+
+          <section id="ordinary-coverage" class="panel" aria-labelledby="ordinary-coverage-title">
+            <div class="panel-heading">
+              <div>
+                <h2 id="ordinary-coverage-title">数据覆盖与来源</h2>
+                <p>任何不满足精确语义或覆盖要求的指标都会保留不可用原因。</p>
+              </div>
+            </div>
+            <div id="ordinary-coverage-grid" class="summary-grid"></div>
+            <div id="ordinary-warnings" class="warning-list"></div>
+          </section>
+
+          <section id="ordinary-technical" class="panel">
+            <details>
+              <summary>查看 Today Market 技术详情</summary>
+              <pre id="ordinary-technical-content"></pre>
+            </details>
+          </section>
+
+          <section class="panel scope-panel legacy-detail" aria-labelledby="scope-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">详细本地数据</p>
                 <h2 id="scope-title">范围与数据新鲜度</h2>
-                <p>先确认覆盖范围、截止时间和对齐状态，再阅读具体指标。</p>
+                <p>以下为原始本地快照详细层，便于核对范围、截止时间和对齐状态。</p>
               </div>
               <span id="snapshot-state-pill" class="status-pill"></span>
             </div>
@@ -116,7 +192,7 @@
             <div id="warnings" class="warning-list"></div>
           </section>
 
-          <section id="runtime-panel" class="panel" aria-labelledby="runtime-title" hidden>
+          <section id="runtime-panel" class="panel legacy-detail" aria-labelledby="runtime-title" hidden>
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">MOCK-ONLY · PROCESS-LOCAL</p>
@@ -134,45 +210,45 @@
             </details>
           </section>
 
-          <section class="panel" aria-labelledby="price-title">
-            <h2 id="price-title">价格行为</h2>
+          <section class="panel legacy-detail" aria-labelledby="price-title">
+            <h2 id="price-title">价格行为（所选范围详细层）</h2>
             <div id="price-behavior" class="data-grid"></div>
           </section>
 
-          <section class="panel" aria-labelledby="liquidity-title">
-            <h2 id="liquidity-title">流动性</h2>
+          <section class="panel legacy-detail" aria-labelledby="liquidity-title">
+            <h2 id="liquidity-title">流动性（所选范围详细层）</h2>
             <div id="liquidity" class="data-grid"></div>
           </section>
 
-          <section class="two-column">
+          <section class="two-column legacy-detail">
             <section class="panel" aria-labelledby="benchmark-title">
               <h2 id="benchmark-title">基准背景</h2>
               <div id="benchmark" class="data-grid"></div>
             </section>
             <section class="panel" aria-labelledby="sector-title">
-              <h2 id="sector-title">行业背景</h2>
+              <h2 id="sector-title">行业价格背景</h2>
               <div id="sector" class="data-grid"></div>
             </section>
           </section>
 
-          <section class="panel" aria-labelledby="completeness-title">
+          <section class="panel legacy-detail" aria-labelledby="completeness-title">
             <h2 id="completeness-title">数据完整性</h2>
             <div id="data-completeness" class="data-grid"></div>
           </section>
 
-          <section class="panel" aria-labelledby="unavailable-title">
+          <section class="panel legacy-detail" aria-labelledby="unavailable-title">
             <div class="panel-heading">
               <div>
                 <h2 id="unavailable-title">当前阶段暂不支持</h2>
-                <p>以下内容没有可靠的本地契约，因此明确显示为不可用，而不是填充推测值。</p>
+                <p>没有可靠本地契约的内容明确显示为不可用，而不是填充推测值。</p>
               </div>
             </div>
             <div id="unavailable-sections" class="unavailable-grid"></div>
           </section>
 
-          <section class="panel">
+          <section class="panel legacy-detail">
             <details>
-              <summary>查看数据与技术详情</summary>
+              <summary>查看原始本地数据与技术详情</summary>
               <pre id="technical-details"></pre>
             </details>
           </section>
