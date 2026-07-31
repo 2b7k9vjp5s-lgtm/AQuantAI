@@ -53,6 +53,11 @@
           </div>
         </section>
 
+        <section class="panel" aria-labelledby="complete-title">
+          <div class="panel-heading"><div><h2 id="complete-title">完整已接受成员（受益公司）</h2><p>这是外层权威集合，只展示已接受身份、状态和准备度；draft、disputed、无候选状态或证据不足的成员都不会消失，也不会被当前候选覆盖层重排。</p></div><span id="complete-count" class="group-count">0</span></div>
+          <div id="complete-members"></div>
+        </section>
+
         <section class="panel candidate-overlay-panel" aria-labelledby="overlay-title">
           <div class="panel-heading"><div><h2 id="overlay-title">当前候选覆盖层</h2><p>候选快照按精确候选池、用途、规则版本和双时间边界列出；即使只有一个也不会自动选择。</p></div><span id="overlay-state" class="group-count">未选择</span></div>
           <div class="snapshot-picker">
@@ -66,7 +71,11 @@
           <div id="candidate-overlay-details"></div>
         </section>
 
-        <section class="panel" aria-labelledby="complete-title"><div class="panel-heading"><div><h2 id="complete-title">完整已接受成员（受益公司）</h2><p>这是外层权威集合。每家公司优先显示产品/链条、客户/认证/产能/订单、业绩传导、预期/估值、催化/风险及明确缺失；draft、disputed、无候选状态或证据不足的成员都不会消失。</p></div><span id="complete-count" class="group-count">0</span></div><div id="complete-members"></div></section>
+        <section class="panel" aria-labelledby="company-explanations-title">
+          <div class="panel-heading"><div><h2 id="company-explanations-title">逐公司精确解释</h2><p>在完整受益公司集合和显式候选覆盖层之后，再展开产品/链条、客户/认证/产能/订单、业绩传导、预期/估值、催化/风险、证伪和明确缺失。</p></div><span id="company-explanation-count" class="group-count">0</span></div>
+          <div id="company-explanations"></div>
+        </section>
+
         <section class="panel" aria-labelledby="supported-title"><div class="panel-heading"><div><h2 id="supported-title">supported 后续研究</h2><p>仅表示接受时进入精确 Candidate Pool 的成员，不等同于当前候选评级。</p></div><span id="supported-count" class="group-count">0</span></div><div id="supported-members"></div></section>
         <section class="panel technical-details"><details><summary>查看精确 Output Link、Map Revision、候选快照、解释指纹和双时间边界</summary><pre id="result-technical" class="json-block"></pre></details></section>
         <p id="result-status" class="status-message" role="status" aria-live="polite"></p>
