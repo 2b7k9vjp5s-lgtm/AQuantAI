@@ -20,10 +20,12 @@ def test_accepted_result_page_exposes_two_layers_and_exact_selector() -> None:
     assert "已接受研究快照" in html
     assert "当前候选覆盖层" in html
     assert "完整已接受成员" in html
+    assert "逐公司精确解释" in html
     assert "解释不改写历史" in html
     assert "产品、业绩传导、预期、估值、催化和风险只展开精确冻结" in html
     assert 'id="snapshot-select"' in html
     assert 'id="map-nodes"' in html
+    assert 'id="company-explanations"' in html
     assert "/industry-analysis/static/accepted_result_assembly.css" in html
     assert "output-link-revisions" in script
     assert "investment_candidate_snapshot_revision_id" in script
@@ -34,12 +36,21 @@ def test_accepted_result_page_exposes_two_layers_and_exact_selector() -> None:
     assert "不使用最新版本回退" in html
     assert "为什么受益 / 为什么是当前研究状态" in script
     assert "SOURCE_LAYER_LABELS" in script
+    assert 'deterministic_candidate: "确定性规则/候选计算"' in script
+    assert "memberSummaryCard" in script
+    assert '"#complete-members"' in script
+    assert '"#company-explanations"' in script
     assert "explained_result_content_sha256" in script
     assert "explained_result_uses_latest_fallback" in script
     assert "未显式选择包含该公司的候选快照，因此不推断当前候选状态" in script
     assert ".candidate-highlights" in css
     assert ".explained-research" in css
     assert ".source-deterministic_candidate" in css
+
+    complete_index = html.index('id="complete-title"')
+    overlay_index = html.index('id="overlay-title"')
+    explanation_index = html.index('id="company-explanations-title"')
+    assert complete_index < overlay_index < explanation_index
 
     forbidden = (
         'fetch("http',
@@ -65,6 +76,7 @@ def test_page_route_and_openapi_include_read_only_assembly() -> None:
     assert page.status_code == 200
     assert "当前候选覆盖层" in page.text
     assert "完整已接受成员" in page.text
+    assert "逐公司精确解释" in page.text
 
     paths = client.get("/openapi.json").json()["paths"]
     path = (
