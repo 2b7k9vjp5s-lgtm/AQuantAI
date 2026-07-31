@@ -12,13 +12,16 @@ from industry_alpha.industry_research_result_accepted import (
     AcceptedResultProjectionReader,
 )
 from industry_alpha.industry_research_result_candidate import CandidateOverlayReader
+from industry_alpha.industry_research_result_company import ExplainedCompanyProjectionReader
 from industry_alpha.industry_research_result_map import ExactIndustryMapRevisionReader
 from industry_alpha.industry_research_result_rules import (
     DEFAULT_OPTION_LIMIT,
+    EXPLAINED_RESULT_CONTRACT_VERSION,
     MAX_OPTION_LIMIT,
     RESULT_CONTRACT_VERSION,
     IndustryResearchResultError,
     conclusion_cards,
+    explained_result_fingerprint,
     recorded_boundary,
 )
 
@@ -30,6 +33,7 @@ class IndustryResearchResultQueryService:
         self._accepted = AcceptedResultProjectionReader(session)
         self._map = ExactIndustryMapRevisionReader(session)
         self._candidate = CandidateOverlayReader(session)
+        self._company = ExplainedCompanyProjectionReader(session)
 
     def get_assembled_result(
         self,
@@ -72,6 +76,7 @@ class IndustryResearchResultQueryService:
                 item["beneficiary_revision_id"]
             ]
             item["candidate_overlay"] = None
+            item["explained_research"] = None
             members.append(item)
 
         pool_revision_text = output["accepted_candidate_pool_revision_id"]
@@ -106,6 +111,20 @@ class IndustryResearchResultQueryService:
                 member["candidate_overlay"] = by_revision.get(
                     member["beneficiary_revision_id"]
                 )
+
+        explained = self._company.explain(
+            members,
+            as_of_cutoff=as_of_cutoff,
+            as_of_recorded_at_utc=boundary,
+        )
+        explained_by_revision = {
+            item["beneficiary_revision_id"]: item for item in explained["members"]
+        }
+        for member in members:
+            member["explained_research"] = explained_by_revision[
+                member["beneficiary_revision_id"]
+            ]
+
         supported = [
             item for item in members if item["included_in_supported_handoff"]
         ]
@@ -115,8 +134,17 @@ class IndustryResearchResultQueryService:
             exact_map=exact_map,
             overlay=overlay,
         )
+        explained_fingerprint = explained_result_fingerprint(explained)
         return {
             "result_contract_version": RESULT_CONTRACT_VERSION,
+            "explained_result": {
+                "contract_version": EXPLAINED_RESULT_CONTRACT_VERSION,
+                "content_sha256": explained_fingerprint,
+                "creates_owner_state": explained["creates_owner_state"],
+                "recomputes_candidate": explained["recomputes_candidate"],
+                "uses_latest_fallback": explained["uses_latest_fallback"],
+                "external_network": explained["external_network"],
+            },
             "accepted_snapshot": {
                 "output_link_revision_id": output["output_link_revision_id"],
                 "reviewed_session_revision_id": output[
