@@ -22,15 +22,16 @@ from industry_alpha.investment_candidate_models import (
     InvestmentCandidateComponentInputLink,
     InvestmentCandidateComponentRevision,
 )
+from industry_alpha.stage2_assessments_fixtures import Stage2AssessmentFixtureIds
 from industry_alpha.stage2_assessments_models import (
     Stage2CatalystAssessmentRevision,
+    Stage2CatalystHypothesisLink,
 )
 from industry_alpha.stage2_expectations_models import (
     Stage2MarketExpectationRevision,
 )
 from industry_alpha.stage2_judgments_fixtures import build_stage2_judgment_fixture
 from industry_alpha.stage2_models import Stage2CompanyResearch
-from industry_alpha.stage2_assessments_fixtures import Stage2AssessmentFixtureIds
 from scripts.demo_industry_research_result_assembly import (
     CUTOFF as RESULT_CUTOFF,
     seed_industry_research_result_demo,
@@ -116,17 +117,8 @@ def _seed_exact_explanation(database) -> dict:
         )
         company_research_revision_id = catalyst.company_research_revision_id
         hypothesis_revision_id = session.scalar(
-            select(
-                __import__(
-                    "industry_alpha.stage2_assessments_models",
-                    fromlist=["Stage2CatalystHypothesisLink"],
-                ).Stage2CatalystHypothesisLink.hypothesis_revision_id
-            ).where(
-                __import__(
-                    "industry_alpha.stage2_assessments_models",
-                    fromlist=["Stage2CatalystHypothesisLink"],
-                ).Stage2CatalystHypothesisLink.catalyst_revision_id
-                == catalyst.id
+            select(Stage2CatalystHypothesisLink.hypothesis_revision_id).where(
+                Stage2CatalystHypothesisLink.catalyst_revision_id == catalyst.id
             )
         )
 
@@ -323,11 +315,16 @@ def test_newer_downstream_records_are_not_selected_without_exact_frozen_link(dat
             as_of_recorded_at_utc=datetime(2026, 7, 20, 20, tzinfo=UTC),
         )
     item = result["members"][0]
-    assert item["risks"][0]["revision_id"] != str(seeded["later_risk_revision_id"])
-    assert item["expectation"][0]["revision_id"] != str(
-        seeded["later_expectation_revision_id"]
+    frozen_risk_id = item["risks"][0]["revision_id"]
+    frozen_expectation_id = item["expectation"][0]["revision_id"]
+    assert frozen_risk_id != str(seeded["later_risk_revision_id"])
+    assert frozen_expectation_id != str(seeded["later_expectation_revision_id"])
+    assert {link["revision_id"] for link in item["technical_exact_links"]}.isdisjoint(
+        {
+            str(seeded["later_risk_revision_id"]),
+            str(seeded["later_expectation_revision_id"]),
+        }
     )
-    assert "Later" not in str(item)
     assert result["uses_latest_fallback"] is False
 
 
