@@ -1084,3 +1084,156 @@ def _parse_utc(value: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("timestamp must be timezone-aware")
     return parsed.astimezone(timezone.utc)
+
+
+# Slice C ordinary-user read-model wiring lives below to avoid changing the
+# established local snapshot/runtime ownership above.
+from math import isfinite
+
+from backend.today_market_refresh.read_model import (
+    TodayMarketRuleProjectionInputs,
+    build_today_market_read_model,
+)
+from market_cockpit.today_market_rule_contracts import StockRuleInput
+
+
+@router.get("/read-model")
+def today_market_read_model(
+    http_request: Request,
+    snapshot_request: TodayMarketSnapshotRequest = Depends(
+        require_today_market_snapshot_request
+    ),
+    session_factory: sessionmaker[Session] = Depends(
+        get_today_market_session_factory
+    ),
+) -> dict[str, Any]:
+    """Project the last valid local snapshot into the Slice C ordinary-user model.
+
+    This GET is read-only. It does not acquire, persist, select a Provider, or activate
+    the live source path. The current production scope remains selected/local-only, so
+    complete Market Overview and constituent-confirmed sector states fail closed.
+    """
+
+    try:
+        prior = build_prior_snapshot_context(snapshot_request, session_factory)
+        configuration, _, coordinator = _app_runtime_dependencies(http_request)
+        scope = build_runtime_scope(
+            request=snapshot_request,
+            prior=prior,
+            configuration=configuration,
+        )
+        runtime_status = coordinator.get_status(scope, configuration)
+        rule_inputs = _ordinary_user_rule_inputs(
+            request=snapshot_request,
+            session_factory=session_factory,
+            data_through_session=prior.snapshot_reference.data_through_session,
+        )
+        return build_today_market_read_model(
+            snapshot_id=prior.snapshot_reference.snapshot_id,
+            snapshot_content_fingerprint=(
+                prior.snapshot_reference.content_fingerprint
+            ),
+            data_date=prior.snapshot_reference.data_through_session.isoformat(),
+            projected_snapshot=prior.projected_snapshot,
+            runtime_status=runtime_status,
+            rule_inputs=rule_inputs,
+        )
+    except RuntimeScopeConflict as exc:
+        raise _error(
+            409,
+            "runtime_scope_identity_conflict",
+            "本地快照身份与权威读取结果不一致，请重新读取。",
+        ) from exc
+
+
+def _ordinary_user_rule_inputs(
+    *,
+    request: TodayMarketSnapshotRequest,
+    session_factory: sessionmaker[Session],
+    data_through_session: date,
+) -> TodayMarketRuleProjectionInputs:
+    """Build only inputs whose semantics are provable from current accepted owners."""
+
+    with session_factory() as session:
+        persisted = _RecordedEquityRepository(
+            session, request.boundaries.recorded_at
+        ).load_snapshot(
+            series_key=request.equity_series_key,
+            as_of_cutoff=request.boundaries.cutoff_compact,
+        )
+        stock_inputs = _volume_only_stock_inputs(
+            persisted.daily_price,
+            persisted.stock_codes,
+            data_through_session,
+        )
+
+    return TodayMarketRuleProjectionInputs(
+        market_overview=None,
+        sectors=(),
+        stocks=stock_inputs,
+        market_unavailable_reason="full_market_universe_not_proven",
+        sector_unavailable_reason="dated_membership_unavailable",
+        stock_unavailable_reasons=(
+            "full_market_cross_section_not_proven",
+            "analysis_price_semantics_unavailable",
+            "reference_close_semantics_unavailable",
+            "dated_membership_unavailable",
+        ),
+    )
+
+
+def _volume_only_stock_inputs(
+    daily_price: Any,
+    stock_codes: list[str],
+    data_through_session: date,
+) -> tuple[StockRuleInput, ...]:
+    """Expose exact 21-row volume windows without enabling price semantics.
+
+    Price-based rules remain unavailable because the current durable owners do not
+    prove the Slice B adjustment/reference-close contract. The volume anomaly rule is
+    independent and may run only when the exact current + prior-20 rows are finite and
+    nonnegative.
+    """
+
+    cutoff = data_through_session.strftime("%Y%m%d")
+    results: list[StockRuleInput] = []
+    for stock_code in sorted(stock_codes):
+        rows = daily_price[
+            (daily_price["stock_code"] == stock_code)
+            & (daily_price["trade_date"] <= cutoff)
+        ].sort_values("trade_date")
+        window = rows.tail(21)
+        volumes: list[float] = []
+        exact_window = len(window.index) == 21
+        if exact_window:
+            for raw_volume in window["volume"].tolist():
+                try:
+                    volume = float(raw_volume)
+                except (TypeError, ValueError):
+                    exact_window = False
+                    break
+                if not isfinite(volume) or volume < 0:
+                    exact_window = False
+                    break
+                volumes.append(volume)
+        current_volume = volumes[-1] if exact_window else None
+        prior_volumes = tuple(volumes[:-1]) if exact_window else ()
+        results.append(
+            StockRuleInput(
+                stock_code=stock_code,
+                r1=None,
+                r5=None,
+                broad_market_benchmark_r5=None,
+                volume_current=current_volume,
+                volume_previous_20=prior_volumes,
+                analysis_closes_60=(),
+                open_current=None,
+                reference_close_previous=None,
+                return_semantics_valid=False,
+                reference_close_semantics_valid=False,
+                sector_code=None,
+                dated_membership_revision_id=None,
+                sector_identity_ambiguous=False,
+            )
+        )
+    return tuple(results)
