@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from types import SimpleNamespace
 from uuid import UUID
 
 from sqlalchemy import select
@@ -13,6 +14,7 @@ from industry_alpha.beneficiary_semantics_models import (
 )
 from industry_alpha.industry_research_result_company import (
     ExplainedCompanyProjectionReader,
+    _target_source_layer,
 )
 from industry_alpha.industry_research_result_query import (
     IndustryResearchResultQueryService,
@@ -413,3 +415,24 @@ def test_assembled_result_exposes_deterministic_explanation_contract_and_fingerp
         member["explained_research"] is not None
         for member in first["accepted_snapshot"]["members"]
     )
+
+
+def test_source_layers_do_not_promote_inference_or_provenance_to_fact() -> None:
+    assert _target_source_layer(
+        "claim", SimpleNamespace(claim_kind="inference")
+    ) == "accepted_research_judgment"
+    assert _target_source_layer(
+        "claim", SimpleNamespace(claim_kind="fact")
+    ) == "accepted_fact"
+    assert _target_source_layer(
+        "evidence", SimpleNamespace()
+    ) == "accepted_research_judgment"
+    assert _target_source_layer(
+        "map_observation", SimpleNamespace()
+    ) == "accepted_research_judgment"
+    assert _target_source_layer(
+        "comparison_eligibility", SimpleNamespace()
+    ) == "deterministic_candidate"
+    assert _target_source_layer(
+        "canonical_price", SimpleNamespace()
+    ) == "accepted_fact"
