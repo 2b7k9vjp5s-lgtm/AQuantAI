@@ -1084,3 +1084,207 @@ def _parse_utc(value: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("timestamp must be timezone-aware")
     return parsed.astimezone(timezone.utc)
+
+
+# Slice C ordinary-user read-model wiring lives below to avoid changing the
+# established local snapshot/runtime ownership above.
+from math import isfinite
+
+from backend.today_market_refresh.read_model import (
+    TodayMarketRuleProjectionInputs,
+    build_today_market_read_model,
+)
+from market_cockpit.today_market_rule_contracts import StockRuleInput
+
+
+@router.get("/read-model")
+def today_market_read_model(
+    http_request: Request,
+    snapshot_request: TodayMarketSnapshotRequest = Depends(
+        require_today_market_snapshot_request
+    ),
+    session_factory: sessionmaker[Session] = Depends(
+        get_today_market_session_factory
+    ),
+) -> dict[str, Any]:
+    """Project the last valid local snapshot into the Slice C ordinary-user model.
+
+    This GET is read-only. It does not acquire, persist, select a Provider, or activate
+    the live source path. The current production scope remains selected/local-only, so
+    complete Market Overview and constituent-confirmed sector states fail closed.
+    """
+
+    try:
+        prior = build_prior_snapshot_context(snapshot_request, session_factory)
+        configuration, _, coordinator = _app_runtime_dependencies(http_request)
+        scope = build_runtime_scope(
+            request=snapshot_request,
+            prior=prior,
+            configuration=configuration,
+        )
+        runtime_status = coordinator.get_status(scope, configuration)
+        rule_inputs = _ordinary_user_rule_inputs(
+            request=snapshot_request,
+            session_factory=session_factory,
+            data_through_session=prior.snapshot_reference.data_through_session,
+        )
+        return build_today_market_read_model(
+            snapshot_id=prior.snapshot_reference.snapshot_id,
+            snapshot_content_fingerprint=(
+                prior.snapshot_reference.content_fingerprint
+            ),
+            data_date=prior.snapshot_reference.data_through_session.isoformat(),
+            projected_snapshot=prior.projected_snapshot,
+            runtime_status=runtime_status,
+            rule_inputs=rule_inputs,
+        )
+    except RuntimeScopeConflict as exc:
+        raise _error(
+            409,
+            "runtime_scope_identity_conflict",
+            "本地快照身份与权威读取结果不一致，请重新读取。",
+        ) from exc
+
+
+def _ordinary_user_rule_inputs(
+    *,
+    request: TodayMarketSnapshotRequest,
+    session_factory: sessionmaker[Session],
+    data_through_session: date,
+) -> TodayMarketRuleProjectionInputs:
+    """Build only inputs whose semantics are provable from current accepted owners."""
+
+    with session_factory() as session:
+        persisted = _RecordedEquityRepository(
+            session, request.boundaries.recorded_at
+        ).load_snapshot(
+            series_key=request.equity_series_key,
+            as_of_cutoff=request.boundaries.cutoff_compact,
+        )
+        stock_inputs = _volume_only_stock_inputs(
+            persisted.daily_price,
+            persisted.trade_calendar,
+            persisted.stock_codes,
+            persisted.adjust_type,
+            data_through_session,
+        )
+
+    return TodayMarketRuleProjectionInputs(
+        market_overview=None,
+        sectors=(),
+        stocks=stock_inputs,
+        market_unavailable_reason="full_market_universe_not_proven",
+        sector_unavailable_reason="dated_membership_unavailable",
+        stock_unavailable_reasons=(
+            "full_market_cross_section_not_proven",
+            "analysis_price_semantics_unavailable",
+            "reference_close_semantics_unavailable",
+            "dated_membership_unavailable",
+        ),
+    )
+
+
+def _volume_only_stock_inputs(
+    daily_price: Any,
+    trade_calendar: Any,
+    stock_codes: list[str],
+    expected_adjust_type: str,
+    data_through_session: date,
+) -> tuple[StockRuleInput, ...]:
+    """Expose volume inputs only for one exact authoritative 21-open-session window.
+
+    The persisted trade calendar owns session identity. Every stock must have exactly
+    one compatible, valid traded row for the current open session and each of the
+    previous 20 open sessions. Missing, duplicate, incompatible-adjustment, no-trade,
+    or otherwise invalid rows fail closed for ``unusual_volume``. Price-based rules
+    remain unavailable because adjustment/reference-close semantics are not durable.
+    """
+
+    cutoff = data_through_session.strftime("%Y%m%d")
+    exact_sessions: tuple[str, ...] = ()
+    if {"trade_date", "is_open"}.issubset(set(trade_calendar.columns)):
+        calendar = trade_calendar.copy()
+        calendar["trade_date"] = calendar["trade_date"].map(
+            lambda value: str(value).strip().replace("-", "")
+        )
+        duplicate_calendar_dates = calendar.duplicated(["trade_date"], keep=False)
+        if not duplicate_calendar_dates.any():
+            open_sessions = sorted(
+                str(value)
+                for value in calendar.loc[
+                    calendar["is_open"].eq(True)
+                    & calendar["trade_date"].le(cutoff),
+                    "trade_date",
+                ].unique()
+            )
+            if (
+                len(open_sessions) >= 21
+                and open_sessions[-1] == cutoff
+            ):
+                exact_sessions = tuple(open_sessions[-21:])
+
+    results: list[StockRuleInput] = []
+    for stock_code in sorted(stock_codes):
+        volumes: list[float] = []
+        exact_window = bool(exact_sessions)
+        if exact_window:
+            rows = daily_price[
+                daily_price["stock_code"].astype(str).eq(stock_code)
+            ].copy()
+            rows["trade_date"] = rows["trade_date"].map(
+                lambda value: str(value).strip().replace("-", "")
+            )
+            window_rows = rows[rows["trade_date"].isin(exact_sessions)]
+            for session in exact_sessions:
+                session_rows = window_rows[window_rows["trade_date"].eq(session)]
+                if len(session_rows.index) != 1:
+                    exact_window = False
+                    break
+                row = session_rows.iloc[0]
+                if str(row.get("adjust_type") or "") != expected_adjust_type:
+                    exact_window = False
+                    break
+                try:
+                    close = float(row["close"])
+                    volume = float(row["volume"])
+                    amount = float(row["amount"])
+                except (KeyError, TypeError, ValueError):
+                    exact_window = False
+                    break
+                if (
+                    not isfinite(close)
+                    or not isfinite(volume)
+                    or not isfinite(amount)
+                    or close <= 0
+                    or volume < 0
+                    or amount < 0
+                    or (volume == 0 and amount == 0)
+                ):
+                    exact_window = False
+                    break
+                volumes.append(volume)
+        current_volume = volumes[-1] if exact_window and len(volumes) == 21 else None
+        prior_volumes = (
+            tuple(volumes[:-1])
+            if exact_window and len(volumes) == 21
+            else ()
+        )
+        results.append(
+            StockRuleInput(
+                stock_code=stock_code,
+                r1=None,
+                r5=None,
+                broad_market_benchmark_r5=None,
+                volume_current=current_volume,
+                volume_previous_20=prior_volumes,
+                analysis_closes_60=(),
+                open_current=None,
+                reference_close_previous=None,
+                return_semantics_valid=False,
+                reference_close_semantics_valid=False,
+                sector_code=None,
+                dated_membership_revision_id=None,
+                sector_identity_ambiguous=False,
+            )
+        )
+    return tuple(results)
