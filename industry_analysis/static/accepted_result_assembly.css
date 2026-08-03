@@ -22,7 +22,8 @@
   margin: 0;
 }
 
-.layer-label {
+.layer-label,
+.source-layer {
   display: inline-flex;
   padding: 4px 9px;
   border-radius: 999px;
@@ -31,14 +32,27 @@
   letter-spacing: .02em;
 }
 
-.layer-label.is-accepted {
+.layer-label.is-accepted,
+.source-accepted_snapshot,
+.source-accepted_fact {
   background: #eaf3ff;
   color: #194f90;
 }
 
-.layer-label.is-overlay {
+.layer-label.is-overlay,
+.source-deterministic_candidate {
   background: #f2edff;
   color: #5d3f9d;
+}
+
+.source-accepted_research_judgment {
+  background: #edf8f1;
+  color: #23633b;
+}
+
+.source-missing_or_unavailable {
+  background: #fff5e8;
+  color: #8b5b12;
 }
 
 .fact-card small {
@@ -139,10 +153,85 @@
   background: #fff5f5;
 }
 
+.explained-research {
+  margin: 16px 0 12px;
+  padding: 16px;
+  border: 1px solid var(--border, #d9dee8);
+  border-radius: 12px;
+  background: var(--surface-subtle, #f8fafc);
+}
+
+.explained-research > h4 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.explanation-status,
+.missing-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  margin: 8px 0 14px;
+}
+
+.company-research-summary {
+  padding: 12px;
+  margin-bottom: 12px;
+  border-left: 3px solid #5d7ea8;
+  background: var(--surface, #fff);
+}
+
+.company-research-summary strong,
+.explanation-item strong,
+.component-explanation strong {
+  margin-right: 8px;
+}
+
+.explanation-section {
+  margin-top: 14px;
+}
+
+.explanation-section h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.explanation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.explanation-item,
+.component-explanation {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--border, #d9dee8);
+  border-radius: 9px;
+  background: var(--surface, #fff);
+}
+
+.explanation-item p,
+.component-explanation p,
+.company-research-summary p {
+  margin: 6px 0 0;
+}
+
+.candidate-reasoning {
+  padding-top: 4px;
+}
+
+.missing-inputs {
+  padding-top: 12px;
+  border-top: 1px dashed var(--border, #d9dee8);
+}
+
 @media (max-width: 960px) {
   .layer-explainer,
   .map-columns,
-  .candidate-highlights {
+  .candidate-highlights,
+  .explanation-grid {
     grid-template-columns: 1fr;
   }
 

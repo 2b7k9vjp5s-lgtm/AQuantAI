@@ -99,6 +99,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Run P0-B explained-result focused tests
+        run: |
+          set -o pipefail
+          python -m pytest \
+            tests/test_industry_research_result_query.py \
+            tests/test_industry_research_result_scale.py \
+            tests/test_industry_research_result_static.py \
+            tests/test_industry_research_explained_result.py \
+            -q --tb=short 2>&1 | tee /tmp/p0b-explained-result-tests.log
+
+      - name: Upload P0-B explained-result diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0b-explained-result-test-diagnostics
+          path: /tmp/p0b-explained-result-tests.log
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Run tests
         run: |
           set -o pipefail
