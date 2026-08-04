@@ -299,7 +299,9 @@ the terminal `accepted` revision.
 
 `local_document_review_candidate_decisions` freezes selected/rejected/deferred
 decisions for exact candidate IDs. Accepted review revisions may select only
-fact/event candidates with valid page, span and quote fingerprints.
+fact/event candidates with valid page, span and quote fingerprints, and must select
+at least one and at most 200 such candidates. A review with no fact/event candidate,
+or with every fact/event candidate rejected/deferred, cannot enter `accepted`.
 
 ### Acceptance receipt
 
@@ -485,7 +487,10 @@ accepted -> terminal; exact replay only
 An accepted review requires every semantic field to be explicit. Missing or
 ambiguous document identity, company/subject identity, source kind, evidence
 grade, information date, candidate decision, Claim status or evidence relation
-fails closed.
+fails closed. It also requires `1..200` selected fact/event candidates. Zero
+selected fact/event candidates fails closed in preview and commit with no accepted
+review revision, receipt or Evidence Ledger row; defer/reject remains available and
+preserves review history without Ledger writes.
 
 Source-layer labels:
 
@@ -559,7 +564,7 @@ expected_source_review_revision_number
 expected_source_review_fingerprint_sha256
 expected_session_latest_revision_number
 target_research_case_id
-selected_candidate_ids and decision fingerprints
+selected_candidate_ids and decision fingerprints in ascending candidate UUID order
 recorded_at_utc
 acceptance_contract_version
 ```
@@ -599,7 +604,8 @@ The transaction lock and transition order is fixed:
    number and fingerprint;
 5. verify it is the current session latest and is `draft` or `deferred`;
 6. lock the exact target Research Case;
-7. reload candidates/decisions in ascending candidate UUID order and run all
+7. reload candidates/decisions in ascending candidate UUID order, require the
+   complete selected fact/event set to contain `1..200` members, and run all
    identity, citation, Claim-key and Evidence-fingerprint checks;
 8. insert the complete Ledger graph, terminal accepted revision, receipt and links;
 9. flush all uniqueness constraints and commit once.
@@ -686,7 +692,7 @@ column.
 
 ```text
 maximum candidates per review session = 500
-maximum selected fact/event candidates per acceptance = 200
+selected fact/event candidates per acceptance = 1..200
 maximum import/review queue page size = 50
 ```
 
@@ -745,6 +751,8 @@ Negative:
 - filename conflict and possible revision;
 - ambiguous company/document identity;
 - invalid page, span, quote or fingerprint;
+- no fact/event candidate and all fact/event candidates rejected/deferred; preview
+  and commit must fail closed with zero accepted revision, receipt or Ledger rows;
 - missing source grade/kind/Claim decision;
 - reject/defer with zero accepted writes;
 - injected mid-transaction failure;

@@ -103,7 +103,7 @@ maximum decoded content stream per page = 52,428,800 bytes
 maximum decoded content streams per document = 209,715,200 bytes
 maximum extractor worker memory = 536,870,912 bytes
 maximum candidates per review session = 500
-maximum accepted fact/event candidates per commit = 200
+accepted fact/event candidates per commit = 1..200
 page numbering = 1-based
 content fingerprint = lowercase SHA-256 over exact input bytes
 page fingerprint = lowercase SHA-256 over exact stored UTF-8 page text
@@ -187,6 +187,11 @@ Defer/reject preserves exact history and creates no Evidence Ledger rows.
 Acceptance requires explicit reviewed source kind, evidence grade, document
 identity, subject/company decision, information date, candidate decisions, Claim
 status and evidence relation. No default or heuristic may fill a missing choice.
+Acceptance additionally requires at least one and at most 200 selected fact/event
+candidates. A review with no fact/event candidate, or with every fact/event
+candidate rejected/deferred, cannot enter `accepted`; preview and commit fail closed
+with zero accepted review revisions, receipts or Evidence Ledger rows. Defer/reject
+remains the explicit zero-Ledger terminal/nonterminal review path.
 
 Document Import v1 supports only
 `claim_operation = create_new_deterministic_claim`. For each selected fact/event
@@ -214,7 +219,9 @@ document command must, inside one transaction:
    or `deferred`;
 5. verify exact content, pages, spans, quotes and selected identity decisions;
 6. lock and verify the exact target Research Case and both time boundaries;
-7. preflight every deterministic Claim key and Evidence fingerprint;
+7. require the complete selected fact/event set, ordered by candidate UUID, to
+   contain `1..200` members and preflight every deterministic Claim key and
+   Evidence fingerprint;
 8. create one Evidence Item per accepted fact/event candidate;
 9. create one new deterministic Claim/ClaimRevision and ClaimEvidenceLink explicitly
    selected by the reviewer;
@@ -225,7 +232,8 @@ document command must, inside one transaction:
 The acceptance request binds
 `source_review_revision_id`, expected source revision number/fingerprint,
 `expected_session_latest_revision_number`, the exact target Case, selected
-candidate/decision fingerprints, recorded time and contract version. The accepted
+candidate IDs and decision fingerprints in ascending candidate UUID order,
+recorded time and contract version. The accepted
 revision is a distinct row with number `source + 1`, state `accepted` and
 `supersedes_review_revision_id = source_review_revision_id`. Its decision rows are
 an exact transactional copy of the validated source decisions; acceptance cannot
@@ -359,6 +367,9 @@ Future implementation must prove:
 - possible document revision without automatic supersession;
 - ambiguous document/company identity fail closed;
 - invalid page/span/quote fingerprint fail closed;
+- no fact/event candidate, or all fact/event candidates rejected/deferred, makes
+  preview and commit fail closed with zero accepted revision, receipt or Ledger
+  writes;
 - defer/reject history with zero accepted rows;
 - interrupted acceptance leaves zero partial accepted rows;
 - exact idempotent acceptance replay and conflicting replay rejection;
