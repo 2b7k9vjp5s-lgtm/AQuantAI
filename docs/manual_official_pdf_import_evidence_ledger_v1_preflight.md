@@ -776,6 +776,42 @@ active and may not be used until this architecture is independently reviewed,
 separately authorized for merge, merged, and followed by explicit project-owner
 implementation authorization from a newly re-read exact `main`.
 
+### Issue #285 minimal migration-test allowlist amendment
+
+The project owner authorized a bounded architecture amendment on 2026-08-04 at
+exact `main@4849f8f680be85f266eba4d7377ec0b288a58916`. The first authorized local
+implementation run produced:
+
+```text
+focused Document Import tests = 16 passed, 1 PostgreSQL-only skipped
+full pytest = 970 passed, 69 skipped, 3 failed
+implementation commit = none
+implementation PR = none
+```
+
+All three failures are existing migration-chain tests that literally expect
+Alembic `head = 20260725_0017`. The already-reviewed Document Import migration
+advances the repository head to `20260803_0018`; therefore the original candidate
+allowlist cannot reach a green complete-suite gate without updating those exact
+tests.
+
+The candidate implementation allowlist in the Issue #283 task snapshot is
+amended by exactly:
+
+```text
+tests/test_industry_thesis_migration.py
+tests/test_investment_candidate_migration.py
+tests/test_normalized_valuation_migration.py
+```
+
+The permitted change is limited to retaining each test's existing historical
+migration/table assertions while recognizing the reviewed new repository head and
+empty forward/downgrade chain. No production owner, schema meaning, migration
+body, table count, downgrade-loss guard or unrelated test expectation may change.
+This amendment adds no production functionality and does not activate the
+implementation before this architecture HEAD is independently reviewed, separately
+authorized for merge and merged.
+
 ## Stop conditions
 
 Stop if architecture review or later implementation discovers a need for:

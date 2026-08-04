@@ -351,11 +351,51 @@ tests/test_document_import_api.py
 tests/test_document_import_static.py
 tests/test_document_import_postgres.py
 tests/test_industry_alpha_ledger.py
+tests/test_industry_thesis_migration.py
+tests/test_investment_candidate_migration.py
+tests/test_normalized_valuation_migration.py
 scripts/demo_manual_document_import.py
 .github/workflows/local-tests.yml
 ```
 
 No additional path is authorized without an Issue amendment.
+
+### Issue #285 minimal migration-test allowlist amendment
+
+The project owner authorized this architecture-only amendment on 2026-08-04
+after the authorized implementation first reached a complete local pytest run.
+The exact architecture-amendment base is:
+
+```text
+main = 4849f8f680be85f266eba4d7377ec0b288a58916
+implementation issue = #285
+implementation commit = none
+implementation PR = none
+```
+
+The complete run proved that adding the already-reviewed single migration
+`20260803_0018_manual_official_pdf_import.py` advances Alembic `head` from
+`20260725_0017` to `20260803_0018`. Three pre-existing migration-chain tests
+assert the former repository head literally, so they fail even though their own
+historical migration/table assertions remain valid. They were omitted from the
+original future implementation allowlist.
+
+This amendment adds exactly these existing tests to the future implementation
+allowlist:
+
+```text
+tests/test_industry_thesis_migration.py
+tests/test_investment_candidate_migration.py
+tests/test_normalized_valuation_migration.py
+```
+
+They may be changed only to preserve their existing historical assertions while
+recognizing the reviewed `20260803_0018` repository head and empty forward/
+downgrade chain. This amendment does not authorize changes to their production
+owners, historical migrations, table counts, downgrade-loss guards or unrelated
+expectations. It adds no production file, schema concept, migration, dependency,
+Provider/network, OCR, AI, automatic acceptance, recommendation, portfolio or
+trading behavior.
 
 ## Required implementation validation after later authorization
 
