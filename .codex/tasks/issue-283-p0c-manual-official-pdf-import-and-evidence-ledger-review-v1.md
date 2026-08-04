@@ -203,20 +203,24 @@ Evidence fingerprint fails closed as `previously_accepted_candidate_conflict`.
 `EvidenceLedgerCommandService` remains the sole accepted owner. Its proposed
 document command must, inside one transaction:
 
-1. lock the exact review session and read any receipt keyed by the exact source
-   review revision;
-2. verify the source revision ID, number and fingerprint, require it to be the
-   current session latest, and allow only `draft` or `deferred`;
-3. verify exact content, pages, spans, quotes and selected identity decisions;
-4. lock and verify the exact target Research Case and both time boundaries;
-5. reject an existing source-revision receipt unless it is an exact idempotent
-   replay;
-6. preflight every deterministic Claim key and Evidence fingerprint;
-7. create one Evidence Item per accepted fact/event candidate;
-8. create one new deterministic Claim/ClaimRevision and ClaimEvidenceLink explicitly
+1. lock the exact review session;
+2. read any receipt keyed by the exact `source_review_revision_id`;
+3. when a receipt exists, compare the complete request fingerprint and immutable
+   receipt bindings, then return the exact prior result with zero writes or fail as
+   `acceptance_replay_conflict`; do not require the source revision to remain the
+   session latest on this replay branch;
+4. only when no receipt exists, verify the source revision ID, number and
+   fingerprint, require it to be the current session latest, and allow only `draft`
+   or `deferred`;
+5. verify exact content, pages, spans, quotes and selected identity decisions;
+6. lock and verify the exact target Research Case and both time boundaries;
+7. preflight every deterministic Claim key and Evidence fingerprint;
+8. create one Evidence Item per accepted fact/event candidate;
+9. create one new deterministic Claim/ClaimRevision and ClaimEvidenceLink explicitly
    selected by the reviewer;
-9. append the terminal accepted review revision and acceptance receipt/link rows;
-10. commit all rows together or leave all accepted counts unchanged.
+10. append the terminal accepted review revision and acceptance receipt/link rows;
+11. flush uniqueness constraints and commit all rows together or leave all accepted
+    counts unchanged.
 
 The acceptance request binds
 `source_review_revision_id`, expected source revision number/fingerprint,
@@ -358,6 +362,8 @@ Future implementation must prove:
 - defer/reject history with zero accepted rows;
 - interrupted acceptance leaves zero partial accepted rows;
 - exact idempotent acceptance replay and conflicting replay rejection;
+- accepted-state exact replay succeeds from the original source request even though
+  the terminal accepted revision is now the session latest;
 - deterministic Claim key plus pre-existing Claim/Evidence conflict;
 - exact source-to-accepted review revision binding and concurrent receipt replay;
 - later activity cannot change exact historical reopen;
