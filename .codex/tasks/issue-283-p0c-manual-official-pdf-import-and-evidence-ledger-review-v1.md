@@ -188,21 +188,59 @@ Acceptance requires explicit reviewed source kind, evidence grade, document
 identity, subject/company decision, information date, candidate decisions, Claim
 status and evidence relation. No default or heuristic may fill a missing choice.
 
+Document Import v1 supports only
+`claim_operation = create_new_deterministic_claim`. For each selected fact/event
+candidate, the exact Claim key is
+`local-document-v1:<candidate_fingerprint_sha256>`. The operation never searches
+for or appends an existing Claim, so `existing_claim_id` and expected existing
+Claim latest revision are absent. The derived key, operation and absence of an
+existing Claim target are part of review, preview and commit fingerprints. Outside
+an exact acceptance-receipt replay, an existing `(case_id, claim_key)` or proposed
+Evidence fingerprint fails closed as `previously_accepted_candidate_conflict`.
+
 ## Atomic acceptance contract
 
 `EvidenceLedgerCommandService` remains the sole accepted owner. Its proposed
 document command must, inside one transaction:
 
-1. lock and reload the exact review revision;
-2. verify the expected review fingerprint and `accepted` transition eligibility;
+1. lock the exact review session and read any receipt keyed by the exact source
+   review revision;
+2. verify the source revision ID, number and fingerprint, require it to be the
+   current session latest, and allow only `draft` or `deferred`;
 3. verify exact content, pages, spans, quotes and selected identity decisions;
-4. verify the exact target Research Case and both time boundaries;
-5. reject an existing acceptance receipt unless it is an exact idempotent replay;
-6. create one Evidence Item per accepted fact/event candidate;
-7. create the exact Claim/ClaimRevision and ClaimEvidenceLink values explicitly
+4. lock and verify the exact target Research Case and both time boundaries;
+5. reject an existing source-revision receipt unless it is an exact idempotent
+   replay;
+6. preflight every deterministic Claim key and Evidence fingerprint;
+7. create one Evidence Item per accepted fact/event candidate;
+8. create one new deterministic Claim/ClaimRevision and ClaimEvidenceLink explicitly
    selected by the reviewer;
-8. append the accepted review revision and acceptance receipt/link rows;
-9. commit all rows together or leave all accepted counts unchanged.
+9. append the terminal accepted review revision and acceptance receipt/link rows;
+10. commit all rows together or leave all accepted counts unchanged.
+
+The acceptance request binds
+`source_review_revision_id`, expected source revision number/fingerprint,
+`expected_session_latest_revision_number`, the exact target Case, selected
+candidate/decision fingerprints, recorded time and contract version. The accepted
+revision is a distinct row with number `source + 1`, state `accepted` and
+`supersedes_review_revision_id = source_review_revision_id`. Its decision rows are
+an exact transactional copy of the validated source decisions; acceptance cannot
+add, remove or reinterpret a candidate decision.
+
+The receipt stores unique `source_review_revision_id`, unique
+`accepted_review_revision_id`, unique request fingerprint, both review
+fingerprints, target Case and contract version. An exact replay returns that exact
+accepted revision and result with zero writes; any difference is
+`acceptance_replay_conflict`. The lock order is review session, receipt lookup,
+an immediate exact/conflicting replay branch when a receipt exists, then—only for
+a new acceptance—source/latest validation, target Case and candidates ordered by
+UUID. Linear review-revision uniqueness and the receipt constraints are the
+database final guards for concurrent acceptance.
+
+The accepted review fingerprint is a canonical SHA-256 over its contract version,
+source review ID/fingerprint, accepted revision number/state, acceptance
+request/plan fingerprint, target Case and exact accepted timestamp; it is distinct
+from the source review fingerprint and never depends on a mutable latest lookup.
 
 The Evidence Item fingerprint is a canonical SHA-256 over the exact document
 content fingerprint, page, offsets, quote fingerprint, reviewed statement and
@@ -213,6 +251,11 @@ All request, candidate, review, preview and acceptance fingerprints use one
 canonical UTF-8 JSON rule: sorted keys, compact separators, no floats, UUIDs in
 lowercase canonical form, dates as ISO `YYYY-MM-DD`, timestamps normalized to UTC
 `Z`, and string code points preserved without Unicode normalization.
+
+Review/preview/acceptance fingerprints additionally include the deterministic
+Claim operation/key, exact source review revision identity, expected session latest
+revision and the complete source-to-accepted transition contract. A same candidate
+submitted through another review never reuses an existing Claim or Evidence row.
 
 ## History and read contract
 
@@ -315,6 +358,8 @@ Future implementation must prove:
 - defer/reject history with zero accepted rows;
 - interrupted acceptance leaves zero partial accepted rows;
 - exact idempotent acceptance replay and conflicting replay rejection;
+- deterministic Claim key plus pre-existing Claim/Evidence conflict;
+- exact source-to-accepted review revision binding and concurrent receipt replay;
 - later activity cannot change exact historical reopen;
 - 1-page, 30-page and 300-page bounded query behavior;
 - SQLite/PostgreSQL semantic parity;

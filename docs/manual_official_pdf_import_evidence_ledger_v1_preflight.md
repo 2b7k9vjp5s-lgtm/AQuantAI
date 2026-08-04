@@ -258,6 +258,21 @@ evidence_relation explicit existing Evidence Ledger value
 Claim status and relation are frozen per selected candidate decision, not inferred
 from candidate kind, Evidence grade or the act of accepting the document.
 
+V1 freezes one Claim identity mode only:
+
+```text
+claim_operation = create_new_deterministic_claim
+claim_key = "local-document-v1:" + candidate_fingerprint_sha256
+existing_claim_id = absent
+expected_existing_claim_latest_revision_number = absent
+```
+
+The resulting key is 82 ASCII characters and fits the existing 96-character
+`Claim.claim_key` boundary. Document acceptance never searches for, selects or
+appends an existing Claim. A later general Evidence Ledger workflow may append a
+revision to the resulting exact Claim under its existing owner, but that is not a
+Document Import v1 acceptance operation.
+
 `local_document_review_revisions` freezes:
 
 ```text
@@ -275,14 +290,42 @@ recorded_at_utc
 supersedes_review_revision_id
 ```
 
+Revisions form one linear chain per session. The schema enforces
+`unique(review_session_id, revision_number)` and at most one successor for a
+non-null `supersedes_review_revision_id`. Every non-initial revision points to the
+immediately preceding exact revision. A user-authored revision may be `draft`,
+`deferred` or `rejected`; only the Evidence Ledger acceptance command may append
+the terminal `accepted` revision.
+
 `local_document_review_candidate_decisions` freezes selected/rejected/deferred
 decisions for exact candidate IDs. Accepted review revisions may select only
 fact/event candidates with valid page, span and quote fingerprints.
 
 ### Acceptance receipt
 
-`local_document_acceptance_receipts` binds one exact accepted review revision,
-target Case, review fingerprint, request fingerprint and commit time.
+`local_document_acceptance_receipts` binds both sides of one acceptance transition:
+
+```text
+id UUID primary key
+review_session_id exact FK
+source_review_revision_id exact FK, unique
+accepted_review_revision_id exact FK, unique
+target_research_case_id exact FK
+source_review_fingerprint_sha256
+accepted_review_fingerprint_sha256
+request_fingerprint_sha256 unique
+acceptance_contract_version
+accepted_at_utc
+```
+
+The source is the exact latest eligible `draft` or `deferred` revision supplied by
+the acceptance request. The accepted revision is created by that request with
+`revision_number = source.revision_number + 1`, `review_state = accepted` and
+`supersedes_review_revision_id = source_review_revision_id`. A receipt therefore
+never uses one ambiguous `review_revision_id` for both the pre-acceptance input and
+the terminal result. In the same transaction, the accepted revision receives an
+exact copy of the source revision's validated candidate decisions; it cannot add,
+drop or reinterpret a decision during acceptance.
 
 `local_document_acceptance_links` binds each exact selected candidate to its exact:
 
@@ -486,14 +529,35 @@ It never contains an OS path. Source kind, grade, title, publisher, information
 date, Claim status and relation come from exact review fields, not PDF/file-name
 heuristics. Existing Evidence Ledger validation remains authoritative.
 
+For every selected candidate, the Claim mapping is closed and deterministic:
+
+```text
+claim_operation = create_new_deterministic_claim
+claim_key = "local-document-v1:" + candidate_fingerprint_sha256
+claim_kind = fact
+claim statement = exact reviewed statement
+claim status = exact reviewed claim_status
+information_cutoff_date = exact reviewed information date
+existing claim append = prohibited
+```
+
+Preview must check both `(target_research_case_id, claim_key)` and the proposed
+Evidence Item fingerprint before commit. Outside an exact receipt replay, any
+existing Claim key or Evidence fingerprint is
+`previously_accepted_candidate_conflict`; v1 never silently reuses, links to or
+appends the existing rows. This makes a duplicate review fail closed while leaving
+the existing Claim identity available to the ordinary Evidence Ledger revision
+workflow.
+
 ## Atomicity and idempotence
 
 Acceptance request binds:
 
 ```text
-review_revision_id
-expected_review_revision_number
-expected_review_fingerprint_sha256
+source_review_revision_id
+expected_source_review_revision_number
+expected_source_review_fingerprint_sha256
+expected_session_latest_revision_number
 target_research_case_id
 selected_candidate_ids and decision fingerprints
 recorded_at_utc
@@ -517,16 +581,43 @@ string code points preserved; no NFC/NFKC/case normalization
 The fingerprint input includes the exact content/page/extractor identities,
 target Case, all selected identity and fact/event candidate fingerprints, all
 candidate decisions, source kind, grade, dates, Claim statuses/relations,
-previous review revision and contract versions.
+`claim_operation`, every derived `claim_key`, source review revision identity,
+expected session latest revision and contract versions.
 
 The service reloads and locks the exact graph. Preview performs the same validation
 and returns a deterministic plan/fingerprint with zero writes. Commit compares the
 request to a freshly rebuilt preview and then executes one transaction.
 
-An exact existing receipt returns the exact prior result with zero writes. Any
-same-review request differing in Case, fingerprint, candidates, Claim semantics or
-contract version is a conflict. An exception at any insertion point rolls back
+The transaction lock and transition order is fixed:
+
+1. lock the exact review session;
+2. read an existing receipt by `source_review_revision_id` for replay/conflict;
+3. when a receipt exists, compare the complete request fingerprint and immutable
+   receipt bindings, then return the exact result or fail as a conflicting replay;
+4. only when no receipt exists, verify the source revision belongs to that session
+   and matches its expected
+   number and fingerprint;
+5. verify it is the current session latest and is `draft` or `deferred`;
+6. lock the exact target Research Case;
+7. reload candidates/decisions in ascending candidate UUID order and run all
+   identity, citation, Claim-key and Evidence-fingerprint checks;
+8. insert the complete Ledger graph, terminal accepted revision, receipt and links;
+9. flush all uniqueness constraints and commit once.
+
+If a receipt already exists for the source revision, an exact request fingerprint,
+source fingerprint, target Case and contract version returns that receipt's exact
+`accepted_review_revision_id` and result links with zero writes. Any difference is
+`acceptance_replay_conflict`. The unique source receipt, unique accepted revision,
+linear revision constraints and session lock make concurrent identical requests
+converge on the same receipt; a losing transaction reloads and applies the same
+exact/conflicting replay rule. An exception at any insertion point rolls back
 review acceptance, receipt and all Evidence Ledger rows.
+
+The accepted review fingerprint is SHA-256 over canonical JSON containing the
+accepted-review contract version, source review revision ID/fingerprint, accepted
+revision number, `review_state = accepted`, acceptance request/plan fingerprint,
+target Case and exact accepted timestamp. It is not copied from the source review
+and cannot be rebuilt from a mutable latest revision.
 
 ## Access, visibility and exact history
 
@@ -642,6 +733,8 @@ Positive:
 - explicit identity decisions;
 - defer then accept history;
 - atomic Evidence/Claim/link/receipt creation;
+- deterministic Claim key creation and pre-existing Claim-key conflict;
+- source-to-accepted review transition and concurrent receipt convergence;
 - exact replay and exact historical reopen.
 
 Negative:
