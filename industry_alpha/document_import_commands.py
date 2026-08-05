@@ -422,7 +422,10 @@ def accept_local_document_in_session(
 
     title = str(document_payload["document_title"])
     publisher = str(document_payload["publisher_or_author"])
-    ledger_rows: list[object] = []
+    evidence_and_claim_rows: list[object] = []
+    claim_revision_rows: list[ClaimRevision] = []
+    claim_evidence_link_rows: list[ClaimEvidenceLink] = []
+    acceptance_link_rows: list[LocalDocumentAcceptanceLink] = []
     for candidate_id in prepared["selected_ids"]:
         candidate = candidates[candidate_id]
         decision = decisions[candidate_id]
@@ -483,8 +486,17 @@ def accept_local_document_in_session(
                 claim_evidence_link_id=link.id,
             )
         )
-        ledger_rows.extend((evidence, claim, claim_revision, link, acceptance_link))
-    session.add_all(ledger_rows)
+        evidence_and_claim_rows.extend((evidence, claim))
+        claim_revision_rows.append(claim_revision)
+        claim_evidence_link_rows.append(link)
+        acceptance_link_rows.append(acceptance_link)
+    session.add_all(evidence_and_claim_rows)
+    session.flush()
+    session.add_all(claim_revision_rows)
+    session.flush()
+    session.add_all(claim_evidence_link_rows)
+    session.flush()
+    session.add_all(acceptance_link_rows)
     session.flush()
     return AcceptanceResult(
         receipt_id=receipt.id,
