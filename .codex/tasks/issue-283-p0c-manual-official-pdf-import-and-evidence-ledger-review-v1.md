@@ -407,6 +407,32 @@ tests/test_investment_candidate_migration.py
 tests/test_normalized_valuation_migration.py
 ```
 
+### Issue #285 second minimal PostgreSQL migration-test allowlist amendment
+
+The project owner explicitly authorized this amendment after Draft PR `#287`
+Local Tests `#1065` / run `30974828193` proved that nine additional existing
+PostgreSQL migration-test files also freeze the former repository head. This
+amendment adds exactly these files to the active implementation allowlist:
+
+```text
+tests/test_benchmark_migration.py
+tests/test_canonical_price_postgres.py
+tests/test_industry_thesis_postgres.py
+tests/test_investment_candidate_postgres.py
+tests/test_normalized_valuation_postgres.py
+tests/test_sector_migration.py
+tests/test_stage1_beneficiaries_postgres.py
+tests/test_stage2_company_research_postgres.py
+tests/test_stage2_expectations_valuation_postgres.py
+```
+
+They may change only the literal current-head expectations from
+`20260725_0017` to `20260803_0018`, including the transactional rollback state
+after a populated downgrade refusal. Historical table, preservation, refusal,
+upgrade and downgrade assertions remain unchanged. No production feature,
+schema concept, migration operation, Provider/network, OCR, AI, automatic
+acceptance, recommendation, portfolio or trading behavior is authorized.
+
 They may be changed only to preserve their existing historical assertions while
 recognizing the reviewed `20260803_0018` repository head and empty forward/
 downgrade chain. This amendment does not authorize changes to their production
