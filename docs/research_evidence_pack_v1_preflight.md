@@ -7,8 +7,8 @@ from exact `main@8dd187c129c3e4a375f550758fab266719ccd0da` after the accepted
 Manual Official PDF Import and Evidence Ledger Review v1 implementation.
 
 The project owner authorized exactly two architecture artifacts. On 2026-08-05
-the owner separately authorized repairing the three blocking findings on PR #289,
-restricted to those same two artifacts, followed by full CI and a new independent
+the owner separately authorized repair of the three blocking findings on PR #289,
+restricted to those same artifacts, followed by full CI and a fresh independent
 fixed-HEAD architecture review.
 
 This document contains no production implementation authority. It does not
@@ -17,43 +17,44 @@ Provider/network, OCR, AI, automatic evidence acceptance, recommendation,
 portfolio, trading, release, tag, version, Ready, merge, Issue closure or PR #241
 changes.
 
-Risk classification is Strict because the future read surface crosses frozen
-Evidence Ledger and local-document receipt boundaries. A later implementation may
-qualify as Standard read-only only if every frozen decision below remains intact.
+Risk classification is Strict because the proposed read crosses frozen Evidence
+Ledger and local-document acceptance boundaries. A later implementation may be
+Standard read-only only if every decision below is preserved without a new owner,
+schema or write path.
 
-## 2. Review-repair decision
+## 2. Fixed-HEAD review repair
 
 The first fixed-HEAD review at
 `a06318e833d7ebca67cc90ef0cb8d484ccf0f66e` withheld approval for three High
-findings. This revision makes the following closed decisions:
+findings. This revision closes them through three exact decisions:
 
-1. Local-document provenance is authoritative only after complete receipt-level
-   replay of the atomic acceptance transition, including source and accepted
-   review revisions, full decision-copy equality, request/contract fingerprints
-   and all receipt links.
-2. Research membership is authoritative per Claim binding. The Evidence entry
-   exposes a derived four-state summary that includes the mixed linked/unlinked
-   case; it has no lossy scalar membership state.
-3. Supersession integrity explicitly permits one bounded set-wise minimal target
-   load. Target content is never projected, and the load remains inside the
-   eight-statement page ceiling.
+1. A local-document citation is authoritative only after complete set-wise replay
+   of the bounded atomic receipt transition: source and accepted revisions,
+   candidate/decision/source/request/accepted fingerprints, exact copied decision
+   set, all sibling acceptance links and the exact produced Ledger graph.
+2. Research membership is authoritative per Claim binding. The Evidence entry has
+   no lossy scalar membership; it exposes a closed derived summary including the
+   mixed linked/unlinked case.
+3. Supersession validation explicitly permits one bounded set-wise minimal target
+   load. It follows the accepted owner chronology, including valid equal recorded
+   timestamps, while target payload remains excluded from the response.
 
-All other boundaries from the original preflight remain frozen.
+No other product or owner boundary expands.
 
 ## 3. Product problem
 
-The local PDF flow can accept exact page-cited facts into the Evidence Ledger,
-and the research flow can preserve exact historical Case revisions. The ordinary
-user still lacks one bounded view answering:
+The local PDF flow can accept page-cited facts into the Evidence Ledger, and the
+research flow can preserve exact historical Case revisions. The ordinary user
+still lacks one bounded view answering:
 
 > For this exact Research Case revision and historical boundary, which accepted
 > evidence exists, which exact Claim revisions does it support, contradict or
 > contextualize, which bindings are already members of this frozen research
-> snapshot, and which intact local PDF receipt proves the citation?
+> snapshot, and which intact local PDF receipt proves each citation?
 
-Existing Evidence Ledger detail is whole-Case and date-oriented. Existing
-Document Import detail starts from a receipt or review identity. The required
-product is a bounded, dual-as-of, Evidence-first projection.
+Existing Evidence Ledger detail is complete-Case/date-oriented. Existing Document
+Import detail starts from one receipt or review identity. The required product is
+one bounded dual-as-of Evidence-first projection.
 
 ## 4. Product boundary
 
@@ -62,7 +63,7 @@ Research Evidence Pack v1 is:
 - local and read-only;
 - anchored to one explicit Research Case and one explicit Case revision;
 - bounded by one information date and one recorded UTC timestamp;
-- Evidence-first and stably keyset-paginated;
+- Evidence-first and keyset-paginated;
 - exhaustive for visible accepted Evidence Items page by page;
 - exact about Claim bindings, selected-revision roles and receipt provenance;
 - deterministic and zero-network/zero-OCR/zero-AI.
@@ -70,10 +71,10 @@ Research Evidence Pack v1 is:
 It is not:
 
 - a persisted pack or saved snapshot;
-- a Provider catalog, document inbox or acquisition workflow;
+- a document inbox, Provider catalog or acquisition workflow;
 - an automatic research refresh;
 - an AI summary, sentiment classifier or evidence generator;
-- an Evidence Ledger or Document Import write path;
+- an Evidence Ledger or Document Import mutation path;
 - a candidate scorer, recommendation, portfolio or trading feature.
 
 ## 5. Existing authoritative owners
@@ -109,8 +110,8 @@ The pack cannot create or mutate any of these rows.
 | Exact stored page text and fingerprint | `LocalDocumentPage` |
 | Case-scoped review identity | `LocalDocumentReviewSession` |
 | Page/span/quote and user statement | `LocalDocumentCandidate` |
-| Append-only reviewed revision | `LocalDocumentReviewRevision` |
-| Exact decision snapshot | `LocalDocumentReviewCandidateDecision` |
+| Append-only review snapshot | `LocalDocumentReviewRevision` |
+| Exact candidate decision snapshot | `LocalDocumentReviewCandidateDecision` |
 | Atomic accepted transition | `LocalDocumentAcceptanceReceipt` |
 | Exact Document-to-Ledger graph | `LocalDocumentAcceptanceLink` |
 
@@ -121,8 +122,8 @@ Document Import path.
 ### 5.4 Existing reads
 
 `EvidenceLedgerRepository.load_case` and `EvidenceLedgerQueryService` retain their
-existing complete-Case/date-only semantics. They are not silently reinterpreted
-as this bounded dual-as-of pack.
+existing complete-Case/date-only semantics. They are not reinterpreted as this
+bounded dual-as-of pack.
 
 `DocumentImportQueryService.acceptance_detail` remains the exact receipt detail
 surface. The pack may read the same immutable rows set-wise, but it may not weaken
@@ -130,15 +131,16 @@ or redefine the accepted transaction.
 
 ## 6. Owner and schema audit result
 
-The exact base already contains the identities and relationships required for a
+The exact base already contains every identity and relationship required for a
 transient projection:
 
 - Evidence rows carry Case and dual-time fields;
 - Claim revisions and relations carry exact IDs and chronology;
 - Case-revision links preserve frozen membership and role;
+- acceptance receipts preserve source/accepted revisions and transition
+  fingerprints;
+- review decisions preserve the complete selected/non-selected snapshot;
 - acceptance links freeze Evidence, Claim, ClaimRevision and relation IDs;
-- receipts preserve source/accepted revisions and transition fingerprints;
-- review decision rows preserve the complete selected/non-selected snapshot;
 - import/content/candidate/page rows preserve the citation path;
 - append-only constraints preserve historical identity.
 
@@ -175,13 +177,13 @@ need not already be linked to the selected Case revision.
 
 Layer C enriches an Evidence Item only through an exact
 `LocalDocumentAcceptanceLink`. It replays the complete bounded receipt transition
-and citation graph. It never classifies provenance from locator text.
+and citation graph. It never classifies provenance from free text.
 
-The following collapse is prohibited:
+The following equation is false and prohibited:
 
 ```text
 accepted Evidence Ledger item
-= already accepted conclusion/context/risk in selected Case revision
+= accepted conclusion/context/risk in selected Case revision
 ```
 
 Only an exact `CaseRevisionClaimLink` gives an exact ClaimRevision a role in the
@@ -206,7 +208,7 @@ Rules:
 - the revision must belong to the Case;
 - `information_cutoff_date <= recorded_at_utc UTC date`;
 - the exact Case revision must be visible under applicable boundaries;
-- no route may ask the service to choose a revision;
+- no route may ask the server to choose a revision;
 - no latest, newest, only-option, same-name, same-ticker or unique-reachable
   inference is permitted;
 - out-of-range limits fail rather than clamp.
@@ -280,7 +282,7 @@ inside `selected_case_revision_roles[]`.
 ### 11.2 Closed entry summary
 
 The Evidence entry has no scalar `research_membership_state`. It exposes a derived
-`membership_summary` with exactly four states:
+`membership_summary` with exactly four values:
 
 ```text
 no_claim_bindings
@@ -335,19 +337,29 @@ ClaimRevision target:
 No target statement, summary, source metadata, locator, quote, page text,
 reviewer note or other payload field may be loaded through this path.
 
-### 12.2 Integrity rules
+### 12.2 Owner-consistent integrity rules
 
 A present `EvidenceItem.supersedes_evidence_id` must identify an existing Evidence
-Item in the same Case with an earlier `recorded_at_utc`.
+Item in the same Case and satisfy:
+
+```text
+target.recorded_at_utc <= superseding_evidence.recorded_at_utc
+```
 
 A present `ClaimRevision.supersedes_revision_id` must identify an existing
-ClaimRevision of the same Claim, with a lower revision number and earlier
-`recorded_at_utc`.
+ClaimRevision of the same Claim, have a lower revision number, and satisfy:
+
+```text
+target.recorded_at_utc <= superseding_claim_revision.recorded_at_utc
+```
+
+This matches `EvidenceLedgerCommandService` chronology exactly. Equal recorded
+timestamps are valid and must not fail integrity.
 
 A valid target outside the requested information boundary is represented only by
 its exact ID and `not_visible_as_of`. Its metadata is not exposed. Missing,
-cross-Case, cross-Claim, non-older or forward-recorded targets fail the whole
-request as `evidence_pack_integrity_error`.
+cross-Case, cross-Claim, invalid revision-order or later-recorded targets fail the
+whole request as `evidence_pack_integrity_error`.
 
 ## 13. Local-document provenance authority
 
@@ -356,8 +368,9 @@ request as `evidence_pack_integrity_error`.
 content, page or offsets.
 
 If any page Evidence Item reaches a receipt, the projection validates the full
-receipt-level transition, including all links and both decision sets for every
-bounded receipt. Validating only the current page link is prohibited.
+receipt-level transition, including all sibling links and both complete decision
+sets for every bounded receipt. Validating only the current page link is
+prohibited.
 
 ## 14. Complete atomic receipt transition
 
@@ -370,32 +383,33 @@ For each bounded receipt:
 - source and accepted review revisions exist;
 - receipt, source, accepted and session share the same `review_session_id`;
 - receipt target Case equals session target Case and requested Case;
+- source recorded time is not after receipt accepted time;
 - receipt accepted time is not after the requested recorded boundary;
 - accepted revision information date is not after the requested information
   boundary.
 
 Any mismatch fails the entire pack.
 
-### 14.2 Source and accepted fingerprints
+### 14.2 Contract and stored fingerprint equality
 
 The following equalities are mandatory:
 
 ```text
+receipt.acceptance_contract_version
+= aquantai.local-document-acceptance.v1
+
 receipt.source_review_fingerprint_sha256
 = source.review_fingerprint_sha256
 
 receipt.accepted_review_fingerprint_sha256
 = accepted.review_fingerprint_sha256
-
-receipt.acceptance_contract_version
-= aquantai.local-document-acceptance.v1
 ```
 
 Source state must be `draft` or `deferred`. Accepted state must be `accepted`.
 
-### 14.3 Exact immediate successor
+### 14.3 Exact terminal immediate successor
 
-The accepted revision must be the exact atomic successor:
+The accepted revision must be the exact immediate successor:
 
 ```text
 accepted.revision_number = source.revision_number + 1
@@ -416,19 +430,68 @@ information_date
 reviewer_note
 ```
 
-No later or same-session revision may be substituted.
+A set-wise aggregate in the receipt statement must also prove that accepted is the
+maximum revision number in that review session. A later revision, alternate
+successor or substituted revision is an integrity failure.
 
-### 14.4 Exact full decision-copy equality
+## 15. Candidate and decision fingerprint replay
 
-The projection loads all `LocalDocumentReviewCandidateDecision` rows for both the
-source and accepted revisions and all candidates owned by the review session.
+### 15.1 Candidate fingerprint
 
-The source and accepted decision sets must:
+For every candidate owned by a bounded receipt review session, parse
+`candidate_payload_json` and canonically rebuild the candidate shape under:
 
-- contain exactly one row for every session candidate;
-- have identical candidate-ID sets;
-- contain no missing or added accepted row;
-- match exactly for each candidate on:
+```text
+aquantai.local-document-candidate.v1
+```
+
+The exact shape is:
+
+```text
+content_id
+content_sha256
+extractor_contract_version
+candidate_kind
+page_number
+start_utf8_byte
+end_utf8_byte
+quote_sha256
+statement
+payload
+```
+
+The rebuilt SHA-256 must equal
+`LocalDocumentCandidate.candidate_fingerprint_sha256`. This applies to document
+identity, company identity, fact and event candidates, whether selected, rejected
+or deferred.
+
+### 15.2 Decision fingerprint
+
+For every source and accepted decision, rebuild the normalized decision shape:
+
+```text
+candidate_id
+rebuilt candidate_fingerprint_sha256
+decision
+claim_operation
+claim_key
+claim_status
+evidence_relation
+```
+
+Its SHA-256 must equal
+`LocalDocumentReviewCandidateDecision.decision_fingerprint_sha256`.
+
+### 15.3 Full decision-copy equality
+
+The projection loads all candidates and all source/accepted decision rows for each
+bounded receipt session. It requires:
+
+- every session candidate has exactly one source decision;
+- every session candidate has exactly one accepted decision;
+- source and accepted candidate-ID sets are identical;
+- no accepted row is missing or added;
+- every source/accepted pair matches exactly on:
 
 ```text
 decision
@@ -439,41 +502,94 @@ evidence_relation
 decision_fingerprint_sha256
 ```
 
-The accepted revision is not authoritative when any decision was dropped,
-inserted, rebound or changed.
+A dropped, inserted, rebound or changed accepted decision invalidates the receipt.
 
-### 14.5 Deterministic plan replay
+## 16. Source review fingerprint replay
 
-For every selected fact/event candidate, the projection rebuilds the accepted
-Evidence fingerprint under:
+The source review fingerprint is rebuilt under:
+
+```text
+aquantai.local-document-review.v1
+```
+
+The exact canonical shape contains:
+
+```text
+review_session_id
+revision_number
+review_state
+source_kind
+evidence_grade
+document_identity_candidate_id
+subject_candidate_id
+information_date
+reviewer_note
+candidate_decisions ordered by canonical candidate UUID
+```
+
+Each normalized candidate decision contains the exact fields from section 15.2.
+The rebuilt fingerprint must equal both:
+
+```text
+source.review_fingerprint_sha256
+receipt.source_review_fingerprint_sha256
+```
+
+Merely comparing two stored fingerprints without deterministic replay is not
+sufficient.
+
+## 17. Acceptance plan and request replay
+
+### 17.1 Evidence fingerprint for selected facts/events
+
+For every source decision satisfying:
+
+```text
+decision = selected
+candidate_kind in {fact, event}
+claim_operation = create_new_deterministic_claim
+```
+
+rebuild the Evidence fingerprint under:
 
 ```text
 aquantai.local-document-evidence-item.v1
 ```
 
-It then rebuilds the acceptance plan fingerprint from the exact source revision,
-session, immutable content, document and subject identity candidates, source
-kind, evidence grade, information date and the ordered selected decision set.
+The exact shape contains content SHA, page, byte span, quote SHA, candidate kind
+and reviewed statement.
 
-The selected decision set is ordered by canonical candidate UUID and contains:
+### 17.2 Acceptance plan fingerprint
+
+Rebuild the plan under `aquantai.local-document-acceptance.v1` from:
 
 ```text
-candidate fingerprint
-decision fingerprint
-claim key
-claim status
-evidence relation
-rebuilt Evidence fingerprint
+source review revision ID
+rebuilt source review fingerprint
+expected session latest revision number = source revision number
+target Research Case ID
+content ID and SHA
+extractor contract version
+rebuilt document identity candidate fingerprint
+rebuilt subject identity candidate fingerprint
+source kind
+evidence grade
+information date
+ordered selected entries
 ```
 
-### 14.6 Request fingerprint replay
+Each selected entry contains rebuilt candidate fingerprint, rebuilt decision
+fingerprint, claim key, claim status, evidence relation and rebuilt Evidence
+fingerprint. Ordering uses canonical candidate UUID.
 
-The request fingerprint is rebuilt from:
+### 17.3 Request fingerprint
+
+Rebuild the acceptance request fingerprint from:
 
 ```text
 source review revision ID
 source revision number
-source review fingerprint
+rebuilt source review fingerprint
 expected session latest revision number = source revision number
 target Research Case ID
 ordered selected candidate IDs
@@ -485,73 +601,104 @@ rebuilt acceptance plan fingerprint
 
 The rebuilt value must equal `receipt.request_fingerprint_sha256`.
 
-### 14.7 Accepted review fingerprint replay
+## 18. Accepted review fingerprint replay
 
-The accepted review fingerprint is rebuilt under:
+Rebuild the accepted review fingerprint under:
 
 ```text
 aquantai.local-document-accepted-review.v1
 ```
 
-Its exact shape contains:
+The exact shape contains:
 
 ```text
 source review revision ID
-source review fingerprint
+rebuilt source review fingerprint
 accepted revision number
 review_state = accepted
 rebuilt acceptance request fingerprint
 rebuilt acceptance plan fingerprint
 target Research Case ID
-accepted_at_utc
+accepted_at_utc = receipt.accepted_at_utc
 ```
 
-The rebuilt value must equal both
-`accepted.review_fingerprint_sha256` and
-`receipt.accepted_review_fingerprint_sha256`.
-
-A source/accepted swap, source fingerprint mismatch, accepted fingerprint
-mismatch, request fingerprint mismatch or contract mismatch is an
-`evidence_pack_integrity_error`.
-
-## 15. Receipt-link completeness and semantic equality
-
-For each receipt, the exact acceptance-link set must equal source decision rows
-where:
+The rebuilt value must equal both:
 
 ```text
-decision = selected
-candidate_kind in {fact, event}
-claim_operation = create_new_deterministic_claim
+accepted.review_fingerprint_sha256
+receipt.accepted_review_fingerprint_sha256
 ```
 
-There must be exactly one link per selected fact/event decision, with no missing
-or extra link. The projection validates every receipt sibling link even when the
-linked Evidence Item is not on the current page.
+A source/accepted swap, candidate/decision/source/request/accepted fingerprint
+mismatch or contract mismatch is `evidence_pack_integrity_error`.
 
-For each link:
+## 19. Receipt-link completeness
+
+For each receipt, the exact `LocalDocumentAcceptanceLink` set must equal the
+selected source fact/event decisions defined in section 17.1.
+
+There must be exactly one link per selected decision and no extra link. The
+projection validates every sibling link under the bounded receipt even when the
+linked Evidence Item was not the row that discovered the receipt.
+
+A missing link, duplicate semantic binding, extra link or link to a non-selected
+decision invalidates the complete receipt.
+
+## 20. Exact produced Ledger graph
+
+For each acceptance link, validate all exact v1 production semantics.
+
+### 20.1 Candidate and Evidence
 
 - candidate belongs to the receipt review session;
-- linked Evidence belongs to the requested Case;
-- linked Claim belongs to the requested Case;
-- linked ClaimRevision belongs to linked Claim;
-- linked ClaimEvidenceLink binds exactly the linked ClaimRevision and Evidence;
-- decision claim key equals persisted Claim key;
-- decision claim status equals persisted ClaimRevision status;
-- decision evidence relation equals persisted ClaimEvidenceLink relation;
-- candidate statement equals Evidence summary and ClaimRevision statement;
-- source information date equals Evidence information date and ClaimRevision
-  information cutoff;
-- receipt accepted time equals Evidence, ClaimRevision and ClaimEvidenceLink
-  recorded time;
-- source kind and evidence grade equal the produced Evidence fields;
-- rebuilt Evidence fingerprint equals persisted content fingerprint;
-- canonical local-document locator exactly matches the accepted v1 command.
+- candidate kind is `fact` or `event`;
+- Evidence belongs to the requested Case;
+- Evidence source kind and grade equal source revision values;
+- Evidence source title and publisher equal the selected document identity
+  payload;
+- Evidence canonical locator is exactly:
 
-A missing/extra link or any link/decision/Ledger semantic mismatch fails the
-complete request. Partial receipt validation and partial output are prohibited.
+```text
+local-document:{content_id}#page={page_number}
+&start_utf8_byte={start_utf8_byte}
+&end_utf8_byte={end_utf8_byte}
+```
 
-## 16. Citation graph validation
+- Evidence information date equals source information date;
+- Evidence recorded time equals receipt accepted time;
+- Evidence summary equals candidate statement;
+- Evidence content fingerprint equals the rebuilt fingerprint;
+- `EvidenceItem.supersedes_evidence_id = null`.
+
+### 20.2 Claim and ClaimRevision
+
+- Claim belongs to the requested Case;
+- Claim key equals the selected decision claim key;
+- Claim creation time equals receipt accepted time;
+- ClaimRevision belongs to that Claim;
+- `revision_no = 1`;
+- statement equals candidate statement;
+- `claim_kind = fact`;
+- status equals selected decision claim status;
+- `inference_confidence = null`;
+- `inference_basis = null`;
+- information cutoff equals source information date;
+- recorded time equals receipt accepted time;
+- `supersedes_revision_id = null`.
+
+### 20.3 ClaimEvidenceLink and acceptance link
+
+- ClaimEvidenceLink binds the exact linked ClaimRevision and Evidence;
+- relation equals selected decision evidence relation;
+- `link_note = null`;
+- recorded time equals receipt accepted time;
+- acceptance-link Evidence, Claim, ClaimRevision and ClaimEvidenceLink IDs equal
+  those exact rows.
+
+Any mismatch fails the whole pack. The projection cannot omit the broken sibling
+link or downgrade the affected item to ledger-only.
+
+## 21. Citation graph validation
 
 For each linked fact/event candidate:
 
@@ -561,18 +708,19 @@ For each linked fact/event candidate:
 - candidate page number identifies an exact page under that content;
 - offsets are a valid half-open UTF-8 byte interval and scalar boundaries;
 - the stored byte slice decodes exactly to `quote_text`;
-- quote SHA-256 and page text SHA-256 match stored values;
-- candidate fingerprint and Evidence fingerprint recompute exactly;
+- quote SHA-256 equals the exact quote bytes;
+- page text SHA-256 equals the exact stored page text;
+- candidate and Evidence fingerprints recompute exactly;
 - extractor/content identities remain exact.
 
 The pack returns receipt/content/page/span/quote identifiers and citation metadata.
 It does not return raw PDF bytes or whole page text.
 
-When no acceptance link exists, provenance state is `ledger_only`, even if a
-locator resembles `local-document:` or a title resembles a filename. A present
-invalid link cannot be omitted or downgraded.
+When no acceptance link exists, provenance is `ledger_only`, even if a locator
+resembles `local-document:` or a title resembles a filename. A present invalid
+link cannot be omitted or downgraded.
 
-## 17. Stable nested ordering
+## 22. Stable nested ordering
 
 Evidence entries:
 
@@ -601,7 +749,7 @@ CaseRevisionClaimLink UUID ASC
 Document citations use receipt UUID then candidate UUID. UUID comparison uses
 lowercase canonical strings across SQLite and PostgreSQL.
 
-## 18. Cursor contract
+## 23. Cursor contract
 
 The cursor is URL-safe base64 encoding of canonical compact JSON containing:
 
@@ -626,7 +774,7 @@ Malformed tokens, unknown keys, version mismatch, checksum mismatch, boundary
 mismatch or limit mismatch return `invalid_evidence_pack_cursor` before database
 projection. Offset pagination is prohibited.
 
-## 19. Response contract
+## 24. Response contract
 
 ```text
 contract_version = aquantai.research-evidence-pack.v1
@@ -669,14 +817,17 @@ supersession_reference
 ```
 
 No entry-level scalar `research_membership_state` exists. Mixed membership is
-represented by exact binding values and
-`membership_summary = mixed_linked_and_unlinked_bindings`.
+represented by exact per-binding values plus:
+
+```text
+membership_summary = mixed_linked_and_unlinked_bindings
+```
 
 The pack may map closed codes to deterministic Chinese labels, but may not
 summarize, rank, score, infer sentiment, generate causal explanations or rewrite
 accepted text.
 
-## 20. Empty and missing states
+## 25. Empty and missing states
 
 An exact visible Case revision with no visible Evidence Items returns HTTP 200:
 
@@ -694,7 +845,7 @@ has per-binding `accepted_unlinked_to_selected_case_revision` and
 Missing local provenance is not an error unless an acceptance link exists and its
 receipt graph is invalid.
 
-## 21. Error taxonomy
+## 26. Error taxonomy
 
 | Stable code | Meaning |
 | --- | --- |
@@ -710,7 +861,7 @@ receipt graph is invalid.
 Ordinary-user copy must explain the next action without stack traces or claims
 that retrying repairs corrupted accepted history.
 
-## 22. Query architecture and exact ceiling
+## 27. Query architecture and exact ceiling
 
 A later implementation may add a pack-specific read repository/query/rules family.
 Direct set-based reads over accepted models are permitted because the module is a
@@ -723,9 +874,9 @@ One page requires at most eight SQL statements:
 3. bounded Evidence page;
 4. Claim/ClaimRevision/ClaimEvidenceLink rows for page Evidence IDs;
 5. selected Case-revision roles for reached Claim revisions;
-6. complete local receipt/session/source+accepted revision/all-decision/all-link/
-   candidate/import/content/Ledger validation rows for every receipt reached from
-   page Evidence IDs;
+6. complete bounded receipt/session/source+accepted revision/candidate/decision/
+   sibling-link/Ledger rows plus a set-wise maximum-review-revision aggregate for
+   every receipt reached from page Evidence IDs;
 7. exact referenced `LocalDocumentPage` rows;
 8. set-wise minimal Evidence/ClaimRevision supersession-target rows.
 
@@ -738,16 +889,17 @@ OCR calls = 0
 AI calls = 0
 ```
 
-One statement may use bounded CTEs or unions and may return all sibling links for
-bounded receipts. Per-item, per-Claim, per-receipt and per-citation query loops are
-prohibited. The statement count is independent of nested relation, decision and
-citation counts.
+Statement 6 is bounded by at most 100 page Evidence Items, at most 100 discovered
+receipts, and the existing maximum 200 candidates per receipt. It may use CTEs,
+unions and set-wise aggregates and must include every sibling link for those
+receipts. Per-item, per-Claim, per-receipt and per-citation query loops are
+prohibited.
 
 Future SQLite/PostgreSQL tests must measure the exact bound. If an additional
 index or ninth statement is required for correctness, implementation must STOP
 and return to Strict architecture.
 
-## 23. Security and local boundary
+## 28. Security and local boundary
 
 - The route is read-only and performs no mutation.
 - It exposes no filesystem path, credential, Provider payload or environment
@@ -758,7 +910,7 @@ and return to Strict architecture.
 - No network is invoked by startup, read, tests or demo.
 - Existing accepted user-authored text must be rendered with safe text semantics.
 
-## 24. Persistence and lifecycle
+## 29. Persistence and lifecycle
 
 ```text
 tables = unchanged
@@ -773,15 +925,15 @@ downgrade = no data action
 Reproducibility comes from exact IDs, boundaries, append-only owners and stable
 pagination, not from saving opaque projection JSON.
 
-## 25. Production-realistic offline golden path
+## 30. Production-realistic offline golden path
 
 The future fixture must use production-reachable commands:
 
 1. create a Research Case and initial revision;
 2. import a small embedded-text official PDF;
-3. create document/company identity and page/span fact candidates;
+3. create document/company identity and multiple page/span fact/event candidates;
 4. append a source review revision with complete decisions;
-5. preview and atomically accept multiple fact/event candidates through the
+5. preview and atomically accept multiple selected facts/events through the
    existing owner, producing one receipt with multiple sibling links;
 6. add one accepted ledger-only Evidence Item;
 7. append the selected Research Case revision, linking one document ClaimRevision
@@ -789,8 +941,8 @@ The future fixture must use production-reachable commands:
 8. create another visible Claim binding on one Evidence Item that is not linked to
    the selected Case revision, producing mixed membership;
 9. accept another document fact without rewriting the selected Case revision;
-10. create valid supersession targets, including one target outside the requested
-    information boundary;
+10. create valid supersession targets, including a same-recorded-time target and
+    an information-hidden target;
 11. create a later Evidence Item outside the recorded boundary;
 12. query with a page size that exercises the next cursor.
 
@@ -798,38 +950,43 @@ Expected result:
 
 - all visible Evidence Items remain present;
 - one entry shows exact linked and unlinked bindings simultaneously;
-- `membership_summary` reports `mixed_linked_and_unlinked_bindings`;
+- `membership_summary` is `mixed_linked_and_unlinked_bindings`;
 - ledger-only provenance remains `ledger_only`;
 - document items expose exact citations only after full receipt replay;
-- the information-hidden supersession target exposes only ID plus
-  `not_visible_as_of`;
+- same-timestamp supersession passes owner-consistent integrity;
+- the information-hidden target exposes only ID plus `not_visible_as_of`;
 - the later Evidence Item is absent;
 - pagination is stable and duplicate-free;
-- all reads perform zero writes/network/OCR/AI.
+- reads perform zero writes/network/OCR/AI.
 
-## 26. Decisive failure families
+## 31. Decisive failure families
 
-Each of the following persisted corruptions must make the whole request return
+Each persisted corruption below must make the complete request return
 `evidence_pack_integrity_error`, with no partially authoritative entries:
 
 - receipt source and accepted revision IDs swapped;
-- receipt/source fingerprint mismatch;
-- receipt/accepted fingerprint mismatch;
-- request fingerprint or acceptance-contract mismatch;
-- accepted revision not the exact immediate successor;
+- receipt/session/Case mismatch;
+- candidate fingerprint mismatch;
+- source or accepted decision fingerprint mismatch;
+- source review fingerprint mismatch;
+- receipt request fingerprint or acceptance-contract mismatch;
+- accepted review fingerprint mismatch;
+- accepted revision not the exact terminal immediate successor;
 - accepted copy field differs from source;
 - accepted decision missing, added, rebound or changed;
 - receipt link missing, extra or bound to a non-selected decision;
 - link claim key/status/relation differs from its decision;
 - link points to the wrong Evidence/Claim/ClaimRevision/ClaimEvidenceLink;
+- produced Ledger default/identity/chronology field differs from v1;
 - candidate page/span/quote/fingerprint mismatch;
 - Evidence fingerprint or canonical locator mismatch;
-- supersession target missing, cross-owner, non-older or forward-recorded.
+- supersession target missing, cross-owner, invalid revision order or recorded
+  later than its successor.
 
 Every failure performs zero writes and makes zero network/OCR/AI calls. Locator
 parsing is never a fallback.
 
-## 27. Required future validation
+## 32. Required future validation
 
 A later separately authorized implementation must cover:
 
@@ -839,21 +996,23 @@ A later separately authorized implementation must cover:
 - all-linked and all-unlinked entries;
 - one Evidence Item with linked and unlinked Claim bindings simultaneously;
 - contradiction/context visibility and deterministic ordering;
-- valid information-hidden Evidence and ClaimRevision supersession targets;
-- missing, cross-Case/cross-Claim, non-older and forward-recorded targets;
+- valid equal-timestamp Evidence and ClaimRevision supersession targets;
+- valid information-hidden supersession targets without payload projection;
+- missing, cross-Case/cross-Claim, invalid revision-order and later-recorded
+  targets;
 - exact unlinked accepted document evidence;
 - Case/revision mismatch and both as-of boundaries;
 - later Evidence/Claim/receipt invisibility;
 - malformed and cross-request cursor;
 - stable pagination with identical timestamps;
-- every receipt-transition failure family in section 26;
+- every receipt-transition failure family in section 31;
 - locator resembling local provenance without an acceptance link;
 - 1, 50 and 100 member SQL ceilings on SQLite and PostgreSQL;
 - zero writes, network, Provider, OCR and AI;
 - safe rendering of persisted user text;
 - full configured regression and all offline demos.
 
-## 28. Expected implementation classification
+## 33. Expected implementation classification
 
 After this architecture PR is independently approved and separately merged, a
 new implementation Issue may classify as Standard only if it preserves:
@@ -862,8 +1021,8 @@ new implementation Issue may classify as Standard only if it preserves:
 - read-only pack-specific projection;
 - exact dual-as-of selectors;
 - authoritative per-binding membership;
-- complete receipt-level transition validation;
-- bounded minimal supersession target loads;
+- complete candidate/decision/source/request/accepted receipt replay;
+- bounded owner-consistent supersession target loads;
 - no more than eight SQL statements;
 - zero network/OCR/AI and zero accepted-state mutation;
 - separate explicit owner authorization.
@@ -871,7 +1030,7 @@ new implementation Issue may classify as Standard only if it preserves:
 Any persistent pack, accepted-owner change, acquisition path or contract
 expansion returns the work to Strict architecture.
 
-## 29. Inactive future implementation boundary
+## 34. Inactive future implementation boundary
 
 Expected new read-only files may include:
 
@@ -889,7 +1048,7 @@ scripts/demo_research_evidence_pack.py
 by the later implementation Issue. No existing write-owner file is implicitly
 authorized.
 
-## 30. Locked exclusions
+## 35. Locked exclusions
 
 - production code in this architecture PR;
 - schema/migration/dependency/configuration changes;
@@ -904,7 +1063,7 @@ authorized.
 - release, tag or version change;
 - PR #241 modification.
 
-## 31. STOP conditions
+## 36. STOP conditions
 
 STOP and request a separately authorized architecture revision if:
 
@@ -921,7 +1080,7 @@ STOP and request a separately authorized architecture revision if:
 10. any file outside the authorized architecture or future implementation scope
     becomes necessary without an Issue amendment.
 
-## 32. Current architecture allowlist
+## 37. Current architecture allowlist
 
 Exactly these two files may change in PR #289:
 
@@ -932,7 +1091,7 @@ docs/research_evidence_pack_v1_preflight.md
 
 No production, schema, migration, workflow, test or fixture file is authorized.
 
-## 33. Delivery gates
+## 38. Delivery gates
 
 The architecture PR must:
 
