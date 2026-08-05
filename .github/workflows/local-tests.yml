@@ -47,6 +47,9 @@ jobs:
       - name: Check Today Market runtime JavaScript syntax
         run: node --check today_market/static/today_market.js
 
+      - name: Check Document Import JavaScript syntax
+        run: node --check document_import/static/document_import.js
+
       - name: Test exact candidate pool controls
         run: node --test tests/js/owner_acceptance_pool.test.js
 
@@ -118,6 +121,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Run Document Import focused tests
+        run: |
+          python -m pytest \
+            tests/test_document_import_models.py \
+            tests/test_document_import_extractor.py \
+            tests/test_document_import_commands.py \
+            tests/test_document_import_query.py \
+            tests/test_document_import_api.py \
+            tests/test_document_import_static.py \
+            tests/test_document_import_postgres.py \
+            -q --tb=short
+
       - name: Run tests
         run: |
           set -o pipefail
@@ -170,3 +185,6 @@ jobs:
 
       - name: Run Today Market deterministic Slice B demo
         run: python -m scripts.demo_today_market_deterministic_rules
+
+      - name: Run manual Document Import and Evidence Ledger demo
+        run: python -m scripts.demo_manual_document_import

@@ -25,6 +25,24 @@ implementation_authorized = false
 
 PR #241 remains excluded and must not be modified.
 
+## Strict implementation activation
+
+Project-owner implementation authorization on 2026-08-04 is recorded by Issue
+`#285`. The exact implementation base is architecture merge commit
+`4849f8f680be85f266eba4d7377ec0b288a58916`; `main` Local Tests `#1062` / run
+`30882371990` / job `91906259635` succeeded at that exact commit. The candidate
+allowlist below is active only for Issue #285 and its new Draft implementation PR.
+Architecture Issue #283 remains open, and implementation still requires fixed-HEAD
+CI, an independent implementation review and separate merge authorization.
+
+After the minimal migration-test allowlist amendment merged through PR `#286`,
+the project owner explicitly authorized implementation resumption from exact
+`main@be8d169b8b892c46ec4aa3a05a9b807aac39e824`. The amendment fixed-head review
+is `4852574079`; merge commit and resumed implementation base are both
+`be8d169b8b892c46ec4aa3a05a9b807aac39e824`; `main` Local Tests `#1064` / run
+`30896037228` / job `91949040855` succeeded at that exact commit. No rebase,
+force-push, Issue closure or PR `#241` change is authorized.
+
 ## Owner inventory result
 
 At the exact base:

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>本地文档证据导入 · AQuantAI</title>
+  <link rel="stylesheet" href="/document-import/static/document_import.css">
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Evidence Ledger · 本地人工审核</p>
+    <h1>导入官方 PDF，逐页核对后再接受为证据</h1>
+    <p class="lead">所有内容只在本机处理。系统不会 OCR、联网、调用 AI，也不会自动认定文档官方或自动接受证据。</p>
+  </header>
+  <main>
+    <section class="card" aria-labelledby="import-title">
+      <div class="step">步骤 1</div>
+      <h2 id="import-title">选择本地 PDF</h2>
+      <label class="file-picker">
+        <span>选择文件</span>
+        <input id="pdf-file" type="file" accept="application/pdf,.pdf">
+      </label>
+      <button id="import-button" type="button" disabled>导入并提取内嵌文本</button>
+      <p id="status" role="status" aria-live="polite">尚未选择文件。</p>
+    </section>
+
+    <section class="card" aria-labelledby="history-title">
+      <div class="step">步骤 2</div>
+      <h2 id="history-title">精确导入记录</h2>
+      <dl id="import-detail" class="detail-grid">
+        <div><dt>状态</dt><dd>等待导入</dd></div>
+        <div><dt>内容指纹</dt><dd>—</dd></div>
+        <div><dt>页数</dt><dd>—</dd></div>
+        <div><dt>提取合同</dt><dd>—</dd></div>
+      </dl>
+    </section>
+
+    <section class="card wide" aria-labelledby="pages-title">
+      <div class="step">步骤 3</div>
+      <h2 id="pages-title">逐页文本</h2>
+      <p class="hint">这里显示确定性解析器保存的原始页文本；它还不是研究事实或已接受证据。</p>
+      <div id="pages" class="pages"><p>导入成功后显示。</p></div>
+      <button id="pages-more" type="button" hidden>继续加载后续页面</button>
+    </section>
+
+    <section class="card wide" aria-labelledby="review-title">
+      <div class="step">步骤 4</div>
+      <h2 id="review-title">人工建立审核快照</h2>
+      <p class="hint">先在上方逐页文本中选择一段原文，再明确填写全部身份与判断。系统不会推断或补全。</p>
+      <div class="review-grid">
+        <label>Research Case 精确 ID<input id="case-id" autocomplete="off"></label>
+        <label>文档身份键<input id="document-key" autocomplete="off"></label>
+        <label>文档标题<input id="document-title" autocomplete="off"></label>
+        <label>发布者/作者<input id="publisher" autocomplete="off"></label>
+        <label>文档日期<input id="document-date" type="date"></label>
+        <label>信息日期<input id="information-date" type="date"></label>
+        <label>主体说明<input id="subject-label" value="非特定公司"></label>
+        <label>事实陈述<textarea id="fact-statement"></textarea></label>
+        <label>来源类型<select id="source-kind"><option value="official">官方</option><option value="filing">法定披露</option><option value="regulatory">监管</option><option value="statistics">统计</option></select></label>
+        <label>证据等级<select id="evidence-grade"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+        <label>Claim 状态<select id="claim-status"><option value="supported">已支持</option><option value="disputed">有争议</option><option value="draft">草稿</option><option value="rejected">已拒绝</option></select></label>
+        <label>证据关系<select id="evidence-relation"><option value="supports">支持</option><option value="contradicts">反驳</option><option value="context">背景</option></select></label>
+      </div>
+      <p id="selection-status" role="status">尚未选择逐页原文。</p>
+      <button id="review-button" type="button" disabled>保存人工审核快照</button>
+    </section>
+
+    <section class="card wide" aria-labelledby="accept-title">
+      <div class="step">步骤 5</div>
+      <h2 id="accept-title">预览并明确接受</h2>
+      <p class="hint">预览零写入；只有再次点击接受，才会在一个事务中写入 Evidence、Claim、审核终态和回执。提交成功后会按本次信息日期与记录时间精确重开回执。</p>
+      <div class="actions"><button id="preview-button" type="button" disabled>生成零写入预览</button><button id="accept-button" type="button" disabled>明确接受并写入</button></div>
+      <pre id="acceptance-result">等待审核快照。</pre>
+    </section>
+
+    <aside class="guardrail">
+      <strong>接受门禁</strong>
+      <span>文档身份、主体身份、页码引用、事实陈述、证据等级和 Claim 判断均需人工明确审核；至少选择一条事实或事件，才能原子写入 Evidence Ledger。</span>
+    </aside>
+  </main>
+  <script src="/document-import/static/document_import.js" defer></script>
+</body>
+</html>
