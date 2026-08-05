@@ -46,14 +46,13 @@ The first independent fixed-HEAD review recorded three High blockers. This
 revision closes them by freezing:
 
 1. complete set-wise replay of every bounded local-document acceptance receipt,
-   including source and accepted revisions, candidate and decision fingerprints,
-   exact copied decisions, request/plan/accepted fingerprints and all receipt
-   links;
+   including source and accepted revision chains, candidate/decision/source/
+   request/accepted fingerprints, accepted owner invariants, exact copied
+   decisions, all receipt links and the exact produced Ledger graph;
 2. authoritative membership on each exact Claim binding, with a closed Evidence
-   summary that represents mixed linked/unlinked bindings without information
-   loss;
+   summary representing mixed linked/unlinked bindings without information loss;
 3. one bounded set-wise minimal supersession-target load used only for identity
-   and chronology validation, with target payload excluded from the response.
+   and owner-consistent chronology validation, with target payload excluded.
 
 No other architecture boundary expands.
 
@@ -208,19 +207,20 @@ ClaimRevision target:
   id, claim_id, revision_no, information_cutoff_date, recorded_at_utc
 ```
 
-Validation follows the accepted command owner chronology exactly:
+Validation follows accepted owner semantics exactly:
 
 - every target exists;
 - an Evidence target belongs to the same Case and
   `target.recorded_at_utc <= successor.recorded_at_utc`;
-- a ClaimRevision target belongs to the same Claim, has a lower revision number,
-  and `target.recorded_at_utc <= successor.recorded_at_utc`;
-- equality of recorded timestamps is valid and must not fail integrity;
+- a ClaimRevision target belongs to the same Claim,
+  `target.revision_no = successor.revision_no - 1`, and
+  `target.recorded_at_utc <= successor.recorded_at_utc`;
+- equal recorded timestamps are valid and must not fail integrity;
 - no target statement, summary, source metadata, quote, page text or other payload
   field is loaded through this path.
 
 A valid target outside the information boundary is represented only by exact ID
-plus `not_visible_as_of`. Missing, cross-owner, invalid revision order or
+plus `not_visible_as_of`. Missing, cross-owner, non-immediate Claim predecessor or
 later-recorded targets fail the whole request as `evidence_pack_integrity_error`.
 
 ## Complete local-document acceptance proof
@@ -243,8 +243,20 @@ The following must all hold:
 - receipt accepted time equals accepted revision recorded time and is visible;
 - accepted information date is visible;
 - receipt contract is `aquantai.local-document-acceptance.v1`;
-- receipt source/accepted fingerprints equal the corresponding persisted revision
-  fingerprints.
+- receipt source/accepted fingerprints equal corresponding persisted fingerprints.
+
+The source revision chain is exact:
+
+```text
+if source.revision_number = 1:
+  source.expected_previous_revision_number = 0
+  source.supersedes_review_revision_id = null
+else:
+  source.expected_previous_revision_number = source.revision_number - 1
+  source.supersedes_review_revision_id points to the exact same-session
+    revision_number = source.revision_number - 1
+  predecessor.recorded_at_utc <= source.recorded_at_utc
+```
 
 The accepted revision is the exact terminal immediate successor:
 
@@ -259,54 +271,59 @@ accepted is the maximum revision number in that review session
 Accepted source kind, evidence grade, document identity candidate, subject
 candidate, information date and reviewer note are exact source copies.
 
-### Candidate and decision fingerprint replay
+### Candidate owner invariants and fingerprints
 
-For every candidate in the receipt review session, the projection rebuilds
-`candidate_fingerprint_sha256` under
+For every session candidate, parse payload through the accepted v1 candidate
+validator and rebuild `candidate_fingerprint_sha256` under
 `aquantai.local-document-candidate.v1` from exact content identity, extractor
-contract, candidate kind, citation fields, quote SHA, statement and parsed
-canonical payload.
+contract, kind, citation fields, quote SHA, statement and canonical payload.
 
-For every source and accepted decision, the projection rebuilds
-`decision_fingerprint_sha256` from exact candidate ID, rebuilt candidate
-fingerprint, decision, claim operation, claim key, claim status and evidence
-relation.
+Closed candidate shapes are revalidated:
 
-All candidates must have exactly one source decision and exactly one accepted
-decision. Source and accepted decision sets must have identical candidate IDs and
-match exactly on:
+- document identity and company identity candidates have no page/span/quote/
+  statement fields and satisfy their exact v1 payload contracts;
+- fact candidates have exact page/span/quote/statement and an empty payload;
+- event candidates have exact page/span/quote/statement and only `event_date`;
+- event date is not after source information date;
+- every candidate belongs to the receipt session and immutable content path.
 
-```text
-decision
-claim_operation
-claim_key
-claim_status
-evidence_relation
-decision_fingerprint_sha256
-```
+The source document candidate must be `document_identity`; the source subject
+candidate must be `company_identity`; both source and accepted decisions for
+those identities must be `selected` with all Claim fields null.
 
-Missing, added, rebound or changed accepted decisions are integrity failures.
+### Decision owner invariants and fingerprints
+
+For every source and accepted decision, rebuild its fingerprint from exact
+candidate ID, rebuilt candidate fingerprint, decision, claim operation, claim
+key, claim status and evidence relation.
+
+All candidates have exactly one source and accepted decision; both sets have
+identical candidate IDs and exact values/fingerprints.
+
+Decision semantics are revalidated:
+
+- only selected fact/event candidates carry Claim fields;
+- every selected fact/event uses
+  `claim_operation = create_new_deterministic_claim`;
+- claim key is exactly
+  `local-document-v1:{candidate_fingerprint_sha256}`;
+- claim status and evidence relation belong to accepted closed values;
+- `supported` requires relation `supports` and source grade other than `D`;
+- `disputed` requires relation `contradicts`;
+- all other decisions and identity decisions have null Claim fields;
+- selected fact/event count is within the accepted `1..200` ceiling.
+
+Missing, added, rebound, semantically invalid or changed accepted decisions are
+integrity failures.
 
 ### Source review fingerprint replay
 
-The source review fingerprint is rebuilt under
-`aquantai.local-document-review.v1` from:
+Rebuild the source review fingerprint under
+`aquantai.local-document-review.v1` from review session, revision number/state,
+source kind, grade, identity candidate IDs, information date, reviewer note and
+all normalized source decisions ordered by candidate UUID.
 
-```text
-review_session_id
-revision_number
-review_state
-source_kind
-evidence_grade
-document_identity_candidate_id
-subject_candidate_id
-information_date
-reviewer_note
-all normalized source decisions ordered by candidate UUID
-```
-
-The rebuilt value must equal both the source revision fingerprint and the
-receipt source fingerprint.
+The rebuilt value must equal both source and receipt source fingerprints.
 
 ### Plan, request and accepted-review replay
 
@@ -347,15 +364,14 @@ claim_operation = create_new_deterministic_claim
 ```
 
 There is exactly one link per selected fact/event decision and no extra link.
-Every link must match the selected decision and the exact v1 produced Ledger
-graph:
+Every link matches the selected decision and exact v1 produced Ledger graph:
 
 - candidate belongs to the receipt session;
 - Evidence belongs to the requested Case and has exact source kind, grade, title,
   publisher, canonical locator, information date, accepted time, candidate
   statement, rebuilt content fingerprint and `supersedes_evidence_id = null`;
-- Claim belongs to the requested Case, has the decision claim key and
-  `created_at_utc = receipt.accepted_at_utc`;
+- Claim belongs to the requested Case, has the deterministic decision claim key
+  and `created_at_utc = receipt.accepted_at_utc`;
 - ClaimRevision belongs to that Claim, has `revision_no = 1`, `claim_kind = fact`,
   exact statement/status/information date/accepted time,
   `inference_confidence = null`, `inference_basis = null`, and
@@ -364,16 +380,16 @@ graph:
   relation, accepted time and `link_note = null`;
 - acceptance-link IDs match those exact Ledger rows.
 
-Any source/accepted swap, candidate/decision/source/request/accepted fingerprint
-mismatch, contract mismatch, non-successor accepted revision, incomplete decision
-copy, missing/extra link or semantic mismatch fails the complete pack request as
-`evidence_pack_integrity_error`.
+Any source/accepted swap, owner-invariant failure, candidate/decision/source/
+request/accepted fingerprint mismatch, contract mismatch, chain mismatch,
+incomplete decision copy, missing/extra link or Ledger semantic mismatch fails the
+complete request as `evidence_pack_integrity_error`.
 
 ### Citation graph
 
 The same proof validates import attempt, immutable content, candidate and page:
 
-- session points to the exact import attempt and content;
+- session points to exact import attempt and content;
 - candidate belongs to the session;
 - page belongs to the content and exact page number;
 - half-open UTF-8 offsets are valid scalar boundaries;
@@ -436,9 +452,9 @@ The eight-statement budget is:
 3. bounded Evidence page;
 4. Claim/ClaimRevision/ClaimEvidenceLink rows for page IDs;
 5. selected Case-revision roles;
-6. complete receipt/session/revision/candidate/decision/link/Ledger transition
-   rows for every receipt reached by page IDs, including sibling links and a
-   set-wise maximum-revision check;
+6. complete receipt/session/source-predecessor/source/accepted/candidate/decision/
+   sibling-link/Ledger transition rows for every reached receipt, including a
+   set-wise maximum-review-revision check;
 7. exact referenced page rows;
 8. set-wise minimal Evidence/ClaimRevision supersession targets.
 
@@ -456,10 +472,13 @@ At minimum cover:
 - contradiction/context relations and deterministic ordering;
 - valid same-timestamp supersession targets;
 - valid information-hidden supersession targets without payload projection;
-- missing, cross-Case/cross-Claim, invalid revision-order and later-recorded
-  targets, each failing closed;
+- missing, cross-Case/cross-Claim, non-immediate Claim predecessor and
+  later-recorded targets, each failing closed;
 - malformed/cross-request cursors and stable identical-timestamp pagination;
-- source/accepted revision swap;
+- source predecessor mismatch and source/accepted revision swap;
+- invalid identity candidate kind/decision;
+- invalid fact/event candidate shape, event date or selected-count ceiling;
+- invalid deterministic claim operation/key/status/relation rule;
 - candidate, decision, source, request, accepted and contract fingerprint
   corruption;
 - non-immediate or non-terminal accepted revision;
