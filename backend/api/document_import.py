@@ -109,6 +109,12 @@ def require_local_csrf(request: Request) -> None:
         raise HTTPException(403, "CSRF confirmation is missing or expired.")
 
 
+def require_local_host(request: Request) -> None:
+    """Keep every document page and read API inside the loopback boundary."""
+
+    _origin(request)
+
+
 def is_document_import_mutation(request: Request) -> bool:
     return request.method == "POST" and (
         request.url.path == "/api/document-imports"
@@ -160,7 +166,9 @@ def _bind_review_path(
 
 
 @page_router.get("/document-import", include_in_schema=False)
-def document_import_page() -> FileResponse:
+def document_import_page(
+    _guard: None = Depends(require_local_host),
+) -> FileResponse:
     return FileResponse(_STATIC_DIR / "document_import.html", media_type="text/html")
 
 
@@ -206,6 +214,7 @@ async def import_document(
 @api_router.get("/api/document-imports/{attempt_id}")
 def import_detail(
     attempt_id: UUID,
+    _guard: None = Depends(require_local_host),
     session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
 ) -> dict[str, object]:
     return _domain_call(lambda: DocumentImportQueryService(session_factory).import_detail(attempt_id))
@@ -216,6 +225,7 @@ def document_pages(
     content_id: UUID,
     after_page: int = Query(default=0, ge=0),
     limit: int = Query(default=30, ge=1, le=30),
+    _guard: None = Depends(require_local_host),
     session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
 ) -> dict[str, object]:
     return _domain_call(
@@ -228,6 +238,7 @@ def document_pages(
 @api_router.get("/api/document-contents/{content_id}/pdf")
 def document_pdf(
     content_id: UUID,
+    _guard: None = Depends(require_local_host),
     session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
 ) -> Response:
     value = _domain_call(lambda: DocumentImportQueryService(session_factory).attachment(content_id))
@@ -298,6 +309,7 @@ def review_detail(
     after_candidate_id: UUID | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=50),
     review_revision_id: UUID | None = Query(default=None),
+    _guard: None = Depends(require_local_host),
     session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
 ) -> dict[str, object]:
     return _domain_call(
@@ -355,6 +367,7 @@ def acceptance_detail(
     receipt_id: UUID,
     information_cutoff_date: date = Query(...),
     recorded_at_utc: datetime = Query(...),
+    _guard: None = Depends(require_local_host),
     session_factory: sessionmaker[Session] = Depends(get_industry_alpha_session_factory),
 ) -> dict[str, object]:
     return _domain_call(

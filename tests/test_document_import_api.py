@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from starlette.requests import Request
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.pool import StaticPool
 
 from backend.api.industry_alpha import get_industry_alpha_session_factory
@@ -59,6 +60,38 @@ def test_mutation_rejects_missing_origin_and_csrf_before_import(api):
     assert response.status_code == 403
     with factory() as session:
         assert session.scalar(select(func.count()).select_from(LocalDocumentImportAttempt)) == 0
+
+
+def test_document_import_reads_reject_non_loopback_host_before_database_access(api):
+    client, factory, _ = api
+    opaque_id = uuid4()
+    paths = (
+        "/document-import",
+        "/api/document-import/csrf",
+        f"/api/document-imports/{opaque_id}",
+        f"/api/document-contents/{opaque_id}/pages",
+        f"/api/document-contents/{opaque_id}/pdf",
+        f"/api/document-reviews/{opaque_id}",
+        (
+            f"/api/document-acceptances/{opaque_id}"
+            "?information_cutoff_date=2026-08-05"
+            "&recorded_at_utc=2026-08-05T12%3A00%3A00Z"
+        ),
+    )
+    statements: list[str] = []
+    engine = factory.kw["bind"]
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        for path in paths:
+            response = client.get(path, headers={"host": "192.168.1.20"})
+            assert response.status_code == 403, path
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    assert statements == []
 
 
 def test_ipv6_loopback_is_a_valid_local_origin():
