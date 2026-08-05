@@ -8,6 +8,11 @@ Project-owner authorization received on 2026-08-05:
 > 启动 Research Evidence Pack v1 Strict Architecture Preflight；
 > 仅允许两份架构工件。
 
+Project-owner repair authorization received on 2026-08-05:
+
+> 授权修复 PR #289 上述三项架构阻断；仅修改现有两份架构工件，
+> 产生新 HEAD 后运行完整 CI，并重新进行独立 fixed-HEAD 架构审核。
+
 This snapshot freezes architecture scope only. It authorizes no production code,
 schema, migration, dependency, API/UI implementation, fixture, test, workflow,
 Provider, network, credential, OCR, AI, automatic evidence acceptance,
@@ -22,6 +27,7 @@ base_branch = main
 base_sha = 8dd187c129c3e4a375f550758fab266719ccd0da
 roadmap = #137
 issue = #288
+pull_request = #289
 risk_tier = Strict Architecture Preflight
 implementation_authorized = false
 ```
@@ -30,49 +36,59 @@ The exact base passed `Local Tests #1069`, run `30988479592`, job
 `92248720124`. PR #241 remains closed, Draft, unmerged and read-only at
 `3116a67ec472131eea3bf3d1bd9daee884c69ee9`.
 
+The superseded review candidate was
+`a06318e833d7ebca67cc90ef0cb8d484ccf0f66e`. Its CI and fixed-HEAD review are
+invalid for every later commit.
+
+## Repair closure
+
+The first independent fixed-HEAD review recorded three High blockers. This
+revision closes them by freezing all of the following:
+
+1. complete receipt-level validation of the atomic local-document acceptance
+   transition, including both review revisions, all fingerprints, exact copied
+   decisions and every receipt link;
+2. authoritative research membership on each exact Claim binding, plus a closed
+   entry summary that represents mixed linked/unlinked bindings without loss;
+3. one bounded set-wise minimal supersession-target load used only for graph
+   integrity, while target content remains excluded from the response.
+
+No other architecture boundary is changed.
+
 ## Product objective
 
-Define one bounded, read-only Research Evidence Pack for an explicit Research
-Case revision. The pack must let an ordinary user see:
+Define one bounded, local, read-only Research Evidence Pack for an explicit
+Research Case revision. The pack lets an ordinary user inspect:
 
-- the exact research snapshot they selected;
+- the exact research snapshot selected by ID;
 - all accepted Evidence Ledger items visible at explicit dual-as-of boundaries;
-- the exact Claim revisions and relations bound to each item;
-- whether a Claim revision is part of the selected Research Case revision or is
-  accepted case evidence not yet linked into that frozen research snapshot;
-- exact local-PDF provenance, page and UTF-8 byte-span citations where an
-  accepted Document Import receipt provides them;
-- conflicts, missing links and unavailable provenance without inference.
+- every exact ClaimRevision and ClaimEvidenceLink reached from each Evidence Item;
+- per-binding membership in the selected Research Case revision;
+- exact local-PDF provenance only when proved by an intact acceptance receipt;
+- conflicts, missing links and unavailable history without inference.
 
-The pack is a transient read projection. It is not a saved pack, accepted-state
-owner, recommendation, score, summary generator or external acquisition flow.
+The pack is a transient projection. It is not a saved pack, accepted-state owner,
+recommendation, score, generated summary or acquisition flow.
 
 ## Exact owner inventory
 
 At the exact base:
 
-1. `ResearchCase` and `ResearchCaseRevision` own case identity and frozen
-   research revisions.
+1. `ResearchCase` and `ResearchCaseRevision` own Case identity and frozen research
+   revisions.
 2. `EvidenceItem`, `Claim`, `ClaimRevision`, `ClaimEvidenceLink` and
    `CaseRevisionClaimLink` own accepted Evidence Ledger meaning.
-3. `EvidenceLedgerCommandService` remains the only accepted Evidence Ledger
-   write owner and is outside the future read-only implementation boundary.
-4. `EvidenceLedgerRepository` / `EvidenceLedgerQueryService` provide existing
-   case-ledger reads, but their date-only, whole-case projection is not the
-   bounded dual-as-of Evidence Pack contract.
-5. `LocalDocumentContent`, `LocalDocumentImportAttempt`, `LocalDocumentPage`,
+3. `EvidenceLedgerCommandService` remains the only accepted Evidence Ledger write
+   owner and is outside the future read implementation boundary.
+4. `LocalDocumentContent`, `LocalDocumentImportAttempt`, `LocalDocumentPage`,
    `LocalDocumentReviewSession`, `LocalDocumentCandidate`,
-   `LocalDocumentReviewRevision`, `LocalDocumentAcceptanceReceipt` and
-   `LocalDocumentAcceptanceLink` own exact local-document provenance and the
-   accepted bridge.
-6. `LocalDocumentAcceptanceLink.evidence_item_id` is unique and is the only
+   `LocalDocumentReviewRevision`, `LocalDocumentReviewCandidateDecision`,
+   `LocalDocumentAcceptanceReceipt` and `LocalDocumentAcceptanceLink` own the
+   local-document acceptance proof.
+5. `LocalDocumentAcceptanceLink.evidence_item_id` is unique and is the only
    authority that classifies an Evidence Item as accepted through Document
-   Import. `EvidenceItem.source_locator` is descriptive and must never be parsed
-   to infer provenance.
-7. Document content, page text, review history, receipts and Evidence Ledger
-   rows are append-only and already contain the exact graph required for a
-   read-only pack.
-8. No persisted Evidence Pack, saved selection, export-history or pack-snapshot
+   Import. `EvidenceItem.source_locator` is descriptive only.
+6. No persisted Evidence Pack, saved selection, export history or pack-snapshot
    owner exists.
 
 ```text
@@ -84,65 +100,31 @@ new_write_owner_required = false
 owner_modification_required = false
 ```
 
-## Frozen architecture decision
-
-Research Evidence Pack v1 is a deterministic read model over existing accepted
-owners:
-
-```text
-exact Research Case
-+ exact Research Case Revision
-+ information_cutoff_date
-+ recorded_at_utc
--> visible accepted Evidence Items for that exact Case
--> exact visible Claim/ClaimRevision/Evidence relations
--> exact selected-revision CaseRevisionClaimLink roles
--> optional exact LocalDocumentAcceptanceLink provenance graph
--> stable paginated Evidence Pack response
-```
-
-The selected Research Case revision is the frozen research anchor. All accepted
-case evidence visible at the boundaries remains discoverable, but the response
-must distinguish:
-
-```text
-linked_to_selected_case_revision
-accepted_unlinked_to_selected_case_revision
-accepted_evidence_without_claim_link
-```
-
-Unlinked accepted evidence must never be presented as a conclusion, context or
-risk already accepted by the selected Research Case revision.
-
-## Canonical selectors
-
-The future canonical request is:
+## Frozen request contract
 
 ```text
 GET /research-evidence-pack/api/cases/{research_case_id}/revisions/{research_case_revision_id}
     ?information_cutoff_date=YYYY-MM-DD
     &recorded_at_utc=<UTC RFC3339 timestamp>
     &limit=<1..100, default 50>
-    [&cursor=<opaque boundary-bound cursor>]
+    [&cursor=<opaque request-bound keyset cursor>]
 ```
 
 Required behavior:
 
-- both IDs are explicit UUIDs;
-- `research_case_revision_id` must belong to `research_case_id`;
+- both IDs are explicit UUIDs and the revision must belong to the Case;
 - `information_cutoff_date <= recorded_at_utc.date()`;
-- the exact Case revision must be visible under both boundaries;
+- the exact Case revision must be visible under both applicable boundaries;
 - no latest, newest, only-option, same-name, same-ticker or unique-reachable
   selection is allowed;
-- the cursor binds contract version, both IDs, both boundaries, page size and
-  the last ordering tuple; a cursor from another request fails before row
-  projection;
-- page size is bounded to `1..100`; values outside the range fail rather than
-  clamp silently.
+- the cursor binds contract version, both IDs, both boundaries, limit and the
+  final ordering tuple;
+- malformed or mismatched cursors fail before row projection;
+- limits outside `1..100` fail rather than clamp.
 
-## Membership and chronology
+## Evidence visibility and ordering
 
-An Evidence Item is visible only when:
+An Evidence Item is eligible only when:
 
 ```text
 EvidenceItem.case_id = research_case_id
@@ -150,60 +132,7 @@ EvidenceItem.information_date <= information_cutoff_date
 EvidenceItem.recorded_at_utc <= recorded_at_utc
 ```
 
-Every returned Claim binding must preserve its exact Claim, ClaimRevision and
-ClaimEvidenceLink IDs. The Claim must belong to the same Research Case and all
-time-bearing rows must be visible at the recorded boundary. A ClaimRevision is
-classified as part of the selected research snapshot only through an exact
-visible `CaseRevisionClaimLink` for the selected Case revision.
-
-The pack does not collapse Claim history into an inferred latest revision. It
-returns only exact revisions reached by visible links for the current Evidence
-page and preserves every relation (`supports`, `contradicts`, `context`).
-
-Visible Evidence and Claim supersession identities remain explicit history.
-`supersedes_evidence_id` must identify an older recorded Evidence Item in the same
-Case when present; `ClaimRevision.supersedes_revision_id` must identify an older
-recorded revision of the same Claim. A target outside the information boundary is
-reported by ID as `not_visible_as_of`, without exposing its fields or replacing
-it. The pack never removes a superseded row or turns either chain into an
-implicit current-row selector. A missing, cross-owner or forward-recorded
-supersession graph is `evidence_pack_integrity_error`.
-
-Evidence without any visible ClaimEvidenceLink remains visible with an explicit
-`accepted_evidence_without_claim_link` state. It is never dropped or treated as
-support for a claim.
-
-## Exact local-document provenance
-
-An Evidence Item receives local-document provenance only when an exact
-`LocalDocumentAcceptanceLink` exists for its ID. The projection must set-wise
-revalidate:
-
-- acceptance link, receipt and review-session identity;
-- receipt target Research Case;
-- exact accepted review revision and its visibility;
-- acceptance-link candidate, Evidence, Claim, ClaimRevision and
-  ClaimEvidenceLink identities;
-- import attempt, immutable content and exact candidate page/span;
-- candidate quote fingerprint and exact UTF-8 byte slice in the stored page;
-- Evidence content fingerprint and canonical local-document locator produced by
-  the accepted v1 command.
-
-The pack returns citation metadata and the reviewed quote, not whole PDF bytes or
-whole page text. The existing exact content/page surfaces remain responsible for
-explicit document inspection.
-
-If no acceptance link exists, the source is `ledger_only`; no source-locator
-string, title, filename, company name or content similarity may upgrade it to
-local-document provenance.
-
-Any present-but-invalid local-document acceptance graph fails the complete pack
-request closed as `evidence_pack_integrity_error`. It must not omit the broken
-item, fall back to source text or return a partially authoritative pack.
-
-## Stable ordering and pagination
-
-The top-level entry is one accepted Evidence Item. Stable order is:
+Stable page order is:
 
 ```text
 information_date DESC,
@@ -211,71 +140,284 @@ recorded_at_utc DESC,
 evidence_id ASC
 ```
 
-Within an entry:
+All UUID tie-breakers use lowercase canonical string order. Offset pagination is
+prohibited.
 
-- Claim bindings: `claim_key`, `claim_revision_no`, relation, ClaimRevision UUID;
-- selected-revision roles: role, CaseRevisionClaimLink UUID;
-- local-document citations: receipt UUID, candidate UUID;
-- all UUID tie-breakers use lowercase canonical string order.
+## Claim binding and research membership
 
-The opaque cursor uses the final Evidence ordering tuple and a deterministic
-SHA-256 checksum over canonical UTF-8 JSON. It is integrity/binding metadata, not
-an authorization token or secret. Malformed or mismatched cursors return
-`invalid_evidence_pack_cursor` before database work.
+Every returned binding preserves exact `Claim`, `ClaimRevision` and
+`ClaimEvidenceLink` IDs and the persisted relation. The Claim must belong to the
+requested Case, and every time-bearing row must be visible at the recorded
+boundary. No latest ClaimRevision is selected.
 
-No offset pagination is allowed.
-
-## Read contract
-
-The future response contract version is:
+Research membership is authoritative on each `claim_bindings[]` member:
 
 ```text
-aquantai.research-evidence-pack.v1
+linked_to_selected_case_revision
+accepted_unlinked_to_selected_case_revision
 ```
 
-It contains:
+A binding is `linked_to_selected_case_revision` only when one or more exact,
+visible `CaseRevisionClaimLink` rows reference that exact ClaimRevision and the
+selected Case revision. Its exact roles and link IDs are returned. Otherwise that
+binding is `accepted_unlinked_to_selected_case_revision`.
 
-- exact request selectors and boundaries;
-- exact Research Case and selected Case revision identity/status;
-- visible Evidence count and page cursor state;
-- Evidence entries with accepted source metadata;
-- exact Claim revision bindings and relation;
-- exact selected-revision role or explicit unlinked state;
-- optional exact local-document receipt/content/page/span/quote provenance;
-- conflict and missing-link states;
-- deterministic notices that accepted evidence does not automatically rewrite
-  the selected research snapshot;
-- zero recommendation, priority, valuation, expected-return or trading meaning.
+The Evidence entry has no scalar `research_membership_state`. It exposes only the
+derived, closed `membership_summary`:
 
-No AI summary, generated conclusion or sentiment label is part of v1. Existing
-Evidence/Claim statements are rendered verbatim as persisted accepted fields.
+```text
+no_claim_bindings
+all_bindings_linked
+all_bindings_unlinked
+mixed_linked_and_unlinked_bindings
+```
 
-## Query architecture and ceilings
+`membership_summary` is presentation metadata derived from the complete binding
+set and never overrides a binding. One Evidence Item may simultaneously contain
+linked and unlinked Claim bindings. Evidence without a visible ClaimEvidenceLink
+remains visible with `no_claim_bindings`; it is never treated as support for any
+Claim.
 
-The expected future implementation is a new read-only, pack-specific projection
-module over existing models. It may use set-based scalar queries in the same
-style as accepted result projections. It may not modify existing repositories or
-write owners merely to force the pack through a whole-graph loader.
+Nested order is deterministic:
+
+```text
+Claim.claim_key ASC
+ClaimRevision.revision_no ASC
+ClaimEvidenceLink.relation ASC
+ClaimRevision.id ASC
+CaseRevisionClaimLink.role ASC
+CaseRevisionClaimLink.id ASC
+```
+
+## Supersession integrity with minimal target loads
+
+Visible Evidence and Claim supersession IDs remain explicit history and never
+become implicit current-row selectors.
+
+For every non-null `EvidenceItem.supersedes_evidence_id` and every non-null
+`ClaimRevision.supersedes_revision_id` reached by the page, the projection must
+perform one bounded, set-wise minimal target load. The load is permitted to cross
+the information boundary solely to validate identity and chronology.
+
+The allowed target columns are exactly:
+
+```text
+Evidence target: id, case_id, information_date, recorded_at_utc
+ClaimRevision target: id, claim_id, revision_no,
+                      information_cutoff_date, recorded_at_utc
+```
+
+Validation requires:
+
+- every referenced target exists;
+- an Evidence target belongs to the same Research Case and is recorded strictly
+  before the superseding Evidence Item;
+- a ClaimRevision target belongs to the same Claim, has a lower revision number
+  and is recorded strictly before the superseding ClaimRevision;
+- no target statement, source metadata, quote, page text or other payload field is
+  loaded or returned by this validation path.
+
+If the minimal target is valid but outside the requested information boundary,
+the response may expose only its exact ID plus `not_visible_as_of`. It must not
+expose target fields or replace it with another row. A missing, cross-owner,
+non-older or forward-recorded target fails the whole request as
+`evidence_pack_integrity_error`.
+
+## Complete local-document acceptance proof
+
+An Evidence Item receives local-document provenance only when an exact
+`LocalDocumentAcceptanceLink` exists. If any page Evidence Item reaches a receipt,
+the projection validates the complete receipt transition set-wise, not merely the
+one link shown on the current page.
+
+### Receipt and revision identity
+
+The following must all hold:
+
+- every receipt and link exists and all receipt links are loaded for the bounded
+  receipt set;
+- receipt, source revision, accepted revision and review session share the exact
+  `review_session_id`;
+- `receipt.target_research_case_id`,
+  `LocalDocumentReviewSession.target_research_case_id` and the requested Case are
+  identical;
+- `receipt.source_review_fingerprint_sha256` equals the exact source revision
+  fingerprint;
+- `receipt.accepted_review_fingerprint_sha256` equals the exact accepted revision
+  fingerprint;
+- `receipt.acceptance_contract_version` equals
+  `aquantai.local-document-acceptance.v1`;
+- source revision state is `draft` or `deferred`;
+- accepted revision state is `accepted`;
+- accepted revision number is `source.revision_number + 1`;
+- accepted `expected_previous_revision_number` equals the source revision number;
+- accepted `supersedes_review_revision_id` equals the source revision ID;
+- accepted and source revisions belong to the same review session;
+- accepted source kind, evidence grade, document identity candidate, subject
+  candidate, information date and reviewer note are exact copies of the source;
+- receipt `accepted_at_utc` equals accepted revision `recorded_at_utc` and is
+  visible at the requested recorded boundary;
+- accepted information date is visible at the requested information boundary.
+
+### Full decision-copy equality
+
+The projection loads every candidate decision for both source and accepted
+revisions for each bounded receipt and requires exact set equality by candidate
+ID. Each paired row must match exactly on:
+
+```text
+decision
+claim_operation
+claim_key
+claim_status
+evidence_relation
+decision_fingerprint_sha256
+```
+
+The decision sets must cover the exact complete candidate set owned by the review
+session. Missing, added, rebound or changed accepted decisions are integrity
+failures.
+
+### Fingerprint replay
+
+Using the accepted owner contracts, the projection deterministically rebuilds:
+
+1. every selected candidate Evidence fingerprint under
+   `aquantai.local-document-evidence-item.v1`;
+2. the acceptance plan fingerprint from the exact source revision, session,
+   content, identity candidates and ordered selected decision set;
+3. the request fingerprint from source revision ID/number/fingerprint, expected
+   session latest number equal to the source revision number, target Case,
+   selected candidate IDs, selected decision fingerprints, receipt accepted time,
+   `aquantai.local-document-acceptance.v1` and the rebuilt plan fingerprint;
+4. the accepted review fingerprint under
+   `aquantai.local-document-accepted-review.v1` from the exact source identity,
+   accepted successor number/state, rebuilt request/plan fingerprints, target
+   Case and accepted time.
+
+The rebuilt request fingerprint must equal
+`receipt.request_fingerprint_sha256`; the rebuilt accepted fingerprint must equal
+both the accepted revision and receipt values. Contract or fingerprint mismatch
+fails the whole request.
+
+### Receipt-link completeness and semantics
+
+For each receipt, the exact set of `LocalDocumentAcceptanceLink` rows must equal
+the source decision set members where:
+
+```text
+decision = selected
+candidate_kind in {fact, event}
+claim_operation = create_new_deterministic_claim
+```
+
+There must be one and only one link for each selected fact/event decision and no
+extra link. Every link must match that decision and produced Ledger graph:
+
+- candidate ID and candidate review session;
+- Evidence ID, requested Case, information date, recorded time, source kind,
+  evidence grade, summary, content fingerprint and canonical local-document
+  locator;
+- Claim ID and Case;
+- Claim key, ClaimRevision ID/revision number/statement/status/information date and
+  recorded time;
+- ClaimEvidenceLink ID, Evidence ID, ClaimRevision ID, relation and recorded time;
+- decision claim key, claim status and evidence relation.
+
+Any source/accepted revision swap, fingerprint or contract mismatch,
+non-successor accepted revision, incomplete/changed decision copy, missing/extra
+link or link/decision semantic mismatch fails the complete pack request as
+`evidence_pack_integrity_error`.
+
+### Citation graph
+
+The same set-wise proof validates import attempt, immutable PDF content, candidate
+and exact page/span:
+
+- review session points to the exact import attempt and content;
+- candidate belongs to the receipt review session;
+- page belongs to that content and page number;
+- half-open UTF-8 byte offsets are valid scalar boundaries;
+- the exact stored byte slice decodes to `quote_text`;
+- quote and page SHA-256 values match;
+- candidate and Evidence fingerprints recompute exactly;
+- canonical local-document locator matches the accepted v1 command.
+
+The pack returns citation metadata and reviewed quote only. It never returns raw
+PDF bytes or whole page text.
+
+If no acceptance link exists, provenance is `ledger_only`. Locator text, title,
+filename, company name or content similarity may never upgrade it. A present but
+invalid graph cannot be omitted or downgraded.
+
+## Response contract
+
+```text
+contract_version = aquantai.research-evidence-pack.v1
+```
+
+Top-level fields include exact selectors, boundaries, Case and selected revision,
+visible count, entries, next cursor and deterministic notices.
+
+Each Evidence entry contains:
+
+```text
+evidence
+claim_bindings[]
+membership_summary
+local_document_provenance | null
+integrity_state
+```
+
+Each Claim binding contains:
+
+```text
+claim
+claim_revision
+claim_evidence_link
+relation
+research_membership_state
+selected_case_revision_roles[]
+supersession_reference
+```
+
+No AI summary, sentiment, rank, score, recommendation, valuation, expected return
+or trading meaning is part of v1. Persisted statements are rendered verbatim.
+
+## Query architecture and ceiling
+
+The future implementation is a new pack-specific read projection over existing
+models. It may use set-based scalar queries and SQL CTE/UNION shapes. It may not
+modify write owners or issue per-item/per-Claim/per-citation queries.
 
 For one page of at most 100 Evidence Items:
 
 ```text
-evidence pack page = <= 8 SQL statements
+maximum SQL statements = 8
 HTTP GET writes = 0
 network calls = 0
+OCR calls = 0
 AI calls = 0
 ```
 
-The ceiling is independent of the number of Claim bindings and local-document
-citations within that bounded Evidence page. Per-item or per-citation query loops
-are prohibited. Full PDF bytes and full page text are not returned by the pack.
-The existing schema is sufficient for correctness; if measured SQLite/PostgreSQL
-validation proves an additional index is required to meet the bounded product
-contract, implementation must STOP rather than add it silently.
+The eight-statement budget includes:
 
-## Error and recovery states
+1. exact Case and selected revision validation;
+2. visible Evidence count;
+3. bounded Evidence page;
+4. Claim/ClaimRevision/ClaimEvidenceLink rows for page IDs;
+5. selected Case-revision roles;
+6. complete receipt-level local-document transition graph for all receipts reached
+   by page IDs, including every sibling receipt link and both decision sets;
+7. exact referenced page rows;
+8. the set-wise minimal Evidence/ClaimRevision supersession-target load.
 
-Closed service states include:
+One statement may contain bounded CTEs/unions. The count is independent of nested
+bindings, candidates and citations. If measured SQLite/PostgreSQL validation
+requires another index or cannot meet the ceiling, implementation must STOP and
+return to separately authorized Strict architecture.
+
+## Error states
 
 ```text
 research_case_not_found
@@ -288,12 +430,39 @@ evidence_pack_integrity_error
 database_unavailable
 ```
 
-Empty visible evidence is a successful, explicit `empty_evidence_pack` result.
-It is not replaced with newer evidence and does not trigger acquisition.
+An exact visible Case revision with no visible Evidence returns HTTP 200 with
+`empty_evidence_pack`; it triggers no acquisition or write.
 
-## Persistence, rollback and downgrade
+## Required future validation
 
-Research Evidence Pack v1 persists nothing:
+Positive and boundary coverage must include:
+
+- exact document plus ledger-only golden path;
+- empty pack and Evidence without Claim links;
+- one Evidence Item with linked and unlinked Claim bindings simultaneously,
+  proving per-binding states and `mixed_linked_and_unlinked_bindings`;
+- contradiction/context relations and deterministic nested ordering;
+- valid information-hidden supersession targets whose content is not projected;
+- missing, cross-Case/cross-Claim, non-older and forward-recorded supersession
+  targets, each failing closed;
+- exact unlinked accepted document evidence;
+- malformed and cross-request cursors;
+- stable pagination with identical timestamps;
+- source/accepted review revision swap;
+- source, accepted, request and contract fingerprint mismatch;
+- non-immediate-successor accepted revision;
+- missing, added or changed accepted decision;
+- missing, extra or semantically mismatched acceptance link;
+- candidate/page/span/quote/Evidence/Claim graph corruption;
+- locator that resembles a local locator without an acceptance link;
+- 1, 50 and 100 member SQL ceilings on SQLite and PostgreSQL;
+- zero writes, network, Provider, OCR and AI;
+- full regression and all configured offline demos.
+
+Every receipt-transition corruption above must fail the entire request as
+`evidence_pack_integrity_error`; partial authoritative output is prohibited.
+
+## Persistence and lifecycle
 
 ```text
 new table = none
@@ -306,56 +475,13 @@ rollback data action = none
 downgrade data action = none
 ```
 
-Removing a future read-only implementation removes only the projection surface;
-all authoritative accepted rows remain unchanged. If implementation proves a
-durable pack identity, saved selection, snapshot, export history or additional
-index is required, it must STOP and return to separately authorized Strict
-architecture.
+Removing a future implementation removes only the read surface. Durable pack
+identity, saved selection, export history or a required index is a STOP condition.
 
-## Production-realistic offline golden path
+## Inactive future implementation families
 
-The required future zero-network fixture contains:
-
-1. one exact Research Case with its initial revision;
-2. one accepted official local PDF with immutable pages;
-3. one human-authored page/span fact accepted atomically through the production
-   Document Import boundary;
-4. one later, explicitly selected Research Case revision created through the
-   existing owner with that exact ClaimRevision linked as `conclusion`;
-5. one accepted non-document Evidence Item linked as `context`;
-6. one later accepted local-document fact visible at the requested boundaries
-   but not linked to the selected Case revision;
-7. one Evidence Item recorded after the requested boundary and therefore absent.
-
-The response anchored to that later Case revision must preserve all three visible Evidence Items, show the exact PDF
-citation for both document-derived items, label the later accepted fact as
-unlinked, preserve the non-document source as `ledger_only`, and write nothing.
-
-## Decisive failure path
-
-Create an otherwise visible local-document Evidence Item whose
-`LocalDocumentAcceptanceLink` points to a candidate/page/span or Claim graph that
-does not match the receipt and accepted Evidence graph. The pack must return
-`evidence_pack_integrity_error`, perform zero writes, make zero network/AI calls
-and must not fall back to parsing `EvidenceItem.source_locator`.
-
-## Expected future implementation classification
-
-A later separately authorized implementation may be Standard read-only work only
-when it:
-
-- uses existing tables and immutable links;
-- adds no persistence or accepted contract;
-- leaves every write owner unchanged;
-- remains local, zero-network and zero-AI;
-- stays inside a separately approved implementation Issue/PR.
-
-Return to Strict architecture if any STOP condition below appears.
-
-## Proposed inactive future implementation families
-
-This preflight does not activate an implementation allowlist. A later Issue may
-authorize only the minimum required families, expected to include:
+This preflight activates no implementation allowlist. A later separately
+approved Issue may authorize only minimum new read-only families such as:
 
 ```text
 industry_alpha/research_evidence_pack_*.py
@@ -364,21 +490,20 @@ backend/main.py
 research_evidence_pack/static/**        (only if separately included)
 tests/test_research_evidence_pack_*.py
 scripts/demo_research_evidence_pack.py
-.github/workflows/local-tests.yml        (only to register focused validation)
+.github/workflows/local-tests.yml        (only to register validation)
 ```
 
-No existing Evidence Ledger or Document Import write-owner file is presumed
-modifiable.
+No Evidence Ledger or Document Import write-owner file is presumed modifiable.
 
 ## Locked exclusions
 
 - production implementation in this PR;
 - schema, migration, dependency, fixture, test or workflow changes;
 - saved pack, saved selection, export history or background refresh;
-- Provider/network/credential use or external announcement catalog/download;
-- OCR, NLP, AI summary, sentiment, candidate generation or automated extraction;
+- Provider/network/credential use or external acquisition;
+- OCR, NLP, AI summary, candidate generation or automated extraction;
 - automatic Evidence/Claim/Research Case acceptance or mutation;
-- fuzzy identity, company-name/ticker matching or hidden latest/default selection;
+- fuzzy identity or hidden latest/default selection;
 - Company Research, Industry Map, beneficiary, Investment Candidate or valuation
   mutation;
 - recommendation, target price, expected return, position sizing, portfolio,
@@ -401,12 +526,12 @@ STOP and request an explicit architecture amendment if review or implementation
 requires:
 
 - a persistent Evidence Pack/snapshot/selection/export-history owner;
-- a table, column, index, migration, backfill or destructive history operation;
+- a table, column, index, migration, backfill or history rewrite;
 - modification of Evidence Ledger or Document Import write owners;
-- packing provenance into free text or parsing a filesystem path/source locator
-  as authority;
-- latest, unique-reachable, title, company-name, ticker or similarity inference;
-- partial success that hides a broken accepted provenance graph;
+- provenance authority from free text, path or locator parsing;
+- latest, unique-reachable, title, company, ticker or similarity inference;
+- partial success hiding any broken accepted graph;
+- more than eight SQL statements for one bounded page;
 - Provider, network, credential, OCR, AI or automatic acceptance;
 - recommendation, portfolio or trading owners;
 - any file outside the then-authorized allowlist.
@@ -416,14 +541,14 @@ requires:
 1. Base remains exact `8dd187c129c3e4a375f550758fab266719ccd0da`.
 2. Base-to-HEAD inventory contains exactly the two architecture artifacts.
 3. PR remains Draft; no Ready transition, merge or Issue closure is authorized.
-4. Repository CI succeeds on one exact immutable HEAD.
-5. A fresh process-independent fixed-head architecture review records zero
+4. Full repository CI succeeds on one exact immutable new HEAD.
+5. A fresh process-independent fixed-HEAD architecture review records zero
    blockers and exactly:
 
 ```text
 AUTHORIZED RESEARCH EVIDENCE PACK V1 PREFLIGHT APPROVED at fixed head <FULL_HEAD_SHA>
 ```
 
-6. Any new commit invalidates prior fixed-head CI and review evidence.
+6. Any new commit invalidates prior fixed-HEAD CI and review evidence.
 7. Separate project-owner authorization is required for merge and again for any
    implementation Issue, branch or PR.
