@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.beneficiary_semantics import router as beneficiary_semantics_router
@@ -9,6 +9,12 @@ from backend.api.canonical_price import router as canonical_price_router
 from backend.api.company_comparison import router as company_comparison_router
 from backend.api.company_research import router as company_research_router
 from backend.api.evidence_intelligence import router as evidence_intelligence_router
+from backend.api.document_import import api_router as document_import_api_router
+from backend.api.document_import import page_router as document_import_page_router
+from backend.api.document_import import (
+    is_document_import_mutation,
+    require_local_csrf,
+)
 from backend.api.industry_alpha import router as industry_alpha_router
 from backend.api.industry_analysis import router as industry_analysis_router
 from backend.api.industry_analysis_acceptance import (
@@ -46,6 +52,23 @@ app = FastAPI(
     version="0.2.0",
     description="A-share AI multi-factor quantitative research platform with a local read-only Dashboard.",
 )
+
+
+@app.middleware("http")
+async def guard_document_import_before_body_parsing(
+    request: Request, call_next
+):
+    """Reject non-local document mutations before FastAPI parses their body."""
+
+    if is_document_import_mutation(request):
+        try:
+            require_local_csrf(request)
+        except HTTPException as exc:
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail},
+            )
+    return await call_next(request)
 install_today_market_runtime(
     app,
     configuration=TodayMarketMockRuntimeConfigurationV1(),
@@ -72,11 +95,17 @@ COMPANY_COMPARISON_STATIC_DIR = (
 INVESTMENT_CANDIDATES_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "investment_candidates" / "static"
 )
+DOCUMENT_IMPORT_STATIC_DIR = Path(__file__).resolve().parents[1] / "document_import" / "static"
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
 app.mount(
     "/market-cockpit/static",
     StaticFiles(directory=MARKET_COCKPIT_STATIC_DIR),
     name="market-cockpit-static",
+)
+app.mount(
+    "/document-import/static",
+    StaticFiles(directory=DOCUMENT_IMPORT_STATIC_DIR),
+    name="document-import-static",
 )
 app.mount(
     "/today-market/static",
@@ -132,6 +161,8 @@ app.include_router(company_comparison_router)
 app.include_router(canonical_price_router)
 app.include_router(investment_candidate_router)
 app.include_router(normalized_valuation_router)
+app.include_router(document_import_api_router)
+app.include_router(document_import_page_router)
 
 
 @app.get("/")

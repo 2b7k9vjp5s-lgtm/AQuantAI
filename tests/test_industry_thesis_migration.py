@@ -78,7 +78,7 @@ def test_migration_creates_exact_six_tables_and_empty_round_trip(tmp_path) -> No
         with engine.connect() as connection:
             assert (
                 connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "20260725_0017"
+                == "20260803_0018"
             )
     finally:
         engine.dispose()

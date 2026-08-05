@@ -45,7 +45,7 @@ def test_migration_creates_exact_thirteen_tables_and_empty_round_trip(tmp_path) 
         assert EXPECTED_TABLES.issubset(tables)
         assert len(EXPECTED_TABLES) == 13
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260725_0017"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260803_0018"
     finally:
         engine.dispose()
 

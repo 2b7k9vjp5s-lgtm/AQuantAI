@@ -25,6 +25,24 @@ implementation_authorized = false
 
 PR #241 remains excluded and must not be modified.
 
+## Strict implementation activation
+
+Project-owner implementation authorization on 2026-08-04 is recorded by Issue
+`#285`. The exact implementation base is architecture merge commit
+`4849f8f680be85f266eba4d7377ec0b288a58916`; `main` Local Tests `#1062` / run
+`30882371990` / job `91906259635` succeeded at that exact commit. The candidate
+allowlist below is active only for Issue #285 and its new Draft implementation PR.
+Architecture Issue #283 remains open, and implementation still requires fixed-HEAD
+CI, an independent implementation review and separate merge authorization.
+
+After the minimal migration-test allowlist amendment merged through PR `#286`,
+the project owner explicitly authorized implementation resumption from exact
+`main@be8d169b8b892c46ec4aa3a05a9b807aac39e824`. The amendment fixed-head review
+is `4852574079`; merge commit and resumed implementation base are both
+`be8d169b8b892c46ec4aa3a05a9b807aac39e824`; `main` Local Tests `#1064` / run
+`30896037228` / job `91949040855` succeeded at that exact commit. No rebase,
+force-push, Issue closure or PR `#241` change is authorized.
+
 ## Owner inventory result
 
 At the exact base:
@@ -388,6 +406,32 @@ tests/test_industry_thesis_migration.py
 tests/test_investment_candidate_migration.py
 tests/test_normalized_valuation_migration.py
 ```
+
+### Issue #285 second minimal PostgreSQL migration-test allowlist amendment
+
+The project owner explicitly authorized this amendment after Draft PR `#287`
+Local Tests `#1065` / run `30974828193` proved that nine additional existing
+PostgreSQL migration-test files also freeze the former repository head. This
+amendment adds exactly these files to the active implementation allowlist:
+
+```text
+tests/test_benchmark_migration.py
+tests/test_canonical_price_postgres.py
+tests/test_industry_thesis_postgres.py
+tests/test_investment_candidate_postgres.py
+tests/test_normalized_valuation_postgres.py
+tests/test_sector_migration.py
+tests/test_stage1_beneficiaries_postgres.py
+tests/test_stage2_company_research_postgres.py
+tests/test_stage2_expectations_valuation_postgres.py
+```
+
+They may change only the literal current-head expectations from
+`20260725_0017` to `20260803_0018`, including the transactional rollback state
+after a populated downgrade refusal. Historical table, preservation, refusal,
+upgrade and downgrade assertions remain unchanged. No production feature,
+schema concept, migration operation, Provider/network, OCR, AI, automatic
+acceptance, recommendation, portfolio or trading behavior is authorized.
 
 They may be changed only to preserve their existing historical assertions while
 recognizing the reviewed `20260803_0018` repository head and empty forward/

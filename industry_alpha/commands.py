@@ -82,6 +82,37 @@ class EvidenceLedgerCommandService:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
+    def preview_reviewed_local_document(self, request: object) -> object:
+        """Validate an exact document acceptance snapshot with zero writes."""
+
+        from industry_alpha.document_import_commands import (
+            preview_local_document_acceptance,
+        )
+
+        with self._session_factory() as session:
+            return preview_local_document_acceptance(session, request)
+
+    def accept_reviewed_local_document(self, request: object) -> object:
+        """Own the one outer transaction for document-to-ledger acceptance."""
+
+        from industry_alpha.document_import_commands import (
+            accept_local_document_in_session,
+        )
+
+        with _revision_lock("local_document_review", request.source_review_revision_id):
+            try:
+                with self._session_factory.begin() as session:
+                    return accept_local_document_in_session(session, request)
+            except IntegrityError:
+                # A concurrent winner may have committed the exact receipt. Re-enter
+                # through the receipt-first replay rule; any non-identical state still
+                # fails closed rather than being translated into reuse.
+                with self._translate_integrity(
+                    "local document acceptance conflicts with immutable history"
+                ):
+                    with self._session_factory.begin() as session:
+                        return accept_local_document_in_session(session, request)
+
     def create_case(
         self,
         *,
