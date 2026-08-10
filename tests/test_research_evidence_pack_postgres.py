@@ -15,6 +15,7 @@ from industry_alpha.commands import EvidenceLedgerCommandService
 from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.research_evidence_pack_contracts import EvidencePackRequest
 from industry_alpha.research_evidence_pack_query import ResearchEvidencePackQueryService
+from scripts.demo_research_evidence_pack import run_demo
 
 
 INFO_DATE = date(2026, 8, 5)
@@ -22,6 +23,17 @@ INFO_DATE = date(2026, 8, 5)
 
 def _utc(hour: int) -> datetime:
     return datetime(2026, 8, 5, hour, tzinfo=timezone.utc)
+
+
+def test_zero_network_demo_is_executable_from_full_pytest():
+    payload = run_demo()
+    assert payload["contract_version"] == "aquantai.research-evidence-pack.v1"
+    assert payload["visible_evidence_count"] == 1
+    assert payload["entries"][0]["integrity_state"] == "ledger_only"
+    assert payload["notices"]["writes_per_get"] == 0
+    assert payload["notices"]["network_calls"] == 0
+    assert payload["notices"]["ocr_calls"] == 0
+    assert payload["notices"]["ai_calls"] == 0
 
 
 @pytest.fixture(scope="module")
