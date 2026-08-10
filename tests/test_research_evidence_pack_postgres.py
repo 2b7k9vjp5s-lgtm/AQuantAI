@@ -71,7 +71,7 @@ def test_postgres_keyset_and_minimal_supersession_target_load_stay_within_ceilin
         evidence_grade="B",
         source_kind="research",
         source_title="旧证据",
-        information_date=INFO_DATE,
+        information_date=date(2026, 8, 4),
         summary="旧证据内容",
         content_fingerprint="research-evidence-pack-pg-old",
         recorded_at_utc=_utc(9),
