@@ -7,15 +7,23 @@ import os
 from alembic import command
 from alembic.config import Config
 import pytest
-from sqlalchemy import create_engine, event, select, text
+from sqlalchemy import create_engine, event, select, text, update
 from sqlalchemy.engine import make_url
 
 from backend.database.engine import build_session_factory
 from industry_alpha.commands import EvidenceLedgerCommandService
+from industry_alpha.document_import_models import (
+    LocalDocumentCandidate,
+    LocalDocumentReviewSession,
+)
 from industry_alpha.models import ResearchCaseRevision
-from industry_alpha.research_evidence_pack_contracts import EvidencePackRequest
+from industry_alpha.research_evidence_pack_contracts import (
+    EvidencePackRequest,
+    ResearchEvidencePackError,
+)
 from industry_alpha.research_evidence_pack_query import ResearchEvidencePackQueryService
 from scripts.demo_research_evidence_pack import run_demo
+from tests.test_research_evidence_pack_query import _build_golden_graph, _request
 
 
 INFO_DATE = date(2026, 8, 5)
@@ -65,6 +73,51 @@ def postgres_session_factory(postgres_database_url):
     with engine.begin() as connection:
         connection.execute(text("TRUNCATE local_document_contents, research_cases CASCADE"))
     engine.dispose()
+
+
+def test_postgres_local_document_receipt_replay_stays_within_eight_statements(
+    postgres_session_factory, monkeypatch
+):
+    graph = _build_golden_graph(postgres_session_factory, monkeypatch)
+    engine = postgres_session_factory.kw["bind"]
+    statements: list[str] = []
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        payload = ResearchEvidencePackQueryService(postgres_session_factory).get_pack(
+            _request(graph, limit=100)
+        ).to_dict()
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    assert 1 <= len(statements) <= 8
+    entries = {row["evidence"]["evidence_id"]: row for row in payload["entries"]}
+    local = entries[str(graph["local_evidence_id"])]
+    assert local["integrity_state"] == "validated_local_document"
+    assert local["membership_summary"] == "mixed_linked_and_unlinked_bindings"
+    assert local["local_document_provenance"]["candidate_id"] == str(graph["candidate_id"])
+
+
+def test_postgres_receipt_chronology_corruption_fails_closed(
+    postgres_session_factory, monkeypatch
+):
+    graph = _build_golden_graph(postgres_session_factory, monkeypatch)
+    with postgres_session_factory.begin() as session:
+        review_session_id = session.scalar(
+            select(LocalDocumentCandidate.review_session_id).where(
+                LocalDocumentCandidate.id == graph["candidate_id"]
+            )
+        )
+        session.execute(
+            update(LocalDocumentReviewSession)
+            .where(LocalDocumentReviewSession.id == review_session_id)
+            .values(created_at_utc=datetime(2026, 8, 5, 11, 30))
+        )
+    with pytest.raises(ResearchEvidencePackError) as error:
+        ResearchEvidencePackQueryService(postgres_session_factory).get_pack(_request(graph))
+    assert error.value.code == "evidence_pack_integrity_error"
 
 
 def test_postgres_keyset_and_minimal_supersession_target_load_stay_within_ceiling(
