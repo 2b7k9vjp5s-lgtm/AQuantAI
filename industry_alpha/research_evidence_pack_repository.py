@@ -178,6 +178,7 @@ class ResearchEvidencePackRepository:
         ledger_revision = ClaimRevision
         ledger_relation = ClaimEvidenceLink
 
+        case_owner = aliased(ResearchCase, name="receipt_case")
         source = aliased(LocalDocumentReviewRevision, name="source_review")
         accepted = aliased(LocalDocumentReviewRevision, name="accepted_review")
         predecessor = aliased(LocalDocumentReviewRevision, name="source_predecessor")
@@ -251,11 +252,41 @@ class ResearchEvidencePackRepository:
             )
             .select_from(discovered)
             .outerjoin(receipt, receipt.id == discovered.c.receipt_id)
-            .outerjoin(review, review.id == receipt.review_session_id)
+            .outerjoin(
+                case_owner,
+                and_(
+                    case_owner.id == receipt.target_research_case_id,
+                    case_owner.created_at_utc <= receipt.accepted_at_utc,
+                ),
+            )
+            .outerjoin(
+                review,
+                and_(
+                    review.id == receipt.review_session_id,
+                    review.target_research_case_id == case_owner.id,
+                    review.created_at_utc <= receipt.accepted_at_utc,
+                ),
+            )
             .outerjoin(attempt, attempt.id == review.import_attempt_id)
             .outerjoin(content, content.id == attempt.content_id)
-            .outerjoin(source, source.id == receipt.source_review_revision_id)
-            .outerjoin(accepted, accepted.id == receipt.accepted_review_revision_id)
+            .outerjoin(
+                source,
+                and_(
+                    source.id == receipt.source_review_revision_id,
+                    source.review_session_id == review.id,
+                    source.recorded_at_utc >= review.created_at_utc,
+                    source.recorded_at_utc <= receipt.accepted_at_utc,
+                    source.information_date <= func.date(source.recorded_at_utc),
+                    source.information_date <= func.date(receipt.accepted_at_utc),
+                ),
+            )
+            .outerjoin(
+                accepted,
+                and_(
+                    accepted.id == receipt.accepted_review_revision_id,
+                    accepted.review_session_id == review.id,
+                ),
+            )
             .outerjoin(
                 predecessor,
                 predecessor.id == source.supersedes_review_revision_id,
