@@ -40,6 +40,7 @@ from backend.api.industry_research_result import router as industry_research_res
 from backend.api.investment_candidate import router as investment_candidate_router
 from backend.api.market_cockpit import router as market_cockpit_router
 from backend.api.normalized_valuation import router as normalized_valuation_router
+from backend.api.research_evidence_pack import router as research_evidence_pack_router
 from backend.api.today_market import router as today_market_router
 from backend.today_market_refresh.runtime import (
     TodayMarketMockRuntimeConfigurationV1,
@@ -163,6 +164,7 @@ app.include_router(investment_candidate_router)
 app.include_router(normalized_valuation_router)
 app.include_router(document_import_api_router)
 app.include_router(document_import_page_router)
+app.include_router(research_evidence_pack_router)
 
 
 @app.get("/")
