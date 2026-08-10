@@ -188,12 +188,12 @@ class ResearchEvidencePackRepository:
         accepted_decision = aliased(
             LocalDocumentReviewCandidateDecision, name="accepted_decision"
         )
-        aggregate_candidate = aliased(LocalDocumentCandidate, name="aggregate_candidate")
-        aggregate_source_decision = aliased(
-            LocalDocumentReviewCandidateDecision, name="aggregate_source_decision"
+        count_candidate = aliased(LocalDocumentCandidate, name="count_candidate")
+        count_source_decision = aliased(
+            LocalDocumentReviewCandidateDecision, name="count_source_decision"
         )
-        aggregate_accepted_decision = aliased(
-            LocalDocumentReviewCandidateDecision, name="aggregate_accepted_decision"
+        count_accepted_decision = aliased(
+            LocalDocumentReviewCandidateDecision, name="count_accepted_decision"
         )
 
         discovered = (
@@ -212,8 +212,9 @@ class ResearchEvidencePackRepository:
             .join(discovered, discovered.c.receipt_id == receipt.id)
             .cte("discovered_receipt_sessions")
         )
-        max_review = (
+        max_review_numbers = (
             select(
+                discovered_sessions.c.receipt_id.label("receipt_id"),
                 discovered_sessions.c.review_session_id.label("review_session_id"),
                 func.max(LocalDocumentReviewRevision.revision_number).label("max_revision_number"),
             )
@@ -223,32 +224,83 @@ class ResearchEvidencePackRepository:
                 LocalDocumentReviewRevision.review_session_id
                 == discovered_sessions.c.review_session_id,
             )
-            .outerjoin(
-                aggregate_candidate,
-                aggregate_candidate.review_session_id
-                == discovered_sessions.c.review_session_id,
-            )
-            .outerjoin(
-                aggregate_source_decision,
-                aggregate_source_decision.review_revision_id
-                == discovered_sessions.c.source_review_revision_id,
-            )
-            .outerjoin(
-                aggregate_accepted_decision,
-                aggregate_accepted_decision.review_revision_id
-                == discovered_sessions.c.accepted_review_revision_id,
-            )
             .group_by(
                 discovered_sessions.c.receipt_id,
                 discovered_sessions.c.review_session_id,
             )
-            .having(
-                func.count(func.distinct(aggregate_candidate.id))
-                == func.count(func.distinct(aggregate_source_decision.id)),
-                func.count(func.distinct(aggregate_candidate.id))
-                == func.count(func.distinct(aggregate_accepted_decision.id)),
+            .subquery("bounded_max_review_numbers")
+        )
+        candidate_counts = (
+            select(
+                discovered_sessions.c.receipt_id.label("receipt_id"),
+                func.count(count_candidate.id).label("candidate_count"),
             )
-            .subquery("bounded_max_review_revision")
+            .select_from(discovered_sessions)
+            .outerjoin(
+                count_candidate,
+                count_candidate.review_session_id
+                == discovered_sessions.c.review_session_id,
+            )
+            .group_by(discovered_sessions.c.receipt_id)
+            .subquery("bounded_candidate_counts")
+        )
+        source_decision_counts = (
+            select(
+                discovered_sessions.c.receipt_id.label("receipt_id"),
+                func.count(count_source_decision.id).label("source_decision_count"),
+            )
+            .select_from(discovered_sessions)
+            .outerjoin(
+                count_source_decision,
+                count_source_decision.review_revision_id
+                == discovered_sessions.c.source_review_revision_id,
+            )
+            .group_by(discovered_sessions.c.receipt_id)
+            .subquery("bounded_source_decision_counts")
+        )
+        accepted_decision_counts = (
+            select(
+                discovered_sessions.c.receipt_id.label("receipt_id"),
+                func.count(count_accepted_decision.id).label("accepted_decision_count"),
+            )
+            .select_from(discovered_sessions)
+            .outerjoin(
+                count_accepted_decision,
+                count_accepted_decision.review_revision_id
+                == discovered_sessions.c.accepted_review_revision_id,
+            )
+            .group_by(discovered_sessions.c.receipt_id)
+            .subquery("bounded_accepted_decision_counts")
+        )
+        max_review = (
+            select(
+                discovered_sessions.c.review_session_id.label("review_session_id"),
+                max_review_numbers.c.max_revision_number.label("max_revision_number"),
+            )
+            .select_from(discovered_sessions)
+            .join(
+                max_review_numbers,
+                max_review_numbers.c.receipt_id == discovered_sessions.c.receipt_id,
+            )
+            .join(
+                candidate_counts,
+                candidate_counts.c.receipt_id == discovered_sessions.c.receipt_id,
+            )
+            .join(
+                source_decision_counts,
+                source_decision_counts.c.receipt_id == discovered_sessions.c.receipt_id,
+            )
+            .join(
+                accepted_decision_counts,
+                accepted_decision_counts.c.receipt_id == discovered_sessions.c.receipt_id,
+            )
+            .where(
+                candidate_counts.c.candidate_count
+                == source_decision_counts.c.source_decision_count,
+                candidate_counts.c.candidate_count
+                == accepted_decision_counts.c.accepted_decision_count,
+            )
+            .subquery("bounded_complete_review_set")
         )
         link_counts = (
             select(
