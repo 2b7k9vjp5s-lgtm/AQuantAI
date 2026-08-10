@@ -194,21 +194,38 @@ class ResearchEvidencePackRepository:
             .distinct()
             .cte("discovered_receipts")
         )
+        discovered_sessions = (
+            select(
+                receipt.id.label("receipt_id"),
+                receipt.review_session_id.label("review_session_id"),
+            )
+            .join(discovered, discovered.c.receipt_id == receipt.id)
+            .cte("discovered_receipt_sessions")
+        )
         max_review = (
             select(
                 LocalDocumentReviewRevision.review_session_id.label("review_session_id"),
                 func.max(LocalDocumentReviewRevision.revision_number).label("max_revision_number"),
             )
+            .join(
+                discovered_sessions,
+                discovered_sessions.c.review_session_id
+                == LocalDocumentReviewRevision.review_session_id,
+            )
             .group_by(LocalDocumentReviewRevision.review_session_id)
-            .subquery("max_review_revision")
+            .subquery("bounded_max_review_revision")
         )
         link_counts = (
             select(
                 LocalDocumentAcceptanceLink.receipt_id.label("receipt_id"),
                 func.count(LocalDocumentAcceptanceLink.id).label("link_count"),
             )
+            .join(
+                discovered,
+                discovered.c.receipt_id == LocalDocumentAcceptanceLink.receipt_id,
+            )
             .group_by(LocalDocumentAcceptanceLink.receipt_id)
-            .subquery("receipt_link_counts")
+            .subquery("bounded_receipt_link_counts")
         )
 
         statement = (
