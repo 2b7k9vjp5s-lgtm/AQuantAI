@@ -48,7 +48,7 @@ from industry_alpha.industry_thesis_review import (
     IndustryThesisReviewedPlanQueryService,
 )
 from industry_alpha.industry_thesis_rules import stored_utc
-from industry_alpha.models import Claim, ClaimRevision, ResearchCase
+from industry_alpha.models import Claim, ClaimRevision, ResearchCase, ResearchCaseRevision
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
     Stage1BeneficiaryAssertionLink,
@@ -131,8 +131,8 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
             or reviewed_projection["owner_context"] is None
         ):
             raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY",
-                "unaccepted v1 reviewed plans require an explicit v2 re-review",
+                "INDUSTRY_THESIS_ACCEPTANCE_LEGACY_CONTEXT_UNBOUND",
+                "historical v1/v2 reviewed plans require an explicit v3 re-review before new acceptance",
             )
 
         context = reviewed_projection["owner_context"]
@@ -147,6 +147,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
             )
         try:
             case_id = UUID(context["research_case_id"])
+            case_revision_id = UUID(context["research_case_revision_id"])
             map_id = UUID(context["industry_map_id"])
             map_revision_id = UUID(context["industry_map_revision_id"])
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
@@ -160,6 +161,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 IndustryThesisSessionRevision,
                 IndustryThesisSessionIdentity,
                 ResearchCase,
+                ResearchCaseRevision,
                 IndustryMap,
                 IndustryMapRevision,
             )
@@ -168,12 +170,17 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 IndustryThesisSessionIdentity.id
                 == IndustryThesisSessionRevision.session_id,
             )
+            .join(
+                ResearchCaseRevision,
+                ResearchCaseRevision.case_id == ResearchCase.id,
+            )
             .join(IndustryMap, IndustryMap.case_id == ResearchCase.id)
             .join(IndustryMapRevision, IndustryMapRevision.map_id == IndustryMap.id)
             .where(
                 IndustryThesisSessionRevision.id == reviewed_session_revision_id,
                 IndustryThesisSessionIdentity.id == session_id,
                 ResearchCase.id == case_id,
+                ResearchCaseRevision.id == case_revision_id,
                 IndustryMap.id == map_id,
                 IndustryMapRevision.id == map_revision_id,
             )
@@ -182,10 +189,18 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY"
             )
-        reviewed, identity, research_case, industry_map, map_revision = header
+        (
+            reviewed,
+            identity,
+            research_case,
+            case_revision,
+            industry_map,
+            map_revision,
+        ) = header
         if (
             reviewed.session_id != session_id
             or reviewed.workflow_state != "reviewed_plan_ready"
+            or case_revision.case_id != research_case.id
             or industry_map.case_id != research_case.id
             or map_revision.map_id != industry_map.id
         ):
@@ -195,6 +210,13 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
         if identity.latest_revision_number != reviewed.revision_number:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE"
+            )
+        if (
+            case_revision.information_cutoff_date > as_of_cutoff
+            or stored_utc(case_revision.recorded_at_utc) > recorded_boundary
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_NOT_VISIBLE"
             )
         if (
             map_revision.information_cutoff_date > as_of_cutoff
@@ -250,9 +272,6 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
             else {}
         )
 
-        # The exact reviewed context is part of the SQL predicate. Rows from
-        # another Case, Map, or Map Revision are never loaded, even when they
-        # point at the same StockBasicRecord.
         context_pairs = list(
             self._session.execute(
                 select(Stage1Beneficiary, Stage1BeneficiaryRevision)
@@ -390,9 +409,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                         {
                             "assertion_kind": row.kind,
                             "assertion_revision_id": str(row.revision_id),
-                            "ordinary_label": (
-                                f"{_ASSERTION_LABELS[row.kind]} · {row.label}"
-                            ),
+                            "ordinary_label": f"{_ASSERTION_LABELS[row.kind]} · {row.label}",
                             "assertion_status": row.status,
                         }
                     )
@@ -493,9 +510,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
         ] = defaultdict(list)
         latest_by_beneficiary: dict[UUID, Stage1BeneficiaryRevision] = {}
         for beneficiary, revision in context_pairs:
-            exact_by_stock[revision.stock_basic_record_id].append(
-                (beneficiary, revision)
-            )
+            exact_by_stock[revision.stock_basic_record_id].append((beneficiary, revision))
             current = latest_by_beneficiary.get(beneficiary.id)
             if current is None or revision.revision_no > current.revision_no:
                 latest_by_beneficiary[beneficiary.id] = revision
@@ -588,9 +603,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                     }
                 )
 
-            exact_rows = (
-                exact_by_stock.get(stock_id, []) if stock_id is not None else []
-            )
+            exact_rows = exact_by_stock.get(stock_id, []) if stock_id is not None else []
             reuse_options = []
             append_options = []
             for beneficiary, revision in exact_rows:
@@ -722,6 +735,15 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
             "research_case": {
                 "id": str(research_case.id),
                 "case_key": research_case.case_key,
+                "revision_id": str(case_revision.id),
+                "revision_number": case_revision.revision_no,
+                "revision_title": case_revision.title,
+                "information_cutoff_date": (
+                    case_revision.information_cutoff_date.isoformat()
+                ),
+                "recorded_at_utc": stored_utc(
+                    case_revision.recorded_at_utc
+                ).isoformat(),
             },
             "industry_map": {
                 "id": str(industry_map.id),
@@ -735,6 +757,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 "owner_context_contract_version": OWNER_CONTEXT_VERSION,
                 "map_mode": MAP_MODE,
                 "research_case_id": str(case_id),
+                "research_case_revision_id": str(case_revision_id),
                 "industry_map_id": str(map_id),
                 "industry_map_revision_id": str(map_revision_id),
             },
@@ -774,9 +797,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                     }
                     for pool, revision in pool_pairs
                 ],
-                "zero_supported_contract": {
-                    "mode": "none_no_supported_members"
-                },
+                "zero_supported_contract": {"mode": "none_no_supported_members"},
             },
             "blocking_reasons": blocking_reasons,
             "commit_possible": not blocking_reasons,
@@ -784,6 +805,7 @@ class IndustryThesisOwnerAcceptanceWorkbenchQueryService:
                 "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
                 "selected_context": {
                     "research_case_id": str(case_id),
+                    "research_case_revision_id": str(case_revision_id),
                     "industry_map_id": str(map_id),
                     "industry_map_revision_id": str(map_revision_id),
                 },
