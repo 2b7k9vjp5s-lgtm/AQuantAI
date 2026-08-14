@@ -19,7 +19,13 @@ from industry_alpha.errors import (
 )
 from industry_alpha.chain_map_models import IndustryMapRelationshipRevision
 from industry_alpha.commands import EvidenceLedgerCommandService
-from industry_alpha.models import Claim, ClaimEvidenceLink, ClaimRevision, EvidenceItem
+from industry_alpha.models import (
+    Claim,
+    ClaimEvidenceLink,
+    ClaimRevision,
+    EvidenceItem,
+    ResearchCaseRevision,
+)
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
@@ -35,9 +41,11 @@ from industry_alpha.stage2_commands import (
 )
 from industry_alpha.stage2_fixtures import build_stage2_company_research_fixture
 from industry_alpha.stage2_models import (
+    STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION,
     STAGE2_MODELS,
     Stage2CompanyResearch,
     Stage2CompanyResearchRevision,
+    Stage2CompanyResearchRevisionCaseBinding,
     Stage2FinancialHypothesis,
     Stage2FinancialHypothesisRevision,
     Stage2HypothesisClaimLink,
@@ -81,6 +89,32 @@ def stage2_counts(session_factory):
         return tuple(
             session.scalar(select(func.count()).select_from(model))
             for model in STAGE2_MODELS
+        )
+
+
+def bound_case_revision_id(session_factory, research_id):
+    with session_factory() as session:
+        return session.scalar(
+            select(Stage2CompanyResearchRevisionCaseBinding.research_case_revision_id)
+            .join(
+                Stage2CompanyResearchRevision,
+                Stage2CompanyResearchRevision.id
+                == Stage2CompanyResearchRevisionCaseBinding.company_research_revision_id,
+            )
+            .where(
+                Stage2CompanyResearchRevision.company_research_id == research_id,
+                Stage2CompanyResearchRevision.revision_no == 1,
+            )
+        )
+
+
+def initial_case_revision_id(session_factory, case_id):
+    with session_factory() as session:
+        return session.scalar(
+            select(ResearchCaseRevision.id).where(
+                ResearchCaseRevision.case_id == case_id,
+                ResearchCaseRevision.revision_no == 1,
+            )
         )
 
 
@@ -182,6 +216,51 @@ def test_fixture_freezes_exact_handoff_and_cutoff_history(session_factory, built
     assert historical["latest_revision"]["revision_no"] == 2
     assert historical["hypotheses"][0]["latest_revision"]["revision_no"] == 1
     assert len(historical["latest_revision"]["后续验证清单"]) == 1
+
+
+def test_fixture_binds_every_research_revision_to_explicit_case_revision(
+    session_factory, built
+):
+    with session_factory() as session:
+        revisions = list(
+            session.scalars(
+                select(Stage2CompanyResearchRevision).order_by(
+                    Stage2CompanyResearchRevision.company_research_id,
+                    Stage2CompanyResearchRevision.revision_no,
+                )
+            )
+        )
+        bindings = list(
+            session.scalars(
+                select(Stage2CompanyResearchRevisionCaseBinding).order_by(
+                    Stage2CompanyResearchRevisionCaseBinding.company_research_revision_id
+                )
+            )
+        )
+    assert len(revisions) == 4
+    assert len(bindings) == 4
+    assert {item.company_research_revision_id for item in bindings} == {
+        item.id for item in revisions
+    }
+    assert len({item.research_case_revision_id for item in bindings}) == 1
+    assert {item.binding_contract_version for item in bindings} == {
+        STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION
+    }
+
+
+def test_research_revision_requires_explicit_case_revision_id(session_factory, built):
+    before = stage2_counts(session_factory)
+    with pytest.raises(TypeError, match="research_case_revision_id"):
+        Stage2CompanyResearchCommandService(session_factory).append_research_revision(
+            built.draft_research_id,
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Missing explicit Case Revision must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_counts(session_factory) == before
 
 
 def test_draft_missing_evidence_is_explicit_and_json_safe(session_factory, built):
@@ -291,6 +370,9 @@ def test_non_member_and_mismatched_membership_are_atomic(session_factory, built)
         Stage2CompanyResearchCommandService(session_factory).create_company_research(
             other_id,
             membership.id,
+            research_case_revision_id=bound_case_revision_id(
+                session_factory, built.supported_research_id
+            ),
             workflow_state="open",
             conclusion_status="unassessed",
             research_question="Should fail exact membership validation?",
@@ -307,6 +389,9 @@ def test_completed_revision_requires_hypothesis_and_checklist(session_factory, b
     with pytest.raises(EvidenceLedgerValidationError, match="accepted hypothesis"):
         Stage2CompanyResearchCommandService(session_factory).append_research_revision(
             built.draft_research_id,
+            research_case_revision_id=bound_case_revision_id(
+                session_factory, built.draft_research_id
+            ),
             workflow_state="completed",
             conclusion_status="insufficient_evidence",
             research_question="Can this be completed without a hypothesis?",
@@ -324,6 +409,9 @@ def test_completed_revision_rejects_missing_checklist(session_factory, built):
     with pytest.raises(EvidenceLedgerValidationError, match="后续验证清单"):
         Stage2CompanyResearchCommandService(session_factory).append_research_revision(
             built.supported_research_id,
+            research_case_revision_id=bound_case_revision_id(
+                session_factory, built.supported_research_id
+            ),
             workflow_state="completed",
             conclusion_status="supported",
             research_question="Missing checklist should fail?",
@@ -648,6 +736,7 @@ def test_handoff_evidence_freezes_at_beneficiary_revision_boundary(session_facto
     ).create_company_research(
         pool_revision.id,
         membership.id,
+        research_case_revision_id=initial_case_revision_id(session_factory, case_id),
         workflow_state="open",
         conclusion_status="unassessed",
         research_question="Does a later Stage 1 evidence link leak into the handoff?",
@@ -725,6 +814,9 @@ def test_supported_research_conclusion_requires_supported_hypothesis(
     with pytest.raises(EvidenceLedgerValidationError, match="supported conclusion"):
         Stage2CompanyResearchCommandService(session_factory).append_research_revision(
             built.draft_research_id,
+            research_case_revision_id=bound_case_revision_id(
+                session_factory, built.draft_research_id
+            ),
             workflow_state="open",
             conclusion_status="supported",
             research_question="Can support be declared without a supported hypothesis?",
