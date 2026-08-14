@@ -72,7 +72,9 @@ industry_map_revision_id
 map_mode = reuse_exact_existing_map_revision
 ```
 
-The review UI/API must require explicit confirmation of a valid Case Revision + Map Revision pair. `automatic_default = None` remains mandatory.
+The active ordinary-user review surface is `industry_analysis/static/candidate_review.html` + `candidate_review.js`. The future implementation must place the explicit Owner Context v2 confirmation there: load `/owner-context-options`, render a Case Revision + Map Revision pair, require the user to choose it, and submit both IDs inside `owner_context`. `automatic_default = None` remains mandatory.
+
+`review_result.js` is also in the future allowlist because it currently gates acceptance by reviewed-plan version and must recognize the new v3 reviewed plan. `review_result.html` is not required by the frozen design.
 
 The exact Case Revision participates in reviewed-plan IDs/fingerprints, acceptance-view snapshot comparison, owner-acceptance plan fingerprint and owner transaction semantics. Body substitution is rejected before writes.
 
@@ -155,9 +157,12 @@ industry_alpha/stage2_models.py
 industry_alpha/stage2_commands.py
 backend/api/industry_analysis_review.py
 backend/api/industry_analysis_acceptance.py
+industry_analysis/static/candidate_review.html
+industry_analysis/static/candidate_review.js
 industry_analysis/static/review_result.js
 migrations/versions/20260814_0019_exact_research_case_revision_bindings.py
 focused existing owner/API/migration/PostgreSQL tests
+one new focused owner-context-v3 UI contract test
 ```
 
 The detailed document lists the exact test allowlist. Ordinary-user Evidence Pack result/drawer integration remains a later slice after this binding owner implementation is accepted.
