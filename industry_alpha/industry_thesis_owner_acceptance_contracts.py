@@ -19,7 +19,10 @@ from industry_alpha.industry_thesis_rules import (
     require_keys,
 )
 
-OWNER_ACCEPTANCE_PLAN_VERSION = "aquantai.industry-thesis-owner-acceptance-plan.v1"
+HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION = (
+    "aquantai.industry-thesis-owner-acceptance-plan.v1"
+)
+OWNER_ACCEPTANCE_PLAN_VERSION = "aquantai.industry-thesis-owner-acceptance-plan.v2"
 OUTPUT_CONTRACT_VERSION = "aquantai.industry-thesis-output-links.v1"
 MAP_MODE = "reuse_exact_existing_map_revision"
 
@@ -43,9 +46,13 @@ LEGACY_BENEFICIARY_KINDS = ("direct", "secondary", "potential")
 ACCEPTANCE_STATUSES = ("draft", "supported", "disputed")
 ASSERTION_KINDS = ("node", "relationship", "observation")
 
-TRANSACTION_NAMESPACE = uuid5(
+HISTORICAL_TRANSACTION_NAMESPACE = uuid5(
     NAMESPACE_URL,
     "aquantai.industry-thesis-owner-acceptance.transaction.v1",
+)
+TRANSACTION_NAMESPACE = uuid5(
+    NAMESPACE_URL,
+    "aquantai.industry-thesis-owner-acceptance.transaction.v2",
 )
 
 REASON_MESSAGES_ZH = {
@@ -54,6 +61,12 @@ REASON_MESSAGES_ZH = {
     "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_FINGERPRINT_MISMATCH": "审核结果校验失败，请重新打开该研究。",
     "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED": "必须选择一个精确的既有产业地图版本。",
     "INDUSTRY_THESIS_ACCEPTANCE_MAP_REVISION_MISMATCH": "所选产业地图版本与研究或公司绑定不一致。",
+    "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_REQUIRED": "必须提交审核时冻结的精确研究案例版本。",
+    "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_MISMATCH": "所选研究案例版本与审核时冻结的版本不一致。",
+    "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_NOT_VISIBLE": "所选研究案例版本超出当前精确时间边界。",
+    "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_CONTEXT_STALE": "研究案例版本或其审核上下文已发生变化，请重新预览。",
+    "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_BINDING_CONFLICT": "已接受成果的研究案例版本绑定发生冲突。",
+    "INDUSTRY_THESIS_ACCEPTANCE_LEGACY_CONTEXT_UNBOUND": "历史接受记录未持久化精确研究案例版本绑定，不能据此创建新的未绑定成果。",
     "INDUSTRY_THESIS_ACCEPTANCE_BINDINGS_INCOMPLETE": "并非所有已选公司都已补齐接受字段。",
     "INDUSTRY_THESIS_ACCEPTANCE_STOCK_IDENTITY_REQUIRED": "必须选择精确的本地股票基础信息记录。",
     "INDUSTRY_THESIS_ACCEPTANCE_LISTED_INSTRUMENT_ONLY": "仅有上市证券身份不足以建立正式受益公司记录。",
@@ -96,7 +109,25 @@ def normalize_owner_acceptance_plan(
     *,
     require_preview_fingerprint: bool = False,
 ) -> dict[str, Any]:
-    allowed = {
+    if not isinstance(raw, dict):
+        raise IndustryThesisOwnerAcceptanceError(
+            "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE",
+            "owner_acceptance must be an object",
+        )
+    version = bounded_text(
+        raw.get("owner_acceptance_plan_version"),
+        "owner_acceptance_plan_version",
+        128,
+    )
+    if version not in {
+        HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION,
+        OWNER_ACCEPTANCE_PLAN_VERSION,
+    }:
+        raise IndustryThesisOwnerAcceptanceError(
+            "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE",
+            "unsupported owner-acceptance plan version",
+        )
+    common_allowed = {
         "reviewed_session_revision_id",
         "expected_session_latest_revision_number",
         "reviewed_plan_fingerprint_sha256",
@@ -113,22 +144,15 @@ def normalize_owner_acceptance_plan(
         "owner_acceptance_plan_version",
         "preview_fingerprint_sha256",
     }
+    allowed = set(common_allowed)
+    if version == OWNER_ACCEPTANCE_PLAN_VERSION:
+        allowed.add("research_case_revision_id")
     required = allowed - {"preview_fingerprint_sha256"}
     require_keys(raw, allowed, required, field="owner_acceptance")
     if require_preview_fingerprint and "preview_fingerprint_sha256" not in raw:
         raise IndustryThesisOwnerAcceptanceError(
             "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE",
             "commit requires the exact preview fingerprint",
-        )
-    version = bounded_text(
-        raw["owner_acceptance_plan_version"],
-        "owner_acceptance_plan_version",
-        128,
-    )
-    if version != OWNER_ACCEPTANCE_PLAN_VERSION:
-        raise IndustryThesisOwnerAcceptanceError(
-            "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE",
-            "unsupported owner-acceptance plan version",
         )
     if raw["map_mode"] != MAP_MODE:
         raise IndustryThesisOwnerAcceptanceError(
@@ -176,26 +200,37 @@ def normalize_owner_acceptance_plan(
             "reviewed_plan_fingerprint_sha256",
         ),
         "research_case_id": str(parse_uuid(raw["research_case_id"], "research_case_id")),
-        "map_mode": MAP_MODE,
-        "industry_map_id": str(
-            parse_uuid(raw["industry_map_id"], "industry_map_id")
-        ),
-        "industry_map_revision_id": str(
-            parse_uuid(raw["industry_map_revision_id"], "industry_map_revision_id")
-        ),
-        "candidate_owner_bindings": bindings,
-        "candidate_pool_operation": _normalize_candidate_pool_operation(
-            raw["candidate_pool_operation"]
-        ),
-        "output_title": bounded_text(raw["output_title"], "output_title", 300),
-        "output_scope": bounded_text(raw["output_scope"], "output_scope", 4000),
-        "information_cutoff_date": parse_date(
-            raw["information_cutoff_date"],
-            "information_cutoff_date",
-        ).isoformat(),
-        "revision_note": bounded_text(raw["revision_note"], "revision_note", 1000),
-        "owner_acceptance_plan_version": OWNER_ACCEPTANCE_PLAN_VERSION,
     }
+    if version == OWNER_ACCEPTANCE_PLAN_VERSION:
+        canonical["research_case_revision_id"] = str(
+            parse_uuid(
+                raw["research_case_revision_id"],
+                "research_case_revision_id",
+            )
+        )
+    canonical.update(
+        {
+            "map_mode": MAP_MODE,
+            "industry_map_id": str(
+                parse_uuid(raw["industry_map_id"], "industry_map_id")
+            ),
+            "industry_map_revision_id": str(
+                parse_uuid(raw["industry_map_revision_id"], "industry_map_revision_id")
+            ),
+            "candidate_owner_bindings": bindings,
+            "candidate_pool_operation": _normalize_candidate_pool_operation(
+                raw["candidate_pool_operation"]
+            ),
+            "output_title": bounded_text(raw["output_title"], "output_title", 300),
+            "output_scope": bounded_text(raw["output_scope"], "output_scope", 4000),
+            "information_cutoff_date": parse_date(
+                raw["information_cutoff_date"],
+                "information_cutoff_date",
+            ).isoformat(),
+            "revision_note": bounded_text(raw["revision_note"], "revision_note", 1000),
+            "owner_acceptance_plan_version": version,
+        }
+    )
     plan_fingerprint = fingerprint(canonical)
     preview = raw.get("preview_fingerprint_sha256")
     if preview is not None:
@@ -220,8 +255,14 @@ def owner_plan_canonical_value(normalized: dict[str, Any]) -> dict[str, Any]:
 
 
 def owner_transaction_id(normalized: dict[str, Any]) -> UUID:
+    namespace = (
+        HISTORICAL_TRANSACTION_NAMESPACE
+        if normalized["owner_acceptance_plan_version"]
+        == HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION
+        else TRANSACTION_NAMESPACE
+    )
     return uuid5(
-        TRANSACTION_NAMESPACE,
+        namespace,
         (
             f"{normalized['reviewed_session_revision_id']}:"
             f"{normalized['owner_acceptance_plan_fingerprint_sha256']}:"
