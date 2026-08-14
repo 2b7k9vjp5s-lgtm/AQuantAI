@@ -23,6 +23,10 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from backend.database.models import Base, IDENTITY_TYPE
 from industry_alpha.orm_append_only import reject_append_only_mutation
 
+STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION = (
+    "aquantai.stage2-company-research-case-revision-binding.v1"
+)
+
 
 class Stage2CompanyResearch(Base):
     __tablename__ = "stage2_company_research"
@@ -188,6 +192,37 @@ class Stage2CompanyResearchRevision(Base):
     )
 
 
+class Stage2CompanyResearchRevisionCaseBinding(Base):
+    __tablename__ = "stage2_company_research_revision_case_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "company_research_revision_id",
+            name="uq_stage2_company_research_revision_case_binding_owner",
+        ),
+        CheckConstraint(
+            "binding_contract_version = "
+            f"'{STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION}'",
+            name="ck_stage2_company_research_revision_case_binding_version",
+        ),
+        Index(
+            "ix_stage2_company_research_revision_case_binding_case_revision",
+            "research_case_revision_id",
+            "company_research_revision_id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    company_research_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("stage2_company_research_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    research_case_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("research_case_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    binding_contract_version: Mapped[str] = mapped_column(String(128), nullable=False)
+
+
 class Stage2FinancialHypothesis(Base):
     __tablename__ = "stage2_financial_hypotheses"
     __table_args__ = (
@@ -342,9 +377,7 @@ class Stage2ResearchHypothesisLink(Base):
     hypothesis_id: Mapped[UUID] = mapped_column(
         ForeignKey("stage2_financial_hypotheses.id", ondelete="RESTRICT"), nullable=False
     )
-    hypothesis_revision_id: Mapped[UUID] = mapped_column(
-        Uuid, nullable=False
-    )
+    hypothesis_revision_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     recorded_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -384,6 +417,7 @@ STAGE2_MODELS = (
     Stage2HandoffClaimLink,
     Stage2HandoffEvidenceLink,
     Stage2CompanyResearchRevision,
+    Stage2CompanyResearchRevisionCaseBinding,
     Stage2FinancialHypothesis,
     Stage2FinancialHypothesisRevision,
     Stage2HypothesisClaimLink,
