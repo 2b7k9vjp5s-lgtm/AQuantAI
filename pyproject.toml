@@ -47,6 +47,7 @@ include = [
   "industry_alpha*",
   "ml*",
   "market_cockpit*",
+  "research_workspace*",
   "ranking*",
   "scripts*",
 ]

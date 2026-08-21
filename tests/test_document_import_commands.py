@@ -70,7 +70,15 @@ def extracted(monkeypatch):
     return raw, text
 
 
-def build_review(session_factory, extracted, *, selected_fact: bool = True):
+def build_review(
+    session_factory,
+    extracted,
+    *,
+    selected_fact: bool = True,
+    review_state: str = "draft",
+    reviewer_identity: str | None = None,
+    reviewer_note: str | None = None,
+):
     raw, text = extracted
     ledger = EvidenceLedgerCommandService(session_factory)
     case = ledger.create_case(
@@ -137,7 +145,7 @@ def build_review(session_factory, extracted, *, selected_fact: bool = True):
         review.id,
         ReviewRevisionInput(
             expected_previous_revision_number=0,
-            review_state="draft",
+            review_state=review_state,
             source_kind="official",
             evidence_grade="A",
             document_identity_candidate_id=document.id,
@@ -153,10 +161,36 @@ def build_review(session_factory, extracted, *, selected_fact: bool = True):
                     evidence_relation="supports" if selected_fact else None,
                 ),
             ),
+            reviewer_identity=reviewer_identity,
+            reviewer_note=reviewer_note,
             recorded_at_utc=utc(3),
         ),
     )
     return ledger, commands, case, imported, review, fact, revision
+
+
+def test_human_rejection_records_reviewer_without_accepted_evidence(
+    session_factory, extracted
+):
+    _, _, _, _, review, _, revision = build_review(
+        session_factory,
+        extracted,
+        selected_fact=False,
+        review_state="rejected",
+        reviewer_identity="local-reviewer",
+        reviewer_note="The selected fragment does not support the proposed fact.",
+    )
+    assert revision.review_state == "rejected"
+    assert revision.reviewer_identity == "local-reviewer"
+    assert revision.reviewer_note == "The selected fragment does not support the proposed fact."
+    detail = DocumentImportQueryService(session_factory).review_detail(
+        review.id,
+        review_revision_id=revision.id,
+    )
+    assert detail["revisions"][0]["reviewer_identity"] == "local-reviewer"
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(EvidenceItem)) == 0
+        assert session.scalar(select(func.count()).select_from(LocalDocumentAcceptanceReceipt)) == 0
 
 
 def acceptance_input(case, fact, revision) -> AcceptanceInput:

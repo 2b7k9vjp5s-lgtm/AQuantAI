@@ -52,17 +52,20 @@
         <label>文档身份键<input id="document-key" autocomplete="off"></label>
         <label>文档标题<input id="document-title" autocomplete="off"></label>
         <label>发布者/作者<input id="publisher" autocomplete="off"></label>
+        <label>来源 URL（可选）<input id="source-url" type="url" autocomplete="off"></label>
         <label>文档日期<input id="document-date" type="date"></label>
         <label>信息日期<input id="information-date" type="date"></label>
         <label>主体说明<input id="subject-label" value="非特定公司"></label>
         <label>事实陈述<textarea id="fact-statement"></textarea></label>
         <label>来源类型<select id="source-kind"><option value="official">官方</option><option value="filing">法定披露</option><option value="regulatory">监管</option><option value="statistics">统计</option></select></label>
         <label>证据等级<select id="evidence-grade"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+        <label>审核人<input id="reviewer-identity" value="local-user" maxlength="128" required></label>
+        <label>审核备注（可选）<textarea id="reviewer-note" maxlength="2000"></textarea></label>
         <label>Claim 状态<select id="claim-status"><option value="supported">已支持</option><option value="disputed">有争议</option><option value="draft">草稿</option><option value="rejected">已拒绝</option></select></label>
         <label>证据关系<select id="evidence-relation"><option value="supports">支持</option><option value="contradicts">反驳</option><option value="context">背景</option></select></label>
       </div>
       <p id="selection-status" role="status">尚未选择逐页原文。</p>
-      <button id="review-button" type="button" disabled>保存人工审核快照</button>
+      <div class="actions"><button id="review-button" type="button" disabled>保存待接受审核快照</button><button id="reject-button" type="button" disabled>拒绝所选证据</button></div>
     </section>
 
     <section class="card wide" aria-labelledby="accept-title">

@@ -122,7 +122,7 @@ def test_postgres_0015_to_0017_and_empty_round_trip(
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version_num FROM alembic_version")
-            ) == "20260803_0018"
+            ) == "20260821_0020"
     finally:
         engine.dispose()
 
@@ -196,6 +196,6 @@ def test_postgres_populated_downgrade_refuses_before_any_drop(
         with engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version_num FROM alembic_version")
-            ) == "20260803_0018"
+            ) == "20260821_0020"
     finally:
         engine.dispose()

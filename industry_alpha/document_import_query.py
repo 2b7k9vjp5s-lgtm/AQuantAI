@@ -172,6 +172,8 @@ class DocumentImportQueryService:
                         ),
                         "subject_candidate_id": str(row.subject_candidate_id),
                         "information_date": row.information_date.isoformat(),
+                        "reviewer_identity": row.reviewer_identity,
+                        "reviewer_note": row.reviewer_note,
                         "recorded_at_utc": _utc(row.recorded_at_utc),
                         "candidate_decisions": decisions_by_revision.get(row.id, []),
                     }
@@ -224,6 +226,8 @@ class DocumentImportQueryService:
                 "target_research_case_id": str(receipt.target_research_case_id),
                 "request_fingerprint_sha256": receipt.request_fingerprint_sha256,
                 "accepted_at_utc": _utc(receipt.accepted_at_utc),
+                "reviewer_identity": accepted.reviewer_identity,
+                "reviewer_note": accepted.reviewer_note,
                 "information_cutoff_date": information_cutoff_date.isoformat(),
                 "recorded_at_boundary_utc": _utc(recorded),
                 "links": [

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0rc1 - Unreleased
+
+- Added a unified local Research Workspace for Industry and Company Research.
+- Added append-only structured Revision content and exact Accepted Evidence references.
+- Productized local PDF review with explicit reviewer identity and deterministic citations.
+- Added local search, deterministic Change Feed, Markdown/HTML export and optional evidence-limited AI drafting.
+- Preserved research-only, non-advisory and no-trading boundaries.
+
 All notable baseline changes for AQuantAI are summarized here.
 
 ## 0.2.0 - v0.2 Local Read-Only Research Dashboard Baseline

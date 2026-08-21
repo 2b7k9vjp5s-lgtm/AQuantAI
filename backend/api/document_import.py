@@ -73,6 +73,7 @@ class ReviewRevisionBody(BaseModel):
     subject_candidate_id: UUID
     information_date: date
     decisions: list[DecisionBody]
+    reviewer_identity: str | None = Field(default=None, max_length=128)
     reviewer_note: str | None = None
     recorded_at_utc: datetime | None = None
 
@@ -145,6 +146,8 @@ def _domain_call(callable_):
     try:
         return callable_()
     except DocumentImportError as exc:
+        if exc.code == "embedded_text_unavailable":
+            raise HTTPException(422, "No extractable text / OCR required") from exc
         status = 404 if exc.code.endswith("not_found") else 409 if "conflict" in exc.code or "mismatch" in exc.code else 422
         raise HTTPException(status, exc.code) from exc
     except EvidenceLedgerNotFound as exc:

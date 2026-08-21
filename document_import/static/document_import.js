@@ -7,6 +7,7 @@
   const pages = document.querySelector("#pages");
   const pagesMore = document.querySelector("#pages-more");
   const reviewButton = document.querySelector("#review-button");
+  const rejectButton = document.querySelector("#reject-button");
   const previewButton = document.querySelector("#preview-button");
   const acceptButton = document.querySelector("#accept-button");
   const selectionStatus = document.querySelector("#selection-status");
@@ -61,6 +62,7 @@
           end_utf8_byte: start + encoder.encode(quote).length, quote_text: quote};
         selectionStatus.textContent = `已选择第 ${page.page_number} 页原文：${quote}`;
         reviewButton.disabled = false;
+        rejectButton.disabled = false;
       });
       article.append(heading, text);
       return article;
@@ -94,6 +96,7 @@
     nextAfterPage = null;
     pagesMore.hidden = true;
     reviewButton.disabled = true;
+    rejectButton.disabled = true;
     previewButton.disabled = true;
     acceptButton.disabled = true;
     selectionStatus.textContent = "尚未选择逐页原文。";
@@ -140,8 +143,9 @@
     return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
   };
 
-  reviewButton.addEventListener("click", async () => {
+  const saveReview = async (reviewState) => {
     reviewButton.disabled = true;
+    rejectButton.disabled = true;
     try {
       const recorded = new Date().toISOString();
       const review = await postJson("/api/document-reviews", {import_attempt_id: importedState.import_attempt_id,
@@ -150,19 +154,31 @@
       const documentCandidate = await postJson(`${base}/candidates`, {candidate_kind: "document_identity",
         payload: {identity_namespace: "user_defined_document", identity_key: field("document-key"),
           document_title: field("document-title"), publisher_or_author: field("publisher"),
-          document_date: field("document-date"), document_kind: "announcement"}, recorded_at_utc: recorded});
+          document_date: field("document-date"), document_kind: "announcement",
+          source_url: field("source-url") || null}, recorded_at_utc: recorded});
       const subject = await postJson(`${base}/candidates`, {candidate_kind: "company_identity",
         payload: {subject_kind: "not_company_specific", display_label: field("subject-label")}, recorded_at_utc: recorded});
       const fact = await postJson(`${base}/candidates`, {candidate_kind: "fact", payload: {}, ...selectedSpan,
         quote_sha256: await quoteSha(selectedSpan.quote_text), statement: field("fact-statement"), recorded_at_utc: recorded});
-      const revision = await postJson(`${base}/revisions`, {expected_previous_revision_number: 0, review_state: "draft",
+      const rejected = reviewState === "rejected";
+      const revision = await postJson(`${base}/revisions`, {expected_previous_revision_number: 0, review_state: reviewState,
         source_kind: field("source-kind"), evidence_grade: field("evidence-grade"),
+        reviewer_identity: field("reviewer-identity"),
+        reviewer_note: field("reviewer-note") || null,
         document_identity_candidate_id: documentCandidate.candidate_id, subject_candidate_id: subject.candidate_id,
         information_date: field("information-date"), recorded_at_utc: recorded, decisions: [
           {candidate_id: documentCandidate.candidate_id, decision: "selected"},
           {candidate_id: subject.candidate_id, decision: "selected"},
-          {candidate_id: fact.candidate_id, decision: "selected", claim_status: field("claim-status"),
-            evidence_relation: field("evidence-relation")}]});
+          {candidate_id: fact.candidate_id, decision: rejected ? "rejected" : "selected",
+            claim_status: rejected ? null : field("claim-status"),
+            evidence_relation: rejected ? null : field("evidence-relation")}]});
+      if (rejected) {
+        acceptanceState = null;
+        previewButton.disabled = true;
+        acceptButton.disabled = true;
+        acceptanceResult.textContent = `证据已由 ${field("reviewer-identity")} 明确拒绝；未写入 Accepted Evidence。Revision ${revision.revision_number}。`;
+        return;
+      }
       const exact = await (await fetch(`${base}?review_revision_id=${revision.review_revision_id}`)).json();
       const decision = exact.revisions[0].candidate_decisions.find((row) => row.candidate_id === fact.candidate_id);
       acceptanceState = {reviewId: review.review_session_id, body: {source_review_revision_id: revision.review_revision_id,
@@ -176,8 +192,12 @@
     } catch (error) {
       acceptanceResult.textContent = `审核未完成：${error.message}`;
       reviewButton.disabled = false;
+      rejectButton.disabled = false;
     }
-  });
+  };
+
+  reviewButton.addEventListener("click", () => saveReview("draft"));
+  rejectButton.addEventListener("click", () => saveReview("rejected"));
 
   previewButton.addEventListener("click", async () => {
     try {
