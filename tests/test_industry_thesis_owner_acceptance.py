@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, delete, func, select, update
 from sqlalchemy.pool import StaticPool
 
 from backend.database.canonical_price_models import ListedInstrument
@@ -16,6 +16,7 @@ from backend.database.models import Base, StockBasicRecord
 from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
 from industry_alpha.industry_thesis_models import (
+    IndustryThesisOutputCaseRevisionBinding,
     IndustryThesisOutputLinkIdentity,
     IndustryThesisOutputLinkRevision,
     IndustryThesisSessionRevision,
@@ -24,6 +25,7 @@ from industry_alpha.industry_thesis_owner_acceptance import (
     IndustryThesisOwnerAcceptanceService,
 )
 from industry_alpha.industry_thesis_owner_acceptance_contracts import (
+    HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION,
     OWNER_ACCEPTANCE_PLAN_VERSION,
     IndustryThesisOwnerAcceptanceError,
     normalize_owner_acceptance_plan,
@@ -33,9 +35,16 @@ from industry_alpha.industry_thesis_owner_acceptance_query import (
 )
 from industry_alpha.industry_thesis_review import (
     ACCEPTANCE_PLAN_VERSION,
+    PREVIOUS_ACCEPTANCE_PLAN_VERSION,
     IndustryThesisProposalReviewService,
 )
-from industry_alpha.industry_thesis_rules import BUILDER_VERSION
+from industry_alpha.industry_thesis_rules import (
+    BUILDER_VERSION,
+    canonical_json_text,
+    fingerprint,
+    json_value,
+)
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
@@ -52,6 +61,7 @@ from industry_alpha.beneficiary_semantics_owner_port import (
 UTC = timezone.utc
 CUTOFF = date(2026, 7, 9)
 BASE_TIME = datetime(2026, 7, 10, 12, tzinfo=UTC)
+OWNER_FIXTURE_CASE_REVISION_ID = UUID("f3c38d50-f094-56f9-bc2e-355f3bab9ae4")
 
 
 @pytest.fixture()
@@ -122,12 +132,53 @@ def _stage1_rows(database, beneficiary_ids: tuple[UUID, ...]):
         return industry_map, map_revision, rows
 
 
+def _initial_case_revision_id(database, case_id: UUID) -> UUID:
+    with database() as session:
+        revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == case_id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+        assert revision is not None
+        return revision.id
+
+
 def _build_reviewed(
     database,
     *,
     beneficiary_ids: tuple[UUID, ...],
 ) -> tuple[dict, IndustryMap, IndustryMapRevision, list[tuple]]:
     industry_map, map_revision, owner_rows = _stage1_rows(database, beneficiary_ids)
+    with database.begin() as session:
+        initial_case_revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == industry_map.case_id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+        if initial_case_revision is None:
+            raise RuntimeError("owner-acceptance fixture requires the initial Case Revision")
+        case_revision = session.get(
+            ResearchCaseRevision,
+            OWNER_FIXTURE_CASE_REVISION_ID,
+        )
+        if case_revision is None:
+            case_revision = ResearchCaseRevision(
+                id=OWNER_FIXTURE_CASE_REVISION_ID,
+                case_id=industry_map.case_id,
+                revision_no=2,
+                title="Owner acceptance fixture evidence boundary",
+                research_question="Which exact evidence boundary anchors acceptance?",
+                summary="Explicit deterministic Case Revision for acceptance tests.",
+                workflow_state="open",
+                conclusion_status="unassessed",
+                information_cutoff_date=CUTOFF,
+                recorded_at_utc=BASE_TIME - timedelta(hours=1),
+                supersedes_revision_id=initial_case_revision.id,
+            )
+            session.add(case_revision)
+            session.flush()
     commands = IndustryThesisCommandService(database, clock=lambda: BASE_TIME)
     created = commands.create_session(_session_input())
     proposals = []
@@ -170,6 +221,7 @@ def _build_reviewed(
             "expected_session_latest_revision_number": 1,
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
             "owner_context": {
+                "research_case_revision_id": str(case_revision.id),
                 "industry_map_revision_id": str(map_revision.id),
             },
             "decisions": [
@@ -237,6 +289,9 @@ def _acceptance_input(
             "acceptance_plan_fingerprint_sha256"
         ],
         "research_case_id": str(industry_map.case_id),
+        "research_case_revision_id": review["acceptance_plan"]["owner_context"][
+            "research_case_revision_id"
+        ],
         "map_mode": "reuse_exact_existing_map_revision",
         "industry_map_id": str(industry_map.id),
         "industry_map_revision_id": str(map_revision.id),
@@ -341,6 +396,18 @@ def test_three_member_golden_path_preview_commit_exact_reads_and_replay(database
     assert output["accepted_candidate_pool_revision_id"] == committed[
         "accepted_candidate_pool_revision_id"
     ]
+    assert output["evidence_context_binding"] == {
+        "state": "exact_bound",
+        "reason": None,
+        "binding_contract_version": (
+            "aquantai.industry-thesis-output-case-revision-binding.v1"
+        ),
+        "binding_id": committed["output_case_revision_binding_id"],
+        "research_case_revision_id": committed["research_case_revision_id"],
+    }
+    assert result["evidence_context_binding"] == output[
+        "evidence_context_binding"
+    ]
     assert result["title"] == "本次研究已接受的完整成员"
     assert result["complete_member_count"] == 3
     assert result["supported_handoff_count"] == 2
@@ -350,6 +417,26 @@ def test_three_member_golden_path_preview_commit_exact_reads_and_replay(database
     assert all(item["typed_semantics"]["state"] == "missing" for item in readiness["items"])
     assert readiness["creates_owner_state"] is False
     assert readiness["computes_score"] is False
+
+    with database.begin() as session:
+        session.execute(
+            delete(IndustryThesisOutputCaseRevisionBinding).where(
+                IndustryThesisOutputCaseRevisionBinding.output_link_revision_id
+                == UUID(committed["output_link_revision_id"])
+            )
+        )
+    for method_name in ("get_output", "get_result", "get_readiness"):
+        with database() as session:
+            method = getattr(IndustryThesisAcceptedOutputQueryService(session), method_name)
+            with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
+                method(
+                    UUID(committed["output_link_revision_id"]),
+                    as_of_cutoff=CUTOFF,
+                    as_of_recorded_at_utc=read_boundary,
+                )
+        assert caught.value.code == (
+            "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
+        )
 
 
 def test_zero_supported_result_keeps_complete_members_and_null_pool(database):
@@ -395,6 +482,128 @@ def test_zero_supported_result_keeps_complete_members_and_null_pool(database):
         "draft",
         "disputed",
     ]
+
+
+def test_legacy_unbound_output_remains_readable_and_v1_replay_is_idempotent(
+    database,
+):
+    fixture = build_stage1_beneficiary_fixture(database)
+    review, industry_map, map_revision, rows = _build_reviewed(
+        database,
+        beneficiary_ids=(fixture.direct_beneficiary_id,),
+    )
+    active_raw = _acceptance_input(
+        review,
+        industry_map,
+        map_revision,
+        rows,
+        pool_mode="create_supported_handoff",
+    )
+    service = IndustryThesisOwnerAcceptanceService(
+        database,
+        clock=lambda: BASE_TIME + timedelta(seconds=3),
+    )
+    active_preview = service.preview(active_raw)
+    committed = service.commit(
+        {
+            **active_raw,
+            "preview_fingerprint_sha256": active_preview[
+                "preview_fingerprint_sha256"
+            ],
+        }
+    )
+
+    reviewed_id = UUID(committed["reviewed_session_revision_id"])
+    output_id = UUID(committed["output_link_revision_id"])
+    with database() as session:
+        stored_graph = session.scalar(
+            select(IndustryThesisSessionRevision.draft_graph_json).where(
+                IndustryThesisSessionRevision.id == reviewed_id
+            )
+        )
+    graph = json_value(stored_graph, "reviewed legacy fixture graph")
+    plan = graph["acceptance_plan_preview"]
+    plan["acceptance_plan_version"] = PREVIOUS_ACCEPTANCE_PLAN_VERSION
+    plan["owner_context"]["owner_context_contract_version"] = (
+        "aquantai.industry-thesis-owner-context.v1"
+    )
+    plan["owner_context"].pop("research_case_revision_id")
+    plan["acceptance_plan_fingerprint_sha256"] = fingerprint(
+        {
+            key: value
+            for key, value in plan.items()
+            if key != "acceptance_plan_fingerprint_sha256"
+        }
+    )
+
+    legacy_raw = deepcopy(active_raw)
+    legacy_raw.pop("research_case_revision_id")
+    legacy_raw["owner_acceptance_plan_version"] = (
+        HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION
+    )
+    legacy_raw["reviewed_plan_fingerprint_sha256"] = plan[
+        "acceptance_plan_fingerprint_sha256"
+    ]
+    legacy_normalized = normalize_owner_acceptance_plan(legacy_raw)
+    with database.begin() as session:
+        session.execute(
+            update(IndustryThesisSessionRevision)
+            .where(IndustryThesisSessionRevision.id == reviewed_id)
+            .values(
+                draft_graph_json=canonical_json_text(
+                    graph,
+                    "reviewed legacy fixture graph",
+                )
+            )
+        )
+        session.execute(
+            update(IndustryThesisOutputLinkRevision)
+            .where(IndustryThesisOutputLinkRevision.id == output_id)
+            .values(
+                reviewed_plan_fingerprint_sha256=legacy_raw[
+                    "reviewed_plan_fingerprint_sha256"
+                ],
+                acceptance_plan_fingerprint_sha256=legacy_normalized[
+                    "owner_acceptance_plan_fingerprint_sha256"
+                ],
+            )
+        )
+        session.execute(
+            delete(IndustryThesisOutputCaseRevisionBinding).where(
+                IndustryThesisOutputCaseRevisionBinding.output_link_revision_id
+                == output_id
+            )
+        )
+
+    with database() as session:
+        output = IndustryThesisAcceptedOutputQueryService(session).get_output(
+            output_id,
+            as_of_cutoff=CUTOFF,
+            as_of_recorded_at_utc=BASE_TIME + timedelta(days=1),
+        )
+    assert output["evidence_context_binding"] == {
+        "state": "unavailable",
+        "reason": "exact_case_revision_binding_not_persisted",
+        "binding_contract_version": None,
+        "binding_id": None,
+        "research_case_revision_id": None,
+    }
+
+    counts_before = _counts(database)
+    replay_preview = service.preview(legacy_raw)
+    assert replay_preview["idempotent_replay"] is True
+    replay = service.commit(
+        {
+            **legacy_raw,
+            "preview_fingerprint_sha256": replay_preview[
+                "preview_fingerprint_sha256"
+            ],
+        }
+    )
+    assert replay["idempotent_replay"] is True
+    assert replay["output_link_revision_id"] == str(output_id)
+    assert replay["research_case_revision_id"] is None
+    assert _counts(database) == counts_before
 
 
 def test_listed_instrument_only_preview_blocks_before_any_owner_write(database):
@@ -448,9 +657,12 @@ def test_listed_instrument_only_preview_blocks_before_any_owner_write(database):
         {
             "session_revision_id": created["session_revision_id"],
             "expected_session_latest_revision_number": 1,
-            "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
-            "owner_context": {
-                "industry_map_revision_id": str(map_revision.id),
+                "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+                "owner_context": {
+                    "research_case_revision_id": str(
+                        _initial_case_revision_id(database, industry_map.case_id)
+                    ),
+                    "industry_map_revision_id": str(map_revision.id),
             },
             "decisions": [
                 {
@@ -477,6 +689,9 @@ def test_listed_instrument_only_preview_blocks_before_any_owner_write(database):
             "acceptance_plan_fingerprint_sha256"
         ],
         "research_case_id": str(industry_map.case_id),
+        "research_case_revision_id": reviewed["acceptance_plan"][
+            "owner_context"
+        ]["research_case_revision_id"],
         "map_mode": "reuse_exact_existing_map_revision",
         "industry_map_id": str(industry_map.id),
         "industry_map_revision_id": str(map_revision.id),
@@ -528,6 +743,7 @@ def test_contract_rejects_unknown_nested_fields_and_rejected_stage1_status():
         "expected_session_latest_revision_number": 1,
         "reviewed_plan_fingerprint_sha256": "a" * 64,
         "research_case_id": str(uuid4()),
+        "research_case_revision_id": str(uuid4()),
         "map_mode": "reuse_exact_existing_map_revision",
         "industry_map_id": str(uuid4()),
         "industry_map_revision_id": str(uuid4()),

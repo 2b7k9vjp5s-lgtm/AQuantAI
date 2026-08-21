@@ -123,7 +123,7 @@ def proposal(
     return raw
 
 
-def test_exact_six_table_contract() -> None:
+def test_exact_seven_table_contract() -> None:
     assert {model.__tablename__ for model in INDUSTRY_THESIS_MODELS} == {
         "industry_thesis_session_identities",
         "industry_thesis_session_revisions",
@@ -131,6 +131,7 @@ def test_exact_six_table_contract() -> None:
         "industry_thesis_candidate_revisions",
         "industry_thesis_output_link_identities",
         "industry_thesis_output_link_revisions",
+        "industry_thesis_output_case_revision_bindings",
     }
 
 

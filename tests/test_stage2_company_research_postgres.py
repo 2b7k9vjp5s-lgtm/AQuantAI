@@ -13,12 +13,21 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from backend.database.engine import build_engine, build_session_factory
-from industry_alpha.errors import EvidenceLedgerImmutableError
+from industry_alpha.commands import EvidenceLedgerCommandService
+from industry_alpha.errors import (
+    EvidenceLedgerConflictError,
+    EvidenceLedgerImmutableError,
+    EvidenceLedgerValidationError,
+)
+import industry_alpha.stage2_commands as stage2_commands
 from industry_alpha.stage2_commands import Stage2CompanyResearchCommandService
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.stage2_fixtures import build_stage2_company_research_fixture
 from industry_alpha.stage2_models import (
+    STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION,
     Stage2CompanyResearch,
     Stage2CompanyResearchRevision,
+    Stage2CompanyResearchRevisionCaseBinding,
     Stage2FinancialHypothesisRevision,
     Stage2ResearchHypothesisLink,
 )
@@ -47,6 +56,8 @@ def clean_stage2(postgres_database_url: str) -> Iterator[None]:
             connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         yield
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         engine.dispose()
 
 
@@ -54,32 +65,205 @@ def utc(day: int, hour: int = 10) -> datetime:
     return datetime(2026, 7, day, hour, tzinfo=timezone.utc)
 
 
+def bound_case_revision_id(factory, research_id):
+    with factory() as session:
+        return session.scalar(
+            select(Stage2CompanyResearchRevisionCaseBinding.research_case_revision_id)
+            .join(
+                Stage2CompanyResearchRevision,
+                Stage2CompanyResearchRevision.id
+                == Stage2CompanyResearchRevisionCaseBinding.company_research_revision_id,
+            )
+            .where(
+                Stage2CompanyResearchRevision.company_research_id == research_id,
+                Stage2CompanyResearchRevision.revision_no == 1,
+            )
+        )
+
+
+def stage2_binding_counts(factory) -> tuple[int, int]:
+    with factory() as session:
+        return (
+            len(list(session.scalars(select(Stage2CompanyResearchRevision.id)))),
+            len(
+                list(
+                    session.scalars(
+                        select(Stage2CompanyResearchRevisionCaseBinding.id)
+                    )
+                )
+            ),
+        )
+
+
 def test_stage2_migration_from_v05c_and_round_trip(postgres_database_url: str):
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", postgres_database_url)
     engine = build_engine(postgres_database_url)
     try:
-        assert "stage2_company_research" in inspect(engine).get_table_names()
+        tables = inspect(engine).get_table_names()
+        assert "stage2_company_research" in tables
+        assert "stage2_company_research_revision_case_bindings" in tables
         command.downgrade(config, "20260719_0007")
         tables = inspect(engine).get_table_names()
         assert "stage2_company_research" not in tables
         assert "stage1_candidate_pool_memberships" in tables
         command.upgrade(config, "head")
-        assert "stage2_verification_items" in inspect(engine).get_table_names()
+        tables = inspect(engine).get_table_names()
+        assert "stage2_verification_items" in tables
+        assert "stage2_company_research_revision_case_bindings" in tables
+        assert "industry_thesis_output_case_revision_bindings" in tables
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260803_0018"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260814_0019"
     finally:
         engine.dispose()
+
+
+def test_postgres_fixture_binds_every_stage2_research_revision(postgres_database_url: str):
+    engine = build_engine(postgres_database_url)
+    factory = build_session_factory(engine)
+    fixture = build_stage2_company_research_fixture(factory)
+    with factory() as session:
+        supported_revisions = list(
+            session.scalars(
+                select(Stage2CompanyResearchRevision)
+                .where(
+                    Stage2CompanyResearchRevision.company_research_id
+                    == fixture.supported_research_id
+                )
+                .order_by(Stage2CompanyResearchRevision.revision_no)
+            )
+        )
+        bindings = list(
+            session.scalars(
+                select(Stage2CompanyResearchRevisionCaseBinding)
+                .where(
+                    Stage2CompanyResearchRevisionCaseBinding.company_research_revision_id.in_(
+                        [revision.id for revision in supported_revisions]
+                    )
+                )
+            )
+        )
+    assert [revision.revision_no for revision in supported_revisions] == [1, 2, 3]
+    assert len(bindings) == 3
+    assert len({binding.research_case_revision_id for binding in bindings}) == 1
+    assert {
+        binding.binding_contract_version for binding in bindings
+    } == {STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION}
+    engine.dispose()
+
+
+def test_postgres_case_binding_failures_are_stable_and_atomic(
+    postgres_database_url: str, monkeypatch
+):
+    engine = build_engine(postgres_database_url)
+    factory = build_session_factory(engine)
+    fixture = build_stage2_company_research_fixture(factory)
+    before = stage2_binding_counts(factory)
+    service = Stage2CompanyResearchCommandService(factory)
+
+    with pytest.raises(
+        EvidenceLedgerValidationError,
+        match="stage2_case_revision_required",
+    ):
+        service.append_research_revision(
+            fixture.draft_research_id,
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Missing binding must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_binding_counts(factory) == before
+
+    other_case = EvidenceLedgerCommandService(factory).create_case(
+        case_key="postgres-stage2-case-mismatch",
+        title="Other PostgreSQL case",
+        research_question="Must fail cross-case binding?",
+        information_cutoff_date=date(2026, 7, 15),
+        recorded_at_utc=utc(15),
+    )
+    with factory() as session:
+        other_revision_id = session.scalar(
+            select(ResearchCaseRevision.id).where(
+                ResearchCaseRevision.case_id == other_case.id
+            )
+        )
+        research = session.get(Stage2CompanyResearch, fixture.draft_research_id)
+    with pytest.raises(
+        EvidenceLedgerValidationError,
+        match="stage2_case_revision_case_mismatch",
+    ):
+        service.append_research_revision(
+            fixture.draft_research_id,
+            research_case_revision_id=other_revision_id,
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Cross-case binding must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_binding_counts(factory) == before
+
+    future_revision = EvidenceLedgerCommandService(factory).append_case_revision(
+        research.case_id,
+        title="Future PostgreSQL case revision",
+        research_question="Must remain outside the earlier boundary?",
+        information_cutoff_date=date(2026, 7, 17),
+        recorded_at_utc=utc(17),
+    )
+    with pytest.raises(
+        EvidenceLedgerValidationError,
+        match="stage2_case_revision_not_visible",
+    ):
+        service.append_research_revision(
+            fixture.draft_research_id,
+            research_case_revision_id=future_revision.id,
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Future binding must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_binding_counts(factory) == before
+
+    with factory() as session:
+        existing_binding_id = session.scalar(
+            select(Stage2CompanyResearchRevisionCaseBinding.id)
+        )
+    monkeypatch.setattr(stage2_commands, "uuid5", lambda *_args: existing_binding_id)
+    with pytest.raises(
+        EvidenceLedgerConflictError,
+        match="stage2_case_revision_binding_conflict",
+    ):
+        service.append_research_revision(
+            fixture.draft_research_id,
+            research_case_revision_id=bound_case_revision_id(
+                factory, fixture.draft_research_id
+            ),
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Binding conflict must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_binding_counts(factory) == before
+    engine.dispose()
 
 
 def test_postgres_concurrent_research_revision_numbers(postgres_database_url: str):
     engine = build_engine(postgres_database_url)
     factory = build_session_factory(engine)
     fixture = build_stage2_company_research_fixture(factory)
+    case_revision_id = bound_case_revision_id(factory, fixture.draft_research_id)
 
     def append(index: int):
         return Stage2CompanyResearchCommandService(factory).append_research_revision(
             fixture.draft_research_id,
+            research_case_revision_id=case_revision_id,
             workflow_state="open",
             conclusion_status="insufficient_evidence",
             research_question=f"Concurrent research revision {index}?",
@@ -91,6 +275,24 @@ def test_postgres_concurrent_research_revision_numbers(postgres_database_url: st
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(append, (1, 2)))
     assert sorted(item.revision_no for item in results) == [2, 3]
+    with factory() as session:
+        binding_count = len(
+            list(
+                session.scalars(
+                    select(Stage2CompanyResearchRevisionCaseBinding)
+                    .join(
+                        Stage2CompanyResearchRevision,
+                        Stage2CompanyResearchRevision.id
+                        == Stage2CompanyResearchRevisionCaseBinding.company_research_revision_id,
+                    )
+                    .where(
+                        Stage2CompanyResearchRevision.company_research_id
+                        == fixture.draft_research_id
+                    )
+                )
+            )
+        )
+    assert binding_count == 3
     engine.dispose()
 
 
@@ -151,6 +353,11 @@ def test_postgres_append_only_guard(postgres_database_url: str):
     with factory() as session:
         revision = session.scalar(select(Stage2CompanyResearchRevision))
         session.delete(revision)
+        with pytest.raises(EvidenceLedgerImmutableError):
+            session.flush()
+    with factory() as session:
+        binding = session.scalar(select(Stage2CompanyResearchRevisionCaseBinding))
+        session.delete(binding)
         with pytest.raises(EvidenceLedgerImmutableError):
             session.flush()
     engine.dispose()

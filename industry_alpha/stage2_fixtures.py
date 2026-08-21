@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from industry_alpha.commands import EvidenceLedgerCommandService
-from industry_alpha.models import ClaimRevision
+from industry_alpha.models import ClaimRevision, ResearchCaseRevision
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
@@ -25,6 +25,10 @@ from industry_alpha.stage2_commands import (
     Stage2VerificationInput,
 )
 from industry_alpha.stage2_models import Stage2FinancialHypothesisRevision
+
+_STAGE2_FIXTURE_CASE_REVISION_ID = uuid5(
+    NAMESPACE_URL, "aquantai.fixture.stage2.research-case-revision.v1"
+)
 
 
 @dataclass(frozen=True)
@@ -101,15 +105,44 @@ def build_stage2_company_research_fixture(
         evidence_links=(),
         recorded_at_utc=_recorded(9),
     )
-    with session_factory() as session:
+    with session_factory.begin() as session:
         missing_claim_revision = session.scalar(
             select(ClaimRevision).where(ClaimRevision.claim_id == missing_claim.id)
         )
+        initial_case_revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == case_id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+        if initial_case_revision is None:
+            raise RuntimeError("Stage2 fixture requires the exact initial ResearchCaseRevision.")
+        fixture_case_revision = ResearchCaseRevision(
+            id=_STAGE2_FIXTURE_CASE_REVISION_ID,
+            case_id=case_id,
+            revision_no=2,
+            title="Stage 2 fixture research boundary",
+            research_question=(
+                "Which exact Research Case revision anchors the Stage 2 fixture writes?"
+            ),
+            summary=(
+                "Explicit deterministic fixture Case Revision for Stage 2 exact-binding tests."
+            ),
+            workflow_state="open",
+            conclusion_status="unassessed",
+            information_cutoff_date=date(2026, 7, 9),
+            recorded_at_utc=_recorded(9, 12),
+            supersedes_revision_id=initial_case_revision.id,
+        )
+        session.add(fixture_case_revision)
+        session.flush()
+        fixture_case_revision_id = fixture_case_revision.id
 
     commands = Stage2CompanyResearchCommandService(session_factory)
     supported_research = commands.create_company_research(
         pool_revision.id,
         memberships[0].id,
+        research_case_revision_id=fixture_case_revision_id,
         workflow_state="open",
         conclusion_status="unassessed",
         research_question="How could the frozen Stage 1 relationship affect operating and financial lines?",
@@ -120,6 +153,7 @@ def build_stage2_company_research_fixture(
     draft_research = commands.create_company_research(
         pool_revision.id,
         memberships[1].id,
+        research_case_revision_id=fixture_case_revision_id,
         workflow_state="open",
         conclusion_status="insufficient_evidence",
         research_question="Is the secondary relationship attributable to an operating metric?",
@@ -168,6 +202,7 @@ def build_stage2_company_research_fixture(
         )
     commands.append_research_revision(
         supported_research.id,
+        research_case_revision_id=fixture_case_revision_id,
         workflow_state="completed",
         conclusion_status="supported",
         research_question="How could the frozen Stage 1 relationship affect operating and financial lines?",
@@ -195,6 +230,7 @@ def build_stage2_company_research_fixture(
     )
     commands.append_research_revision(
         supported_research.id,
+        research_case_revision_id=fixture_case_revision_id,
         workflow_state="completed",
         conclusion_status="supported",
         research_question="How could the frozen Stage 1 relationship affect operating and financial lines?",

@@ -146,14 +146,20 @@ def test_workbench_uses_reviewed_context_and_excludes_same_stock_elsewhere(datab
 
     assert len(view["members"]) == 3
     assert view["owner_context"] == {
-        "owner_context_contract_version": "aquantai.industry-thesis-owner-context.v1",
+        "owner_context_contract_version": "aquantai.industry-thesis-owner-context.v2",
         "map_mode": "reuse_exact_existing_map_revision",
         "research_case_id": str(industry_map.case_id),
+        "research_case_revision_id": review["acceptance_plan"]["owner_context"][
+            "research_case_revision_id"
+        ],
         "industry_map_id": str(industry_map.id),
         "industry_map_revision_id": str(map_revision.id),
     }
     assert view["technical_details"]["selected_context"] == {
         "research_case_id": str(industry_map.case_id),
+        "research_case_revision_id": review["acceptance_plan"]["owner_context"][
+            "research_case_revision_id"
+        ],
         "industry_map_id": str(industry_map.id),
         "industry_map_revision_id": str(map_revision.id),
     }
@@ -259,5 +265,5 @@ def test_unaccepted_v1_fails_closed_even_when_one_stock_context_is_reachable(
                 as_of_recorded_at_utc=owner_fixture.BASE_TIME
                 + timedelta(seconds=3),
             )
-    assert exc.value.code == "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY"
+    assert exc.value.code == "INDUSTRY_THESIS_ACCEPTANCE_LEGACY_CONTEXT_UNBOUND"
     assert _read_counts(database) == counts_before

@@ -14,11 +14,13 @@ import backend.api.industry_analysis_review as review_api
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
 from backend.main import app
+from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
 from industry_alpha.industry_thesis_models import (
     IndustryThesisSessionIdentity,
     IndustryThesisSessionRevision,
 )
 import industry_alpha.stage1_models  # noqa: F401 - register exact FK targets
+from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 
 UTC = timezone.utc
 CUTOFF = date(2026, 7, 23)
@@ -28,6 +30,7 @@ PRIOR_REVISION_ID = uuid4()
 SOURCE_REVISION_ID = uuid4()
 REVIEWED_REVISION_ID = uuid4()
 MAP_REVISION_ID = uuid4()
+CASE_REVISION_ID = uuid4()
 CANDIDATE_A = uuid4()
 CANDIDATE_B = uuid4()
 
@@ -156,6 +159,7 @@ def _review_payload() -> dict:
         "expected_session_latest_revision_number": 2,
         "acceptance_plan_version": review_api.ACCEPTANCE_PLAN_VERSION,
         "owner_context": {
+            "research_case_revision_id": str(CASE_REVISION_ID),
             "industry_map_revision_id": str(MAP_REVISION_ID),
         },
         "decisions": [
@@ -180,6 +184,83 @@ def _review_payload() -> dict:
         ],
         "revision_note": "完整审阅两条精确候选路径",
     }
+
+
+def test_owner_context_options_return_exact_pairs_without_default() -> None:
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = build_session_factory(engine)
+    build_stage1_beneficiary_fixture(factory)
+    created = IndustryThesisCommandService(
+        factory,
+        clock=lambda: BOUNDARY,
+    ).create_session(
+        {
+            "thesis_text_original": "显式研究归属选择",
+            "thesis_title_reviewed": "显式研究归属选择",
+            "driver_type": "demand_expansion",
+            "analysis_horizon_kind": "medium_term",
+            "market_scope": [
+                {
+                    "market_namespace": "CN_A",
+                    "exchange_namespace": None,
+                    "security_type": "common_equity",
+                    "include_status": "active",
+                    "listed_instrument_ids": [],
+                }
+            ],
+            "chain_boundary": {},
+            "exclusions": [],
+            "seed_companies": [],
+            "seed_products": [],
+            "seed_technologies": [],
+            "seed_bottlenecks": [],
+            "draft_graph": {},
+            "coverage_state": "partial_local_coverage",
+            "workflow_state": "candidate_build_ready",
+            "information_cutoff_date": CUTOFF.isoformat(),
+            "revision_note": "owner-context option fixture",
+        }
+    )
+    app.dependency_overrides[
+        review_api.get_industry_analysis_session_factory
+    ] = lambda: factory
+    try:
+        http = TestClient(app)
+        query = urlencode(
+            {
+                "session_id": created["session_id"],
+                "as_of_cutoff": CUTOFF.isoformat(),
+                "as_of_recorded_at_utc": BOUNDARY.isoformat(),
+            }
+        )
+        response = http.get(
+            f"/industry-analysis/api/session-revisions/"
+            f"{created['session_revision_id']}/owner-context-options?{query}"
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["explicit_confirmation_required"] is True
+        assert body["automatic_default"] is None
+        assert body["items"]
+        assert all(item["research_case_revision_id"] for item in body["items"])
+        assert all(item["industry_map_revision_id"] for item in body["items"])
+        assert len(
+            {
+                (
+                    item["research_case_revision_id"],
+                    item["industry_map_revision_id"],
+                )
+                for item in body["items"]
+            }
+        ) == len(body["items"])
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
 
 
 def test_review_and_result_pages_are_active_and_static_boundaries_are_safe(client) -> None:
@@ -288,9 +369,10 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
         url,
         json={
             "expected_session_latest_revision_number": 2,
-            "acceptance_plan_version": review_api.ACCEPTANCE_PLAN_VERSION,
-            "owner_context": {
-                "industry_map_revision_id": str(MAP_REVISION_ID),
+                "acceptance_plan_version": review_api.ACCEPTANCE_PLAN_VERSION,
+                "owner_context": {
+                    "research_case_revision_id": str(CASE_REVISION_ID),
+                    "industry_map_revision_id": str(MAP_REVISION_ID),
             },
             "decisions": [],
             "revision_note": "完整审阅",
@@ -361,6 +443,7 @@ def test_review_write_requires_strict_complete_json_and_maps_user_text_exactly(c
     command = captured[0][0]
     assert command["session_revision_id"] == str(SOURCE_REVISION_ID)
     assert command["owner_context"] == {
+        "research_case_revision_id": str(CASE_REVISION_ID),
         "industry_map_revision_id": str(MAP_REVISION_ID),
     }
     assert command["decisions"][0]["rationale"] == {

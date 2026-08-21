@@ -46,6 +46,8 @@ def clean_database(postgres_database_url: str) -> Iterator[None]:
             connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         yield
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         engine.dispose()
 
 
@@ -84,6 +86,7 @@ def test_postgres_v06d_migration_round_trip(postgres_database_url: str):
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260719_0011"
     finally:
         engine.dispose()
+        command.upgrade(config, "head")
 
 
 @pytest.mark.parametrize("kind", ["industry", "company"])

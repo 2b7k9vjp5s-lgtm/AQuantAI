@@ -15,7 +15,9 @@ from industry_alpha.beneficiary_semantics_models import (
 )
 from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 from industry_alpha.industry_thesis_models import (
+    INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION,
     IndustryThesisCandidateRevision,
+    IndustryThesisOutputCaseRevisionBinding,
     IndustryThesisOutputLinkIdentity,
     IndustryThesisOutputLinkRevision,
     IndustryThesisSessionIdentity,
@@ -26,7 +28,8 @@ from industry_alpha.industry_thesis_owner_acceptance_contracts import (
     IndustryThesisOwnerAcceptanceError,
 )
 from industry_alpha.industry_thesis_rules import json_value, stored_utc
-from industry_alpha.models import ResearchCase
+from industry_alpha.industry_thesis_review import ACCEPTANCE_PLAN_VERSION
+from industry_alpha.models import ResearchCase, ResearchCaseRevision
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
     Stage1BeneficiaryRevision,
@@ -86,6 +89,7 @@ class IndustryThesisAcceptedOutputQueryService:
             "reviewed_session_revision_id": str(output.reviewed_session_revision_id),
             "accepted_session_revision_id": str(output.accepted_session_revision_id),
             "research_case_id": str(output.research_case_id),
+            "evidence_context_binding": graph["evidence_context_binding"],
             "industry_map_id": str(output.accepted_industry_map_identity_id),
             "industry_map_revision_id": str(output.accepted_industry_map_revision_id),
             "accepted_candidate_pool_revision_id": (
@@ -194,6 +198,7 @@ class IndustryThesisAcceptedOutputQueryService:
                 if output.accepted_candidate_pool_revision_id is None
                 else str(output.accepted_candidate_pool_revision_id)
             ),
+            "evidence_context_binding": graph["evidence_context_binding"],
             "members": members,
             "coverage_notice": (
                 "本结果仅表示这次已审核研究中被接受的完整成员，"
@@ -346,6 +351,12 @@ class IndustryThesisAcceptedOutputQueryService:
             )
         )
         research_case = self._session.get(ResearchCase, output.research_case_id)
+        case_binding = self._session.scalar(
+            select(IndustryThesisOutputCaseRevisionBinding).where(
+                IndustryThesisOutputCaseRevisionBinding.output_link_revision_id
+                == output.id
+            )
+        )
         industry_map = self._session.get(
             IndustryMap,
             output.accepted_industry_map_identity_id,
@@ -366,6 +377,67 @@ class IndustryThesisAcceptedOutputQueryService:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
             )
+        reviewed_graph = json_value(reviewed.draft_graph_json, "reviewed draft graph")
+        reviewed_plan = (
+            reviewed_graph.get("acceptance_plan_preview")
+            if isinstance(reviewed_graph, dict)
+            else None
+        )
+        reviewed_plan_version = (
+            reviewed_plan.get("acceptance_plan_version")
+            if isinstance(reviewed_plan, dict)
+            else None
+        )
+        if case_binding is None and reviewed_plan_version == ACCEPTANCE_PLAN_VERSION:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                "active v3 accepted output is missing its exact Case Revision binding",
+            )
+        evidence_context_binding: dict[str, Any] = {
+            "state": "unavailable",
+            "reason": "exact_case_revision_binding_not_persisted",
+            "binding_contract_version": None,
+            "binding_id": None,
+            "research_case_revision_id": None,
+        }
+        if case_binding is not None:
+            case_revision = self._session.get(
+                ResearchCaseRevision,
+                case_binding.research_case_revision_id,
+            )
+            if (
+                case_binding.binding_contract_version
+                != INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION
+                or case_revision is None
+                or case_revision.case_id != research_case.id
+                or case_revision.information_cutoff_date
+                > output.information_cutoff_date
+                or stored_utc(case_revision.recorded_at_utc)
+                > stored_utc(output.recorded_at_utc)
+                or not _visible(
+                    case_revision.information_cutoff_date,
+                    case_revision.recorded_at_utc,
+                    as_of_cutoff=as_of_cutoff,
+                    as_of_recorded_at_utc=recorded_boundary,
+                )
+                or not isinstance(reviewed_plan, dict)
+                or reviewed_plan_version != ACCEPTANCE_PLAN_VERSION
+                or reviewed_plan.get("owner_context", {}).get(
+                    "research_case_revision_id"
+                )
+                != str(case_revision.id)
+            ):
+                raise IndustryThesisOwnerAcceptanceError(
+                    "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
+                    "exact Case Revision binding is inconsistent with the accepted output",
+                )
+            evidence_context_binding = {
+                "state": "exact_bound",
+                "reason": None,
+                "binding_contract_version": case_binding.binding_contract_version,
+                "binding_id": str(case_binding.id),
+                "research_case_revision_id": str(case_revision.id),
+            }
         if (
             output.session_revision_id != accepted.id
             or accepted.workflow_state != "accepted_outputs_linked"
@@ -610,6 +682,7 @@ class IndustryThesisAcceptedOutputQueryService:
             "reviewed": reviewed,
             "accepted": accepted,
             "research_case": research_case,
+            "evidence_context_binding": evidence_context_binding,
             "industry_map": industry_map,
             "map_revision": map_revision,
             "ordered_beneficiary_revision_ids": beneficiary_ids,

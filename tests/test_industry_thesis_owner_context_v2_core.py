@@ -10,6 +10,8 @@ from industry_alpha.industry_thesis_owner_acceptance import (
     IndustryThesisOwnerAcceptanceService,
 )
 from industry_alpha.industry_thesis_owner_acceptance_contracts import (
+    HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION,
+    OWNER_ACCEPTANCE_PLAN_VERSION,
     IndustryThesisOwnerAcceptanceError,
 )
 from industry_alpha.industry_thesis_review import (
@@ -25,6 +27,7 @@ def _owner_context() -> dict[str, str]:
         "owner_context_contract_version": OWNER_CONTEXT_VERSION,
         "map_mode": OWNER_MAP_MODE,
         "research_case_id": str(uuid4()),
+        "research_case_revision_id": str(uuid4()),
         "industry_map_id": str(uuid4()),
         "industry_map_revision_id": str(uuid4()),
     }
@@ -34,8 +37,10 @@ def _normalized(context: dict[str, str]) -> dict[str, Any]:
     return {
         "reviewed_session_revision_id": str(uuid4()),
         "reviewed_plan_fingerprint_sha256": "a" * 64,
+        "owner_acceptance_plan_version": OWNER_ACCEPTANCE_PLAN_VERSION,
         "map_mode": context["map_mode"],
         "research_case_id": context["research_case_id"],
+        "research_case_revision_id": context["research_case_revision_id"],
         "industry_map_id": context["industry_map_id"],
         "industry_map_revision_id": context["industry_map_revision_id"],
     }
@@ -83,8 +88,8 @@ def test_unaccepted_historical_v1_plan_fails_closed() -> None:
             {"acceptance_plan_version": HISTORICAL_ACCEPTANCE_PLAN_VERSION}
         )
 
-    assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY"
-    assert "explicitly re-review" in (caught.value.detail or "")
+    assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_LEGACY_CONTEXT_UNBOUND"
+    assert "explicit reviewed-plan v3 re-review" in (caught.value.detail or "")
 
 
 def test_v2_owner_context_requires_exact_contract_shape() -> None:
@@ -121,6 +126,11 @@ def test_v2_owner_context_requires_exact_contract_shape() -> None:
             "research_case_id",
             lambda: str(uuid4()),
             "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
+        ),
+        (
+            "research_case_revision_id",
+            lambda: str(uuid4()),
+            "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_CONTEXT_STALE",
         ),
         (
             "industry_map_id",
@@ -160,7 +170,7 @@ def test_v1_missing_context_stops_before_graph_or_owner_work() -> None:
     with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
         service._run(object(), _normalized(context), dry_run=True)
 
-    assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY"
+    assert caught.value.code == "INDUSTRY_THESIS_ACCEPTANCE_LEGACY_CONTEXT_UNBOUND"
     assert service.graph_or_owner_work_reached is False
 
 
@@ -185,9 +195,13 @@ def test_v2_substitution_stops_before_graph_or_owner_work() -> None:
 def test_exact_accepted_v1_output_replay_remains_valid() -> None:
     context = _owner_context()
     normalized = _normalized(context)
+    normalized["owner_acceptance_plan_version"] = (
+        HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION
+    )
     output = _output(context)
 
     IndustryThesisOwnerAcceptanceService._validate_existing_output_replay(
+        object(),
         output,
         normalized,
         {"acceptance_plan_version": HISTORICAL_ACCEPTANCE_PLAN_VERSION},
@@ -197,10 +211,14 @@ def test_exact_accepted_v1_output_replay_remains_valid() -> None:
 def test_v1_output_replay_rejects_context_substitution() -> None:
     context = _owner_context()
     normalized = _normalized(context)
+    normalized["owner_acceptance_plan_version"] = (
+        HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION
+    )
     normalized["industry_map_revision_id"] = str(uuid4())
 
     with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
         IndustryThesisOwnerAcceptanceService._validate_existing_output_replay(
+            object(),
             _output(context),
             normalized,
             {"acceptance_plan_version": HISTORICAL_ACCEPTANCE_PLAN_VERSION},
@@ -216,6 +234,7 @@ def test_v2_output_replay_requires_reviewed_context_match() -> None:
 
     with pytest.raises(IndustryThesisOwnerAcceptanceError) as caught:
         IndustryThesisOwnerAcceptanceService._validate_existing_output_replay(
+            object(),
             _output(context),
             normalized,
             {

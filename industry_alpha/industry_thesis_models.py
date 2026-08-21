@@ -69,6 +69,9 @@ REVIEW_STATES = (
 )
 PROPOSED_EXPOSURE_TYPES = ("direct", "conditional", "indirect", "conceptual", "unknown")
 PROPOSAL_CONFIDENCE_STATES = ("high", "medium", "low", "unknown")
+INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION = (
+    "aquantai.industry-thesis-output-case-revision-binding.v1"
+)
 
 
 def _sql_values(values: tuple[str, ...]) -> str:
@@ -452,6 +455,37 @@ class IndustryThesisOutputLinkRevision(Base):
     )
 
 
+class IndustryThesisOutputCaseRevisionBinding(Base):
+    __tablename__ = "industry_thesis_output_case_revision_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "output_link_revision_id",
+            name="uq_industry_thesis_output_case_revision_binding_owner",
+        ),
+        CheckConstraint(
+            "binding_contract_version = "
+            f"'{INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION}'",
+            name="ck_industry_thesis_output_case_revision_binding_version",
+        ),
+        Index(
+            "ix_industry_thesis_output_case_revision_binding_case_revision",
+            "research_case_revision_id",
+            "output_link_revision_id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    output_link_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("industry_thesis_output_link_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    research_case_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("research_case_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    binding_contract_version: Mapped[str] = mapped_column(String(128), nullable=False)
+
+
 INDUSTRY_THESIS_MODELS = (
     IndustryThesisSessionIdentity,
     IndustryThesisSessionRevision,
@@ -459,12 +493,14 @@ INDUSTRY_THESIS_MODELS = (
     IndustryThesisCandidateRevision,
     IndustryThesisOutputLinkIdentity,
     IndustryThesisOutputLinkRevision,
+    IndustryThesisOutputCaseRevisionBinding,
 )
 
 _STRICT_APPEND_ONLY_MODELS = (
     IndustryThesisSessionRevision,
     IndustryThesisCandidateRevision,
     IndustryThesisOutputLinkRevision,
+    IndustryThesisOutputCaseRevisionBinding,
 )
 _IDENTITY_MODELS = (
     IndustryThesisSessionIdentity,

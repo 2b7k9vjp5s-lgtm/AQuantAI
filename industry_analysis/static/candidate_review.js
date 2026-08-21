@@ -9,7 +9,7 @@ const boundary = {
   cutoff: query.get("as_of_cutoff"),
   recordedAtUtc: query.get("as_of_recorded_at_utc"),
 };
-const ACCEPTANCE_PLAN_VERSION = "aquantai.industry-thesis-acceptance-plan.v1";
+const ACCEPTANCE_PLAN_VERSION = "aquantai.industry-thesis-acceptance-plan.v3";
 const UNCERTAINTY_OPTIONS = [
   ["confirmed_scope", "范围与信息已确认"],
   ["limited_evidence", "证据有限"],
@@ -19,6 +19,7 @@ const UNCERTAINTY_OPTIONS = [
 ];
 let sourceOptions = null;
 let reviewView = null;
+let ownerContextOptions = null;
 let busy = false;
 let lastCheckedPayload = null;
 
@@ -508,6 +509,41 @@ function renderReview(view) {
   updateReviewCounts();
 }
 
+function renderOwnerContextOptions(options) {
+  ownerContextOptions = options;
+  const container = document.querySelector("#owner-context-options");
+  container.replaceChildren();
+  if (!options.items.length) {
+    container.append(node("p", "当前双时间边界内没有可选的研究归属版本。", "option-empty"));
+    return;
+  }
+  options.items.forEach((item) => {
+    const label = node("label", null, "pool-option");
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "owner-context-pair";
+    radio.dataset.researchCaseRevisionId = item.research_case_revision_id;
+    radio.dataset.industryMapRevisionId = item.industry_map_revision_id;
+    const copy = node("span");
+    copy.append(
+      node("strong", item.ordinary_label),
+      node("p", `${item.case_revision_title} · ${item.map_revision_title}`),
+    );
+    label.append(radio, copy);
+    container.append(label);
+  });
+  container.addEventListener("change", invalidateReviewPreview);
+}
+
+function selectedOwnerContext() {
+  const selected = document.querySelector('input[name="owner-context-pair"]:checked');
+  if (!selected) return null;
+  return {
+    research_case_revision_id: selected.dataset.researchCaseRevisionId,
+    industry_map_revision_id: selected.dataset.industryMapRevisionId,
+  };
+}
+
 function collectReviewPayload() {
   const cards = Array.from(document.querySelectorAll(".review-card"));
   const decisions = [];
@@ -539,6 +575,12 @@ function collectReviewPayload() {
       uncertainty_note: uncertaintyNote,
     });
   });
+  const ownerContext = selectedOwnerContext();
+  if (!ownerContext) {
+    setStatus("#review-status", "请先明确选择一组 Case Revision + Map Revision。", "error");
+    document.querySelector("#owner-context-fieldset").scrollIntoView({ block: "center" });
+    return null;
+  }
   const revisionNote = document.querySelector("#review-revision-note").value.trim();
   if (!revisionNote) {
     document.querySelector("#review-revision-note").focus();
@@ -554,6 +596,7 @@ function collectReviewPayload() {
   return {
     expected_session_latest_revision_number: reviewView.session_revision_number,
     acceptance_plan_version: ACCEPTANCE_PLAN_VERSION,
+    owner_context: ownerContext,
     decisions,
     revision_note: revisionNote,
   };
@@ -635,6 +678,17 @@ async function loadReviewView() {
   return view;
 }
 
+async function loadOwnerContextOptions() {
+  const params = exactQuery();
+  const response = await fetch(
+    `/industry-analysis/api/session-revisions/${encodeURIComponent(route.sessionRevisionId)}/owner-context-options?${params.toString()}`,
+    { headers: { Accept: "application/json" } },
+  );
+  const options = await readJson(response);
+  renderOwnerContextOptions(options);
+  return options;
+}
+
 async function loadSourceOptions() {
   const params = exactQuery();
   const response = await fetch(
@@ -669,6 +723,7 @@ async function initialize() {
     if (universe && universe.candidate_count > 0) {
       document.querySelector("#prepare-panel").hidden = true;
       document.querySelector("#build-panel").hidden = true;
+      await loadOwnerContextOptions();
       await loadReviewView();
     }
     document.querySelector("#page-state").textContent = "本地精确数据可用";

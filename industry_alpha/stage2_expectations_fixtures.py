@@ -28,6 +28,7 @@ from industry_alpha.stage2_fixtures import (
 from industry_alpha.stage2_models import (
     Stage2CompanyResearch,
     Stage2CompanyResearchRevision,
+    Stage2CompanyResearchRevisionCaseBinding,
     Stage2HypothesisClaimLink,
     Stage2ResearchHypothesisLink,
 )
@@ -71,6 +72,12 @@ def build_stage2_expectation_valuation_fixture(
                 Stage2CompanyResearchRevision.revision_no == 3,
             )
         )
+        research_case_revision_id = session.scalars(
+            select(Stage2CompanyResearchRevisionCaseBinding.research_case_revision_id).where(
+                Stage2CompanyResearchRevisionCaseBinding.company_research_revision_id
+                == research_revision.id
+            )
+        ).one()
         hypothesis_revision_id = session.scalar(
             select(Stage2ResearchHypothesisLink.hypothesis_revision_id).where(
                 Stage2ResearchHypothesisLink.company_research_revision_id
@@ -245,6 +252,7 @@ def build_stage2_expectation_valuation_fixture(
     )
     later_research = stage2_commands.append_research_revision(
         stage2.supported_research_id,
+        research_case_revision_id=research_case_revision_id,
         workflow_state="completed",
         conclusion_status="disputed",
         research_question="How could the frozen Stage 1 relationship affect operating and financial lines?",

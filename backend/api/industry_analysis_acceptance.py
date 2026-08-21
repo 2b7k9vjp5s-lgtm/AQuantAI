@@ -61,6 +61,7 @@ class OwnerAcceptancePlanRequest(_StrictModel):
     expected_session_latest_revision_number: int = Field(ge=1)
     reviewed_plan_fingerprint_sha256: str = Field(min_length=64, max_length=64)
     research_case_id: UUID
+    research_case_revision_id: UUID
     map_mode: str = Field(min_length=1, max_length=96)
     industry_map_id: UUID
     industry_map_revision_id: UUID
@@ -223,6 +224,9 @@ def _validate_route_and_snapshot(
             "reviewed_plan_fingerprint_sha256"
         ),
         "research_case_id": view["owner_context"]["research_case_id"],
+        "research_case_revision_id": view["owner_context"][
+            "research_case_revision_id"
+        ],
         "map_mode": view["owner_context"]["map_mode"],
         "industry_map_id": view["owner_context"]["industry_map_id"],
         "industry_map_revision_id": view["owner_context"][
@@ -240,6 +244,7 @@ def _validate_route_and_snapshot(
             payload.reviewed_plan_fingerprint_sha256
         ),
         "research_case_id": str(payload.research_case_id),
+        "research_case_revision_id": str(payload.research_case_revision_id),
         "map_mode": payload.map_mode,
         "industry_map_id": str(payload.industry_map_id),
         "industry_map_revision_id": str(payload.industry_map_revision_id),
@@ -249,7 +254,9 @@ def _validate_route_and_snapshot(
     mismatched = [key for key in expected if expected[key] != actual[key]]
     if not mismatched:
         return
-    if mismatched == ["industry_map_revision_id"]:
+    if mismatched == ["research_case_revision_id"]:
+        code = "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_CONTEXT_STALE"
+    elif mismatched == ["industry_map_revision_id"]:
         code = "INDUSTRY_THESIS_ACCEPTANCE_MAP_REVISION_MISMATCH"
     elif {
         "research_case_id",
@@ -492,6 +499,10 @@ def _compose_result(
             "reviewed_session_revision_id": output["reviewed_session_revision_id"],
             "accepted_session_revision_id": output["accepted_session_revision_id"],
             "research_case_id": output["research_case_id"],
+            "research_case_revision_id": output["evidence_context_binding"][
+                "research_case_revision_id"
+            ],
+            "evidence_context_binding": output["evidence_context_binding"],
             "industry_map_id": output["industry_map_id"],
             "industry_map_revision_id": output["industry_map_revision_id"],
             "supported_handoff_members": supported,

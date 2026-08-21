@@ -5,13 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.database.models import IngestionRun, StockBasicRecord
 from industry_alpha.errors import (
+    EvidenceLedgerConflictError,
     EvidenceLedgerNotFound,
     EvidenceLedgerValidationError,
 )
@@ -21,6 +23,7 @@ from industry_alpha.models import (
     ClaimRevision,
     EvidenceItem,
     ResearchCase,
+    ResearchCaseRevision,
 )
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
@@ -32,8 +35,10 @@ from industry_alpha.stage1_models import (
     Stage1CandidatePoolRevision,
 )
 from industry_alpha.stage2_models import (
+    STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION,
     Stage2CompanyResearch,
     Stage2CompanyResearchRevision,
+    Stage2CompanyResearchRevisionCaseBinding,
     Stage2FinancialHypothesis,
     Stage2FinancialHypothesisRevision,
     Stage2HandoffAssertionLink,
@@ -59,6 +64,13 @@ from industry_alpha.validation import (
 
 HYPOTHESIS_STATUSES = frozenset({"draft", "supported", "disputed", "rejected"})
 HYPOTHESIS_DIRECTIONS = frozenset({"positive", "negative", "mixed", "uncertain"})
+_STAGE2_CASE_BINDING_NAMESPACE = uuid5(
+    NAMESPACE_URL, STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION
+)
+_CASE_REVISION_REQUIRED = "stage2_case_revision_required"
+_CASE_REVISION_MISMATCH = "stage2_case_revision_case_mismatch"
+_CASE_REVISION_NOT_VISIBLE = "stage2_case_revision_not_visible"
+_CASE_REVISION_BINDING_CONFLICT = "stage2_case_revision_binding_conflict"
 
 
 @dataclass(frozen=True)
@@ -85,6 +97,7 @@ class Stage2CompanyResearchCommandService:
         summary: str | None,
         information_cutoff_date: date,
         recorded_at_utc: datetime | None = None,
+        research_case_revision_id: UUID | None = None,
     ) -> Stage2CompanyResearch:
         recorded = utc_timestamp(recorded_at_utc)
         information_cutoff_date = _required_date(
@@ -101,6 +114,13 @@ class Stage2CompanyResearchCommandService:
                     recorded,
                 )
                 pool, pool_revision, membership, beneficiary, beneficiary_revision, stock, _run = handoff
+                exact_case_revision = self._exact_case_revision(
+                    session,
+                    research_case_revision_id,
+                    case_id=pool.case_id,
+                    cutoff=information_cutoff_date,
+                    recorded=recorded,
+                )
                 research = Stage2CompanyResearch(
                     case_id=pool.case_id,
                     map_id=pool.map_id,
@@ -123,6 +143,7 @@ class Stage2CompanyResearchCommandService:
                 self._insert_research_revision(
                     session,
                     research,
+                    research_case_revision=exact_case_revision,
                     workflow_state=workflow_state,
                     conclusion_status=conclusion_status,
                     research_question=research_question,
@@ -146,6 +167,7 @@ class Stage2CompanyResearchCommandService:
         hypothesis_revision_ids: tuple[UUID, ...] = (),
         verification_items: tuple[Stage2VerificationInput, ...] = (),
         recorded_at_utc: datetime | None = None,
+        research_case_revision_id: UUID | None = None,
     ) -> Stage2CompanyResearchRevision:
         recorded = utc_timestamp(recorded_at_utc)
         information_cutoff_date = _required_date(
@@ -156,9 +178,17 @@ class Stage2CompanyResearchCommandService:
             with _translate_integrity("company-research revision conflicts with accepted history"):
                 with self._session_factory.begin() as session:
                     research = self._locked_research(session, company_research_id)
+                    exact_case_revision = self._exact_case_revision(
+                        session,
+                        research_case_revision_id,
+                        case_id=research.case_id,
+                        cutoff=information_cutoff_date,
+                        recorded=recorded,
+                    )
                     revision = self._insert_research_revision(
                         session,
                         research,
+                        research_case_revision=exact_case_revision,
                         workflow_state=workflow_state,
                         conclusion_status=conclusion_status,
                         research_question=research_question,
@@ -329,6 +359,7 @@ class Stage2CompanyResearchCommandService:
         session: Session,
         research: Stage2CompanyResearch,
         *,
+        research_case_revision: ResearchCaseRevision,
         workflow_state: str,
         conclusion_status: str,
         research_question: str,
@@ -338,10 +369,17 @@ class Stage2CompanyResearchCommandService:
         verification_items: tuple[Stage2VerificationInput, ...],
         recorded_at_utc: datetime,
     ) -> Stage2CompanyResearchRevision:
+        if research_case_revision.case_id != research.case_id:
+            raise EvidenceLedgerValidationError(_CASE_REVISION_MISMATCH)
+        if research_case_revision.information_cutoff_date > information_cutoff_date:
+            raise EvidenceLedgerValidationError(_CASE_REVISION_NOT_VISIBLE)
+        if _stored_utc(research_case_revision.recorded_at_utc) > recorded_at_utc:
+            raise EvidenceLedgerValidationError(_CASE_REVISION_NOT_VISIBLE)
         prior = self._latest(session, Stage2CompanyResearchRevision, "company_research_id", research.id)
         chronology = [("company-research identity timestamp", _stored_utc(research.created_at_utc))]
         if prior is not None:
             chronology.append(("previous company-research revision timestamp", _stored_utc(prior.recorded_at_utc)))
+        chronology.append(("research case revision timestamp", _stored_utc(research_case_revision.recorded_at_utc)))
         validate_utc_chronology(recorded_at_utc, *chronology)
         state = reviewed_value(workflow_state, "workflow_state", WORKFLOW_STATES)
         conclusion = reviewed_value(conclusion_status, "conclusion_status", CONCLUSION_STATUSES)
@@ -405,6 +443,22 @@ class Stage2CompanyResearchCommandService:
         )
         session.add(revision)
         session.flush()
+        binding = Stage2CompanyResearchRevisionCaseBinding(
+            id=uuid5(
+                _STAGE2_CASE_BINDING_NAMESPACE,
+                f"{revision.id}:{research_case_revision.id}",
+            ),
+            company_research_revision_id=revision.id,
+            research_case_revision_id=research_case_revision.id,
+            binding_contract_version=STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION,
+        )
+        session.add(binding)
+        try:
+            session.flush()
+        except IntegrityError as exc:
+            raise EvidenceLedgerConflictError(
+                _CASE_REVISION_BINDING_CONFLICT
+            ) from exc
         for hypothesis_revision in hypotheses:
             session.add(
                 Stage2ResearchHypothesisLink(
@@ -550,6 +604,32 @@ class Stage2CompanyResearchCommandService:
             ("company snapshot completion timestamp", _stored_utc(run.completed_at)),
         )
         return pool, pool_revision, membership, beneficiary, beneficiary_revision, stock, run
+
+    @staticmethod
+    def _exact_case_revision(
+        session: Session,
+        research_case_revision_id: UUID | None,
+        *,
+        case_id: UUID,
+        cutoff: date,
+        recorded: datetime,
+    ) -> ResearchCaseRevision:
+        if not isinstance(research_case_revision_id, UUID):
+            raise EvidenceLedgerValidationError(_CASE_REVISION_REQUIRED)
+        revision = session.scalar(
+            select(ResearchCaseRevision)
+            .where(ResearchCaseRevision.id == research_case_revision_id)
+            .with_for_update()
+        )
+        if revision is None:
+            raise EvidenceLedgerNotFound(_CASE_REVISION_NOT_VISIBLE)
+        if revision.case_id != case_id:
+            raise EvidenceLedgerValidationError(_CASE_REVISION_MISMATCH)
+        if revision.information_cutoff_date > cutoff:
+            raise EvidenceLedgerValidationError(_CASE_REVISION_NOT_VISIBLE)
+        if _stored_utc(revision.recorded_at_utc) > recorded:
+            raise EvidenceLedgerValidationError(_CASE_REVISION_NOT_VISIBLE)
+        return revision
 
     @staticmethod
     def _freeze_handoff_boundary(session: Session, research: Stage2CompanyResearch, beneficiary_revision: Stage1BeneficiaryRevision, cutoff: date, recorded: datetime) -> None:
@@ -719,6 +799,7 @@ class Stage2CompanyResearchCommandService:
         if row is None:
             raise EvidenceLedgerNotFound(f"Stage 2 hypothesis {identity} was not found.")
         return row
+
 
 def _required_text(value: str, field: str, maximum: int) -> str:
     if not isinstance(value, str):

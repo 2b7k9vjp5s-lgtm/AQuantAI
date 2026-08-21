@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from backend.database.canonical_price_models import ListedInstrument
 from backend.database.engine import build_session_factory
 from backend.database.models import Base
-from industry_alpha.chain_map_models import IndustryMapRevision
+from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
 from industry_alpha.industry_thesis_models import (
     IndustryThesisCandidateRevision,
@@ -23,6 +23,7 @@ from industry_alpha.industry_thesis_review import (
     IndustryThesisReviewedPlanQueryService,
 )
 from industry_alpha.industry_thesis_rules import BUILDER_VERSION, IndustryThesisError
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import Stage1Beneficiary
 
@@ -173,13 +174,30 @@ def _seed_three(database):
     return created, committed, instrument_id, map_revision_id
 
 
-def _review_input(created, committed, map_revision_id: UUID):
+def _case_revision_id(database, map_revision_id: UUID) -> UUID:
+    with database() as session:
+        map_revision = session.get(IndustryMapRevision, map_revision_id)
+        industry_map = session.get(IndustryMap, map_revision.map_id)
+        case_revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == industry_map.case_id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+        assert case_revision is not None
+        return case_revision.id
+
+
+def _review_input(database, created, committed, map_revision_id: UUID):
     rows = {row["company_label_original"]: row for row in committed["candidates"]}
     return {
         "session_revision_id": created["session_revision_id"],
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
         "owner_context": {
+            "research_case_revision_id": str(
+                _case_revision_id(database, map_revision_id)
+            ),
             "industry_map_revision_id": str(map_revision_id),
         },
         "decisions": [
@@ -212,7 +230,7 @@ def _review_input(created, committed, map_revision_id: UUID):
 
 def test_three_candidate_review_freezes_deterministic_plan(database) -> None:
     created, committed, instrument_id, map_revision_id = _seed_three(database)
-    raw = _review_input(created, committed, map_revision_id)
+    raw = _review_input(database, created, committed, map_revision_id)
 
     dry = IndustryThesisProposalReviewService(
         database,
@@ -272,7 +290,7 @@ def test_three_candidate_review_freezes_deterministic_plan(database) -> None:
 
 def test_review_order_does_not_change_plan_or_fingerprint(database) -> None:
     created, committed, _, map_revision_id = _seed_three(database)
-    raw = _review_input(created, committed, map_revision_id)
+    raw = _review_input(database, created, committed, map_revision_id)
     reverse = dict(raw)
     reverse["decisions"] = list(reversed(raw["decisions"]))
 
@@ -293,7 +311,7 @@ def test_review_order_does_not_change_plan_or_fingerprint(database) -> None:
 
 def test_incomplete_stale_and_ambiguous_selection_fail_atomically(database) -> None:
     created, committed, _, map_revision_id = _seed_three(database)
-    raw = _review_input(created, committed, map_revision_id)
+    raw = _review_input(database, created, committed, map_revision_id)
 
     incomplete = dict(raw)
     incomplete["decisions"] = raw["decisions"][:-1]
@@ -304,7 +322,7 @@ def test_incomplete_stale_and_ambiguous_selection_fail_atomically(database) -> N
     with pytest.raises(IndustryThesisError, match="complete exact latest"):
         service.review_candidates(incomplete)
 
-    ambiguous_selected = _review_input(created, committed, map_revision_id)
+    ambiguous_selected = _review_input(database, created, committed, map_revision_id)
     for decision in ambiguous_selected["decisions"]:
         if decision["decision"] == "rejected_by_user":
             decision["decision"] = "selected_for_acceptance"
@@ -312,7 +330,7 @@ def test_incomplete_stale_and_ambiguous_selection_fail_atomically(database) -> N
     with pytest.raises(IndustryThesisError, match="exact accepted identity"):
         service.review_candidates(ambiguous_selected)
 
-    stale = _review_input(created, committed, map_revision_id)
+    stale = _review_input(database, created, committed, map_revision_id)
     stale["decisions"][0]["expected_latest_revision_number"] = 2
     with pytest.raises(IndustryThesisError, match="expected latest candidate"):
         service.review_candidates(stale)
@@ -371,6 +389,9 @@ def test_duplicate_selected_exact_identity_is_rejected(database) -> None:
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
         "owner_context": {
+            "research_case_revision_id": str(
+                _case_revision_id(database, map_revision_id)
+            ),
             "industry_map_revision_id": str(map_revision_id),
         },
         "decisions": [

@@ -14,6 +14,10 @@ EXPECTED_TABLES = {
     "industry_thesis_output_link_identities",
     "industry_thesis_output_link_revisions",
 }
+BINDING_TABLES = {
+    "industry_thesis_output_case_revision_bindings",
+    "stage2_company_research_revision_case_bindings",
+}
 
 
 def config_for(path) -> Config:
@@ -52,14 +56,16 @@ def _legacy_output_values() -> dict[str, str | int]:
     }
 
 
-def test_migration_creates_exact_six_tables_and_empty_round_trip(tmp_path) -> None:
+def test_migration_creates_industry_tables_and_empty_round_trip(tmp_path) -> None:
     database = tmp_path / "industry-thesis.db"
     config = config_for(database)
     prepare_prior_head(config)
     command.upgrade(config, "head")
     engine = create_engine(f"sqlite:///{database}")
     try:
-        assert EXPECTED_TABLES.issubset(inspect(engine).get_table_names())
+        tables = set(inspect(engine).get_table_names())
+        assert EXPECTED_TABLES.issubset(tables)
+        assert BINDING_TABLES.issubset(tables)
         columns = {
             item["name"]: item
             for item in inspect(engine).get_columns(
@@ -78,7 +84,7 @@ def test_migration_creates_exact_six_tables_and_empty_round_trip(tmp_path) -> No
         with engine.connect() as connection:
             assert (
                 connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "20260803_0018"
+                == "20260814_0019"
             )
     finally:
         engine.dispose()
@@ -87,6 +93,137 @@ def test_migration_creates_exact_six_tables_and_empty_round_trip(tmp_path) -> No
     engine = create_engine(f"sqlite:///{database}")
     try:
         assert EXPECTED_TABLES.isdisjoint(inspect(engine).get_table_names())
+        assert BINDING_TABLES.isdisjoint(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()
+
+
+def test_0019_creates_only_two_binding_tables_and_does_not_backfill_history(
+    tmp_path,
+) -> None:
+    database = tmp_path / "exact-binding-delta.db"
+    config = config_for(database)
+    prepare_prior_head(config)
+    command.upgrade(config, "20260803_0018")
+    engine = create_engine(f"sqlite:///{database}")
+    values = _legacy_output_values()
+    try:
+        before_tables = set(inspect(engine).get_table_names())
+        with engine.begin() as connection:
+            connection.execute(text("PRAGMA foreign_keys=OFF"))
+            connection.execute(
+                text(
+                    "INSERT INTO industry_thesis_output_link_revisions "
+                    "(id, output_link_id, revision_number, session_revision_id, "
+                    "accepted_session_revision_id, reviewed_session_revision_id, "
+                    "research_case_id, accepted_industry_map_identity_id, "
+                    "accepted_industry_map_revision_id, "
+                    "accepted_candidate_pool_revision_id, output_contract_version, "
+                    "reviewed_plan_fingerprint_sha256, "
+                    "ordered_beneficiary_revision_ids_json, "
+                    "ordered_owner_output_bindings_json, coverage_state, "
+                    "acceptance_plan_fingerprint_sha256, owner_transaction_id, "
+                    "information_cutoff_date, recorded_at_utc, "
+                    "supersedes_output_link_revision_id) "
+                    "VALUES (:id, :output_link_id, 1, :session_revision_id, "
+                    ":session_revision_id, :session_revision_id, :session_id, "
+                    ":map_id, :map_revision_id, NULL, :contract_version, "
+                    ":reviewed_fingerprint, '[\"legacy-unbound\"]', "
+                    ":owner_bindings, 'partial_local_coverage', "
+                    ":fingerprint, :transaction_id, '2026-07-22', "
+                    "'2026-07-22 16:00:00', NULL)"
+                ),
+                {
+                    **values,
+                    "contract_version": "aquantai.industry-thesis-output-links.v1",
+                    "reviewed_fingerprint": "c" * 64,
+                    "owner_bindings": '[{"sequence":0}]',
+                    "fingerprint": "a" * 64,
+                },
+            )
+        engine.dispose()
+
+        command.upgrade(config, "head")
+        engine = create_engine(f"sqlite:///{database}")
+        after_tables = set(inspect(engine).get_table_names())
+        assert after_tables - before_tables == BINDING_TABLES
+        with engine.connect() as connection:
+            assert connection.scalar(
+                text(
+                    "SELECT COUNT(*) FROM industry_thesis_output_link_revisions "
+                    "WHERE id = :id"
+                ),
+                {"id": values["id"]},
+            ) == 1
+            assert connection.scalar(
+                text("SELECT COUNT(*) FROM industry_thesis_output_case_revision_bindings")
+            ) == 0
+            assert connection.scalar(
+                text("SELECT COUNT(*) FROM stage2_company_research_revision_case_bindings")
+            ) == 0
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260814_0019"
+        engine.dispose()
+
+        command.downgrade(config, "20260803_0018")
+        engine = create_engine(f"sqlite:///{database}")
+        assert BINDING_TABLES.isdisjoint(inspect(engine).get_table_names())
+        with engine.connect() as connection:
+            assert connection.scalar(
+                text(
+                    "SELECT COUNT(*) FROM industry_thesis_output_link_revisions "
+                    "WHERE id = :id"
+                ),
+                {"id": values["id"]},
+            ) == 1
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260803_0018"
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize(
+    "table_name,owner_column,contract_version",
+    [
+        (
+            "industry_thesis_output_case_revision_bindings",
+            "output_link_revision_id",
+            "aquantai.industry-thesis-output-case-revision-binding.v1",
+        ),
+        (
+            "stage2_company_research_revision_case_bindings",
+            "company_research_revision_id",
+            "aquantai.stage2-company-research-case-revision-binding.v1",
+        ),
+    ],
+)
+def test_0019_downgrade_refuses_when_either_binding_table_is_non_empty(
+    tmp_path, table_name, owner_column, contract_version
+) -> None:
+    database = tmp_path / f"{table_name}.db"
+    config = config_for(database)
+    prepare_prior_head(config)
+    command.upgrade(config, "head")
+    engine = create_engine(f"sqlite:///{database}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("PRAGMA foreign_keys=OFF"))
+            connection.execute(
+                text(
+                    f"INSERT INTO {table_name} "
+                    f"(id, {owner_column}, research_case_revision_id, binding_contract_version) "
+                    "VALUES (:id, :owner_id, :case_revision_id, :contract_version)"
+                ),
+                {
+                    "id": str(uuid4()),
+                    "owner_id": str(uuid4()),
+                    "case_revision_id": str(uuid4()),
+                    "contract_version": contract_version,
+                },
+            )
+        with pytest.raises(RuntimeError, match="Cannot downgrade exact Research Case Revision bindings"):
+            command.downgrade(config, "20260803_0018")
+        assert BINDING_TABLES.issubset(inspect(engine).get_table_names())
+        with engine.connect() as connection:
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260814_0019"
     finally:
         engine.dispose()
 

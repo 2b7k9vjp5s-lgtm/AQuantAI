@@ -28,7 +28,7 @@ import industry_alpha.stage2_models as v06a
 
 
 MODULES = (
-    ("industry_alpha.stage2_models", v06a, "reject_stage2_mutation", "STAGE2_MODELS", 11),
+    ("industry_alpha.stage2_models", v06a, "reject_stage2_mutation", "STAGE2_MODELS", 12),
     (
         "industry_alpha.stage2_expectations_models",
         v06b,
@@ -102,7 +102,7 @@ def _first_row(session: Session, model: type):
 
 
 def test_listener_registration_model_counts_and_shared_metadata_are_fixed():
-    assert [size for *_rest, size in MODULES] == [11, 10, 14, 18]
+    assert [size for *_rest, size in MODULES] == [12, 10, 14, 18]
     for _module_name, module, listener_name, tuple_name, expected_size in MODULES:
         listener = getattr(module, listener_name)
         models = getattr(module, tuple_name)
@@ -113,7 +113,7 @@ def test_listener_registration_model_counts_and_shared_metadata_are_fixed():
     stage2_tables = sorted(
         table_name for table_name in Base.metadata.tables if table_name.startswith("stage2_")
     )
-    assert len(stage2_tables) == 53
+    assert len(stage2_tables) == 54
 
 
 def test_dynamic_model_globals_and_tables_are_fixed():

@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from backend.database.canonical_price_models import ListedInstrument
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun, StockBasicRecord
-from industry_alpha.chain_map_models import IndustryMapRevision
+from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 from industry_alpha.industry_thesis_commands import IndustryThesisCommandService
 from industry_alpha.industry_thesis_review import (
     ACCEPTANCE_PLAN_VERSION,
@@ -22,6 +22,7 @@ from industry_alpha.industry_thesis_rules import (
     IndustryThesisError,
     IndustryThesisNotFound,
 )
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 
 UTC = timezone.utc
@@ -85,6 +86,20 @@ def _owner_map_revision_id(database) -> UUID:
         return map_revision.id
 
 
+def _case_revision_id(database, map_revision_id: UUID) -> UUID:
+    with database() as session:
+        map_revision = session.get(IndustryMapRevision, map_revision_id)
+        industry_map = session.get(IndustryMap, map_revision.map_id)
+        case_revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == industry_map.case_id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+        assert case_revision is not None
+        return case_revision.id
+
+
 def _seed_single_exact(database):
     map_revision_id = _owner_map_revision_id(database)
     with database.begin() as session:
@@ -130,6 +145,9 @@ def _seed_single_exact(database):
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
         "owner_context": {
+            "research_case_revision_id": str(
+                _case_revision_id(database, map_revision_id)
+            ),
             "industry_map_revision_id": str(map_revision_id),
         },
         "decisions": [
@@ -268,6 +286,9 @@ def test_selected_candidate_rejects_two_unbound_identity_authorities(database) -
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
         "owner_context": {
+            "research_case_revision_id": str(
+                _case_revision_id(database, map_revision_id)
+            ),
             "industry_map_revision_id": str(map_revision_id),
         },
         "decisions": [

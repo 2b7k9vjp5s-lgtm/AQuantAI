@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from threading import Lock, RLock
 from typing import Any, Callable
-from uuid import UUID, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -26,13 +26,16 @@ from industry_alpha.errors import (
     EvidenceLedgerValidationError,
 )
 from industry_alpha.industry_thesis_models import (
+    INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION,
     IndustryThesisCandidateRevision,
+    IndustryThesisOutputCaseRevisionBinding,
     IndustryThesisOutputLinkIdentity,
     IndustryThesisOutputLinkRevision,
     IndustryThesisSessionIdentity,
     IndustryThesisSessionRevision,
 )
 from industry_alpha.industry_thesis_owner_acceptance_contracts import (
+    HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION,
     OUTPUT_CONTRACT_VERSION,
     TRANSACTION_NAMESPACE,
     IndustryThesisOwnerAcceptanceError,
@@ -44,7 +47,6 @@ from industry_alpha.industry_thesis_owner_acceptance_contracts import (
 )
 from industry_alpha.industry_thesis_review import (
     ACCEPTANCE_PLAN_VERSION,
-    HISTORICAL_ACCEPTANCE_PLAN_VERSION,
     OWNER_CONTEXT_VERSION,
     OWNER_MAP_MODE,
 )
@@ -58,11 +60,10 @@ from industry_alpha.industry_thesis_rules import (
     stored_utc,
     utc_now,
 )
-from industry_alpha.models import ResearchCase
+from industry_alpha.models import ResearchCase, ResearchCaseRevision
 from industry_alpha.stage1_commands import MapAssertionRevisionInput
 from industry_alpha.stage1_models import (
     Stage1BeneficiaryRevision,
-    Stage1CandidatePoolMembership,
     Stage1CandidatePoolRevision,
 )
 from industry_alpha.stage1_owner_port import (
@@ -73,6 +74,10 @@ from industry_alpha.stage1_owner_port import (
 
 _LOCK_GUARD = Lock()
 _LOCKS: dict[str, RLock] = {}
+_OUTPUT_CASE_BINDING_NAMESPACE = uuid5(
+    NAMESPACE_URL,
+    INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION,
+)
 
 
 def _lock(key: str) -> RLock:
@@ -194,7 +199,8 @@ class IndustryThesisOwnerAcceptanceService:
             normalized=normalized,
         )
         if existing_output is not None:
-            self._validate_existing_output_replay(
+            existing_binding = self._validate_existing_output_replay(
+                session,
                 existing_output,
                 normalized,
                 reviewed_plan,
@@ -202,12 +208,27 @@ class IndustryThesisOwnerAcceptanceService:
             return self._idempotent_result(
                 existing_output,
                 normalized,
+                binding=existing_binding,
                 dry_run=dry_run,
+            )
+
+        if (
+            normalized["owner_acceptance_plan_version"]
+            == HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_LEGACY_CONTEXT_UNBOUND",
+                "historical owner-acceptance v1 may replay an existing accepted graph only",
             )
 
         owner_context = self._validate_reviewed_owner_context(reviewed_plan)
         self._validate_submitted_owner_context(normalized, owner_context)
-        research_case, industry_map, map_revision = self._validate_case_and_map(
+        (
+            research_case,
+            case_revision,
+            industry_map,
+            map_revision,
+        ) = self._validate_case_and_map(
             session,
             normalized,
             reviewed,
@@ -232,6 +253,7 @@ class IndustryThesisOwnerAcceptanceService:
             session,
             normalized,
             reviewed,
+            case_revision,
             map_revision,
         )
         self._lock_owner_targets(session, normalized)
@@ -297,6 +319,7 @@ class IndustryThesisOwnerAcceptanceService:
             ),
             "ordered_owner_output_bindings": output_bindings,
             "no_supported_handoff_members": not supported_ids,
+            "research_case_revision_id": str(case_revision.id),
         }
 
         transaction_id = owner_transaction_id(normalized)
@@ -335,7 +358,11 @@ class IndustryThesisOwnerAcceptanceService:
             pool_result=pool_result,
             recorded_at=recorded_at,
         )
-        session.flush()
+        output_case_binding = self._append_output_case_revision_binding(
+            session,
+            output_revision=output_revision,
+            research_case_revision=case_revision,
+        )
 
         return {
             "dry_run": dry_run,
@@ -356,8 +383,12 @@ class IndustryThesisOwnerAcceptanceService:
             ),
             "output_link_id": None if dry_run else str(output_identity.id),
             "output_link_revision_id": None if dry_run else str(output_revision.id),
+            "output_case_revision_binding_id": (
+                None if dry_run else str(output_case_binding.id)
+            ),
             "owner_transaction_id": str(transaction_id),
             "research_case_id": str(research_case.id),
+            "research_case_revision_id": str(case_revision.id),
             "industry_map_id": str(industry_map.id),
             "industry_map_revision_id": str(map_revision.id),
             "complete_universe_count": len(output_bindings),
@@ -416,11 +447,7 @@ class IndustryThesisOwnerAcceptanceService:
             )
             .with_for_update()
         )
-        if (
-            reviewed is None
-            or latest is None
-            or reviewed.revision_number != expected
-        ):
+        if reviewed is None or latest is None or reviewed.revision_number != expected:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_STALE"
             )
@@ -445,9 +472,7 @@ class IndustryThesisOwnerAcceptanceService:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE"
             )
-        stored_fingerprint = reviewed_plan.get(
-            "acceptance_plan_fingerprint_sha256"
-        )
+        stored_fingerprint = reviewed_plan.get("acceptance_plan_fingerprint_sha256")
         base = {
             key: value
             for key, value in reviewed_plan.items()
@@ -468,21 +493,17 @@ class IndustryThesisOwnerAcceptanceService:
         reviewed_plan: dict[str, Any],
     ) -> dict[str, str]:
         version = reviewed_plan.get("acceptance_plan_version")
-        if version == HISTORICAL_ACCEPTANCE_PLAN_VERSION:
-            raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_REVIEWED_PLAN_NOT_READY",
-                "reviewed Owner Context is required; explicitly re-review the v1 plan",
-            )
         if version != ACCEPTANCE_PLAN_VERSION:
             raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_GRAPH_INCOMPLETE",
-                "reviewed acceptance-plan version is unsupported",
+                "INDUSTRY_THESIS_ACCEPTANCE_LEGACY_CONTEXT_UNBOUND",
+                "new bound acceptance requires an explicit reviewed-plan v3 re-review",
             )
         raw = reviewed_plan.get("owner_context")
         allowed = {
             "owner_context_contract_version",
             "map_mode",
             "research_case_id",
+            "research_case_revision_id",
             "industry_map_id",
             "industry_map_revision_id",
         }
@@ -501,6 +522,7 @@ class IndustryThesisOwnerAcceptanceService:
             )
         try:
             case_id = UUID(str(raw["research_case_id"]))
+            case_revision_id = UUID(str(raw["research_case_revision_id"]))
             map_id = UUID(str(raw["industry_map_id"]))
             map_revision_id = UUID(str(raw["industry_map_revision_id"]))
         except (TypeError, ValueError, AttributeError) as exc:
@@ -512,6 +534,7 @@ class IndustryThesisOwnerAcceptanceService:
             "owner_context_contract_version": OWNER_CONTEXT_VERSION,
             "map_mode": OWNER_MAP_MODE,
             "research_case_id": str(case_id),
+            "research_case_revision_id": str(case_revision_id),
             "industry_map_id": str(map_id),
             "industry_map_revision_id": str(map_revision_id),
         }
@@ -523,13 +546,20 @@ class IndustryThesisOwnerAcceptanceService:
     ) -> None:
         if (
             normalized["map_mode"] != owner_context["map_mode"]
-            or normalized["research_case_id"]
-            != owner_context["research_case_id"]
+            or normalized["research_case_id"] != owner_context["research_case_id"]
             or normalized["industry_map_id"] != owner_context["industry_map_id"]
         ):
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED",
                 "submitted Case, Map or map mode does not match reviewed authority",
+            )
+        if (
+            normalized.get("research_case_revision_id")
+            != owner_context["research_case_revision_id"]
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_CONTEXT_STALE",
+                "submitted Case Revision does not match reviewed authority",
             )
         if (
             normalized["industry_map_revision_id"]
@@ -543,10 +573,11 @@ class IndustryThesisOwnerAcceptanceService:
     @classmethod
     def _validate_existing_output_replay(
         cls,
+        session: Session,
         output: IndustryThesisOutputLinkRevision,
         normalized: dict[str, Any],
         reviewed_plan: dict[str, Any],
-    ) -> None:
+    ) -> IndustryThesisOutputCaseRevisionBinding | None:
         if (
             output.reviewed_plan_fingerprint_sha256
             != normalized["reviewed_plan_fingerprint_sha256"]
@@ -559,9 +590,11 @@ class IndustryThesisOwnerAcceptanceService:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_CONFLICT"
             )
-        version = reviewed_plan.get("acceptance_plan_version")
-        if version == HISTORICAL_ACCEPTANCE_PLAN_VERSION:
-            return
+        if (
+            normalized["owner_acceptance_plan_version"]
+            == HISTORICAL_OWNER_ACCEPTANCE_PLAN_VERSION
+        ):
+            return None
         owner_context = cls._validate_reviewed_owner_context(reviewed_plan)
         cls._validate_submitted_owner_context(normalized, owner_context)
         if (
@@ -574,6 +607,29 @@ class IndustryThesisOwnerAcceptanceService:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_OUTPUT_CONFLICT"
             )
+        binding = session.scalar(
+            select(IndustryThesisOutputCaseRevisionBinding)
+            .where(
+                IndustryThesisOutputCaseRevisionBinding.output_link_revision_id
+                == output.id
+            )
+            .with_for_update()
+        )
+        if binding is None:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_BINDING_CONFLICT",
+                "active v2 replay requires the persisted exact output Case Revision binding",
+            )
+        if (
+            binding.binding_contract_version
+            != INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION
+            or binding.research_case_revision_id
+            != UUID(owner_context["research_case_revision_id"])
+        ):
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_BINDING_CONFLICT"
+            )
+        return binding
 
     @staticmethod
     def _validate_case_and_map(
@@ -581,16 +637,32 @@ class IndustryThesisOwnerAcceptanceService:
         normalized: dict[str, Any],
         reviewed: IndustryThesisSessionRevision,
         owner_context: dict[str, str],
-    ) -> tuple[ResearchCase, IndustryMap, IndustryMapRevision]:
+    ) -> tuple[
+        ResearchCase,
+        ResearchCaseRevision,
+        IndustryMap,
+        IndustryMapRevision,
+    ]:
         case_id = UUID(owner_context["research_case_id"])
+        case_revision_id = UUID(owner_context["research_case_revision_id"])
         map_id = UUID(owner_context["industry_map_id"])
         map_revision_id = UUID(owner_context["industry_map_revision_id"])
         research_case = session.get(ResearchCase, case_id)
+        case_revision = session.get(ResearchCaseRevision, case_revision_id)
         industry_map = session.get(IndustryMap, map_id)
         map_revision = session.get(IndustryMapRevision, map_revision_id)
+        if case_revision is None:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_NOT_VISIBLE",
+                "exact ResearchCaseRevision was not found",
+            )
         if research_case is None or industry_map is None or map_revision is None:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED"
+            )
+        if case_revision.case_id != research_case.id:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_MISMATCH"
             )
         if industry_map.case_id != research_case.id or map_revision.map_id != industry_map.id:
             raise IndustryThesisOwnerAcceptanceError(
@@ -602,11 +674,16 @@ class IndustryThesisOwnerAcceptanceService:
                 "INDUSTRY_THESIS_ACCEPTANCE_CHRONOLOGY_INVALID",
                 "owner-acceptance cutoff must equal the exact reviewed cutoff",
             )
+        if case_revision.information_cutoff_date > cutoff:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_NOT_VISIBLE",
+                "Case Revision cutoff exceeds the exact reviewed cutoff",
+            )
         if map_revision.information_cutoff_date > cutoff:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_CHRONOLOGY_INVALID"
             )
-        return research_case, industry_map, map_revision
+        return research_case, case_revision, industry_map, map_revision
 
     @staticmethod
     def _lock_existing_output(
@@ -743,10 +820,12 @@ class IndustryThesisOwnerAcceptanceService:
         session: Session,
         normalized: dict[str, Any],
         reviewed: IndustryThesisSessionRevision,
+        case_revision: ResearchCaseRevision,
         map_revision: IndustryMapRevision,
     ) -> datetime:
         boundaries = [
             stored_utc(reviewed.recorded_at_utc),
+            stored_utc(case_revision.recorded_at_utc),
             stored_utc(map_revision.recorded_at_utc),
         ]
         for binding in normalized["candidate_owner_bindings"]:
@@ -758,8 +837,7 @@ class IndustryThesisOwnerAcceptanceService:
                     boundaries.append(stored_utc(row.recorded_at_utc))
             semantic = binding["semantic"]
             if (
-                binding["semantic_operation"]
-                == "append_complete_semantic_profile"
+                binding["semantic_operation"] == "append_complete_semantic_profile"
                 and semantic["expected_latest_revision_id"] is not None
             ):
                 row = session.get(
@@ -774,7 +852,10 @@ class IndustryThesisOwnerAcceptanceService:
             row = session.get(Stage1CandidatePoolRevision, UUID(expected_pool))
             if row is not None:
                 boundaries.append(stored_utc(row.recorded_at_utc))
-        recorded = max(stored_utc(self._clock()), max(boundaries) + timedelta(microseconds=1))
+        recorded = max(
+            stored_utc(self._clock()),
+            max(boundaries) + timedelta(microseconds=1),
+        )
         if date.fromisoformat(normalized["information_cutoff_date"]) > recorded.date():
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_CHRONOLOGY_INVALID"
@@ -791,18 +872,14 @@ class IndustryThesisOwnerAcceptanceService:
             for binding in normalized["candidate_owner_bindings"]
             if "beneficiary_id" in binding["stage1"]
         )
-        self._stage1.lock_identities(
-            session,
-            beneficiary_ids=beneficiary_ids,
-        )
+        self._stage1.lock_identities(session, beneficiary_ids=beneficiary_ids)
         profile_ids: list[UUID] = []
         for binding in normalized["candidate_owner_bindings"]:
             semantic = binding["semantic"]
             if binding["semantic_operation"] == "reuse_exact_semantic_revision":
                 profile_ids.append(UUID(semantic["profile_id"]))
             elif (
-                binding["semantic_operation"]
-                == "append_complete_semantic_profile"
+                binding["semantic_operation"] == "append_complete_semantic_profile"
                 and "beneficiary_id" in binding["stage1"]
             ):
                 profile = session.scalar(
@@ -814,8 +891,7 @@ class IndustryThesisOwnerAcceptanceService:
                 if profile is not None:
                     profile_ids.append(profile.id)
         self._semantics.lock_profiles(session, tuple(profile_ids))
-        pool = normalized["candidate_pool_operation"]
-        pool_id = pool.get("candidate_pool_id")
+        pool_id = normalized["candidate_pool_operation"].get("candidate_pool_id")
         if pool_id is not None:
             self._stage1.lock_identities(
                 session,
@@ -833,9 +909,7 @@ class IndustryThesisOwnerAcceptanceService:
         stage1 = binding["stage1"]
         common = {
             "session": session,
-            "selected_map_revision_id": UUID(
-                normalized["industry_map_revision_id"]
-            ),
+            "selected_map_revision_id": UUID(normalized["industry_map_revision_id"]),
             "stock_basic_record_id": stage1["stock_basic_record_id"],
             "information_cutoff_date": date.fromisoformat(
                 normalized["information_cutoff_date"]
@@ -847,9 +921,7 @@ class IndustryThesisOwnerAcceptanceService:
                 return self._stage1.reuse_beneficiary_revision(
                     **common,
                     beneficiary_id=UUID(stage1["beneficiary_id"]),
-                    beneficiary_revision_id=UUID(
-                        stage1["beneficiary_revision_id"]
-                    ),
+                    beneficiary_revision_id=UUID(stage1["beneficiary_revision_id"]),
                     case_id=UUID(normalized["research_case_id"]),
                     map_id=UUID(normalized["industry_map_id"]),
                 )
@@ -881,9 +953,7 @@ class IndustryThesisOwnerAcceptanceService:
             return self._stage1.append_beneficiary_revision(
                 **owner_common,
                 beneficiary_id=UUID(stage1["beneficiary_id"]),
-                expected_latest_revision_id=UUID(
-                    stage1["expected_latest_revision_id"]
-                ),
+                expected_latest_revision_id=UUID(stage1["expected_latest_revision_id"]),
             )
         except EvidenceLedgerConflictError as exc:
             raise IndustryThesisOwnerAcceptanceError(
@@ -928,12 +998,8 @@ class IndustryThesisOwnerAcceptanceService:
                 **semantic,
                 "beneficiary_id": str(beneficiary.beneficiary.id),
                 "beneficiary_revision_id": str(beneficiary.revision.id),
-                "selected_map_revision_id": normalized[
-                    "industry_map_revision_id"
-                ],
-                "information_cutoff_date": normalized[
-                    "information_cutoff_date"
-                ],
+                "selected_map_revision_id": normalized["industry_map_revision_id"],
+                "information_cutoff_date": normalized["information_cutoff_date"],
                 "recorded_at_utc": recorded_at.isoformat(),
             }
             return self._semantics.append_complete_profile(session, payload)
@@ -969,9 +1035,7 @@ class IndustryThesisOwnerAcceptanceService:
             )
         common = {
             "session": session,
-            "selected_map_revision_id": UUID(
-                normalized["industry_map_revision_id"]
-            ),
+            "selected_map_revision_id": UUID(normalized["industry_map_revision_id"]),
             "information_cutoff_date": date.fromisoformat(
                 normalized["information_cutoff_date"]
             ),
@@ -1129,9 +1193,7 @@ class IndustryThesisOwnerAcceptanceService:
             revision_note=data["revision_note"],
         )
         session.add(accepted)
-        session.flush()
         identity.latest_revision_number = accepted.revision_number
-        session.flush()
         return accepted
 
     @staticmethod
@@ -1149,6 +1211,9 @@ class IndustryThesisOwnerAcceptanceService:
         pool_result: Stage1CandidatePoolOwnerResult | None,
         recorded_at: datetime,
     ) -> tuple[IndustryThesisOutputLinkIdentity, IndustryThesisOutputLinkRevision]:
+        # The output revision references this newly appended session revision.
+        # Persist it first so PostgreSQL's immediate FK sees the exact parent.
+        session.flush([accepted_session])
         output_identity = IndustryThesisOutputLinkIdentity(
             id=output_identity_id,
             session_id=identity.id,
@@ -1156,8 +1221,6 @@ class IndustryThesisOwnerAcceptanceService:
             created_recorded_utc=recorded_at,
             latest_revision_number=0,
         )
-        session.add(output_identity)
-        session.flush()
         bindings = accepted_result["ordered_owner_output_bindings"]
         revision = IndustryThesisOutputLinkRevision(
             id=output_revision_id,
@@ -1167,9 +1230,7 @@ class IndustryThesisOwnerAcceptanceService:
             accepted_session_revision_id=accepted_session.id,
             reviewed_session_revision_id=reviewed.id,
             research_case_id=UUID(normalized["research_case_id"]),
-            accepted_industry_map_identity_id=UUID(
-                normalized["industry_map_id"]
-            ),
+            accepted_industry_map_identity_id=UUID(normalized["industry_map_id"]),
             accepted_industry_map_revision_id=UUID(
                 normalized["industry_map_revision_id"]
             ),
@@ -1199,10 +1260,41 @@ class IndustryThesisOwnerAcceptanceService:
             recorded_at_utc=recorded_at,
             supersedes_output_link_revision_id=None,
         )
+        session.add(output_identity)
         session.add(revision)
         output_identity.latest_revision_number = 1
-        session.flush()
         return output_identity, revision
+
+    @staticmethod
+    def _append_output_case_revision_binding(
+        session: Session,
+        *,
+        output_revision: IndustryThesisOutputLinkRevision,
+        research_case_revision: ResearchCaseRevision,
+    ) -> IndustryThesisOutputCaseRevisionBinding:
+        try:
+            # PostgreSQL enforces the binding FK immediately. Persist the parent
+            # accepted graph first while retaining the same outer transaction.
+            session.flush()
+            binding = IndustryThesisOutputCaseRevisionBinding(
+                id=uuid5(
+                    _OUTPUT_CASE_BINDING_NAMESPACE,
+                    f"{output_revision.id}:{research_case_revision.id}",
+                ),
+                output_link_revision_id=output_revision.id,
+                research_case_revision_id=research_case_revision.id,
+                binding_contract_version=(
+                    INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION
+                ),
+            )
+            session.add(binding)
+            session.flush([binding])
+        except IntegrityError as exc:
+            raise IndustryThesisOwnerAcceptanceError(
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_BINDING_CONFLICT",
+                "output Case Revision binding could not be atomically persisted",
+            ) from exc
+        return binding
 
     @staticmethod
     def _preview_operation_summary(
@@ -1261,6 +1353,7 @@ class IndustryThesisOwnerAcceptanceService:
         output: IndustryThesisOutputLinkRevision,
         normalized: dict[str, Any],
         *,
+        binding: IndustryThesisOutputCaseRevisionBinding | None,
         dry_run: bool,
     ) -> dict[str, Any]:
         bindings = json_value(
@@ -1280,16 +1373,18 @@ class IndustryThesisOwnerAcceptanceService:
             "preview_fingerprint_sha256": normalized[
                 "owner_acceptance_plan_fingerprint_sha256"
             ],
-            "reviewed_session_revision_id": str(
-                output.reviewed_session_revision_id
-            ),
-            "accepted_session_revision_id": str(
-                output.accepted_session_revision_id
-            ),
+            "reviewed_session_revision_id": str(output.reviewed_session_revision_id),
+            "accepted_session_revision_id": str(output.accepted_session_revision_id),
             "output_link_id": str(output.output_link_id),
             "output_link_revision_id": str(output.id),
+            "output_case_revision_binding_id": (
+                None if binding is None else str(binding.id)
+            ),
             "owner_transaction_id": output.owner_transaction_id,
             "research_case_id": str(output.research_case_id),
+            "research_case_revision_id": (
+                None if binding is None else str(binding.research_case_revision_id)
+            ),
             "industry_map_id": str(output.accepted_industry_map_identity_id),
             "industry_map_revision_id": str(
                 output.accepted_industry_map_revision_id

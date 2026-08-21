@@ -40,7 +40,7 @@ from industry_alpha.industry_thesis_rules import (
     IndustryThesisNotFound,
     stored_utc,
 )
-from industry_alpha.models import ResearchCase
+from industry_alpha.models import ResearchCase, ResearchCaseRevision
 
 api_router = APIRouter(prefix="/industry-analysis/api", tags=["industry-analysis-review"])
 page_router = APIRouter(tags=["industry-analysis-pages"])
@@ -59,6 +59,7 @@ class _StrictModel(BaseModel):
 
 
 class OwnerContextRequest(_StrictModel):
+    research_case_revision_id: UUID
     industry_map_revision_id: UUID
 
 
@@ -104,7 +105,7 @@ def _review_http_error(exc: IndustryThesisError) -> HTTPException:
         "industry_thesis_review_stale_universe": "候选池已变化，必须重新打开完整候选池后审阅。",
         "industry_thesis_review_incomplete": "每条完整候选路径都必须明确选择一个审阅状态。",
         "industry_thesis_review_invalid": "审阅状态、研究归属、暴露类型、理由或不确定性不符合要求。",
-        "industry_thesis_owner_context_invalid": "请选择一个当前数据边界内的精确研究案例与产业地图版本。",
+        "industry_thesis_owner_context_invalid": "请选择同一研究案例下明确的 Case Revision + Map Revision 精确组合。",
         "industry_thesis_duplicate_review": "同一候选不能在一次审阅中重复提交。",
         "industry_thesis_duplicate_selected_identity": "多个纳入项指向同一正式公司身份，请保留不同来源但只纳入其中一条。",
         "industry_thesis_identity_invalid": "纳入后续研究需要唯一且已接受的精确公司身份。",
@@ -205,9 +206,12 @@ def _normalized_command(
         ),
         "acceptance_plan_version": payload.acceptance_plan_version,
         "owner_context": {
+            "research_case_revision_id": str(
+                payload.owner_context.research_case_revision_id
+            ),
             "industry_map_revision_id": str(
                 payload.owner_context.industry_map_revision_id
-            )
+            ),
         },
         "decisions": decisions,
         "revision_note": payload.revision_note.strip(),
@@ -223,15 +227,25 @@ def _explicit_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def _decode_context_cursor(value: str | None) -> tuple[str, str, int, UUID] | None:
+ContextCursor = tuple[str, str, int, int, UUID, UUID]
+
+
+def _decode_context_cursor(value: str | None) -> ContextCursor | None:
     if value is None:
         return None
     try:
         padding = "=" * (-len(value) % 4)
         raw = json.loads(base64.urlsafe_b64decode(value + padding).decode("utf-8"))
-        if not isinstance(raw, list) or len(raw) != 4:
+        if not isinstance(raw, list) or len(raw) != 6:
             raise ValueError("invalid cursor shape")
-        return str(raw[0]), str(raw[1]), int(raw[2]), UUID(str(raw[3]))
+        return (
+            str(raw[0]),
+            str(raw[1]),
+            int(raw[2]),
+            int(raw[3]),
+            UUID(str(raw[4])),
+            UUID(str(raw[5])),
+        )
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         raise IndustryThesisError(
             "industry_thesis_input_invalid",
@@ -239,9 +253,9 @@ def _decode_context_cursor(value: str | None) -> tuple[str, str, int, UUID] | No
         ) from exc
 
 
-def _encode_context_cursor(value: tuple[str, str, int, UUID]) -> str:
+def _encode_context_cursor(value: ContextCursor) -> str:
     payload = json.dumps(
-        [value[0], value[1], value[2], str(value[3])],
+        [value[0], value[1], value[2], value[3], str(value[4]), str(value[5])],
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
@@ -346,14 +360,27 @@ def get_owner_context_options(
                 ):
                     raise IndustryThesisError(
                         "industry_thesis_review_invalid",
-                        "a v2 reviewed plan cannot be re-reviewed only to replace context",
+                        "an active v3 reviewed plan cannot be re-reviewed only to replace context",
                     )
 
             statement = (
-                select(ResearchCase, IndustryMap, IndustryMapRevision)
+                select(
+                    ResearchCase,
+                    ResearchCaseRevision,
+                    IndustryMap,
+                    IndustryMapRevision,
+                )
+                .join(
+                    ResearchCaseRevision,
+                    ResearchCaseRevision.case_id == ResearchCase.id,
+                )
                 .join(IndustryMap, IndustryMap.case_id == ResearchCase.id)
                 .join(IndustryMapRevision, IndustryMapRevision.map_id == IndustryMap.id)
                 .where(
+                    ResearchCaseRevision.information_cutoff_date
+                    <= revision.information_cutoff_date,
+                    ResearchCaseRevision.information_cutoff_date <= as_of_cutoff,
+                    ResearchCaseRevision.recorded_at_utc <= boundary,
                     IndustryMapRevision.information_cutoff_date
                     <= revision.information_cutoff_date,
                     IndustryMapRevision.information_cutoff_date <= as_of_cutoff,
@@ -366,13 +393,22 @@ def get_owner_context_options(
                 statement = statement.where(
                     or_(
                         ResearchCase.case_key.ilike(pattern),
+                        ResearchCaseRevision.title.ilike(pattern),
+                        ResearchCaseRevision.research_question.ilike(pattern),
                         IndustryMap.map_key.ilike(pattern),
                         IndustryMapRevision.title.ilike(pattern),
                         IndustryMapRevision.scope.ilike(pattern),
                     )
                 )
             if cursor_value is not None:
-                case_key, map_key, revision_no, revision_id = cursor_value
+                (
+                    case_key,
+                    map_key,
+                    case_revision_no,
+                    map_revision_no,
+                    case_revision_id,
+                    map_revision_id,
+                ) = cursor_value
                 statement = statement.where(
                     or_(
                         ResearchCase.case_key > case_key,
@@ -383,13 +419,28 @@ def get_owner_context_options(
                         and_(
                             ResearchCase.case_key == case_key,
                             IndustryMap.map_key == map_key,
-                            IndustryMapRevision.revision_no < revision_no,
+                            ResearchCaseRevision.revision_no < case_revision_no,
                         ),
                         and_(
                             ResearchCase.case_key == case_key,
                             IndustryMap.map_key == map_key,
-                            IndustryMapRevision.revision_no == revision_no,
-                            IndustryMapRevision.id > revision_id,
+                            ResearchCaseRevision.revision_no == case_revision_no,
+                            IndustryMapRevision.revision_no < map_revision_no,
+                        ),
+                        and_(
+                            ResearchCase.case_key == case_key,
+                            IndustryMap.map_key == map_key,
+                            ResearchCaseRevision.revision_no == case_revision_no,
+                            IndustryMapRevision.revision_no == map_revision_no,
+                            ResearchCaseRevision.id > case_revision_id,
+                        ),
+                        and_(
+                            ResearchCase.case_key == case_key,
+                            IndustryMap.map_key == map_key,
+                            ResearchCaseRevision.revision_no == case_revision_no,
+                            IndustryMapRevision.revision_no == map_revision_no,
+                            ResearchCaseRevision.id == case_revision_id,
+                            IndustryMapRevision.id > map_revision_id,
                         ),
                     )
                 )
@@ -398,7 +449,9 @@ def get_owner_context_options(
                     statement.order_by(
                         ResearchCase.case_key.asc(),
                         IndustryMap.map_key.asc(),
+                        ResearchCaseRevision.revision_no.desc(),
                         IndustryMapRevision.revision_no.desc(),
+                        ResearchCaseRevision.id.asc(),
                         IndustryMapRevision.id.asc(),
                     ).limit(limit + 1)
                 )
@@ -407,45 +460,60 @@ def get_owner_context_options(
             visible = rows[:limit]
             items = [
                 {
+                    "research_case_revision_id": str(case_revision.id),
                     "industry_map_revision_id": str(map_revision.id),
                     "ordinary_label": (
-                        f"{research_case.case_key} · {industry_map.map_key} · "
-                        f"第 {map_revision.revision_no} 版"
+                        f"{research_case.case_key} · Case 第 {case_revision.revision_no} 版 · "
+                        f"{industry_map.map_key} · Map 第 {map_revision.revision_no} 版"
                     ),
                     "case_key": research_case.case_key,
                     "map_key": industry_map.map_key,
-                    "revision_number": map_revision.revision_no,
-                    "title": map_revision.title,
-                    "scope": map_revision.scope,
-                    "information_cutoff_date": (
+                    "case_revision_number": case_revision.revision_no,
+                    "map_revision_number": map_revision.revision_no,
+                    "case_revision_title": case_revision.title,
+                    "map_revision_title": map_revision.title,
+                    "map_scope": map_revision.scope,
+                    "case_revision_information_cutoff_date": (
+                        case_revision.information_cutoff_date.isoformat()
+                    ),
+                    "map_revision_information_cutoff_date": (
                         map_revision.information_cutoff_date.isoformat()
                     ),
-                    "recorded_at_utc": stored_utc(
+                    "case_revision_recorded_at_utc": stored_utc(
+                        case_revision.recorded_at_utc
+                    ).isoformat(),
+                    "map_revision_recorded_at_utc": stored_utc(
                         map_revision.recorded_at_utc
                     ).isoformat(),
                     "technical_details": {
                         "research_case_id": str(research_case.id),
+                        "research_case_revision_id": str(case_revision.id),
                         "industry_map_id": str(industry_map.id),
                         "industry_map_revision_id": str(map_revision.id),
                     },
                 }
-                for research_case, industry_map, map_revision in visible
+                for research_case, case_revision, industry_map, map_revision in visible
             ]
             next_cursor = None
             if has_more and visible:
-                last_case, last_map, last_revision = visible[-1]
+                last_case, last_case_revision, last_map, last_map_revision = visible[-1]
                 next_cursor = _encode_context_cursor(
                     (
                         last_case.case_key,
                         last_map.map_key,
-                        last_revision.revision_no,
-                        last_revision.id,
+                        last_case_revision.revision_no,
+                        last_map_revision.revision_no,
+                        last_case_revision.id,
+                        last_map_revision.id,
                     )
                 )
             return {
                 "session_id": str(session_id),
                 "session_revision_id": str(session_revision_id),
                 "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
+                "owner_context_contract_version": (
+                    "aquantai.industry-thesis-owner-context.v2"
+                ),
                 "explicit_confirmation_required": True,
                 "automatic_default": None,
                 "items": items,
@@ -556,7 +624,7 @@ async def review_candidate_universe(
             plan.get("unresolved_candidate_revision_ids", [])
         )
         result["ownership_notice"] = (
-            "审阅计划已冻结精确研究归属，但尚未写入 Stage 1 受益公司或投资候选快照。"
+            "审阅计划已冻结精确 Case Revision + Map Revision 归属，但尚未写入 Stage 1 受益公司或投资候选快照。"
         )
         result["result_path"] = None
         if not dry_run:
