@@ -1211,6 +1211,9 @@ class IndustryThesisOwnerAcceptanceService:
         pool_result: Stage1CandidatePoolOwnerResult | None,
         recorded_at: datetime,
     ) -> tuple[IndustryThesisOutputLinkIdentity, IndustryThesisOutputLinkRevision]:
+        # The output revision references this newly appended session revision.
+        # Persist it first so PostgreSQL's immediate FK sees the exact parent.
+        session.flush([accepted_session])
         output_identity = IndustryThesisOutputLinkIdentity(
             id=output_identity_id,
             session_id=identity.id,
