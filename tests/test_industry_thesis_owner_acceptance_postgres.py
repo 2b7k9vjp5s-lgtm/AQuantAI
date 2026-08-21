@@ -152,6 +152,7 @@ def _reviewed_fixture(factory):
         base_recorded = max(
             _stored_utc(beneficiary_revision.recorded_at_utc),
             _stored_utc(map_revision.recorded_at_utc),
+            _stored_utc(case_revision.recorded_at_utc),
         )
 
     created = IndustryThesisCommandService(

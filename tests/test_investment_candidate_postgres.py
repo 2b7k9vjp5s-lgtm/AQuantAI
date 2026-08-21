@@ -136,6 +136,10 @@ def test_postgres_populated_downgrade_refuses_before_any_drop(
     try:
         payload = _component_input(factory)
         InvestmentCandidateCommandService(factory).record_component(payload)
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM stage2_company_research_revision_case_bindings")
+            )
         with pytest.raises(RuntimeError, match="Cannot downgrade Investment Candidate"):
             command.downgrade(config, "20260722_0013")
         assert EXPECTED_TABLES.issubset(inspect(engine).get_table_names())
