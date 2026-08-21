@@ -26,6 +26,8 @@ from industry_alpha.industry_thesis_owner_acceptance import (
 )
 from industry_alpha.industry_thesis_owner_acceptance_contracts import (
     OWNER_ACCEPTANCE_PLAN_VERSION,
+    IndustryThesisOwnerAcceptanceError,
+    normalize_owner_acceptance_plan,
 )
 from industry_alpha.industry_thesis_review import (
     ACCEPTANCE_PLAN_VERSION,
@@ -282,7 +284,18 @@ def test_postgres_identical_concurrent_commit_serializes_to_one_output(
         clock=lambda: recorded + timedelta(seconds=1),
     )
     preview = service.preview(raw)
-    assert preview["commit_ready"] is True, preview["blocked_reasons"]
+    if preview["commit_ready"] is not True:
+        with factory() as diagnostic_session:
+            with pytest.raises(IndustryThesisOwnerAcceptanceError) as blocked:
+                service._run(
+                    diagnostic_session,
+                    normalize_owner_acceptance_plan(raw),
+                    dry_run=True,
+                )
+        pytest.fail(
+            f"{preview['blocked_reasons']}; database cause: "
+            f"{blocked.value.__cause__!r}"
+        )
     commit_input = {
         **raw,
         "preview_fingerprint_sha256": preview["preview_fingerprint_sha256"],
