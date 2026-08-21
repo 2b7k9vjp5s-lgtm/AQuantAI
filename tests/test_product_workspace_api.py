@@ -51,12 +51,20 @@ def test_workspace_page_and_api_golden_draft_path() -> None:
     try:
         page = client.get("/research-workspace")
         assert page.status_code == 200
-        assert "Research Cases" in page.text
-        assert "Import / Review Queue" in page.text
+        assert "研究案例" in page.text
+        assert "导入与审核队列" in page.text
+        assert "新手操作指引" in page.text
+        assert "Pending Review" not in page.text
+        guide = client.get("/research-workspace/guide")
+        assert guide.status_code == 200
+        assert "从零开始完成一次研究闭环" in guide.text
+        assert "明确接受并写入" in guide.text
         assert client.get("/research-workspace/static/workspace.css").status_code == 200
         script = client.get("/research-workspace/static/workspace.js")
         assert script.status_code == 200
         assert "innerHTML" not in script.text
+        assert "待审核证据" in script.text
+        assert "已接受证据" in script.text
         assert "rejectButton" in client.get("/document-import/static/document_import.js").text
         assert 'id="reviewer-note"' in client.get("/document-import").text
 

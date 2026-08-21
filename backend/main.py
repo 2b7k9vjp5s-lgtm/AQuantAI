@@ -207,6 +207,16 @@ def research_workspace_page() -> FileResponse:
     )
 
 
+@app.get("/research-workspace/guide", include_in_schema=False)
+def research_workspace_guide_page() -> FileResponse:
+    """Serve the Chinese ordinary-user guide."""
+
+    return FileResponse(
+        RESEARCH_WORKSPACE_STATIC_DIR / "guide.html",
+        media_type="text/html",
+    )
+
+
 @app.get("/industry-analysis", include_in_schema=False)
 @app.get("/industry-analysis/new", include_in_schema=False)
 @app.get("/workbench/settings", include_in_schema=False)

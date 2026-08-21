@@ -156,7 +156,7 @@ Run the complete offline V1 product golden path:
 python -m scripts.demo_v1_product
 ```
 
-This demo executes PDF import, deterministic duplicate/hash handling, manual review, accepted Evidence creation, exact Revision binding and Markdown report export without network or AI calls. See [V1 product guide](docs/v1_product.md).
+This demo executes PDF import, deterministic duplicate/hash handling, manual review, accepted Evidence creation, exact Revision binding and Markdown report export without network or AI calls. See [V1 product guide](docs/v1_product.md) and the [中文新手操作指引](docs/new_user_guide_zh.md).
 
 ## Local Docker launch
 

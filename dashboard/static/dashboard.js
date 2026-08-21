@@ -18,7 +18,7 @@ function renderEmpty(container, message) {
 function renderMetricCards(container, metrics) {
   container.replaceChildren();
   if (!Array.isArray(metrics) || metrics.length === 0) {
-    renderEmpty(container, "No local fixture data is available for this section.");
+    renderEmpty(container, "本区块暂无本地样例数据。");
     return;
   }
   for (const metric of metrics) {
@@ -36,7 +36,7 @@ function renderTable(container, section) {
   const columns = Array.isArray(section.columns) ? section.columns : [];
   const rows = Array.isArray(section.rows) ? section.rows : [];
   if (columns.length === 0 || rows.length === 0) {
-    renderEmpty(container, "No local fixture rows are available for this table.");
+    renderEmpty(container, "本表暂无本地样例数据行。");
     return;
   }
 
@@ -69,7 +69,7 @@ function renderList(container, title, values) {
   const block = createElement("section", null, "content-block");
   block.append(createElement("h3", title));
   if (!Array.isArray(values) || values.length === 0) {
-    block.append(createElement("p", "No local fixture data is available."));
+    block.append(createElement("p", "暂无本地样例数据。"));
   } else {
     const list = document.createElement("ul");
     for (const value of values) {
@@ -83,7 +83,7 @@ function renderList(container, title, values) {
 function renderReport(container, report) {
   container.replaceChildren();
   if (!report || (!report.title && !report.summary)) {
-    renderEmpty(container, "No local fixture report is available.");
+    renderEmpty(container, "暂无本地样例研究报告。");
     return;
   }
   const block = createElement("article", null, "content-block");
@@ -98,7 +98,7 @@ function renderOverview(overview) {
   renderTable(document.getElementById("factor-summary"), sections.factor_summary || {});
   renderMetricCards(document.getElementById("backtest-summary"), (sections.backtest_summary || {}).metrics);
   renderTable(document.getElementById("ml-summary"), sections.ml_summary || {});
-  document.getElementById("research-disclaimer").textContent = overview.disclaimer || "Research-only disclaimer is unavailable.";
+  document.getElementById("research-disclaimer").textContent = overview.disclaimer || "暂无研究免责声明。";
   renderSources(document.getElementById("source-references"), overview.source_refs);
 }
 
@@ -108,21 +108,21 @@ function renderReportPayload(report) {
 
   const highlights = document.getElementById("report-highlights");
   highlights.replaceChildren();
-  renderList(highlights, "Factor highlights", sections.factor_highlights);
-  renderList(highlights, "Backtest highlights", sections.backtest_highlights);
-  renderList(highlights, "ML highlights", sections.ml_highlights);
+  renderList(highlights, "因子重点", sections.factor_highlights);
+  renderList(highlights, "回测重点", sections.backtest_highlights);
+  renderList(highlights, "机器学习重点", sections.ml_highlights);
 
   const riskSection = sections.risk_and_disclaimer || {};
   const risks = document.getElementById("research-risks");
   risks.replaceChildren();
-  renderList(risks, "Risks", riskSection.risks);
-  renderList(risks, "Limitations", riskSection.limitations);
+  renderList(risks, "风险", riskSection.risks);
+  renderList(risks, "限制", riskSection.limitations);
 }
 
 function renderSources(container, sources) {
   container.replaceChildren();
   if (!Array.isArray(sources) || sources.length === 0) {
-    renderEmpty(container, "No local fixture source references are available.");
+    renderEmpty(container, "暂无本地样例来源引用。");
     return;
   }
   const list = document.createElement("ul");
@@ -135,7 +135,7 @@ function renderSources(container, sources) {
 async function fetchJson(path) {
   const response = await fetch(path, { headers: { Accept: "application/json" } });
   if (!response.ok) {
-    throw new Error("The local dashboard data could not be loaded.");
+    throw new Error("无法加载本地看板数据。");
   }
   return response.json();
 }
@@ -150,11 +150,11 @@ async function loadDashboard() {
     ]);
     renderOverview(results[0]);
     renderReportPayload(results[1]);
-    status.textContent = "Showing local fixture/sample research data. Read-only; no live market data.";
+    status.textContent = "正在显示本地固定样例研究数据。页面只读，不含实时市场数据。";
   } catch (loadError) {
-    error.textContent = "Unable to load the local dashboard data. The raw JSON links remain available for inspection.";
+    error.textContent = "无法加载本地看板数据，仍可通过上方原始 JSON 链接检查响应。";
     error.hidden = false;
-    status.textContent = "Local dashboard data is unavailable.";
+    status.textContent = "本地看板数据不可用。";
   }
 }
 
