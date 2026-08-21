@@ -73,9 +73,10 @@ def test_dashboard_page_and_local_assets_are_available() -> None:
 
     assert page.status_code == 200
     assert page.headers["content-type"].startswith("text/html")
-    assert "AQuantAI Dashboard" in page.text
-    assert "Local fixture/sample research data" in page.text
-    assert "Research disclaimer" in page.text
+    assert "AQuantAI 只读研究看板" in page.text
+    assert "本地固定样例研究数据" in page.text
+    assert "研究免责声明" in page.text
+    assert "新手操作指引" in page.text
     assert "<form" not in page.text.lower()
     assert "<button" not in page.text.lower()
     assert stylesheet.status_code == 200
@@ -94,7 +95,7 @@ def test_dashboard_page_uses_only_existing_safe_json_endpoints() -> None:
     assert "new Function" not in script
     assert "`" not in script
     assert "textContent" in script
-    assert "No local fixture rows are available" in script
+    assert "本表暂无本地样例数据行" in script
 
 
 def test_dashboard_page_preserves_existing_endpoint_contracts() -> None:

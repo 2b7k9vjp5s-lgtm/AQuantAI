@@ -194,6 +194,7 @@ class LocalDocumentReviewRevision(Base):
         ForeignKey("local_document_candidates.id", ondelete="RESTRICT"), nullable=False
     )
     information_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reviewer_identity: Mapped[str | None] = mapped_column(String(128))
     reviewer_note: Mapped[str | None] = mapped_column(String(2000))
     recorded_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     supersedes_review_revision_id: Mapped[UUID | None] = mapped_column(

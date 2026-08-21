@@ -6,6 +6,7 @@ import hashlib
 import json
 from datetime import date, datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from industry_alpha.document_import_contracts import DocumentImportError
@@ -124,6 +125,7 @@ def validate_document_identity_payload(payload: dict[str, Any]) -> dict[str, Any
         "document_kind",
         "revision_label",
         "supersedes_document_content_id",
+        "source_url",
     }
     if set(payload) - expected:
         raise DocumentImportError("candidate_payload_unknown_field")
@@ -144,6 +146,7 @@ def validate_document_identity_payload(payload: dict[str, Any]) -> dict[str, Any
         "document_kind": str(payload.get("document_kind", "")),
         "revision_label": None,
         "supersedes_document_content_id": None,
+        "source_url": None,
     }
     if result["document_kind"] not in DOCUMENT_KINDS:
         raise DocumentImportError("invalid_document_kind")
@@ -158,6 +161,15 @@ def validate_document_identity_payload(payload: dict[str, Any]) -> dict[str, Any
             )
         except ValueError as exc:
             raise DocumentImportError("invalid_superseded_content_id") from exc
+    if payload.get("source_url") is not None:
+        source_url = bounded_text(
+            str(payload["source_url"]), "source_url", 1500, optional=True
+        )
+        if source_url:
+            parsed = urlsplit(source_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise DocumentImportError("invalid_source_url")
+        result["source_url"] = source_url
     return result
 
 

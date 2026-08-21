@@ -38,14 +38,14 @@ def test_migration_creates_exact_thirteen_tables_and_empty_round_trip(tmp_path) 
     database = tmp_path / "normalized-valuation.db"
     config = config_for(database)
     prepare_prior_head(config)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260722_0015")
     engine = create_engine(f"sqlite:///{database}")
     try:
         tables = set(inspect(engine).get_table_names())
         assert EXPECTED_TABLES.issubset(tables)
         assert len(EXPECTED_TABLES) == 13
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260803_0018"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260722_0015"
     finally:
         engine.dispose()
 
@@ -61,7 +61,7 @@ def test_populated_downgrade_refuses_before_any_drop(tmp_path) -> None:
     database = tmp_path / "normalized-valuation-populated.db"
     config = config_for(database)
     prepare_prior_head(config)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260722_0015")
     engine = create_engine(f"sqlite:///{database}")
     try:
         with engine.begin() as connection:

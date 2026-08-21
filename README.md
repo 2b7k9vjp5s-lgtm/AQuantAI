@@ -1,6 +1,6 @@
 # AQuantAI
 
-AQuantAI is a local-first personal A-share research workbench built around attributable market data, deterministic quantitative research, evidence-backed industry/company research, backtesting foundations and guarded AI assistance.
+AQuantAI is a local-first personal A-share research workbench built around attributable market data, deterministic quantitative research, evidence-backed industry/company research, backtesting foundations and guarded AI assistance. The V1.0 release candidate adds an ordinary-user research workspace that completes the PDF-to-report evidence loop.
 
 It is for research and learning only. It does not provide investment advice, recommendations, broker connectivity, real orders or automated trading, and it is not production-ready.
 
@@ -11,11 +11,12 @@ AQuantAI uses three independent status axes:
 | Axis | Current state |
 | --- | --- |
 | Released software version | `0.2.0` |
+| Product validation milestone | `V1.0 RC` |
 | Phase 2A capability merge commit | `1f9edfc0719c9d512ed95c2330db78dadea17eea` |
 | Latest merged product capability | Personal Research Workbench UI Phase 2A — local-only Today Market through PRs #209 and #212 |
 | Runtime surfaces | Local Dashboard, technical Market Cockpit, Today Market, Industry Research, Company Research, Investment Candidates and related exact-ID APIs/commands when configured |
 
-Merged capability stages do not automatically publish a new release. The application version remains `0.2.0` until a separate release decision.
+`V1.0 RC` is a product-validation milestone, not a published package version or release tag. The package and compatibility metadata remain `0.2.0` until a separate release decision.
 
 The authoritative state, dependency direction, ownership rules, invariants, architecture debt and development gates are defined in [the architecture baseline](docs/architecture_baseline.md).
 
@@ -70,7 +71,7 @@ The attempted v0.6E price-observation judgment path in Issue #70 and PR #71 is s
 
 Canonical Price and Comparison Eligibility now own accepted price identity and purpose-specific use. A generic valuation `observed_value` or Provider-normalized market row is not automatically canonical or eligible for comparison.
 
-No next product phase is currently authorized. Roadmap Issue #210 describes a possible Personal Research Workbench UI Phase 2B, but it does not authorize architecture, implementation or production changes. Every future phase still requires its own linked Issue, bounded scope, validation and explicit merge authorization.
+The V1.0 Product Completion authorization supersedes the older "no next product phase" handoff. Historical slices remain immutable context; this release candidate adds the integrated ordinary-user workflow without turning research outputs into trading actions.
 
 ## Technology stack
 
@@ -85,6 +86,20 @@ No next product phase is currently authorized. Roadmap Issue #210 describes a po
 
 ## Quick start
 
+The most direct V1.0 RC path uses the existing Docker Compose stack:
+
+```text
+start-aquantai.bat
+```
+
+On macOS/Linux:
+
+```bash
+./start-aquantai.sh
+```
+
+After the health check succeeds, open `http://127.0.0.1:8000/research-workspace`. Compose waits for PostgreSQL, applies the checked-in Alembic migrations, and then starts the app. The launcher never overwrites an existing `.env`.
+
 Install runtime and development dependencies:
 
 ```bash
@@ -97,12 +112,19 @@ Run the API:
 uvicorn backend.main:app --reload
 ```
 
+Initialize or upgrade the explicitly configured database before first use:
+
+```bash
+python -m scripts.init_v1_product
+```
+
 Available local surfaces include:
 
 - `GET /`
 - `GET /health`
 - `GET /dashboard`
 - `GET /workbench`
+- `GET /research-workspace`
 - `GET /industry-analysis`
 - `GET /today-market`
 - `GET /market-cockpit`
@@ -128,6 +150,14 @@ Run tests:
 python -m pytest
 ```
 
+Run the complete offline V1 product golden path:
+
+```bash
+python -m scripts.demo_v1_product
+```
+
+This demo executes PDF import, deterministic duplicate/hash handling, manual review, accepted Evidence creation, exact Revision binding and Markdown report export without network or AI calls. See [V1 product guide](docs/v1_product.md) and the [中文新手操作指引](docs/new_user_guide_zh.md).
+
 ## Local Docker launch
 
 With Docker Desktop available:
@@ -139,7 +169,7 @@ The launcher checks Docker and Compose, preserves an existing `.env`, starts the
 
 ## Database-backed local use
 
-Migrations are explicit and never run during FastAPI import or startup.
+FastAPI import and startup hooks never mutate schema. The Docker Compose command explicitly runs Alembic after PostgreSQL is healthy; direct Python users run the migration command themselves.
 
 ```bash
 python -m alembic upgrade head

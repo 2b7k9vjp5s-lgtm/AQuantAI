@@ -23,6 +23,7 @@ import industry_alpha.normalized_valuation_models  # noqa: F401 - register norma
 import industry_alpha.normalized_valuation_context  # noqa: F401 - register typed v0.6B context columns
 import industry_alpha.industry_thesis_models  # noqa: F401 - register industry thesis metadata
 import industry_alpha.document_import_models  # noqa: F401 - register local document metadata
+import industry_alpha.product_workspace_models  # noqa: F401 - register V1 product workspace metadata
 
 config = context.config
 

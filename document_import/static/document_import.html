@@ -8,7 +8,7 @@
 </head>
 <body>
   <header>
-    <p class="eyebrow">Evidence Ledger · 本地人工审核</p>
+    <p class="eyebrow">证据账本 · 本地人工审核</p>
     <h1>导入官方 PDF，逐页核对后再接受为证据</h1>
     <p class="lead">所有内容只在本机处理。系统不会 OCR、联网、调用 AI，也不会自动认定文档官方或自动接受证据。</p>
   </header>
@@ -48,34 +48,37 @@
       <h2 id="review-title">人工建立审核快照</h2>
       <p class="hint">先在上方逐页文本中选择一段原文，再明确填写全部身份与判断。系统不会推断或补全。</p>
       <div class="review-grid">
-        <label>Research Case 精确 ID<input id="case-id" autocomplete="off"></label>
+        <label>研究案例精确 ID<input id="case-id" autocomplete="off"></label>
         <label>文档身份键<input id="document-key" autocomplete="off"></label>
         <label>文档标题<input id="document-title" autocomplete="off"></label>
         <label>发布者/作者<input id="publisher" autocomplete="off"></label>
+        <label>来源 URL（可选）<input id="source-url" type="url" autocomplete="off"></label>
         <label>文档日期<input id="document-date" type="date"></label>
         <label>信息日期<input id="information-date" type="date"></label>
         <label>主体说明<input id="subject-label" value="非特定公司"></label>
         <label>事实陈述<textarea id="fact-statement"></textarea></label>
         <label>来源类型<select id="source-kind"><option value="official">官方</option><option value="filing">法定披露</option><option value="regulatory">监管</option><option value="statistics">统计</option></select></label>
         <label>证据等级<select id="evidence-grade"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
-        <label>Claim 状态<select id="claim-status"><option value="supported">已支持</option><option value="disputed">有争议</option><option value="draft">草稿</option><option value="rejected">已拒绝</option></select></label>
+        <label>审核人<input id="reviewer-identity" value="local-user" maxlength="128" required></label>
+        <label>审核备注（可选）<textarea id="reviewer-note" maxlength="2000"></textarea></label>
+        <label>主张状态<select id="claim-status"><option value="supported">已支持</option><option value="disputed">有争议</option><option value="draft">草稿</option><option value="rejected">已拒绝</option></select></label>
         <label>证据关系<select id="evidence-relation"><option value="supports">支持</option><option value="contradicts">反驳</option><option value="context">背景</option></select></label>
       </div>
       <p id="selection-status" role="status">尚未选择逐页原文。</p>
-      <button id="review-button" type="button" disabled>保存人工审核快照</button>
+      <div class="actions"><button id="review-button" type="button" disabled>保存待接受审核快照</button><button id="reject-button" type="button" disabled>拒绝所选证据</button></div>
     </section>
 
     <section class="card wide" aria-labelledby="accept-title">
       <div class="step">步骤 5</div>
       <h2 id="accept-title">预览并明确接受</h2>
-      <p class="hint">预览零写入；只有再次点击接受，才会在一个事务中写入 Evidence、Claim、审核终态和回执。提交成功后会按本次信息日期与记录时间精确重开回执。</p>
+      <p class="hint">预览零写入（不会写入数据）；只有再次点击接受，才会在一个事务中写入证据、主张、审核终态和回执。提交成功后会按本次信息日期与记录时间精确重开回执。</p>
       <div class="actions"><button id="preview-button" type="button" disabled>生成零写入预览</button><button id="accept-button" type="button" disabled>明确接受并写入</button></div>
       <pre id="acceptance-result">等待审核快照。</pre>
     </section>
 
     <aside class="guardrail">
       <strong>接受门禁</strong>
-      <span>文档身份、主体身份、页码引用、事实陈述、证据等级和 Claim 判断均需人工明确审核；至少选择一条事实或事件，才能原子写入 Evidence Ledger。</span>
+      <span>文档身份、主体身份、页码引用、事实陈述、证据等级和主张判断均需人工明确审核；至少选择一条事实或事件，才能原子写入证据账本。</span>
     </aside>
   </main>
   <script src="/document-import/static/document_import.js" defer></script>

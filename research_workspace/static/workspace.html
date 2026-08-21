@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQuantAI V1.0 研究工作台</title>
+  <link rel="stylesheet" href="/research-workspace/static/workspace.css">
+  <script src="/research-workspace/static/workspace.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/research-workspace">AQuantAI <span>V1.0 RC</span></a>
+    <div class="boundary"><strong>本地研究系统</strong><span>非投资建议 · 无交易动作</span></div>
+  </header>
+  <div class="app-shell">
+    <nav class="sidebar" aria-label="研究工作台导航">
+      <button data-view="dashboard" class="active">总览</button>
+      <button data-view="cases">研究案例</button>
+      <button data-view="industry">行业研究</button>
+      <button data-view="company">公司研究</button>
+      <button data-view="evidence">证据账本</button>
+      <button data-view="documents">文档</button>
+      <button data-view="sources">来源</button>
+      <a href="/document-import">导入与审核队列</a>
+      <button data-view="feed">研究变化</button>
+      <button data-view="search">搜索</button>
+      <button data-view="settings">设置</button>
+      <a href="/research-workspace/guide">新手操作指引</a>
+      <hr>
+      <a href="/today-market">今日市场</a>
+      <a href="/market-cockpit">市场驾驶舱</a>
+      <a href="/industry-research">旧版行业研究</a>
+      <a href="/company-research">旧版公司研究</a>
+    </nav>
+    <main>
+      <p id="global-status" class="status" role="status" aria-live="polite">正在连接本地数据库…</p>
+      <section id="view-dashboard" class="view active" aria-labelledby="dashboard-title">
+        <div class="page-heading"><div><p class="eyebrow">研究总览</p><h1 id="dashboard-title">研究工作台</h1></div><button id="refresh-dashboard">刷新</button></div>
+        <div id="metrics" class="metrics"></div>
+        <section class="panel"><h2>最近研究变化</h2><div id="dashboard-feed" class="timeline"></div></section>
+      </section>
+      <section id="view-cases" class="view" aria-labelledby="cases-title">
+        <div class="page-heading"><div><p class="eyebrow">仅追加研究记录</p><h1 id="cases-title">研究案例</h1></div><button id="new-case-button">创建研究案例</button></div>
+        <div class="split"><section class="panel"><h2>全部研究案例</h2><div id="case-list" class="item-list"></div></section><section class="panel" id="case-detail"><h2>选择一个研究案例</h2><p class="muted">查看当前修订、权威修订、证据引用和历史。</p></section></div>
+      </section>
+      <section id="view-industry" class="view"><div class="page-heading"><div><p class="eyebrow">行业研究</p><h1>行业研究</h1></div><button class="create-type" data-case-type="industry">新建行业研究</button></div><div id="industry-list" class="cards"></div></section>
+      <section id="view-company" class="view"><div class="page-heading"><div><p class="eyebrow">公司研究</p><h1>公司研究</h1></div><button class="create-type" data-case-type="company">新建公司研究</button></div><div id="company-list" class="cards"></div></section>
+      <section id="view-evidence" class="view"><div class="page-heading"><div><p class="eyebrow">人工审核</p><h1>证据账本</h1></div><a class="button" href="/document-import">导入并审核 PDF</a></div><div class="filters"><button class="evidence-filter active" data-status="">全部</button><button class="evidence-filter" data-status="imported">已导入</button><button class="evidence-filter" data-status="pending_review">待审核</button><button class="evidence-filter" data-status="accepted">已接受</button><button class="evidence-filter" data-status="rejected">已拒绝</button></div><div id="evidence-list" class="cards"></div></section>
+      <section id="view-documents" class="view"><div class="page-heading"><div><p class="eyebrow">本地来源追踪</p><h1>文档与来源</h1></div><a class="button" href="/document-import">选择本地 PDF</a></div><p class="notice">文档内容、SHA256、页码和提取结果由本地 PDF 导入流程保存。扫描件无内嵌文本时会明确提示“无可提取文本，需要 OCR”，不会伪造文本。</p><div id="document-list" class="cards"></div></section>
+      <section id="view-sources" class="view"><div class="page-heading"><div><p class="eyebrow">已接受证据的来源</p><h1>来源</h1></div></div><div id="source-list" class="cards"></div></section>
+      <section id="view-feed" class="view"><div class="page-heading"><div><p class="eyebrow">确定性系统事件</p><h1>研究变化记录</h1></div></div><div id="change-feed" class="timeline"></div></section>
+      <section id="view-search" class="view"><div class="page-heading"><div><p class="eyebrow">本地搜索</p><h1>搜索</h1></div></div><form id="search-form" class="search-bar"><input id="search-query" maxlength="200" required placeholder="搜索研究案例、公司、行业、来源、证据或文档"><button>搜索</button></form><div id="search-results" class="cards"></div></section>
+      <section id="view-settings" class="view"><div class="page-heading"><div><p class="eyebrow">本地配置</p><h1>设置</h1></div></div><div class="panel prose"><h2>运行边界</h2><p>核心工作流无需 AI 服务商。AI 仅在用户预览输入并明确确认远程传输后调用，输出为临时草稿，不能审核证据、修改来源记录或决定权威修订。</p><p><a href="/research-workspace/guide">打开新手操作指引</a></p><h2>数据库</h2><code>python -m alembic upgrade head</code><h2>AI 服务商</h2><code>AQUANTAI_GUARDED_AI_ENABLED=true</code><code>AQUANTAI_GUARDED_AI_ENDPOINT_URL=https://…</code><code>AQUANTAI_GUARDED_AI_MODEL_ID=…</code><code>AQUANTAI_GUARDED_AI_API_KEY=…</code></div></section>
+    </main>
+  </div>
+  <dialog id="case-dialog">
+    <form id="case-form" method="dialog"><div class="dialog-heading"><h2>创建研究案例</h2><button type="button" class="icon-button" data-close="case-dialog" aria-label="关闭">×</button></div><div class="form-grid">
+      <label>类型<select id="case-type"><option value="industry">行业研究</option><option value="company">公司研究</option></select></label><label>案例标识键<input id="case-key" maxlength="96" required></label><label class="wide">标题<input id="case-title" maxlength="300" required></label><label class="wide">研究问题<textarea id="case-question" maxlength="2000" required></textarea></label><label>研究者<input id="case-author" maxlength="128" value="local-user" required></label><label>信息截止日<input id="case-cutoff" type="date" required></label><label id="industry-theme-field">行业/主题<input id="industry-theme" maxlength="300"></label><label id="company-name-field" hidden>公司名称<input id="company-name" maxlength="300"></label><label id="stock-code-field" hidden>股票代码<input id="stock-code" maxlength="32"></label>
+    </div><p id="case-form-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="case-dialog" class="secondary">取消</button><button type="submit">创建草稿</button></div></form>
+  </dialog>
+  <dialog id="revision-dialog">
+    <form id="revision-form" method="dialog"><div class="dialog-heading"><h2>保存新修订</h2><button type="button" class="icon-button" data-close="revision-dialog" aria-label="关闭">×</button></div><div class="form-grid">
+      <label class="wide">标题<input id="revision-title" maxlength="300" required></label><label class="wide">研究问题<textarea id="revision-question" maxlength="2000" required></textarea></label><label>工作流状态<select id="revision-workflow"><option value="open">进行中</option><option value="paused">已暂停</option><option value="completed">已完成</option><option value="archived">已归档</option></select></label><label>结论状态<select id="revision-conclusion"><option value="unassessed">未评估</option><option value="insufficient_evidence">证据不足</option><option value="supported">已支持</option><option value="disputed">有争议</option><option value="rejected">已否定</option></select></label><label>研究者<input id="revision-author" maxlength="128" value="local-user" required></label><label>信息截止日<input id="revision-cutoff" type="date" required></label><label class="wide">变化摘要<textarea id="revision-change" maxlength="2000"></textarea></label>
+    </div><div id="content-fields" class="form-grid"></div><fieldset><legend>绑定已接受证据</legend><div id="revision-evidence" class="checkbox-list"></div></fieldset><p id="revision-form-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="revision-dialog" class="secondary">取消</button><button type="submit">追加修订</button></div></form>
+  </dialog>
+</body>
+</html>

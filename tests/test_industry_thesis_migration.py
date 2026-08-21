@@ -56,7 +56,7 @@ def test_migration_creates_exact_six_tables_and_empty_round_trip(tmp_path) -> No
     database = tmp_path / "industry-thesis.db"
     config = config_for(database)
     prepare_prior_head(config)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260803_0018")
     engine = create_engine(f"sqlite:///{database}")
     try:
         assert EXPECTED_TABLES.issubset(inspect(engine).get_table_names())
@@ -95,7 +95,7 @@ def test_legacy_output_rows_refuse_upgrade_before_schema_mutation(tmp_path) -> N
     database = tmp_path / "industry-thesis-legacy-output.db"
     config = config_for(database)
     prepare_prior_head(config)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260803_0018")
     command.downgrade(config, "20260722_0016")
     engine = create_engine(f"sqlite:///{database}")
     values = _legacy_output_values()
@@ -124,7 +124,7 @@ def test_legacy_output_rows_refuse_upgrade_before_schema_mutation(tmp_path) -> N
                 {**values, "fingerprint": "a" * 64},
             )
         with pytest.raises(RuntimeError, match="cannot be derived without guessing"):
-            command.upgrade(config, "head")
+            command.upgrade(config, "20260803_0018")
         columns = {
             item["name"]
             for item in inspect(engine).get_columns(
@@ -145,7 +145,7 @@ def test_v1_output_rows_refuse_downgrade_before_any_loss(tmp_path) -> None:
     database = tmp_path / "industry-thesis-v1-output.db"
     config = config_for(database)
     prepare_prior_head(config)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260803_0018")
     engine = create_engine(f"sqlite:///{database}")
     values = _legacy_output_values()
     accepted_session_id = str(uuid4())
@@ -217,7 +217,7 @@ def test_populated_downgrade_refuses_before_any_drop(tmp_path) -> None:
     database = tmp_path / "industry-thesis-populated.db"
     config = config_for(database)
     prepare_prior_head(config)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260803_0018")
     engine = create_engine(f"sqlite:///{database}")
     try:
         with engine.begin() as connection:

@@ -7,6 +7,7 @@
   const pages = document.querySelector("#pages");
   const pagesMore = document.querySelector("#pages-more");
   const reviewButton = document.querySelector("#review-button");
+  const rejectButton = document.querySelector("#reject-button");
   const previewButton = document.querySelector("#preview-button");
   const acceptButton = document.querySelector("#accept-button");
   const selectionStatus = document.querySelector("#selection-status");
@@ -16,11 +17,15 @@
   let selectedSpan = null;
   let acceptanceState = null;
   let nextAfterPage = null;
+  const admissionLabels = { accepted: "已接收", rejected: "已拒绝" };
+  const humanMessage = (message) => message === "No extractable text / OCR required"
+    ? "没有可提取文本，需要 OCR"
+    : message;
 
   const safe = (value) => String(value ?? "—");
   const setDetail = (data) => {
     const entries = [
-      ["状态", data.admission_state],
+      ["状态", admissionLabels[data.admission_state] || data.admission_state],
       ["内容指纹", data.content_sha256],
       ["页数", data.page_count],
       ["提取合同", data.extractor_contract_version],
@@ -61,6 +66,7 @@
           end_utf8_byte: start + encoder.encode(quote).length, quote_text: quote};
         selectionStatus.textContent = `已选择第 ${page.page_number} 页原文：${quote}`;
         reviewButton.disabled = false;
+        rejectButton.disabled = false;
       });
       article.append(heading, text);
       return article;
@@ -94,6 +100,7 @@
     nextAfterPage = null;
     pagesMore.hidden = true;
     reviewButton.disabled = true;
+    rejectButton.disabled = true;
     previewButton.disabled = true;
     acceptButton.disabled = true;
     selectionStatus.textContent = "尚未选择逐页原文。";
@@ -112,7 +119,7 @@
         body: file,
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "导入失败");
+      if (!response.ok) throw new Error(humanMessage(data.detail) || "导入失败");
       importedState = data;
       const detailResponse = await fetch(`/api/document-imports/${data.import_attempt_id}`);
       const imported = await detailResponse.json();
@@ -132,7 +139,7 @@
       headers: {"Content-Type": "application/json", "X-AQuantAI-CSRF": csrf},
       body: JSON.stringify(body)});
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || "操作失败");
+    if (!response.ok) throw new Error(humanMessage(data.detail) || "操作失败");
     return data;
   };
   const quoteSha = async (quote) => {
@@ -140,8 +147,9 @@
     return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
   };
 
-  reviewButton.addEventListener("click", async () => {
+  const saveReview = async (reviewState) => {
     reviewButton.disabled = true;
+    rejectButton.disabled = true;
     try {
       const recorded = new Date().toISOString();
       const review = await postJson("/api/document-reviews", {import_attempt_id: importedState.import_attempt_id,
@@ -150,19 +158,31 @@
       const documentCandidate = await postJson(`${base}/candidates`, {candidate_kind: "document_identity",
         payload: {identity_namespace: "user_defined_document", identity_key: field("document-key"),
           document_title: field("document-title"), publisher_or_author: field("publisher"),
-          document_date: field("document-date"), document_kind: "announcement"}, recorded_at_utc: recorded});
+          document_date: field("document-date"), document_kind: "announcement",
+          source_url: field("source-url") || null}, recorded_at_utc: recorded});
       const subject = await postJson(`${base}/candidates`, {candidate_kind: "company_identity",
         payload: {subject_kind: "not_company_specific", display_label: field("subject-label")}, recorded_at_utc: recorded});
       const fact = await postJson(`${base}/candidates`, {candidate_kind: "fact", payload: {}, ...selectedSpan,
         quote_sha256: await quoteSha(selectedSpan.quote_text), statement: field("fact-statement"), recorded_at_utc: recorded});
-      const revision = await postJson(`${base}/revisions`, {expected_previous_revision_number: 0, review_state: "draft",
+      const rejected = reviewState === "rejected";
+      const revision = await postJson(`${base}/revisions`, {expected_previous_revision_number: 0, review_state: reviewState,
         source_kind: field("source-kind"), evidence_grade: field("evidence-grade"),
+        reviewer_identity: field("reviewer-identity"),
+        reviewer_note: field("reviewer-note") || null,
         document_identity_candidate_id: documentCandidate.candidate_id, subject_candidate_id: subject.candidate_id,
         information_date: field("information-date"), recorded_at_utc: recorded, decisions: [
           {candidate_id: documentCandidate.candidate_id, decision: "selected"},
           {candidate_id: subject.candidate_id, decision: "selected"},
-          {candidate_id: fact.candidate_id, decision: "selected", claim_status: field("claim-status"),
-            evidence_relation: field("evidence-relation")}]});
+          {candidate_id: fact.candidate_id, decision: rejected ? "rejected" : "selected",
+            claim_status: rejected ? null : field("claim-status"),
+            evidence_relation: rejected ? null : field("evidence-relation")}]});
+      if (rejected) {
+        acceptanceState = null;
+        previewButton.disabled = true;
+        acceptButton.disabled = true;
+        acceptanceResult.textContent = `证据已由 ${field("reviewer-identity")} 明确拒绝；未写入已接受证据。审核修订 ${revision.revision_number}。`;
+        return;
+      }
       const exact = await (await fetch(`${base}?review_revision_id=${revision.review_revision_id}`)).json();
       const decision = exact.revisions[0].candidate_decisions.find((row) => row.candidate_id === fact.candidate_id);
       acceptanceState = {reviewId: review.review_session_id, body: {source_review_revision_id: revision.review_revision_id,
@@ -172,18 +192,22 @@
         selected_candidate_ids: [fact.candidate_id], selected_decision_fingerprints: [decision.decision_fingerprint_sha256],
         recorded_at_utc: new Date().toISOString(), acceptance_plan_fingerprint_sha256: "0".repeat(64)}};
       previewButton.disabled = false;
-      acceptanceResult.textContent = "审核快照已保存；请先执行零写入预览。";
+      acceptanceResult.textContent = "审核快照已保存；请先执行不会写入数据的预览。";
     } catch (error) {
       acceptanceResult.textContent = `审核未完成：${error.message}`;
       reviewButton.disabled = false;
+      rejectButton.disabled = false;
     }
-  });
+  };
+
+  reviewButton.addEventListener("click", () => saveReview("draft"));
+  rejectButton.addEventListener("click", () => saveReview("rejected"));
 
   previewButton.addEventListener("click", async () => {
     try {
       const preview = await postJson(`/api/document-reviews/${acceptanceState.reviewId}/acceptance-preview`, acceptanceState.body);
       acceptanceState.body.acceptance_plan_fingerprint_sha256 = preview.acceptance_plan_fingerprint_sha256;
-      acceptanceResult.textContent = JSON.stringify(preview, null, 2);
+      acceptanceResult.textContent = "预览成功，尚未写入证据。\n" + JSON.stringify(preview, null, 2);
       acceptButton.disabled = false;
     } catch (error) { acceptanceResult.textContent = `预览失败：${error.message}`; }
   });
@@ -196,7 +220,7 @@
       const reopenResponse = await fetch(`/api/document-acceptances/${result.receipt_id}?${query}`);
       const reopened = await reopenResponse.json();
       if (!reopenResponse.ok) throw new Error(reopened.detail || "精确回执重开失败");
-      acceptanceResult.textContent = JSON.stringify({commit: result, exact_reopen: reopened}, null, 2);
+      acceptanceResult.textContent = "证据已接受并写入，以下为提交和精确重开结果。\n" + JSON.stringify({commit: result, exact_reopen: reopened}, null, 2);
       acceptButton.disabled = true;
     } catch (error) { acceptanceResult.textContent = `接受失败：${error.message}`; }
   });

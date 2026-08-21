@@ -91,6 +91,7 @@ class ReviewRevisionInput:
     subject_candidate_id: UUID
     information_date: date
     decisions: tuple[DecisionInput, ...]
+    reviewer_identity: str | None = None
     reviewer_note: str | None = None
     recorded_at_utc: datetime | None = None
 

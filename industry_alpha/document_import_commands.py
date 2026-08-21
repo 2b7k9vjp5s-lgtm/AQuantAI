@@ -387,6 +387,7 @@ def accept_local_document_in_session(
         document_identity_candidate_id=source.document_identity_candidate_id,
         subject_candidate_id=source.subject_candidate_id,
         information_date=source.information_date,
+        reviewer_identity=source.reviewer_identity,
         reviewer_note=source.reviewer_note,
         recorded_at_utc=accepted_at,
         supersedes_review_revision_id=source.id,
@@ -963,6 +964,12 @@ class DocumentImportCommandService(_DocumentImportBase):
                 2000,
                 optional=True,
             )
+            reviewer_identity = bounded_text(
+                revision_input.reviewer_identity or "",
+                "reviewer_identity",
+                128,
+                optional=True,
+            )
             review_shape = {
                 "contract": "aquantai.local-document-review.v1",
                 "review_session_id": review.id,
@@ -987,6 +994,7 @@ class DocumentImportCommandService(_DocumentImportBase):
                 document_identity_candidate_id=document.id,
                 subject_candidate_id=subject.id,
                 information_date=revision_input.information_date,
+                reviewer_identity=reviewer_identity,
                 reviewer_note=reviewer_note,
                 recorded_at_utc=recorded,
                 supersedes_review_revision_id=latest.id if latest else None,

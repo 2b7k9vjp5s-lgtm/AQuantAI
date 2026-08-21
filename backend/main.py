@@ -41,6 +41,7 @@ from backend.api.investment_candidate import router as investment_candidate_rout
 from backend.api.market_cockpit import router as market_cockpit_router
 from backend.api.normalized_valuation import router as normalized_valuation_router
 from backend.api.research_evidence_pack import router as research_evidence_pack_router
+from backend.api.research_workspace import router as research_workspace_router
 from backend.api.today_market import router as today_market_router
 from backend.today_market_refresh.runtime import (
     TodayMarketMockRuntimeConfigurationV1,
@@ -97,6 +98,7 @@ INVESTMENT_CANDIDATES_STATIC_DIR = (
     Path(__file__).resolve().parents[1] / "investment_candidates" / "static"
 )
 DOCUMENT_IMPORT_STATIC_DIR = Path(__file__).resolve().parents[1] / "document_import" / "static"
+RESEARCH_WORKSPACE_STATIC_DIR = Path(__file__).resolve().parents[1] / "research_workspace" / "static"
 app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="dashboard-static")
 app.mount(
     "/market-cockpit/static",
@@ -143,6 +145,11 @@ app.mount(
     StaticFiles(directory=INVESTMENT_CANDIDATES_STATIC_DIR),
     name="investment-candidates-static",
 )
+app.mount(
+    "/research-workspace/static",
+    StaticFiles(directory=RESEARCH_WORKSPACE_STATIC_DIR),
+    name="research-workspace-static",
+)
 app.include_router(market_cockpit_router)
 app.include_router(today_market_router)
 app.include_router(industry_alpha_router)
@@ -165,6 +172,7 @@ app.include_router(normalized_valuation_router)
 app.include_router(document_import_api_router)
 app.include_router(document_import_page_router)
 app.include_router(research_evidence_pack_router)
+app.include_router(research_workspace_router)
 
 
 @app.get("/")
@@ -187,6 +195,26 @@ def personal_research_workbench_root() -> RedirectResponse:
     """Enter the personal workbench through its first active module."""
 
     return RedirectResponse(url="/industry-analysis", status_code=307)
+
+
+@app.get("/research-workspace", include_in_schema=False)
+def research_workspace_page() -> FileResponse:
+    """Serve the local V1 research product workspace."""
+
+    return FileResponse(
+        RESEARCH_WORKSPACE_STATIC_DIR / "workspace.html",
+        media_type="text/html",
+    )
+
+
+@app.get("/research-workspace/guide", include_in_schema=False)
+def research_workspace_guide_page() -> FileResponse:
+    """Serve the Chinese ordinary-user guide."""
+
+    return FileResponse(
+        RESEARCH_WORKSPACE_STATIC_DIR / "guide.html",
+        media_type="text/html",
+    )
 
 
 @app.get("/industry-analysis", include_in_schema=False)
