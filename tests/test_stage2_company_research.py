@@ -14,6 +14,7 @@ from backend.database.engine import build_session_factory
 from backend.database.models import Base
 from backend.main import app
 from industry_alpha.errors import (
+    EvidenceLedgerConflictError,
     EvidenceLedgerImmutableError,
     EvidenceLedgerValidationError,
 )
@@ -39,6 +40,7 @@ from industry_alpha.stage2_commands import (
     Stage2CompanyResearchCommandService,
     Stage2VerificationInput,
 )
+import industry_alpha.stage2_commands as stage2_commands
 from industry_alpha.stage2_fixtures import build_stage2_company_research_fixture
 from industry_alpha.stage2_models import (
     STAGE2_COMPANY_RESEARCH_CASE_REVISION_BINDING_VERSION,
@@ -250,12 +252,102 @@ def test_fixture_binds_every_research_revision_to_explicit_case_revision(
 
 def test_research_revision_requires_explicit_case_revision_id(session_factory, built):
     before = stage2_counts(session_factory)
-    with pytest.raises(TypeError, match="research_case_revision_id"):
+    with pytest.raises(
+        EvidenceLedgerValidationError,
+        match="stage2_case_revision_required",
+    ):
         Stage2CompanyResearchCommandService(session_factory).append_research_revision(
             built.draft_research_id,
             workflow_state="open",
             conclusion_status="insufficient_evidence",
             research_question="Missing explicit Case Revision must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_counts(session_factory) == before
+
+
+def test_research_revision_case_mismatch_and_visibility_fail_atomically(
+    session_factory, built
+):
+    before = stage2_counts(session_factory)
+    other_case = EvidenceLedgerCommandService(session_factory).create_case(
+        case_key="stage2-case-revision-mismatch",
+        title="Other case",
+        research_question="Must not bind across cases?",
+        information_cutoff_date=date(2026, 7, 15),
+        recorded_at_utc=utc(15),
+    )
+    other_revision_id = initial_case_revision_id(session_factory, other_case.id)
+    after_case = stage2_counts(session_factory)
+    with pytest.raises(
+        EvidenceLedgerValidationError,
+        match="stage2_case_revision_case_mismatch",
+    ):
+        Stage2CompanyResearchCommandService(session_factory).append_research_revision(
+            built.draft_research_id,
+            research_case_revision_id=other_revision_id,
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Cross-case binding must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_counts(session_factory) == after_case
+
+    with session_factory() as session:
+        research = session.get(Stage2CompanyResearch, built.draft_research_id)
+    future_revision = EvidenceLedgerCommandService(
+        session_factory
+    ).append_case_revision(
+        research.case_id,
+        title="Future exact case revision",
+        research_question="Must remain outside the earlier boundary?",
+        information_cutoff_date=date(2026, 7, 17),
+        recorded_at_utc=utc(17),
+    )
+    after_future = stage2_counts(session_factory)
+    with pytest.raises(
+        EvidenceLedgerValidationError,
+        match="stage2_case_revision_not_visible",
+    ):
+        Stage2CompanyResearchCommandService(session_factory).append_research_revision(
+            built.draft_research_id,
+            research_case_revision_id=future_revision.id,
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Future binding must fail.",
+            summary=None,
+            information_cutoff_date=date(2026, 7, 16),
+            recorded_at_utc=utc(16),
+        )
+    assert stage2_counts(session_factory) == after_future
+    assert before == after_case
+
+
+def test_research_revision_binding_conflict_rolls_back(
+    session_factory, built, monkeypatch
+):
+    before = stage2_counts(session_factory)
+    with session_factory() as session:
+        existing_binding_id = session.scalar(
+            select(Stage2CompanyResearchRevisionCaseBinding.id)
+        )
+    monkeypatch.setattr(stage2_commands, "uuid5", lambda *_args: existing_binding_id)
+    with pytest.raises(
+        EvidenceLedgerConflictError,
+        match="stage2_case_revision_binding_conflict",
+    ):
+        Stage2CompanyResearchCommandService(session_factory).append_research_revision(
+            built.draft_research_id,
+            research_case_revision_id=bound_case_revision_id(
+                session_factory, built.draft_research_id
+            ),
+            workflow_state="open",
+            conclusion_status="insufficient_evidence",
+            research_question="Binding conflict must roll back.",
             summary=None,
             information_cutoff_date=date(2026, 7, 16),
             recorded_at_utc=utc(16),

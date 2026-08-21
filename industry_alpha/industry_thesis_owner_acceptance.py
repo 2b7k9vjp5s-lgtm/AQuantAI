@@ -558,7 +558,7 @@ class IndustryThesisOwnerAcceptanceService:
             != owner_context["research_case_revision_id"]
         ):
             raise IndustryThesisOwnerAcceptanceError(
-                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_MISMATCH",
+                "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_CONTEXT_STALE",
                 "submitted Case Revision does not match reviewed authority",
             )
         if (

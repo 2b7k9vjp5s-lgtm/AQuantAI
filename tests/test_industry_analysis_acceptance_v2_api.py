@@ -135,6 +135,9 @@ def _payload_from_view(view: dict) -> dict:
             "reviewed_plan_fingerprint_sha256"
         ],
         "research_case_id": view["owner_context"]["research_case_id"],
+        "research_case_revision_id": view["owner_context"][
+            "research_case_revision_id"
+        ],
         "map_mode": view["owner_context"]["map_mode"],
         "industry_map_id": view["owner_context"]["industry_map_id"],
         "industry_map_revision_id": view["owner_context"][
@@ -269,6 +272,16 @@ def test_three_company_preview_commit_and_exact_result(database, client) -> None
     assert len(body["supported_handoff_members"]) == 2
     assert body["ranking_applied"] is False
     assert body["research_case_id"] == view["owner_context"]["research_case_id"]
+    assert body["research_case_revision_id"] == view["owner_context"][
+        "research_case_revision_id"
+    ]
+    assert body["evidence_context_binding"]["state"] == "exact_bound"
+    assert body["evidence_context_binding"]["research_case_revision_id"] == view[
+        "owner_context"
+    ]["research_case_revision_id"]
+    assert committed["research_case_revision_id"] == view["owner_context"][
+        "research_case_revision_id"
+    ]
     assert body["industry_map_id"] == view["owner_context"]["industry_map_id"]
     assert body["industry_map_revision_id"] == view["owner_context"][
         "industry_map_revision_id"
@@ -296,6 +309,19 @@ def test_context_substitution_rejected_before_writes(database, client) -> None:
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == (
         "INDUSTRY_THESIS_ACCEPTANCE_EXACT_MAP_REQUIRED"
+    )
+    assert _counts(database) == counts_before
+
+    case_revision_substitution = deepcopy(payload)
+    case_revision_substitution["research_case_revision_id"] = str(uuid4())
+    response = client.post(
+        f"/industry-analysis/api/session-revisions/{reviewed_id}/"
+        f"owner-acceptance/preview?{query}",
+        json=case_revision_substitution,
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == (
+        "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_CONTEXT_STALE"
     )
     assert _counts(database) == counts_before
 

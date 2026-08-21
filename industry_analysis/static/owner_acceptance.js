@@ -585,6 +585,7 @@ function buildPayload() {
     expected_session_latest_revision_number: state.view.expected_session_latest_revision_number,
     reviewed_plan_fingerprint_sha256: state.view.reviewed_plan_fingerprint_sha256,
     research_case_id: state.view.owner_context.research_case_id,
+    research_case_revision_id: state.view.owner_context.research_case_revision_id,
     map_mode: state.view.owner_context.map_mode,
     industry_map_id: state.view.owner_context.industry_map_id,
     industry_map_revision_id: state.view.owner_context.industry_map_revision_id,

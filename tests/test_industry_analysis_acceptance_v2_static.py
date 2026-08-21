@@ -84,6 +84,7 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     assert "window.confirm" in acceptance
     assert "preview_fingerprint_sha256" in acceptance
     assert "owner_context.research_case_id" in acceptance
+    assert "owner_context.research_case_revision_id" in acceptance
     assert "owner_context.industry_map_id" in acceptance
     assert "owner_context.industry_map_revision_id" in acceptance
     assert 'const OP_REUSE = "reuse_exact_beneficiary_revision"' in acceptance
@@ -120,7 +121,7 @@ def test_owner_acceptance_scripts_are_local_explicit_and_context_bound() -> None
     assert "supported_handoff_members" in result
     assert "页面只读且不会移动版本" in result
 
-    assert "aquantai.industry-thesis-acceptance-plan.v2" in reviewed
+    assert "aquantai.industry-thesis-acceptance-plan.v3" in reviewed
     assert "owner-acceptance-link" in reviewed
     assert "/acceptance?" in reviewed
 

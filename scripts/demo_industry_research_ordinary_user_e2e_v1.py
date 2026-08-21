@@ -84,6 +84,9 @@ def _payload(view: dict) -> dict:
             "reviewed_plan_fingerprint_sha256"
         ],
         "research_case_id": view["owner_context"]["research_case_id"],
+        "research_case_revision_id": view["owner_context"][
+            "research_case_revision_id"
+        ],
         "map_mode": view["owner_context"]["map_mode"],
         "industry_map_id": view["owner_context"]["industry_map_id"],
         "industry_map_revision_id": view["owner_context"][

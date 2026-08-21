@@ -149,6 +149,9 @@ def _payload(view: dict, binding: dict, *, supported: bool) -> dict:
             "acceptance_view_snapshot_content_sha256"
         ],
         "research_case_id": view["owner_context"]["research_case_id"],
+        "research_case_revision_id": view["owner_context"][
+            "research_case_revision_id"
+        ],
         "map_mode": view["owner_context"]["map_mode"],
         "industry_map_id": view["owner_context"]["industry_map_id"],
         "industry_map_revision_id": view["owner_context"][
@@ -285,6 +288,12 @@ def _build_create_review(database) -> tuple[dict, int]:
             "expected_session_latest_revision_number": 1,
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
             "owner_context": {
+                "research_case_revision_id": str(
+                    owner_fixture._initial_case_revision_id(
+                        database,
+                        industry_map.case_id,
+                    )
+                ),
                 "industry_map_revision_id": str(map_revision_id),
             },
             "decisions": [

@@ -126,7 +126,7 @@ function renderAcceptanceAction(result) {
   const existing = document.querySelector("#owner-acceptance-link");
   if (existing) existing.remove();
   if (
-    result.acceptance_plan_version !== "aquantai.industry-thesis-acceptance-plan.v2"
+    result.acceptance_plan_version !== "aquantai.industry-thesis-acceptance-plan.v3"
     || result.selected_count < 1
   ) return;
   const link = node("a", "检查并接受研究成果", "button button-primary");
@@ -150,6 +150,14 @@ function renderResult(result) {
     summaryItem("暂不纳入", result.rejected_count),
     summaryItem("信息截止", result.information_cutoff_date),
     summaryItem("完整记录边界", result.complete_result_recorded_at_utc),
+    summaryItem(
+      "研究案例修订",
+      result.owner_context && result.owner_context.research_case_revision_id,
+    ),
+    summaryItem(
+      "产业地图修订",
+      result.owner_context && result.owner_context.industry_map_revision_id,
+    ),
   );
   const coverage = document.querySelector("#coverage-notice");
   coverage.replaceChildren(

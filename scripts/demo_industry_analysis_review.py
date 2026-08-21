@@ -22,6 +22,7 @@ from industry_alpha.industry_thesis_models import (
     IndustryThesisSessionRevision,
 )
 from industry_alpha.industry_thesis_review import ACCEPTANCE_PLAN_VERSION
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import Stage1Beneficiary
 
@@ -143,6 +144,13 @@ def run_demo() -> dict:
             )
             assert owner_map_revision is not None
             owner_map_revision_id = owner_map_revision.id
+            owner_case_revision_id = session.scalar(
+                select(ResearchCaseRevision.id)
+                .join(IndustryMap, IndustryMap.case_id == ResearchCaseRevision.case_id)
+                .where(IndustryMap.id == owner_fixture.map_id)
+                .order_by(ResearchCaseRevision.revision_no.desc())
+            )
+            assert owner_case_revision_id is not None
 
         with factory.begin() as session:
             run = _ingestion()
@@ -250,6 +258,7 @@ def run_demo() -> dict:
                 "expected_session_latest_revision_number": 1,
                 "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
                 "owner_context": {
+                    "research_case_revision_id": str(owner_case_revision_id),
                     "industry_map_revision_id": str(owner_map_revision_id),
                 },
                 "decisions": decisions,

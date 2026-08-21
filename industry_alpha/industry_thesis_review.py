@@ -1014,20 +1014,32 @@ class IndustryThesisReviewedPlanQueryService:
                 "industry_thesis_graph_incomplete",
                 "stored Owner Context identifiers are invalid",
             ) from exc
-        research_case = self._session.get(ResearchCase, case_id)
-        case_revision = self._session.get(ResearchCaseRevision, case_revision_id)
-        industry_map = self._session.get(IndustryMap, map_id)
-        map_revision = self._session.get(IndustryMapRevision, map_revision_id)
-        if (
-            research_case is None
-            or case_revision is None
-            or industry_map is None
-            or map_revision is None
-        ):
+        owner_context = self._session.execute(
+            select(
+                ResearchCase,
+                ResearchCaseRevision,
+                IndustryMap,
+                IndustryMapRevision,
+            )
+            .join(
+                ResearchCaseRevision,
+                ResearchCaseRevision.case_id == ResearchCase.id,
+            )
+            .join(IndustryMap, IndustryMap.case_id == ResearchCase.id)
+            .join(IndustryMapRevision, IndustryMapRevision.map_id == IndustryMap.id)
+            .where(
+                ResearchCase.id == case_id,
+                ResearchCaseRevision.id == case_revision_id,
+                IndustryMap.id == map_id,
+                IndustryMapRevision.id == map_revision_id,
+            )
+        ).one_or_none()
+        if owner_context is None:
             raise IndustryThesisError(
                 "industry_thesis_graph_incomplete",
                 "stored Owner Context graph is incomplete",
             )
+        research_case, case_revision, industry_map, map_revision = owner_context
         if (
             case_revision.case_id != research_case.id
             or industry_map.case_id != research_case.id

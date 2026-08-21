@@ -103,6 +103,7 @@ def test_0019_creates_only_two_binding_tables_and_does_not_backfill_history(
 ) -> None:
     database = tmp_path / "exact-binding-delta.db"
     config = config_for(database)
+    prepare_prior_head(config)
     command.upgrade(config, "20260803_0018")
     engine = create_engine(f"sqlite:///{database}")
     values = _legacy_output_values()
@@ -128,7 +129,7 @@ def test_0019_creates_only_two_binding_tables_and_does_not_backfill_history(
                     ":session_revision_id, :session_revision_id, :session_id, "
                     ":map_id, :map_revision_id, NULL, :contract_version, "
                     ":reviewed_fingerprint, '[\"legacy-unbound\"]', "
-                    "'[{\"sequence\":0}]', 'partial_local_coverage', "
+                    ":owner_bindings, 'partial_local_coverage', "
                     ":fingerprint, :transaction_id, '2026-07-22', "
                     "'2026-07-22 16:00:00', NULL)"
                 ),
@@ -136,6 +137,7 @@ def test_0019_creates_only_two_binding_tables_and_does_not_backfill_history(
                     **values,
                     "contract_version": "aquantai.industry-thesis-output-links.v1",
                     "reviewed_fingerprint": "c" * 64,
+                    "owner_bindings": '[{"sequence":0}]',
                     "fingerprint": "a" * 64,
                 },
             )
@@ -198,6 +200,7 @@ def test_0019_downgrade_refuses_when_either_binding_table_is_non_empty(
 ) -> None:
     database = tmp_path / f"{table_name}.db"
     config = config_for(database)
+    prepare_prior_head(config)
     command.upgrade(config, "head")
     engine = create_engine(f"sqlite:///{database}")
     try:

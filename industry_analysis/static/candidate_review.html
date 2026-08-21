@@ -136,6 +136,11 @@
             <div id="review-counts" class="count-strip" aria-live="polite"></div>
           </div>
           <form id="review-form" novalidate>
+            <fieldset class="review-note-field" id="owner-context-fieldset">
+              <legend>选择研究归属版本</legend>
+              <p>必须明确选择同一研究案例下的一组 Case Revision + Map Revision。系统不会自动选择第一项或最新项。</p>
+              <div id="owner-context-options" class="source-list" aria-live="polite"></div>
+            </fieldset>
             <div id="review-rows" class="review-list"></div>
             <div class="review-note-field">
               <label for="review-revision-note">本次审阅说明</label>

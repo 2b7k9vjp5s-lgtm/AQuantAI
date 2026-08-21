@@ -45,6 +45,7 @@ def _plan(sequences: list[int]) -> dict:
         "expected_session_latest_revision_number": 1,
         "reviewed_plan_fingerprint_sha256": "a" * 64,
         "research_case_id": str(uuid4()),
+        "research_case_revision_id": str(uuid4()),
         "map_mode": "reuse_exact_existing_map_revision",
         "industry_map_id": str(uuid4()),
         "industry_map_revision_id": str(uuid4()),

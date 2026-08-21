@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database.engine import build_session_factory
 from backend.database.models import Base, IngestionRun, StockBasicRecord
-from industry_alpha.chain_map_models import IndustryMapRevision
+from industry_alpha.chain_map_models import IndustryMap, IndustryMapRevision
 from industry_alpha.industry_thesis_candidate_workbench import (
     IndustryThesisCandidateWorkbenchService,
     IndustryThesisWorkbenchCandidateCommandService,
@@ -29,6 +29,7 @@ from industry_alpha.industry_thesis_review_workbench import (
     IndustryThesisReviewWorkbenchQueryService,
 )
 from industry_alpha.industry_thesis_rules import IndustryThesisError, IndustryThesisNotFound
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.industry_thesis_workbench import IndustryThesisWorkbenchQueryService
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 
@@ -154,7 +155,7 @@ def _session_payload(rows: list[StockBasicRecord]) -> dict:
     }
 
 
-def _built_universe(database) -> tuple[dict, dict, UUID]:
+def _built_universe(database) -> tuple[dict, dict, UUID, UUID]:
     owner_fixture = build_stage1_beneficiary_fixture(database)
     with database() as session:
         owner_map_revision = session.scalar(
@@ -164,6 +165,15 @@ def _built_universe(database) -> tuple[dict, dict, UUID]:
         )
         assert owner_map_revision is not None
         owner_map_revision_id = owner_map_revision.id
+        owner_map = session.get(IndustryMap, owner_fixture.map_id)
+        owner_case_revision = session.scalar(
+            select(ResearchCaseRevision).where(
+                ResearchCaseRevision.case_id == owner_map.case_id,
+                ResearchCaseRevision.revision_no == 1,
+            )
+        )
+        assert owner_case_revision is not None
+        owner_case_revision_id = owner_case_revision.id
 
     rows = _seed_stock_records(database)
     created = IndustryThesisCommandService(
@@ -188,7 +198,7 @@ def _built_universe(database) -> tuple[dict, dict, UUID]:
         clock=FixedClock(BASE + timedelta(minutes=3)),
     ).build_candidates(command)
     assert built["candidate_count"] == 3
-    return created, built, owner_map_revision_id
+    return created, built, owner_case_revision_id, owner_map_revision_id
 
 
 def _decision_payload(view: dict) -> list[dict]:
@@ -217,7 +227,9 @@ def _decision_payload(view: dict) -> list[dict]:
 
 
 def test_exact_review_projection_dry_run_commit_and_result_reopen(database) -> None:
-    created, built, owner_map_revision_id = _built_universe(database)
+    created, built, owner_case_revision_id, owner_map_revision_id = _built_universe(
+        database
+    )
     session_id = UUID(created["session_id"])
     source_revision_id = UUID(created["session_revision_id"])
     boundary = datetime.fromisoformat(built["recorded_at_utc"])
@@ -240,6 +252,7 @@ def test_exact_review_projection_dry_run_commit_and_result_reopen(database) -> N
         "expected_session_latest_revision_number": 1,
         "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
         "owner_context": {
+            "research_case_revision_id": str(owner_case_revision_id),
             "industry_map_revision_id": str(owner_map_revision_id),
         },
         "decisions": list(reversed(decisions)),

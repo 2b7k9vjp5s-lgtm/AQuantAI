@@ -27,12 +27,14 @@ from industry_alpha.industry_thesis_review import (
     IndustryThesisProposalReviewService,
 )
 from industry_alpha.industry_thesis_rules import BUILDER_VERSION
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import Stage1Beneficiary, Stage1BeneficiaryRevision
 
 UTC = timezone.utc
 CUTOFF = date(2026, 7, 9)
 BASE_TIME = datetime(2026, 7, 10, 12, tzinfo=UTC)
+DEMO_CASE_REVISION_ID = UUID("0e4f7b40-ccef-540f-abd4-08bebdf849f9")
 
 
 def _session_input() -> dict[str, Any]:
@@ -81,7 +83,7 @@ def build_industry_thesis_owner_acceptance_demo_payload() -> dict[str, Any]:
             fixture.draft_beneficiary_id,
             fixture.secondary_beneficiary_id,
         )
-        with factory() as session:
+        with factory.begin() as session:
             first = session.get(Stage1Beneficiary, selected_ids[0])
             industry_map = session.get(IndustryMap, first.map_id)
             map_revision = session.scalar(
@@ -89,6 +91,29 @@ def build_industry_thesis_owner_acceptance_demo_payload() -> dict[str, Any]:
                 .where(IndustryMapRevision.map_id == industry_map.id)
                 .order_by(IndustryMapRevision.revision_no.desc())
             )
+            initial_case_revision = session.scalar(
+                select(ResearchCaseRevision).where(
+                    ResearchCaseRevision.case_id == industry_map.case_id,
+                    ResearchCaseRevision.revision_no == 1,
+                )
+            )
+            if initial_case_revision is None:
+                raise RuntimeError("owner-acceptance demo requires the initial Case Revision")
+            case_revision = ResearchCaseRevision(
+                id=DEMO_CASE_REVISION_ID,
+                case_id=industry_map.case_id,
+                revision_no=2,
+                title="Owner acceptance demo evidence boundary",
+                research_question="Which exact evidence boundary anchors acceptance?",
+                summary="Explicit deterministic Case Revision for the offline demo.",
+                workflow_state="open",
+                conclusion_status="unassessed",
+                information_cutoff_date=CUTOFF,
+                recorded_at_utc=BASE_TIME - timedelta(hours=1),
+                supersedes_revision_id=initial_case_revision.id,
+            )
+            session.add(case_revision)
+            session.flush()
             owner_rows = []
             for beneficiary_id in selected_ids:
                 beneficiary = session.get(Stage1Beneficiary, beneficiary_id)
@@ -152,6 +177,7 @@ def build_industry_thesis_owner_acceptance_demo_payload() -> dict[str, Any]:
                 "expected_session_latest_revision_number": 1,
                 "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
                 "owner_context": {
+                    "research_case_revision_id": str(case_revision.id),
                     "industry_map_revision_id": str(map_revision.id),
                 },
                 "decisions": [
@@ -185,6 +211,7 @@ def build_industry_thesis_owner_acceptance_demo_payload() -> dict[str, Any]:
                 "acceptance_plan_fingerprint_sha256"
             ],
             "research_case_id": str(industry_map.case_id),
+            "research_case_revision_id": str(case_revision.id),
             "map_mode": "reuse_exact_existing_map_revision",
             "industry_map_id": str(industry_map.id),
             "industry_map_revision_id": str(map_revision.id),
