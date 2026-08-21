@@ -50,6 +50,8 @@ def clean_stage2(postgres_database_url: str) -> Iterator[None]:
             connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         yield
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         engine.dispose()
 
 

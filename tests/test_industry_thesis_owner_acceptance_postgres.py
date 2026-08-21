@@ -32,6 +32,7 @@ from industry_alpha.industry_thesis_review import (
     IndustryThesisProposalReviewService,
 )
 from industry_alpha.industry_thesis_rules import BUILDER_VERSION
+from industry_alpha.models import ResearchCaseRevision
 from industry_alpha.stage1_fixtures import build_stage1_beneficiary_fixture
 from industry_alpha.stage1_models import (
     Stage1Beneficiary,
@@ -141,6 +142,13 @@ def _reviewed_fixture(factory):
             .order_by(IndustryMapRevision.revision_no.desc())
         )
         assert map_revision is not None
+        case_revision = session.scalar(
+            select(ResearchCaseRevision)
+            .where(ResearchCaseRevision.case_id == industry_map.case_id)
+            .order_by(ResearchCaseRevision.revision_no.desc())
+        )
+        assert case_revision is not None
+        case_revision_id = case_revision.id
         base_recorded = max(
             _stored_utc(beneficiary_revision.recorded_at_utc),
             _stored_utc(map_revision.recorded_at_utc),
@@ -192,6 +200,7 @@ def _reviewed_fixture(factory):
             "expected_session_latest_revision_number": 1,
             "acceptance_plan_version": ACCEPTANCE_PLAN_VERSION,
             "owner_context": {
+                "research_case_revision_id": str(case_revision_id),
                 "industry_map_revision_id": str(map_revision.id),
             },
             "decisions": [
@@ -216,6 +225,7 @@ def _reviewed_fixture(factory):
             "acceptance_plan_fingerprint_sha256"
         ],
         "research_case_id": str(industry_map.case_id),
+        "research_case_revision_id": str(case_revision_id),
         "map_mode": "reuse_exact_existing_map_revision",
         "industry_map_id": str(industry_map.id),
         "industry_map_revision_id": str(map_revision.id),

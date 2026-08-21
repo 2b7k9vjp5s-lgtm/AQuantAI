@@ -53,6 +53,8 @@ def clean_stage2_expectations(postgres_database_url: str) -> Iterator[None]:
             connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         yield
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         engine.dispose()
 
 
@@ -128,7 +130,7 @@ def test_postgres_v06b_migration_from_v06a_and_round_trip(postgres_database_url:
         command.upgrade(config, "head")
         assert "stage2_valuation_snapshots" in inspect(engine).get_table_names()
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260803_0018"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260814_0019"
     finally:
         engine.dispose()
 

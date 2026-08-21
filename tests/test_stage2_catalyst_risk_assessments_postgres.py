@@ -46,6 +46,8 @@ def clean_assessments(postgres_database_url: str) -> Iterator[None]:
             connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         yield
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE research_cases, ingestion_runs CASCADE"))
         engine.dispose()
 
 
@@ -73,6 +75,7 @@ def test_postgres_v06c_migration_round_trip(postgres_database_url: str):
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260719_0010"
     finally:
         engine.dispose()
+        command.upgrade(config, "head")
 
 
 def test_postgres_concurrent_catalyst_revision_numbers(postgres_database_url: str):
