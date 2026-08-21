@@ -1269,20 +1269,23 @@ class IndustryThesisOwnerAcceptanceService:
         output_revision: IndustryThesisOutputLinkRevision,
         research_case_revision: ResearchCaseRevision,
     ) -> IndustryThesisOutputCaseRevisionBinding:
-        binding = IndustryThesisOutputCaseRevisionBinding(
-            id=uuid5(
-                _OUTPUT_CASE_BINDING_NAMESPACE,
-                f"{output_revision.id}:{research_case_revision.id}",
-            ),
-            output_link_revision_id=output_revision.id,
-            research_case_revision_id=research_case_revision.id,
-            binding_contract_version=(
-                INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION
-            ),
-        )
-        session.add(binding)
         try:
+            # PostgreSQL enforces the binding FK immediately. Persist the parent
+            # accepted graph first while retaining the same outer transaction.
             session.flush()
+            binding = IndustryThesisOutputCaseRevisionBinding(
+                id=uuid5(
+                    _OUTPUT_CASE_BINDING_NAMESPACE,
+                    f"{output_revision.id}:{research_case_revision.id}",
+                ),
+                output_link_revision_id=output_revision.id,
+                research_case_revision_id=research_case_revision.id,
+                binding_contract_version=(
+                    INDUSTRY_THESIS_OUTPUT_CASE_REVISION_BINDING_VERSION
+                ),
+            )
+            session.add(binding)
+            session.flush([binding])
         except IntegrityError as exc:
             raise IndustryThesisOwnerAcceptanceError(
                 "INDUSTRY_THESIS_ACCEPTANCE_CASE_REVISION_BINDING_CONFLICT",
