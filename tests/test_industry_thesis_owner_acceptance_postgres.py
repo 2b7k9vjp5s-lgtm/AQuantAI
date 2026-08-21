@@ -282,7 +282,7 @@ def test_postgres_identical_concurrent_commit_serializes_to_one_output(
         clock=lambda: recorded + timedelta(seconds=1),
     )
     preview = service.preview(raw)
-    assert preview["commit_ready"] is True
+    assert preview["commit_ready"] is True, preview["blocked_reasons"]
     commit_input = {
         **raw,
         "preview_fingerprint_sha256": preview["preview_fingerprint_sha256"],
